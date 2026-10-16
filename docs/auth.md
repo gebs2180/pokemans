@@ -46,4 +46,8 @@ The backend is an OAuth2 resource server (HLD §7). The SPA logs in with a manag
    .\gradlew.bat :app:bootRun
    ```
 
-SPA login (e.g. `@auth0/auth0-react`) is not wired up yet.
+## Web app
+
+The SPA uses `@auth0/auth0-react`. Copy `web/.env.example` to `web/.env.local` and set the tenant domain, the SPA application's client ID and the API audience (none of these are secrets). After login it calls `/api/me` and shows the roles the backend sees.
+
+Tokens are cached in memory, so a page reload may send you through the Auth0 login again. Turning on refresh token rotation in the SPA application's settings would fix this; that's not done yet.
