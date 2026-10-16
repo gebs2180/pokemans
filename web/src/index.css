@@ -2,6 +2,12 @@
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
   line-height: 1.5;
+  --accent: #1f3a5f;
+  --ok: #2e7d32;
+  --warn: #b26a00;
+  --error: #c62828;
+  --muted: #6b7280;
+  --border: #d1d5db;
 }
 
 body {
@@ -9,11 +15,134 @@ body {
 }
 
 .shell {
-  max-width: 40rem;
+  max-width: 44rem;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 0 1rem 3rem;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.brand {
+  font-weight: 700;
+  text-decoration: none;
+  color: inherit;
+}
+
+.who {
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+button,
+.capture {
+  font: inherit;
+  padding: 0.6rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+}
+
+button.link {
+  background: none;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  padding: 0;
+}
+
+input,
+select {
+  font: inherit;
+  padding: 0.55rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.row input:not([type='checkbox']) {
+  flex: 1 1 12rem;
+}
+
+.stack {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.narrow {
+  width: 6rem;
+}
+
+.list {
+  padding-left: 1.1rem;
+}
+
+.list li {
+  margin: 0.4rem 0;
+}
+
+.invite {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.invite input {
+  flex: 1 1 16rem;
+}
+
+.side {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem 1rem;
+  margin: 1rem 0;
+}
+
+.side h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+/* The file input is hidden; the label is the big tap target. */
+.capture {
+  display: inline-block;
+  margin-top: 0.25rem;
+}
+
+.capture input {
+  display: none;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.warn {
+  color: var(--warn);
 }
 
 .error {
-  color: #c62828;
+  color: var(--error);
 }

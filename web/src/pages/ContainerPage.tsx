@@ -1,0 +1,88 @@
+import { useState, type FormEvent } from 'react'
+import { Link, useParams } from 'react-router'
+import { useApi, type ContainerDetail } from '../api'
+import { useLoad } from '../useLoad'
+
+/** A batch or collection: its cards and their capture status. */
+export function ContainerPage() {
+  const { orgId = '', kind = '', containerId = '' } = useParams()
+  const api = useApi()
+  const { data, error, reload } = useLoad(
+    () => api<ContainerDetail>('GET', `/api/orgs/${orgId}/${kind}/${containerId}`),
+    [api, orgId, kind, containerId],
+  )
+  const [label, setLabel] = useState('')
+  const [lot, setLot] = useState(false)
+  const [quantity, setQuantity] = useState(1)
+  const [addError, setAddError] = useState<string | null>(null)
+
+  if (kind !== 'batches' && kind !== 'collections') return <p>Page not found.</p>
+
+  async function addCard(e: FormEvent) {
+    e.preventDefault()
+    try {
+      await api('POST', `/api/orgs/${orgId}/${kind}/${containerId}/cards`, { label, lot, quantity: lot ? quantity : 1 })
+      setLabel('')
+      setLot(false)
+      setQuantity(1)
+      reload()
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  if (error) return <p className="error">{error}</p>
+  if (!data) return <p>Loading…</p>
+
+  const complete = data.cards.filter((c) => c.captureComplete).length
+  return (
+    <>
+      <p>
+        <Link to={`/orgs/${orgId}`}>← Back</Link>
+      </p>
+      <h1>{data.name}</h1>
+      <p className="muted">
+        {complete} of {data.cards.length} card{data.cards.length === 1 ? '' : 's'} fully photographed
+      </p>
+
+      <form onSubmit={addCard} className="stack">
+        <input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="Card, e.g. Charizard Base Set Unlimited 4/102"
+          required
+          maxLength={300}
+        />
+        <label className="row">
+          <input type="checkbox" checked={lot} onChange={(e) => setLot(e.target.checked)} /> Lot of cheaper cards
+          {lot && (
+            <input
+              type="number"
+              min={1}
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              className="narrow"
+              aria-label="Number of cards in the lot"
+            />
+          )}
+        </label>
+        <button type="submit">Add card</button>
+      </form>
+      {addError && <p className="error">{addError}</p>}
+
+      <ul className="list">
+        {data.cards.map((card) => (
+          <li key={card.id}>
+            <Link to={`/orgs/${orgId}/cards/${card.id}`}>{card.label}</Link>{' '}
+            {card.lot && <span className="muted">lot of {card.quantity}</span>}{' '}
+            {card.captureComplete ? (
+              <span className="ok">Photos OK</span>
+            ) : (
+              <span className="warn">Needs {card.missingSides.map((s) => s.toLowerCase()).join(' and ')}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
