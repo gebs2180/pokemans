@@ -1,4 +1,4 @@
-package com.pokemans.app.security;
+package com.pokemans.app.identity;
 
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;

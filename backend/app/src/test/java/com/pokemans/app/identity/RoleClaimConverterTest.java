@@ -1,4 +1,4 @@
-package com.pokemans.app.security;
+package com.pokemans.app.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,9 +32,10 @@ class RoleClaimConverterTest {
     }
 
     @Test
-    void mapsKnownRolesCaseInsensitivelyAndDropsUnknownOnes() {
-        assertThat(authorities(true, List.of("partner", "COLLECTOR", "superuser", "Partner"), null))
-                .containsExactly("ROLE_PARTNER", "ROLE_COLLECTOR");
+    void ignoresPartnerAndCollectorInTheToken() {
+        // Those come from org membership in the database, never from the token.
+        assertThat(authorities(true, List.of("partner", "COLLECTOR", "superuser"), List.of("mfa"))).isEmpty();
+        assertThat(authorities(true, List.of("admin", "PARTNER"), List.of("mfa"))).containsExactly("ROLE_ADMIN");
     }
 
     @Test

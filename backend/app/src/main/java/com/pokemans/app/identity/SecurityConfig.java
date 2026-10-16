@@ -1,4 +1,4 @@
-package com.pokemans.app.security;
+package com.pokemans.app.identity;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +25,7 @@ import org.springframework.util.StringUtils;
  * turn on token validation. Without it the app still starts, but rejects every token (fail closed).
  */
 @Configuration
-@EnableConfigurationProperties(SecurityProperties.class)
+@EnableConfigurationProperties({SecurityProperties.class, InviteProperties.class})
 public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
@@ -41,8 +41,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/error").permitAll()
                         .requestMatchers("/api/admin/**").hasRole(Role.ADMIN.name())
-                        .requestMatchers("/api/partner/**").hasAnyRole(Role.PARTNER.name(), Role.ADMIN.name())
-                        .requestMatchers("/api/collector/**").hasAnyRole(Role.COLLECTOR.name(), Role.ADMIN.name())
+                        // Org-scoped endpoints (/api/orgs/{orgId}/...) check membership in OrgAccess.
                         .requestMatchers("/api/**").authenticated()
                         // Opened up for the built SPA's static files once the app serves them.
                         .anyRequest().denyAll())

@@ -1,4 +1,4 @@
-package com.pokemans.app.security;
+package com.pokemans.app.identity;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,11 +10,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import com.pokemans.app.TestcontainersConfiguration;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(TestcontainersConfiguration.class)
+@Testcontainers(disabledWithoutDocker = true)
 class SecurityConfigTest {
 
     private static final String ROLES = "https://pokemans.app/roles";
@@ -50,14 +55,15 @@ class SecurityConfigTest {
 
     @Test
     void meReturnsSubjectAndRoles() throws Exception {
-        mvc.perform(get("/api/me").with(token(List.of("partner", "made-up"), List.of("pwd"))))
+        mvc.perform(get("/api/me").with(token(List.of("ADMIN", "partner"), List.of("mfa"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.subject").value("auth0|zach"))
                 .andExpect(jsonPath("$.issuer").value("https://example.test/"))
-                .andExpect(jsonPath("$.roles[0]").value("PARTNER"))
+                .andExpect(jsonPath("$.roles[0]").value("ADMIN"))
                 .andExpect(jsonPath("$.roles.length()").value(1))
                 .andExpect(jsonPath("$.claimedRoles.length()").value(2))
-                .andExpect(jsonPath("$.mfa").value(false));
+                .andExpect(jsonPath("$.mfa").value(true))
+                .andExpect(jsonPath("$.memberships.length()").value(0));
     }
 
     @Test
@@ -73,18 +79,15 @@ class SecurityConfigTest {
     }
 
     @Test
-    void adminWithMfaPassesAuthorization() throws Exception {
-        // No admin endpoints exist yet, so getting past authorization means a 404.
-        mvc.perform(get("/api/admin/anything").with(token(List.of("ADMIN"), List.of("pwd", "mfa"))))
-                .andExpect(status().isNotFound());
-        mvc.perform(get("/api/partner/anything").with(token(List.of("ADMIN"), List.of("mfa"))))
-                .andExpect(status().isNotFound());
+    void adminWithMfaReachesAdminApi() throws Exception {
+        mvc.perform(get("/api/admin/orgs").with(token(List.of("ADMIN"), List.of("pwd", "mfa"))))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void collectorCannotReachPartnerApi() throws Exception {
-        mvc.perform(get("/api/partner/anything").with(token(List.of("COLLECTOR"), List.of("pwd"))))
-                .andExpect(status().isForbidden());
+    void nonMemberCannotSeeAnOrg() throws Exception {
+        mvc.perform(get("/api/orgs/00000000-0000-0000-0000-000000000000/batches").with(token(List.of(), List.of("pwd"))))
+                .andExpect(status().isNotFound());
     }
 
     @Test

@@ -1,18 +1,48 @@
+# Defaults point at the local docker-compose services; production overrides everything via environment variables.
 spring:
   application:
     name: pokemans
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/pokemans}
+    username: ${DB_USERNAME:pokemans}
+    password: ${DB_PASSWORD:pokemans}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate # Flyway owns the schema (src/main/resources/db/migration)
+  mvc:
+    problemdetails:
+      enabled: true
   # OIDC: set SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI (e.g. https://<tenant>.us.auth0.com/)
   # and SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES (the API identifier) in the environment.
   # Without an issuer the API rejects every bearer token.
 
 pokemans:
   security:
-    # Custom claim the provider adds to access tokens with the user's roles (ADMIN, PARTNER, COLLECTOR).
+    # Custom claim the provider adds to access tokens with the user's roles. Only ADMIN is read from it;
+    # PARTNER and COLLECTOR come from org membership in the database.
     roles-claim: https://pokemans.app/roles
     # Custom claim set to true by the provider's post-login Action when the login used MFA.
     mfa-claim: https://pokemans.app/mfa
     # ADMIN requires an MFA login (amr contains "mfa", or the MFA claim is true).
     require-admin-mfa: true
+  invites:
+    ttl: 7d
+  storage:
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:}
+    region: ${STORAGE_REGION:us-east-1}
+    access-key: ${STORAGE_ACCESS_KEY:pokemans}
+    secret-key: ${STORAGE_SECRET_KEY:pokemans-local}
+    path-style: true
+    photo-bucket: ${STORAGE_PHOTO_BUCKET:photos}
+    upload-url-ttl: 10m
+    max-upload-bytes: 26214400
+  quality:
+    min-short-side-px: 1200
+    min-long-side-px: 1600
+    min-blur-score: 100
+    max-glare-fraction: 0.03
 
 management:
   endpoints:
