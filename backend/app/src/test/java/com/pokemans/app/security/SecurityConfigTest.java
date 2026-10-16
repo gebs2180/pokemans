@@ -55,7 +55,9 @@ class SecurityConfigTest {
                 .andExpect(jsonPath("$.subject").value("auth0|zach"))
                 .andExpect(jsonPath("$.issuer").value("https://example.test/"))
                 .andExpect(jsonPath("$.roles[0]").value("PARTNER"))
-                .andExpect(jsonPath("$.roles.length()").value(1));
+                .andExpect(jsonPath("$.roles.length()").value(1))
+                .andExpect(jsonPath("$.claimedRoles.length()").value(2))
+                .andExpect(jsonPath("$.mfa").value(false));
     }
 
     @Test

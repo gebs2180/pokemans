@@ -2,6 +2,8 @@ export type Me = {
   subject: string
   issuer: string | null
   roles: string[]
+  claimedRoles: string[]
+  mfa: boolean
 }
 
 /** Calls the backend with the user's access token. In dev, Vite proxies /api to localhost:8080. */

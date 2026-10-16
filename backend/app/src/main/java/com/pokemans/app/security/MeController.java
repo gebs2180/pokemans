@@ -2,6 +2,7 @@ package com.pokemans.app.security;
 
 import java.util.List;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -10,18 +11,33 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class MeController {
 
-    public record Me(String subject, String issuer, List<String> roles) {
+    private final SecurityProperties properties;
+
+    public MeController(SecurityProperties properties) {
+        this.properties = properties;
+    }
+
+    /**
+     * @param roles        roles granted after filtering
+     * @param claimedRoles roles as they arrived in the token's roles claim (empty if the claim is missing)
+     * @param mfa          whether the token's {@code amr} claim includes {@code mfa}
+     */
+    public record Me(String subject, String issuer, List<String> roles, List<String> claimedRoles, boolean mfa) {
     }
 
     @GetMapping("/api/me")
     public Me me(JwtAuthenticationToken auth) {
+        Jwt jwt = auth.getToken();
         List<String> roles = auth.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .filter(a -> a.startsWith("ROLE_"))
                 .map(a -> a.substring("ROLE_".length()))
                 .sorted()
                 .toList();
-        Object issuer = auth.getToken().getClaims().get("iss");
-        return new Me(auth.getName(), issuer == null ? null : issuer.toString(), roles);
+        List<String> claimed = jwt.hasClaim(properties.rolesClaim()) ? jwt.getClaimAsStringList(properties.rolesClaim()) : null;
+        List<String> amr = jwt.hasClaim("amr") ? jwt.getClaimAsStringList("amr") : null;
+        Object issuer = jwt.getClaims().get("iss");
+        return new Me(auth.getName(), issuer == null ? null : issuer.toString(), roles,
+                claimed == null ? List.of() : claimed, amr != null && amr.contains("mfa"));
     }
 }

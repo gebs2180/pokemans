@@ -37,9 +37,15 @@ function App() {
         <section>
           <p>Signed in as {user?.email ?? user?.name}</p>
           {me && (
-            <p>
-              API sees you as <code>{me.subject}</code> with roles: {me.roles.length ? me.roles.join(', ') : 'none'}
-            </p>
+            <>
+              <p>
+                API sees you as <code>{me.subject}</code> with roles: {me.roles.length ? me.roles.join(', ') : 'none'}
+              </p>
+              <p>
+                Token roles claim: {me.claimedRoles.length ? me.claimedRoles.join(', ') : 'missing or empty'} · MFA:{' '}
+                {me.mfa ? 'yes' : 'no'}
+              </p>
+            </>
           )}
           {apiError && <p className="error">{apiError}</p>}
           <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>Log out</button>
