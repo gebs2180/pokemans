@@ -244,7 +244,7 @@ docker-compose.yml
 |---|---|---|---|
 | M0 Skeleton | 1–2 | Repo layout, CI, docker-compose, auth wiring, `valuation-core` with full methodology math | Worked-example golden test passes; deploy pipeline green |
 | M1 Intake | 3–4 | Orgs/invites, batches, collections, presigned uploads, quality checks, capture PWA | A partner can upload a batch and see pass/retake per photo |
-| M2 Identify + condition | 4–6 | Catalog adapter, two pre-grade adapters, manual fallbacks, review UI, assessments, whole-card-in-frame photo check and centering measurement (see below) | Controlled set has stored predictions from both providers plus reviewed distributions |
+| M2 Identify + condition | 4–6 | Catalog adapter, two pre-grade adapters, manual fallbacks, review UI, assessments, whole-card-in-frame photo check and centering measurement, contributor upload of graded examples (see below) | Controlled set has stored predictions from both providers plus reviewed distributions |
 | M3 Pricing | 5–7 | Price adapter, comp ingestion job, per-grade snapshots, missing-grade rule, volatility/liquidity | Snapshots exist for the controlled set with method and comp ids |
 | M4 Valuation + reports | 8–10 | Valuation runs, portfolio caps, grade-first list, lender and insurer PDFs | First free report delivered from real data |
 | M5 Outcomes + calibration | 8–12 | Grader submissions, returned-grade entry/CSV, analysis views, notebooks | First calibration check run (weeks 8–14 item) |
@@ -254,13 +254,22 @@ docker-compose.yml
 
 The blur check needs the same fix. First real phone photos (4032 × 3024 JPEGs) scored 337–1678 on the Laplacian-variance blur score, so the starting threshold of 100 passes everything, including a deliberately very blurry photo (most likely the 337, the smallest file at 781 KB). The score is also measured over the whole frame, so a sharp background hides a blurry card. In M2, measure blur on the detected card region only, then set the threshold from labelled real photos (stored scores make that a query).
 
+**M2 contributor upload (2026-10-16):** "guess the grade" posts (Reddit and forums) pair raw photos with the returned grade, which makes them labelled examples. Scraping them is out: Reddit's Data API terms bar AI training without the posters' permission and require a separate agreement for commercial use, and the photos belong to the posters. Instead, Zach contacts posters by hand and offers a free collection report. Contributors use a consent-first upload, built on M1 intake:
+- **Who and where:** a `CONTRIBUTOR` org type, reached by invite like the others.
+- **Each submission:** raw front and back photos run through the same quality checks, plus the grader and cert number.
+- **Consent:** a required checkbox, stored as a versioned consent record (text version, timestamp, user). It covers storing the photos and grade and using them to train and evaluate our models.
+- **Cert check:** the cert number is checked against the grader's public cert lookup (PSA first). The submission is held until the card and grade match. The cert lookup's API terms need the same review as the pre-graders' (`docs/pregrade-providers.md`).
+- **Storage:** results become outcomes with source `CONTRIBUTOR`, kept apart from partner submissions so selection bias (people post surprises) can be measured, not mixed in. Photo capture conditions vary, so these are tagged and down-weighted until compared against the capture standard.
+
+Posts are only read by hand to find people to ask. They are never stored.
+
 ## 11. Risks and open decisions
 
 | Item | Notes |
 |---|---|
 | Employment agreement / IP | Zach is proceeding without clearance and believes it only matters if he charges. Invention-assignment clauses often cover inventions related to the employer's business regardless of monetization, and lending tech is adjacent. Personal accounts and devices only. Revisit before charging, publicizing, or approaching lenders. |
 | Price data licensing | Which sources allow commercial use and storage. `PriceDataProvider` keeps this swappable. |
-| Pre-grading API terms | Storing results and training our own model may be restricted. Read before M2. |
+| Pre-grading API terms | Reviewed 2026-10-16 in `docs/pregrade-providers.md`. Plan: Ximilar plus CardGrade.io (opted out of training). CardGrader.AI is out: its terms ban storing results and training on them. Get storage, training and lender-report rights confirmed in writing before production data. |
 | Lender error tolerance | Drives confidence thresholds and α ranges; ask during pilots. |
 | Custody | Whether to partner with an existing vault. Out of v1; CustodyRecord is manual. |
 | Native capture | Revisit if photo rejection data shows phone capture is the bottleneck, or if borrowers become the main channel (React Native + Expo, capture only). |

@@ -70,3 +70,10 @@ Every accuracy figure below is self-reported on the vendor's own blog. There is 
 - **Before M2 stores production data:** email both to confirm the rights listed above.
 - **Dropped:** CardGrader.AI (§4 bans storing and training). CardMintAI unless it clarifies output rights in writing.
 - **Neither A nor B** returns a grade distribution. Our distribution comes from their point grades and sub-grades plus the reviewer, which is what M2 planned.
+
+## Cost (list prices, 2026-10-16)
+
+- **Ximilar:** "Grade a card" costs 100 credits, and front plus back in one request counts as one card. The free plan has 1,000 credits a month (about 10 cards). Business 100K is $69/mo (about 1,000 cards, roughly 7¢ each). Top-up packs that never expire start at 10,000 credits for $11 (about 100 cards).
+- **CardGrade.io:** Pro is $24.99/mo for 80 grades at 10 requests per minute. Business is $74.99/mo for 300 grades at 30 per minute. API Starter is $149.99/mo for 1,000 (15¢ each). It doesn't say whether front plus back is one credit. Confirm that.
+- **Controlled set (30 cards):** about $11 on a Ximilar top-up (or its free plan over a few months) plus one month of CardGrade.io Pro ($24.99), so about $36 in all.
+- **Per 1,000 partner cards:** about $69 (Ximilar) + $150 (CardGrade.io API Starter), so about $220. That's about 22¢ per card for both opinions. Only cards that pass quality checks and are worth over $25 get sent, and each card is sent once.
