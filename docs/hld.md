@@ -244,11 +244,13 @@ docker-compose.yml
 |---|---|---|---|
 | M0 Skeleton | 1–2 | Repo layout, CI, docker-compose, auth wiring, `valuation-core` with full methodology math | Worked-example golden test passes; deploy pipeline green |
 | M1 Intake | 3–4 | Orgs/invites, batches, collections, presigned uploads, quality checks, capture PWA | A partner can upload a batch and see pass/retake per photo |
-| M2 Identify + condition | 4–6 | Catalog adapter, two pre-grade adapters, manual fallbacks, review UI, assessments | Controlled set has stored predictions from both providers plus reviewed distributions |
+| M2 Identify + condition | 4–6 | Catalog adapter, two pre-grade adapters, manual fallbacks, review UI, assessments, whole-card-in-frame photo check and centering measurement (see below) | Controlled set has stored predictions from both providers plus reviewed distributions |
 | M3 Pricing | 5–7 | Price adapter, comp ingestion job, per-grade snapshots, missing-grade rule, volatility/liquidity | Snapshots exist for the controlled set with method and comp ids |
 | M4 Valuation + reports | 8–10 | Valuation runs, portfolio caps, grade-first list, lender and insurer PDFs | First free report delivered from real data |
 | M5 Outcomes + calibration | 8–12 | Grader submissions, returned-grade entry/CSV, analysis views, notebooks | First calibration check run (weeks 8–14 item) |
 | M6 Collector self-serve + automation | 12–16 | Collector registration, notifications, automated refreshes, admin health page | System runs on about 5 h/week |
+
+**M2 carry-over from M1 testing (2026-10-16):** photo quality checks only cover resolution, blur, glare and duplicates, so a sharp photo of half a card passes. M2 adds card outline detection with OpenCV (`org.openpnp:opencv`): find the largest quadrilateral, check the card aspect ratio (63 × 88 mm, ≈0.716), minimum frame coverage and that no edge is cut off. New retake reasons: no card found, card cut off, too far away. The same four corners give a perspective-corrected crop for measuring centering (border widths), one of the four condition scores. Thresholds go in `pokemans.quality`, tested with synthetic images.
 
 ## 11. Risks and open decisions
 
