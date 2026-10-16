@@ -31,16 +31,42 @@ Sources: [terms](https://www.ximilar.com/terms-of-use-privacy/), [data security 
 
 Sources: [API terms](https://cardgrader.ai/api-terms), [API data policy](https://cardgrader.ai/api-data-policy), [API docs](https://cardgrader.ai/api-docs).
 
+## CardGrade.io (Pennsylvania): usable, opt out of training
+
+- **API:** a REST API (OpenAPI 3.1). It returns an overall grade, centering, corners, edges and surface sub-grades, PSA/BGS/CGC predictions, a `limitingFactor`, per-zone corner and edge scores, centering percentages, zone close-up crops, and a market value range when it has one. It returns no grade probabilities. Plans: Starter at $149.99/mo (1,000 grades, 30 per minute), Growth at $399.99/mo (4,000, 60 per minute), Scale at $999.99/mo (12,000, 120 per minute). Pro ($24.99) and Business ($74.99) also include some API access.
+- **Storing results / training our own model:** not restricted. The terms have no clause on output ownership, competing models or benchmarking. The anti-bot clause (no automated access "without our express written permission") should be covered by an API subscription. Confirm that.
+- **Our photos:** **they train on uploads and results by default** (§5–6): "develop, train, test, and improve our AI models". You can opt out in Settings. De-identified derivatives (crops, labels) can survive account deletion. Opt out before sending partner photos.
+- **Third parties:** not addressed.
+- **Other:** Pennsylvania law, with arbitration.
+- **Confirm in writing:** that API use is the permitted automated access, that we can store and train on results, that our account is opted out of training, and that we can use results in lender reports.
+
+Sources: [terms](https://cardgrade.io/terms), [API announcement](https://cardgrade.io/blog/introducing-cardgrade-api).
+
+## Market scan: top pre-grading tools (consumer apps, Oct 2026)
+
+Every accuracy figure below is self-reported on the vendor's own blog. There is no independent head-to-head test. Our controlled PSA set will be the first real comparison.
+
+| Tool | Claimed accuracy | API? | Terms fit |
+|---|---|---|---|
+| SnapGradeAI | 87% within ±0.5 of PSA over 412 logged returns (the only public returns log) | none found | n/a |
+| PreGradeCards | 89% within ±1, 68% exact, on a 10k-card benchmark | none found | n/a |
+| CardGrade.io | 92.8% (described as model confidence, not PSA match) | yes | OK, opt out of training |
+| CardMintAI | ~95% "PSA match", no published method | yes, on $25+ plans, no docs | unclear: §5 "may not copy, modify, distribute, or reproduce any materials from the platform" without permission; outputs may count as theirs |
+| CardGrader.AI | not checked | yes | blocked (see above) |
+| Ximilar | n/a (B2B vision API) | yes | OK |
+| CardGrading.app, Gradeon, MasterGrade, OneGrade | none published | none found | n/a |
+| Ludex | cataloguing, condition flags only | n/a | n/a |
+
 ## Others looked at
 
-- **CardMintAI:** advertises an embeddable API. No public API terms were found, so we'd need to ask.
-- **OneGrade:** advertises a grading engine API. No docs or terms were found.
 - **PREGRAiDED:** its terms bar building a competing pre-grading service or reselling reports, so the same problem as CardGrader.AI.
-- **Nyckel:** a pretrained 10-class condition classifier that can be retrained on our data. It's generic rather than card-specialised. Terms not checked.
-- **Scrydex Vision, CardSight AI:** identification and slab reading, not raw condition. They're possible catalog or ID candidates, not pre-graders.
+- **Nyckel:** a generic 10-class condition classifier. Under its terms (Common Paper CSA), our training data is used only for our own models. Output ownership and restrictions on the customer weren't visible. It's weaker than card-specialised graders.
+- **Scrydex Vision, CardSight AI:** identification and slab reading, not raw condition. They're possible catalog or ID candidates.
 
 ## Recommendation
 
-- **Provider A: Ximilar.** Its terms fit. Get the three rights above confirmed by email before M2 stores production data.
-- **Provider B:** ask CardGrader.AI for the written carve-out, since its sub-grade output is the closest comparison. If they refuse, ask CardMintAI for its API terms. If nothing clears in time, M2 ships with Ximilar plus the human reviewer as the second opinion. The `PreGradeProvider` port keeps adding B later cheap.
-- **Either way:** neither returns a grade distribution. Our distribution comes from their point grades and sub-grades plus the reviewer, which is what M2 planned.
+- **Provider A: Ximilar.** Its terms fit and it doesn't keep our photos.
+- **Provider B: CardGrade.io.** Its terms don't restrict our use of results, and it gives the richest output (PSA/BGS/CGC predictions, limiting factor, zone scores). Opt out of training before sending partner photos. Start on Pro ($24.99) for the controlled set before paying for an API tier.
+- **Before M2 stores production data:** email both to confirm the rights listed above.
+- **Dropped:** CardGrader.AI (§4 bans storing and training). CardMintAI unless it clarifies output rights in writing.
+- **Neither A nor B** returns a grade distribution. Our distribution comes from their point grades and sub-grades plus the reviewer, which is what M2 planned.
