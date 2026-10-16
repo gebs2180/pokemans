@@ -24,7 +24,7 @@ jobs:
       - name: Build and test (includes valuation-core golden tests)
         run: ./gradlew build --console=plain
       - name: Upload test reports
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v5
         with:
           name: backend-test-reports
