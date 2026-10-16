@@ -1,6 +1,16 @@
 spring:
   application:
     name: pokemans
+  # OIDC: set SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI (e.g. https://<tenant>.us.auth0.com/)
+  # and SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES (the API identifier) in the environment.
+  # Without an issuer the API rejects every bearer token.
+
+pokemans:
+  security:
+    # Custom claim the provider adds to access tokens with the user's roles (ADMIN, PARTNER, COLLECTOR).
+    roles-claim: https://pokemans.app/roles
+    # ADMIN requires an MFA login (amr contains "mfa").
+    require-admin-mfa: true
 
 management:
   endpoints:
