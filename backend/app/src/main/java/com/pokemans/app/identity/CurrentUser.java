@@ -6,7 +6,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /** The signed-in user for the current request, created in the database on first use. */
@@ -14,17 +13,18 @@ import org.springframework.web.server.ResponseStatusException;
 public class CurrentUser {
 
     private final AppUserRepository users;
+    private final UserProvisioner provisioner;
 
-    CurrentUser(AppUserRepository users) {
+    CurrentUser(AppUserRepository users, UserProvisioner provisioner) {
         this.users = users;
+        this.provisioner = provisioner;
     }
 
-    @Transactional
     public AppUser get() {
         JwtAuthenticationToken token = token();
         String subject = token.getName();
         return users.findBySubject(subject).orElseGet(() -> {
-            users.insertIfAbsent(UUID.randomUUID(), subject, token.getToken().getClaimAsString("email"));
+            provisioner.createIfAbsent(subject, token.getToken().getClaimAsString("email"));
             return users.findBySubject(subject).orElseThrow();
         });
     }
