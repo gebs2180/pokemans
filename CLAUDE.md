@@ -4,6 +4,8 @@ Collateral reports for raw-heavy Pokémon card collections: what a collection re
 
 **Source of truth:** the *Raw Collection Valuation Methodology* Claude Doc (https://claude.ai/artifact/1XVmPmLtueJk37u2hXgDmL). This file summarizes it as of 2026-10-15. If they disagree, the doc wins: re-read it and update this file.
 
+**System design:** [docs/hld.md](docs/hld.md) covers the architecture, modules, data model, flows and milestones. Read it before adding modules or entities.
+
 ## Non-negotiable principles
 
 - **Condition is a distribution, not a grade.** Each raw card gets probabilities over 11 outcomes: Ungradable (U), 1…10. Uncertainty widens the haircut instead of being hidden.
