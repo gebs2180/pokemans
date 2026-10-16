@@ -211,7 +211,7 @@ Notes on key entities:
 
 ## 7. Security
 
-- Managed OIDC (free tier) with Spring Security as a resource server. Roles ADMIN, PARTNER, COLLECTOR. MFA required for ADMIN.
+- Managed OIDC (free tier) with Spring Security as a resource server. Roles ADMIN, PARTNER, COLLECTOR. MFA required for ADMIN. ADMIN comes from the token; PARTNER and COLLECTOR come from org membership in Postgres, created by accepting an invite link (decided 2026-10-16). See [auth.md](auth.md).
 - Invite-only onboarding for partners in v1. Collectors self-register behind an allowlist until pilots end.
 - Presigned upload URLs scoped to one key, short expiry, content-type and size limits. The photo bucket is private with versioning/object lock; reports are served through short-lived signed links.
 - Secrets live in the host's environment config, never in the repo.
@@ -220,7 +220,7 @@ Notes on key entities:
 
 ## 8. Deployment and operations
 
-- **Local:** docker-compose with Postgres and MinIO; seed data includes the worked-example card and a small fake collection.
+- **Local:** docker-compose with Postgres and MinIO (Chainguard's build, since MinIO left Docker Hub); seed data includes the worked-example card and a small fake collection. See [local-dev.md](local-dev.md).
 - **Prod:** one container (Spring Boot serving the built SPA) on a managed platform, plus managed Postgres and R2/S3. A single environment plus local in v1; add staging only when there are paying users.
 - **CI/CD:** GitHub Actions running backend tests (unit, `valuation-core` golden tests, Testcontainers integration), web build and lint, then deploy on merge to `main`.
 - **Observability:** structured JSON logs, error tracking (Sentry-type), JobRunr dashboard, and a simple admin health page (queue depth, failed jobs, last comp refresh).
