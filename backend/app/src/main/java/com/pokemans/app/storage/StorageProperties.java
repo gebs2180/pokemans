@@ -13,6 +13,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param pathStyle      path-style addressing (needed for MinIO)
  * @param photoBucket    private, versioned bucket for card photos
  * @param uploadUrlTtl   how long a presigned upload URL stays valid
+ * @param downloadUrlTtl how long a presigned link for viewing a photo stays valid
  * @param maxUploadBytes largest photo accepted
  * @param autoCreateBuckets create the photo bucket (versioned) at startup if missing; local dev and tests only
  */
@@ -26,6 +27,7 @@ public record StorageProperties(
         @DefaultValue("true") boolean pathStyle,
         @DefaultValue("photos") String photoBucket,
         @DefaultValue("10m") Duration uploadUrlTtl,
+        @DefaultValue("15m") Duration downloadUrlTtl,
         @DefaultValue("26214400") long maxUploadBytes,
         @DefaultValue("false") boolean autoCreateBuckets) {
 }

@@ -10,21 +10,38 @@ import java.util.List;
 import javax.imageio.ImageIO;
 
 /**
- * Capture-standard checks on one photo: resolution, blur (variance of the Laplacian) and glare
- * (share of blown-out pixels). Pure image analysis, no I/O beyond decoding the bytes it is given.
+ * Capture-standard checks on one photo: resolution, a whole card in frame and large enough, blur
+ * (variance of the Laplacian) and glare (share of blown-out pixels). Blur and glare are judged on the
+ * card when one is found, otherwise on the whole frame. Pure image analysis, no I/O beyond decoding
+ * the bytes it is given.
+ *
+ * <p>{@code blurScore} and {@code glareFraction} are always the whole-frame values, kept comparable
+ * with photos checked before card detection existed; the card's own values are on {@link #card()}.
  */
 class QualityChecker {
 
-    record Result(Integer width, Integer height, Double blurScore, Double glareFraction, List<RetakeReason> reasons) {
+    /** @param card the detected card, or null when no whole card was found */
+    record Result(Integer width, Integer height, Double blurScore, Double glareFraction, CardDetector.Detection card,
+                  List<RetakeReason> reasons) {
     }
 
     private final QualityProperties properties;
+    private final CardDetector detector;
 
     QualityChecker(QualityProperties properties) {
         this.properties = properties;
+        this.detector = new CardDetector(properties);
     }
 
     Result check(byte[] imageBytes) {
+        return check(imageBytes, true);
+    }
+
+    /**
+     * @param wholeCardExpected false for photos that don't show one whole card (a lot spread out on a
+     *                          table, a close-up of a corner); those skip the card checks
+     */
+    Result check(byte[] imageBytes, boolean wholeCardExpected) {
         BufferedImage image;
         try {
             image = ImageIO.read(new ByteArrayInputStream(imageBytes));
@@ -32,7 +49,7 @@ class QualityChecker {
             image = null;
         }
         if (image == null) {
-            return new Result(null, null, null, null, List.of(RetakeReason.UNREADABLE));
+            return new Result(null, null, null, null, null, List.of(RetakeReason.UNREADABLE));
         }
 
         int width = image.getWidth();
@@ -45,13 +62,30 @@ class QualityChecker {
         int[][] luma = luma(downscale(image, properties.analysisLongSidePx()));
         double blur = laplacianVariance(luma);
         double glare = glareFraction(luma, properties.glareLuma());
-        if (blur < properties.minBlurScore()) {
+
+        CardDetector.Detection card = wholeCardExpected ? detector.detect(imageBytes).orElse(null) : null;
+        boolean blurry;
+        boolean glary;
+        if (card == null) {
+            if (wholeCardExpected) {
+                reasons.add(RetakeReason.CARD_NOT_FOUND);
+            }
+            blurry = blur < properties.minBlurScore();
+            glary = glare > properties.maxGlareFraction();
+        } else {
+            if (card.coverage() < properties.minCardCoverage()) {
+                reasons.add(RetakeReason.CARD_TOO_SMALL);
+            }
+            blurry = card.blurScore() < properties.minCardBlurScore();
+            glary = card.glareFraction() > properties.maxGlareFraction();
+        }
+        if (blurry) {
             reasons.add(RetakeReason.BLURRY);
         }
-        if (glare > properties.maxGlareFraction()) {
+        if (glary) {
             reasons.add(RetakeReason.GLARE);
         }
-        return new Result(width, height, blur, glare, reasons);
+        return new Result(width, height, blur, glare, card, reasons);
     }
 
     private static BufferedImage downscale(BufferedImage image, int longSide) {

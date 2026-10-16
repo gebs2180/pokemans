@@ -123,20 +123,13 @@ class IntakeFlowTest {
         mvc.perform(post("/api/orgs/" + orgId + "/photos/" + pendingId + "/confirm").with(partner)).andExpect(status().isConflict());
 
         // A sharp front passes.
-        uploadPhoto(orgId, cardId, "FRONT", QualityCheckerTest.png(QualityCheckerTest.sharp(1600, 2200)), partner)
+        uploadPhoto(orgId, cardId, "FRONT", QualityCheckerTest.png(QualityCheckerTest.goodPhoto()), partner)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PASSED"))
                 .andExpect(jsonPath("$.width").value(1600));
 
         // A blurry back needs a retake, with a reason the partner can act on.
-        BufferedImage smooth = new BufferedImage(1600, 2200, BufferedImage.TYPE_INT_RGB);
-        for (int y = 0; y < smooth.getHeight(); y++) {
-            for (int x = 0; x < smooth.getWidth(); x++) {
-                int v = 60 + x * 120 / smooth.getWidth();
-                smooth.setRGB(x, y, (v << 16) | (v << 8) | v);
-            }
-        }
-        uploadPhoto(orgId, cardId, "BACK", QualityCheckerTest.png(smooth), partner)
+        uploadPhoto(orgId, cardId, "BACK", QualityCheckerTest.png(QualityCheckerTest.blurred(QualityCheckerTest.goodPhoto(), 6)), partner)
                 .andExpect(jsonPath("$.status").value("RETAKE"))
                 .andExpect(jsonPath("$.retakeReasons[0].code").value("BLURRY"))
                 .andExpect(jsonPath("$.retakeReasons[0].message").isNotEmpty());
@@ -145,7 +138,8 @@ class IntakeFlowTest {
                 .andExpect(jsonPath("$.missingSides[0]").value("BACK"));
 
         // The retake passes and the card is complete.
-        uploadPhoto(orgId, cardId, "BACK", QualityCheckerTest.png(QualityCheckerTest.sharp(1700, 2300)), partner)
+        BufferedImage retake = QualityCheckerTest.withCard(QualityCheckerTest.background(1700, 2300), 950, 850, 1150, -3);
+        uploadPhoto(orgId, cardId, "BACK", QualityCheckerTest.png(retake), partner)
                 .andExpect(jsonPath("$.status").value("PASSED"));
         mvc.perform(get("/api/orgs/" + orgId + "/batches/" + batchId).with(partner))
                 .andExpect(jsonPath("$.cards[0].captureComplete").value(true))
@@ -159,7 +153,8 @@ class IntakeFlowTest {
         String cardId = read(postJson("/api/orgs/" + orgId + "/collections/" + collectionId + "/cards",
                 "{\"label\":\"Bulk commons\",\"lot\":true,\"quantity\":200}", admin()), "$.id");
 
-        byte[] png = QualityCheckerTest.png(QualityCheckerTest.sharp(1600, 2200));
+        // A lot is cards spread on a table, so no single whole card is expected.
+        byte[] png = QualityCheckerTest.png(QualityCheckerTest.background(1600, 2200));
         String body = postJson("/api/orgs/" + orgId + "/cards/" + cardId + "/photos",
                 "{\"side\":\"FRONT\",\"contentType\":\"image/png\",\"sizeBytes\":" + png.length + "}", admin())
                 .andReturn().getResponse().getContentAsString();

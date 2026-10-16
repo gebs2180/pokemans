@@ -28,9 +28,16 @@ final class IntakeViews {
                     List<Photo.Side> missingSides, List<PhotoView> photos) {
     }
 
+    /**
+     * @param card where the whole card was found and how it measured, or null (no card found, a lot,
+     *             a detail close-up, or checked before card detection existed)
+     */
     record PhotoView(UUID id, Photo.Side side, Photo.Status status, List<ReasonView> retakeReasons,
-                     Integer width, Integer height, Double blurScore, Double glareFraction,
+                     Integer width, Integer height, Double blurScore, Double glareFraction, CardFit card,
                      Instant capturedAt, Instant uploadedAt) {
+    }
+
+    record CardFit(double coverage, double aspect, double blurScore, double glareFraction) {
     }
 
     record ReasonView(RetakeReason code, String message) {
@@ -41,8 +48,10 @@ final class IntakeViews {
 
     static PhotoView photo(Photo p) {
         List<ReasonView> reasons = p.getRetakeReasons().stream().map(r -> new ReasonView(r, r.message())).toList();
+        CardFit card = p.getCardCoverage() == null ? null
+                : new CardFit(p.getCardCoverage(), p.getCardAspect(), p.getCardBlurScore(), p.getCardGlareFraction());
         return new PhotoView(p.getId(), p.getSide(), p.getStatus(), reasons, p.getWidth(), p.getHeight(),
-                p.getBlurScore(), p.getGlareFraction(), p.getCapturedAt(), p.getUploadedAt());
+                p.getBlurScore(), p.getGlareFraction(), card, p.getCapturedAt(), p.getUploadedAt());
     }
 
     static CardView card(CardItem card, List<Photo> photos) {

@@ -14,6 +14,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
@@ -97,6 +98,26 @@ class S3BlobStore implements BlobStore, AutoCloseable {
     @Override
     public byte[] read(String bucket, String key) {
         return client.getObjectAsBytes(r -> r.bucket(bucket).key(key)).asByteArray();
+    }
+
+    @Override
+    public boolean putIfAbsent(String bucket, String key, byte[] bytes, String contentType) {
+        try {
+            client.putObject(r -> r.bucket(bucket).key(key).contentType(contentType).ifNoneMatch("*"), RequestBody.fromBytes(bytes));
+            return true;
+        } catch (S3Exception e) {
+            if (e.statusCode() == 412) {
+                return false;
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public URI presignDownload(String bucket, String key) {
+        return URI.create(presigner.presignGetObject(r -> r
+                .signatureDuration(properties.downloadUrlTtl())
+                .getObjectRequest(g -> g.bucket(bucket).key(key))).url().toString());
     }
 
     /** Creates the bucket with versioning on if it does not exist. Returns true if it was created. */

@@ -17,6 +17,7 @@ dependencies {
     implementation("org.springframework.modulith:spring-modulith-starter-core")
     implementation("software.amazon.awssdk:s3")
     implementation("com.drewnoakes:metadata-extractor:2.21.0")
+    implementation("org.openpnp:opencv:4.9.0-0")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
@@ -29,4 +30,13 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("org.testcontainers:testcontainers-minio")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+// OpenCV loads its bundled native library through JNI, which Java 24+ warns about unless allowed.
+tasks.withType<Test>().configureEach {
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
 }

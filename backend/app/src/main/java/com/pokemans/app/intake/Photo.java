@@ -43,6 +43,13 @@ class Photo {
     private Double glareFraction;
     @JdbcTypeCode(SqlTypes.JSON)
     private List<RetakeReason> retakeReasons = new ArrayList<>();
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<CardDetector.Corner> cardCorners;
+    private Double cardCoverage;
+    private Double cardAspect;
+    private Double cardBlurScore;
+    private Double cardGlareFraction;
+    private String cropKey;
     private Instant capturedAt;
     private UUID createdBy;
     private Instant createdAt;
@@ -65,8 +72,18 @@ class Photo {
         this.createdAt = Instant.now();
     }
 
-    /** Records the uploaded object and the quality check result. */
-    void checked(long sizeBytes, String sha256, QualityChecker.Result quality, Instant capturedAt, List<RetakeReason> extraReasons) {
+    /** Key for this photo's card crop, a derivative stored next to the original. */
+    String cropStorageKey() {
+        return storageKey + ".card.jpg";
+    }
+
+    /**
+     * Records the uploaded object and the quality check result.
+     *
+     * @param cropKey where the card crop was stored, or null when no card was found
+     */
+    void checked(long sizeBytes, String sha256, QualityChecker.Result quality, Instant capturedAt,
+                 List<RetakeReason> extraReasons, String cropKey) {
         Instant now = Instant.now();
         this.sizeBytes = sizeBytes;
         this.sha256 = sha256;
@@ -75,6 +92,15 @@ class Photo {
         this.blurScore = quality.blurScore();
         this.glareFraction = quality.glareFraction();
         this.capturedAt = capturedAt;
+        CardDetector.Detection card = quality.card();
+        if (card != null) {
+            this.cardCorners = card.corners();
+            this.cardCoverage = card.coverage();
+            this.cardAspect = card.aspect();
+            this.cardBlurScore = card.blurScore();
+            this.cardGlareFraction = card.glareFraction();
+        }
+        this.cropKey = cropKey;
         this.retakeReasons = new ArrayList<>(quality.reasons());
         this.retakeReasons.addAll(extraReasons);
         this.status = retakeReasons.isEmpty() ? Status.PASSED : Status.RETAKE;
@@ -136,6 +162,30 @@ class Photo {
 
     List<RetakeReason> getRetakeReasons() {
         return List.copyOf(retakeReasons);
+    }
+
+    List<CardDetector.Corner> getCardCorners() {
+        return cardCorners;
+    }
+
+    Double getCardCoverage() {
+        return cardCoverage;
+    }
+
+    Double getCardAspect() {
+        return cardAspect;
+    }
+
+    Double getCardBlurScore() {
+        return cardBlurScore;
+    }
+
+    Double getCardGlareFraction() {
+        return cardGlareFraction;
+    }
+
+    String getCropKey() {
+        return cropKey;
     }
 
     Instant getCapturedAt() {

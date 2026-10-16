@@ -62,7 +62,7 @@ class PhotoService {
     @Transactional
     PhotoView confirm(UUID orgId, UUID photoId) {
         Photo photo = photos.findByIdAndOrgId(photoId, orgId).orElseThrow(() -> IntakeService.notFound("Photo"));
-        intake.requireCard(orgId, photo.getCardItemId());
+        CardItem card = intake.requireCard(orgId, photo.getCardItemId());
         if (photo.getStatus() != Photo.Status.AWAITING_UPLOAD) {
             return IntakeViews.photo(photo);
         }
@@ -71,7 +71,8 @@ class PhotoService {
 
         byte[] bytes = blobs.read(storage.photoBucket(), photo.getStorageKey());
         String sha256 = sha256(bytes);
-        QualityChecker.Result result = quality.check(bytes);
+        boolean wholeCardExpected = !card.isLot() && photo.getSide() != Photo.Side.DETAIL;
+        QualityChecker.Result result = quality.check(bytes, wholeCardExpected);
 
         List<RetakeReason> extra = new ArrayList<>();
         if (stored.size() != photo.getDeclaredSize()) {
@@ -80,7 +81,12 @@ class PhotoService {
         if (photos.existsByOrgIdAndSha256AndCardItemIdNot(orgId, sha256, photo.getCardItemId())) {
             extra.add(RetakeReason.DUPLICATE);
         }
-        photo.checked(stored.size(), sha256, result, ExifReader.capturedAt(bytes), extra);
+        String cropKey = null;
+        if (result.card() != null) {
+            cropKey = photo.cropStorageKey();
+            blobs.putIfAbsent(storage.photoBucket(), cropKey, result.card().cropJpeg(), "image/jpeg");
+        }
+        photo.checked(stored.size(), sha256, result, ExifReader.capturedAt(bytes), extra, cropKey);
         return IntakeViews.photo(photo);
     }
 

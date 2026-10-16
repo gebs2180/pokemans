@@ -19,6 +19,15 @@ public interface BlobStore {
 
     byte[] read(String bucket, String key);
 
+    /**
+     * Writes a server-made object (a derivative such as a card crop) unless the key already exists.
+     * Returns false if it existed: derivatives are deterministic, so a retry finds the same bytes there.
+     */
+    boolean putIfAbsent(String bucket, String key, byte[] bytes, String contentType);
+
+    /** A short-lived link for viewing one private object in the browser. */
+    URI presignDownload(String bucket, String key);
+
     record PresignedUpload(URI url, String method, Map<String, String> headers, Instant expiresAt) {
     }
 
