@@ -9,7 +9,9 @@ pokemans:
   security:
     # Custom claim the provider adds to access tokens with the user's roles (ADMIN, PARTNER, COLLECTOR).
     roles-claim: https://pokemans.app/roles
-    # ADMIN requires an MFA login (amr contains "mfa").
+    # Custom claim set to true by the provider's post-login Action when the login used MFA.
+    mfa-claim: https://pokemans.app/mfa
+    # ADMIN requires an MFA login (amr contains "mfa", or the MFA claim is true).
     require-admin-mfa: true
 
 management:

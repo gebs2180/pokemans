@@ -10,7 +10,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
  * Maps the roles claim of an access token to Spring authorities. Unknown roles are dropped, and
- * ADMIN requires an MFA login ({@code amr} contains {@code mfa}) unless that check is turned off.
+ * ADMIN requires an MFA login (see {@link SecurityProperties#mfa}) unless that check is turned off.
  */
 public class RoleClaimConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
@@ -25,8 +25,7 @@ public class RoleClaimConverter implements Converter<Jwt, Collection<GrantedAuth
         List<String> claimed = jwt.hasClaim(properties.rolesClaim())
                 ? jwt.getClaimAsStringList(properties.rolesClaim())
                 : List.of();
-        List<String> amr = jwt.hasClaim("amr") ? jwt.getClaimAsStringList("amr") : List.of();
-        boolean mfa = amr != null && amr.contains("mfa");
+        boolean mfa = properties.mfa(jwt);
 
         List<GrantedAuthority> authorities = new ArrayList<>();
         for (String value : claimed == null ? List.<String>of() : claimed) {

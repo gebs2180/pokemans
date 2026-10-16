@@ -20,7 +20,7 @@ public class MeController {
     /**
      * @param roles        roles granted after filtering
      * @param claimedRoles roles as they arrived in the token's roles claim (empty if the claim is missing)
-     * @param mfa          whether the token's {@code amr} claim includes {@code mfa}
+     * @param mfa          whether the token shows an MFA login
      */
     public record Me(String subject, String issuer, List<String> roles, List<String> claimedRoles, boolean mfa) {
     }
@@ -35,9 +35,8 @@ public class MeController {
                 .sorted()
                 .toList();
         List<String> claimed = jwt.hasClaim(properties.rolesClaim()) ? jwt.getClaimAsStringList(properties.rolesClaim()) : null;
-        List<String> amr = jwt.hasClaim("amr") ? jwt.getClaimAsStringList("amr") : null;
         Object issuer = jwt.getClaims().get("iss");
         return new Me(auth.getName(), issuer == null ? null : issuer.toString(), roles,
-                claimed == null ? List.of() : claimed, amr != null && amr.contains("mfa"));
+                claimed == null ? List.of() : claimed, properties.mfa(jwt));
     }
 }
