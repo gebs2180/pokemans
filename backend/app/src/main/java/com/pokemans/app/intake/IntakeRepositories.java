@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 /** Every lookup is scoped by org id, so a wrong id from another org finds nothing. */
 interface SubmissionBatchRepository extends JpaRepository<SubmissionBatch, UUID> {
@@ -31,6 +32,14 @@ interface CardItemRepository extends JpaRepository<CardItem, UUID> {
     long countByBatchId(UUID batchId);
 
     long countByCollectionId(UUID collectionId);
+
+    /** Cards with a passing front, and a passing back unless they are a lot. */
+    @Query(nativeQuery = true, value = """
+            select c.* from card_item c
+            where exists (select 1 from photo p where p.card_item_id = c.id and p.side = 'FRONT' and p.status = 'PASSED')
+              and (c.is_lot or exists (select 1 from photo p where p.card_item_id = c.id and p.side = 'BACK' and p.status = 'PASSED'))
+            order by c.created_at""")
+    List<CardItem> findCaptureComplete();
 }
 
 interface PhotoRepository extends JpaRepository<Photo, UUID> {

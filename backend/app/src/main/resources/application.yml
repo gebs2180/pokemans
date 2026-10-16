@@ -51,6 +51,11 @@ pokemans:
     min-card-margin-fraction: 0.06
     min-card-coverage: 0.25
     min-card-blur-score: 50
+  catalog:
+    tcgdex:
+      # Free, no key; card data MIT-licensed. Off = manual entry only.
+      enabled: ${CATALOG_TCGDEX_ENABLED:true}
+      base-url: https://api.tcgdex.net/v2
 
 management:
   endpoints:

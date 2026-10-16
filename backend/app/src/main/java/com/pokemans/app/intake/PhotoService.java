@@ -12,6 +12,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,15 +33,17 @@ class PhotoService {
     private final BlobStore blobs;
     private final StorageProperties storage;
     private final QualityChecker quality;
+    private final ApplicationEventPublisher events;
 
     PhotoService(IntakeService intake, CurrentUser currentUser, PhotoRepository photos, BlobStore blobs,
-                 StorageProperties storage, QualityProperties qualityProperties) {
+                 StorageProperties storage, QualityProperties qualityProperties, ApplicationEventPublisher events) {
         this.intake = intake;
         this.currentUser = currentUser;
         this.photos = photos;
         this.blobs = blobs;
         this.storage = storage;
         this.quality = new QualityChecker(qualityProperties);
+        this.events = events;
     }
 
     @Transactional
@@ -86,7 +89,12 @@ class PhotoService {
             cropKey = photo.cropStorageKey();
             blobs.putIfAbsent(storage.photoBucket(), cropKey, result.card().cropJpeg(), "image/jpeg");
         }
+        boolean wasComplete = IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId())).captureComplete();
         photo.checked(stored.size(), sha256, result, ExifReader.capturedAt(bytes), extra, cropKey);
+        photos.flush();
+        if (!wasComplete && IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId())).captureComplete()) {
+            events.publishEvent(new CardItems.CaptureCompleted(orgId, card.getId()));
+        }
         return IntakeViews.photo(photo);
     }
 
