@@ -252,6 +252,8 @@ docker-compose.yml
 
 **M2 carry-over from M1 testing (2026-10-16):** photo quality checks only cover resolution, blur, glare and duplicates, so a sharp photo of half a card passes. M2 adds card outline detection with OpenCV (`org.openpnp:opencv`): find the largest quadrilateral, check the card aspect ratio (63 × 88 mm, ≈0.716), minimum frame coverage and that no edge is cut off. New retake reasons: no card found, card cut off, too far away. The same four corners give a perspective-corrected crop for measuring centering (border widths), one of the four condition scores. Thresholds go in `pokemans.quality`, tested with synthetic images.
 
+The blur check needs the same fix. First real phone photos (4032 × 3024 JPEGs) scored 337–1678 on the Laplacian-variance blur score, so the starting threshold of 100 passes everything, including a deliberately very blurry photo (most likely the 337, the smallest file at 781 KB). The score is also measured over the whole frame, so a sharp background hides a blurry card. In M2, measure blur on the detected card region only, then set the threshold from labelled real photos (stored scores make that a query).
+
 ## 11. Risks and open decisions
 
 | Item | Notes |
