@@ -25,29 +25,42 @@ The backend is an OAuth2 resource server (HLD §7). The SPA logs in with a manag
 | other `/api/**` | any signed-in user |
 | everything else | denied (opened for the SPA's static files when the app serves them) |
 
-`GET /api/me` returns the caller's subject, issuer and roles, which is the quickest way to check the wiring.
+`GET /api/me` returns the caller's subject, issuer, granted roles, the raw roles claim and whether the token shows MFA. The web app displays these after login, which is the quickest way to check the wiring.
 
 ## Auth0 setup (free tier)
 
 1. Create a tenant. Its domain gives the issuer: `https://<tenant>.<region>.auth0.com/`, trailing slash included.
-2. **Applications → APIs → Create API.** The identifier is the audience, e.g. `https://api.pokemans.app`. Use RS256.
-3. **Applications → Create Application → Single Page Application** for the React app. Allowed callback and logout URLs: `http://localhost:5173`.
-4. **User Management → Roles:** create `ADMIN`, `PARTNER`, `COLLECTOR` and assign them to users.
-5. **Actions → Triggers → post-login:** add an action that copies roles and MFA status into the access token:
+2. **Applications → APIs → Create API.** The identifier is the audience, e.g. `https://api.pokemans.app` (it can't be changed later). Use RS256.
+3. **Applications → Create Application → Single Page Application** (React) for the web app. Allowed Callback URLs, Allowed Logout URLs and Allowed Web Origins: `http://localhost:5173`.
+4. **Applications → APIs → (your API) → Application Access:** authorize the SPA for user access. Newer tenants block apps from APIs by default ("Client … is not authorized to access resource server").
+5. **User Management → Roles:** create `ADMIN`, `PARTNER`, `COLLECTOR` and assign them to users.
+6. **Actions → Library → Build from scratch** (trigger Login / Post Login), deploy it, then add it to **Actions → Triggers → post-login** and click Apply. It must be the only action that sets these claims:
    ```js
    exports.onExecutePostLogin = async (event, api) => {
-     api.accessToken.setCustomClaim('https://pokemans.app/roles', event.authorization?.roles ?? []);
-     const mfa = (event.authentication?.methods ?? []).some((m) => m.name === 'mfa');
-     api.accessToken.setCustomClaim('https://pokemans.app/mfa', mfa);
+     const roles = event.authorization?.roles ?? [];
+     api.accessToken.setCustomClaim('https://pokemans.app/roles', roles);
+
+     if (roles.includes('ADMIN')) {
+       // Admins must pass MFA on every login; no token is issued unless they do.
+       api.multifactor.enable('any', { allowRememberBrowser: false });
+       api.accessToken.setCustomClaim('https://pokemans.app/mfa', true);
+     } else {
+       const mfa = (event.authentication?.methods ?? []).some((m) => m.name === 'mfa');
+       api.accessToken.setCustomClaim('https://pokemans.app/mfa', mfa);
+     }
    };
    ```
-6. **Security → Multi-factor Auth:** turn on a factor (e.g. one-time password) and require it for your admin account, so admin logins pass the MFA check.
-7. Run the backend with the issuer and audience set:
+   Why the Action requires MFA itself: post-login Actions run *before* a policy-triggered MFA prompt, so checking `event.authentication.methods` alone misses the MFA done in the same login. Auth0 also puts `amr` only in the ID token, not the access token.
+7. **Security → Multi-factor Auth:** enable One-time Password (the Action needs at least one factor turned on).
+
+8. Run the backend with the issuer and audience set:
    ```powershell
    $env:SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI = "https://<tenant>.<region>.auth0.com/"
    $env:SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES = "https://api.pokemans.app"
    .\gradlew.bat :app:bootRun
    ```
+
+Changes to Actions can take a minute to take effect. Log out and back in to get a fresh token.
 
 ## Web app
 
