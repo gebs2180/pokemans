@@ -14,7 +14,9 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -95,6 +97,22 @@ class S3BlobStore implements BlobStore, AutoCloseable {
     @Override
     public byte[] read(String bucket, String key) {
         return client.getObjectAsBytes(r -> r.bucket(bucket).key(key)).asByteArray();
+    }
+
+    /** Creates the bucket with versioning on if it does not exist. Returns true if it was created. */
+    boolean ensureVersionedBucket(String bucket) {
+        try {
+            client.headBucket(r -> r.bucket(bucket));
+            return false;
+        } catch (S3Exception e) {
+            if (!(e instanceof NoSuchBucketException) && e.statusCode() != 404) {
+                throw e;
+            }
+            client.createBucket(r -> r.bucket(bucket));
+            client.putBucketVersioning(r -> r.bucket(bucket)
+                    .versioningConfiguration(v -> v.status(BucketVersioningStatus.ENABLED)));
+            return true;
+        }
     }
 
     @Override

@@ -16,9 +16,11 @@ services:
       timeout: 3s
       retries: 10
 
+  # MinIO stopped publishing images to Docker Hub in 2025; Chainguard's free build is a drop-in
+  # (only :latest is free). The backend creates the versioned photo bucket on startup.
   minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: server /data --console-address ":9001"
+    image: cgr.dev/chainguard/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: pokemans
       MINIO_ROOT_PASSWORD: pokemans-local
@@ -27,19 +29,6 @@ services:
       - "9001:9001"
     volumes:
       - minio-data:/data
-
-  # Creates the private photo and report buckets with versioning on, then exits.
-  minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-      until mc alias set local http://minio:9000 pokemans pokemans-local; do sleep 1; done;
-      mc mb --ignore-existing local/photos local/reports;
-      mc version enable local/photos;
-      mc version enable local/reports;
-      "
 
 volumes:
   postgres-data:

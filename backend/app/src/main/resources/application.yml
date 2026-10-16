@@ -38,6 +38,8 @@ pokemans:
     photo-bucket: ${STORAGE_PHOTO_BUCKET:photos}
     upload-url-ttl: 10m
     max-upload-bytes: 26214400
+    # Local dev: create the versioned photo bucket on startup. Turn off in production.
+    auto-create-buckets: ${STORAGE_AUTO_CREATE_BUCKETS:true}
   quality:
     min-short-side-px: 1200
     min-long-side-px: 1600

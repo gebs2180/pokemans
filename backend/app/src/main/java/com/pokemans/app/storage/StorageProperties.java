@@ -14,6 +14,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param photoBucket    private, versioned bucket for card photos
  * @param uploadUrlTtl   how long a presigned upload URL stays valid
  * @param maxUploadBytes largest photo accepted
+ * @param autoCreateBuckets create the photo bucket (versioned) at startup if missing; local dev and tests only
  */
 @ConfigurationProperties("pokemans.storage")
 public record StorageProperties(
@@ -25,5 +26,6 @@ public record StorageProperties(
         @DefaultValue("true") boolean pathStyle,
         @DefaultValue("photos") String photoBucket,
         @DefaultValue("10m") Duration uploadUrlTtl,
-        @DefaultValue("26214400") long maxUploadBytes) {
+        @DefaultValue("26214400") long maxUploadBytes,
+        @DefaultValue("false") boolean autoCreateBuckets) {
 }
