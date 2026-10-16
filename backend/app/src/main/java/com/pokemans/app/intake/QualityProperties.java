@@ -1,0 +1,25 @@
+package com.pokemans.app.intake;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
+
+/**
+ * Photo capture-standard thresholds. Starting values, to be calibrated against reviewer judgements:
+ * every photo stores its raw metrics, so thresholds can be re-tuned and replayed later.
+ *
+ * @param minShortSidePx    smallest acceptable short side
+ * @param minLongSidePx     smallest acceptable long side
+ * @param analysisLongSidePx images are downscaled to this long side before blur and glare analysis
+ * @param minBlurScore      variance of the Laplacian (on the downscaled grayscale image) below which a photo is blurry
+ * @param glareLuma         luma (0–255) at or above which a pixel counts as blown out
+ * @param maxGlareFraction  share of blown-out pixels above which a photo has glare
+ */
+@ConfigurationProperties("pokemans.quality")
+public record QualityProperties(
+        @DefaultValue("1200") int minShortSidePx,
+        @DefaultValue("1600") int minLongSidePx,
+        @DefaultValue("1024") int analysisLongSidePx,
+        @DefaultValue("100") double minBlurScore,
+        @DefaultValue("250") int glareLuma,
+        @DefaultValue("0.03") double maxGlareFraction) {
+}
