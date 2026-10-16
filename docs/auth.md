@@ -1,6 +1,6 @@
 # Auth setup
 
-The backend is an OAuth2 resource server (HLD §7). The SPA logs in with a managed OIDC provider and calls the API with the access token as a bearer token. The backend only validates tokens and reads roles from them, so any OIDC provider works. The steps below use Auth0's free tier as the example.
+The backend is an OAuth2 resource server (HLD §7). The SPA logs in with a managed OIDC provider and calls the API with the access token as a bearer token. The backend only validates tokens and reads ADMIN from them, so any OIDC provider works. The steps below use Auth0's free tier as the example.
 
 ## What the backend expects
 
@@ -12,7 +12,8 @@ The backend is an OAuth2 resource server (HLD §7). The SPA logs in with a manag
 | MFA claim | `POKEMANS_SECURITY_MFA_CLAIM` (optional) | default `https://pokemans.app/mfa` |
 | Require MFA for ADMIN | `POKEMANS_SECURITY_REQUIRE_ADMIN_MFA` (optional) | default `true` |
 
-- The roles claim is a list containing any of `ADMIN`, `PARTNER`, `COLLECTOR` (case-insensitive). Unknown values are ignored.
+- **ADMIN comes from the token.** The roles claim is a list of strings; only `ADMIN` (case-insensitive) is read from it.
+- **PARTNER and COLLECTOR come from the database.** An admin creates an org and an invite link; whoever accepts the link while signed in becomes a member of that org with the org's role. Nothing needs to be set per user in Auth0. Users are created in the database on their first API call, keyed by the token's `sub`.
 - ADMIN is granted only for an MFA login: the token's `amr` contains `mfa`, or the MFA claim is `true`. Auth0 puts `amr` only in the ID token, so the post-login Action sets the MFA claim on the access token.
 - With no issuer set, the app still starts, but every bearer token is rejected (fail closed). `/actuator/health` stays public.
 
@@ -20,12 +21,11 @@ The backend is an OAuth2 resource server (HLD §7). The SPA logs in with a manag
 |---|---|
 | `/actuator/health`, `/actuator/info` | anyone |
 | `/api/admin/**` | ADMIN |
-| `/api/partner/**` | PARTNER, ADMIN |
-| `/api/collector/**` | COLLECTOR, ADMIN |
-| other `/api/**` | any signed-in user |
+| `/api/orgs/{orgId}/**` | members of that org, and ADMIN (checked per request; others get 404) |
+| other `/api/**` (`/api/me`, `/api/invites/...`) | any signed-in user |
 | everything else | denied (opened for the SPA's static files when the app serves them) |
 
-`GET /api/me` returns the caller's subject, issuer, granted roles, the raw roles claim and whether the token shows MFA. The web app displays these after login, which is the quickest way to check the wiring.
+`GET /api/me` returns the caller's subject, issuer, roles (ADMIN plus membership roles), org memberships, the raw roles claim and whether the token shows MFA. The web app displays these after login, which is the quickest way to check the wiring.
 
 ## Auth0 setup (free tier)
 
@@ -33,7 +33,7 @@ The backend is an OAuth2 resource server (HLD §7). The SPA logs in with a manag
 2. **Applications → APIs → Create API.** The identifier is the audience, e.g. `https://api.pokemans.app` (it can't be changed later). Use RS256.
 3. **Applications → Create Application → Single Page Application** (React) for the web app. Allowed Callback URLs, Allowed Logout URLs and Allowed Web Origins: `http://localhost:5173`.
 4. **Applications → APIs → (your API) → Application Access:** authorize the SPA for user access. Newer tenants block apps from APIs by default ("Client … is not authorized to access resource server").
-5. **User Management → Roles:** create `ADMIN`, `PARTNER`, `COLLECTOR` and assign them to users.
+5. **User Management → Roles:** create `ADMIN` and assign it to admin users. Partners and collectors join through invite links instead.
 6. **Actions → Library → Build from scratch** (trigger Login / Post Login), deploy it, then add it to **Actions → Triggers → post-login** and click Apply. It must be the only action that sets these claims:
    ```js
    exports.onExecutePostLogin = async (event, api) => {
