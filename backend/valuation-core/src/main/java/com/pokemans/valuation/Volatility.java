@@ -46,11 +46,19 @@ public final class Volatility {
      * @return empty when fewer than two changes exist; the caller must not invent a σ
      */
     public static Optional<Estimate> fromComps(Map<Grade, List<Comp>> compsByGrade, LocalDate asOf, int months) {
+        return fromSeries(compsByGrade.values(), asOf, months);
+    }
+
+    /**
+     * As {@link #fromComps}, over any set of price series, e.g. one per grading company and grade.
+     * Each series must be one market (one grader's one grade), so a change never compares two.
+     */
+    public static Optional<Estimate> fromSeries(Collection<List<Comp>> series, LocalDate asOf, int months) {
         if (months < 2) {
             throw new IllegalArgumentException("Need at least 2 months: " + months);
         }
         List<BigDecimal> pooled = new ArrayList<>();
-        for (List<Comp> comps : compsByGrade.values()) {
+        for (List<Comp> comps : series) {
             BigDecimal[] points = bucketMedians(comps, asOf, months);
             for (int i = 1; i < points.length; i++) {
                 if (points[i - 1] != null && points[i] != null) {

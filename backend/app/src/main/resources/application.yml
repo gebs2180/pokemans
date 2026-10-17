@@ -77,12 +77,9 @@ pokemans:
   pricing:
     # Valuation parameter set the snapshots are priced with (windows, half-life, trimming, confidence).
     parameter-set: 1.0.0
-    # Whose graded comps price grades 1-10. Other graders' comps are stored but not used yet.
-    grading-company: PSA
+    # Each grading company's comps price that company's grades separately; there is no bulk floor.
     currency: USD
-    # Starting values, to be set from real data: the price of an outcome with no usable comps,
-    # and how many cards an era step-down ratio needs.
-    bulk-floor: 0.25
+    # Starting value, to be set from real data: how many cards an era step-down ratio needs.
     min-cards-per-ratio: 3
     ingestion:
       # Nightly comp ingestion and snapshot refresh. Off: no price source is licensed yet

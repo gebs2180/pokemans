@@ -1,6 +1,7 @@
 package com.pokemans.app.pricing;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.pokemans.app.TestApi;
@@ -110,7 +111,8 @@ class PricingFlowTest {
         source.graded(target, GradingCompany.PSA, "2", "40", daysAgo(12));
         source.raw(target, RawCondition.DAMAGED, "15", daysAgo(7));
         source.raw(target, RawCondition.DAMAGED, "15", daysAgo(14));
-        source.graded(target, GradingCompany.CGC, "10", "5000", daysAgo(2)); // stored, not used for PSA grades
+        source.graded(target, GradingCompany.CGC, "10", "5000", daysAgo(2)); // CGC is priced on its own
+        source.graded(target, GradingCompany.CGC, "1", "30", daysAgo(3));
         source.raw(target, RawCondition.NEAR_MINT, "200", daysAgo(2));       // stored, not used for grades
         PriceSource.Sale twice = source.graded(target, GradingCompany.PSA, "9", "400", daysAgo(20));
         source.add(twice);                                                    // the source repeats a sale
@@ -138,18 +140,20 @@ class PricingFlowTest {
         assertThat((Integer) run.get("duplicates")).isGreaterThanOrEqualTo(1);
         assertThat(run.get("errors").toString()).contains("currency EUR").contains("in the future");
         assertThat(jdbc.queryForObject("select count(*) from sold_comp where catalog_card_id = ?", Integer.class, target))
-                .isEqualTo(13 + 2 + 2 + 2 + 2 + 1 + 1 + 1);
+                .isEqualTo(13 + 2 + 2 + 2 + 2 + 2 + 1 + 1);
         assertThat(jdbc.queryForObject("select count(*) from sold_comp where catalog_card_id = ? and (licence <> 'test fixture'"
                 + " or retrieved_at is null or ingest_run_id is null)", Integer.class, target)).isZero();
 
         // Snapshots: every grade of the target, with method, comps, window and confidence.
         assertThat(result.snapshotSets()).containsKeys(target, comparables[0], comparables[1], comparables[2]);
         assertThat(result.skipped()).containsKey(modern);
-        assertThat(result.skipped().get(modern)).contains("step-down ratio");
-        assertThat(prices.latest(modern)).isEmpty();
+        assertThat(result.skipped().get(modern)).singleElement().asString().startsWith("PSA: ").contains("step-down ratio");
+        assertThat(prices.latestByCompany(modern)).isEmpty();
+        assertThat(result.snapshotSets().get(target)).containsOnlyKeys(GradingCompany.PSA, GradingCompany.CGC);
+        assertThat(result.snapshotSets().get(comparables[0])).containsOnlyKeys(GradingCompany.PSA);
 
-        Prices.CardPrices card = prices.latest(target).orElseThrow();
-        assertThat(card.snapshotSetId()).isEqualTo(result.snapshotSets().get(target));
+        Prices.CardPrices card = prices.latest(target, "PSA").orElseThrow();
+        assertThat(card.snapshotSetId()).isEqualTo(result.snapshotSets().get(target).get(GradingCompany.PSA));
         assertThat(card.grades()).hasSize(11);
         assertThat(card.gradingCompany()).isEqualTo("PSA");
         assertThat(card.parameterSet()).isEqualTo("1.0.0");
@@ -191,20 +195,42 @@ class PricingFlowTest {
         assertThat(card.grades().get(Grade.U).price()).isEqualByComparingTo("15");
         assertThat(card.sigma()).isNotNull();
         assertThat(card.sigmaChanges()).isEqualTo(12);
-        assertThat(card.salesPerMonth()).isEqualByComparingTo("4.67"); // 14 comps in 90 days
+        assertThat(card.salesPerMonth()).isEqualByComparingTo("5.00"); // 15 comps in 90 days, raw and every grader
+
+        // CGC: its own table from CGC sales only, never mixed with or converted from PSA.
+        Prices.CardPrices cgc = prices.latestByCompany(target).get("CGC");
+        assertThat(cgc.gradingCompany()).isEqualTo("CGC");
+        assertThat(cgc.grades()).hasSize(11);
+        assertThat(cgc.grades().get(Grade.G10).price()).isEqualByComparingTo("5000");
+        assertThat(cgc.grades().get(Grade.G10).compIds()).singleElement().satisfies(compId ->
+                assertThat(jdbc.queryForObject("select grading_company from sold_comp where id = ?", String.class, compId)).isEqualTo("CGC"));
+        assertThat(cgc.grades().get(Grade.G5).method()).isEqualTo(GradePrice.Method.INTERPOLATED);
+        assertThat(cgc.grades().get(Grade.G5).basis()).containsExactly(Grade.G1, Grade.G10);
+        assertThat(cgc.grades().get(Grade.U).price()).isEqualByComparingTo("15"); // damaged raw sales serve every table
+        assertThat(cgc.sigma()).isEqualByComparingTo(card.sigma());               // σ belongs to the card
+        assertThat(cgc.salesPerMonth()).isEqualByComparingTo(card.salesPerMonth());
 
         // A comparable with nothing above grade 2: higher grades carry grade 2's price, never stepped up.
-        Prices.CardPrices comparable = prices.latest(comparables[0]).orElseThrow();
+        Prices.CardPrices comparable = prices.latest(comparables[0], "PSA").orElseThrow();
         assertThat(comparable.grades().get(Grade.G10).method()).isEqualTo(GradePrice.Method.CARRIED_DOWN);
         assertThat(comparable.grades().get(Grade.G10).price()).isEqualByComparingTo("40");
-        assertThat(comparable.grades().get(Grade.U).method()).isEqualTo(GradePrice.Method.FLOOR);
+        // No damaged sales: U is worth zero. There is no bulk floor.
+        assertThat(comparable.grades().get(Grade.U).method()).isEqualTo(GradePrice.Method.NO_SALES);
+        assertThat(comparable.grades().get(Grade.U).price()).isEqualByComparingTo("0");
 
         // Running again stores no new comps and appends a new snapshot set.
         int before = jdbc.queryForObject("select count(*) from sold_comp", Integer.class);
         PriceSnapshotService.Result again = refresh.runOnce(TODAY);
         assertThat(jdbc.queryForObject("select count(*) from sold_comp", Integer.class)).isEqualTo(before);
-        assertThat(again.snapshotSets().get(target)).isNotEqualTo(card.snapshotSetId());
-        assertThat(prices.latest(target).orElseThrow().snapshotSetId()).isEqualTo(again.snapshotSets().get(target));
+        UUID newPsaSet = again.snapshotSets().get(target).get(GradingCompany.PSA);
+        assertThat(newPsaSet).isNotEqualTo(card.snapshotSetId());
+        assertThat(prices.latest(target, "PSA").orElseThrow().snapshotSetId()).isEqualTo(newPsaSet);
         assertThat(prices.bySet(card.snapshotSetId())).isPresent();
+
+        // Append-only is enforced by the database, not only by the code.
+        for (String table : new String[] {"sold_comp", "price_snapshot", "price_stats"}) {
+            assertThatThrownBy(() -> jdbc.update("update " + table + " set created_at = now() where catalog_card_id = ?", target))
+                    .hasMessageContaining("append-only");
+        }
     }
 }

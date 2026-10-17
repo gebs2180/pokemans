@@ -21,8 +21,12 @@ interface PriceSnapshotRepository extends JpaRepository<PriceSnapshot, UUID> {
 
     List<PriceSnapshot> findBySnapshotSetId(UUID snapshotSetId);
 
-    /** The newest snapshot row for a card; its set is the card's current price table. */
-    Optional<PriceSnapshot> findFirstByCatalogCardIdOrderByAsOfDescCreatedAtDesc(UUID catalogCardId);
+    /** The newest snapshot row for a card and grading company; its set is that company's current price table. */
+    Optional<PriceSnapshot> findFirstByCatalogCardIdAndGradingCompanyOrderByAsOfDescCreatedAtDesc(
+            UUID catalogCardId, PriceSource.GradingCompany gradingCompany);
+
+    @Query("select distinct s.gradingCompany from PriceSnapshot s where s.catalogCardId = :catalogCardId")
+    List<PriceSource.GradingCompany> findGradingCompaniesByCatalogCardId(UUID catalogCardId);
 }
 
 interface PriceStatsRepository extends JpaRepository<PriceStats, UUID> {

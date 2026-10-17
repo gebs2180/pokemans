@@ -46,8 +46,8 @@ public record GradePrice(
         STEP_DOWN,
         /** Only lower grades observed: the lower grade's price, unchanged (never stepped up). */
         CARRIED_DOWN,
-        /** No usable comps: bulk floor. */
-        FLOOR
+        /** U only: no damaged or altered raw sales, so it is valued at zero. There is no bulk floor. */
+        NO_SALES
     }
 
     /** True for prices from the missing-grade rule; these drop confidence one level. */

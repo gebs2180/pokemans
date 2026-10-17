@@ -21,10 +21,12 @@ import java.util.Objects;
  *   <li>Missing grades: log interpolation between observed grades on both sides; the era step-down
  *       ratio from the nearest observed grade above; or, with only lower grades observed, the lower
  *       grade's price unchanged. Never stepped up.
- *   <li>U from damaged/altered raw sales, else the bulk floor.
+ *   <li>U from damaged/altered raw sales, else zero. There is no bulk floor: low-value cards are
+ *       kept out by the portfolio's FMV minimum, not propped up here.
+ *   <li>No graded sales in any grade: refused, so the caller leaves the card unpriced.
  *   <li>Net of grading costs, unless the raw-sale price for that condition is higher.
  *   <li>Per-grade confidence: observed prices from their comp count, derived prices one level below
- *       the grades they came from (so a step-down chain drops once per step), floor prices D.
+ *       the grades they came from (so a step-down chain drops once per step), U with no sales D.
  * </ul>
  */
 public final class GradePricer {
@@ -39,7 +41,6 @@ public final class GradePricer {
      * @param asOf               valuation date; comps after it are ignored
      * @param gradedComps        sold comps per gradable grade (half grades already folded)
      * @param damagedRawComps    raw sales of damaged or altered copies, used for U
-     * @param bulkFloor          U price when no damaged raw sales exist
      * @param stepDownRatios     for grade g, the era median ratio of price(g) to price(g + 1)
      * @param gradingCost        cost of grading, netted from graded prices
      * @param rawConditionPrices optional raw-sale price for a card in the condition of each grade
@@ -48,7 +49,6 @@ public final class GradePricer {
             LocalDate asOf,
             Map<Grade, List<Comp>> gradedComps,
             List<Comp> damagedRawComps,
-            BigDecimal bulkFloor,
             Map<Grade, BigDecimal> stepDownRatios,
             GradingCost gradingCost,
             Map<Grade, BigDecimal> rawConditionPrices) {
@@ -80,9 +80,9 @@ public final class GradePricer {
             method.put(Grade.U, GradePrice.Method.OBSERVED);
             observedComps.put(Grade.U, damaged);
         } else {
-            gross.put(Grade.U, input.bulkFloor());
-            method.put(Grade.U, GradePrice.Method.FLOOR);
-            trace.add("price[U]", "bulk floor", input.bulkFloor(), "no damaged/altered raw sales in window");
+            gross.put(Grade.U, BigDecimal.ZERO);
+            method.put(Grade.U, GradePrice.Method.NO_SALES);
+            trace.add("price[U]", "no sales, valued at zero", BigDecimal.ZERO, "no damaged/altered raw sales in window");
         }
 
         EnumMap<Grade, Confidence> confidence = new EnumMap<>(Grade.class);
@@ -144,7 +144,7 @@ public final class GradePricer {
         }
         Confidence c = switch (method.get(grade)) {
             case OBSERVED -> fromCompCount(observed.get(grade).salesInWindow());
-            case FLOOR -> Confidence.D;
+            case NO_SALES -> Confidence.D;
             case INTERPOLATED, STEP_DOWN, CARRIED_DOWN -> {
                 Confidence worst = Confidence.A;
                 for (Grade from : basis.get(grade)) {
@@ -176,13 +176,7 @@ public final class GradePricer {
         // Observed grades only: derived prices never anchor other derived prices except step-down chains.
         EnumMap<Grade, BigDecimal> observed = new EnumMap<>(gross);
         if (observed.isEmpty()) {
-            for (int g = 1; g <= 10; g++) {
-                Grade grade = Grade.of(g);
-                gross.put(grade, input.bulkFloor());
-                method.put(grade, GradePrice.Method.FLOOR);
-                trace.add("price[" + grade + "]", "bulk floor", input.bulkFloor(), "no graded sales for any grade");
-            }
-            return;
+            throw new IllegalArgumentException("No graded sales for any grade");
         }
         // Walk downward so step-down chains use the already-derived grade above.
         for (int g = 10; g >= 1; g--) {

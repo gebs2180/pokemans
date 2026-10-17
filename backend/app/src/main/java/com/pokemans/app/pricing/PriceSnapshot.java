@@ -55,7 +55,8 @@ class PriceSnapshot {
         this.snapshotSetId = snapshotSetId;
         this.catalogCardId = catalogCardId;
         this.grade = price.grade().toString();
-        this.gradingCompany = price.grade().isUngradable() ? null : gradingCompany;
+        // Every row carries its set's company, U included: each company's table is priced on its own.
+        this.gradingCompany = gradingCompany;
         this.asOf = asOf;
         this.price = price.gross();
         this.currency = currency;

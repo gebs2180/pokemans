@@ -24,9 +24,10 @@ Collateral reports for raw-heavy Pokémon card collections: what a collection re
    - Sales only above → higher grade × era step-down ratio (median adjacent-grade price ratio across comparable same-era cards).
    - Sales only below → use the lower grade's price unchanged. **Never step up.**
    - Any derived price → confidence drops one level.
-   - U priced from damaged/altered raw sales, else a bulk floor.
+   - Each grading company (PSA, CGC, BGS, …) is priced separately from its own comps, never pooled or converted.
+   - U priced from damaged/altered raw sales, else $0. No bulk floor (Zach, 2026-10-17; the methodology doc still says bulk floor and needs updating). Low-value cards are excluded by the $25 FMV minimum instead.
    - Each grade's price is **net** of grading fee, shipping, insurance and a time-to-cash discount, but use the raw-sale price for that condition if it's higher.
-   - Volatility σ = std dev of 30-day price changes over 12 months, stored per card.
+   - Volatility σ = std dev of 30-day price changes over 12 months, stored per card, from graded sales only (never raw).
 4. **Values** (p = grade probability, P = net price):
    - `FMV_i = Σ_g p_ig · P_ig`
    - `RV_i = FMV_i · (1 + b + s_i)`, using the central (unstressed) distribution. b = 12% buyer costs; s = search premium of 0% (>20 sales/mo), 5% (5–20), 10% (<5).

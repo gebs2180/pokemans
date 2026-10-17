@@ -9,6 +9,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +34,7 @@ public class Prices {
     /**
      * A card's price table as of a date, with its market stats.
      *
-     * @param gradingCompany whose graded comps priced grades 1–10
+     * @param gradingCompany whose graded comps priced this table
      * @param sigma          monthly σ, or null when there were too few 30-day changes
      */
     public record CardPrices(UUID snapshotSetId, UUID catalogCardId, LocalDate asOf, String parameterSet, String gradingCompany,
@@ -48,11 +49,25 @@ public class Prices {
         this.stats = stats;
     }
 
-    /** The card's newest snapshot set, if it has been priced. */
+    /**
+     * The card's newest price table for one grading company (e.g. "PSA"), if that company's grades
+     * have been priced. Companies are priced separately and never converted into one another.
+     */
     @Transactional(readOnly = true)
-    public Optional<CardPrices> latest(UUID catalogCardId) {
-        return snapshots.findFirstByCatalogCardIdOrderByAsOfDescCreatedAtDesc(catalogCardId)
+    public Optional<CardPrices> latest(UUID catalogCardId, String gradingCompany) {
+        return snapshots.findFirstByCatalogCardIdAndGradingCompanyOrderByAsOfDescCreatedAtDesc(catalogCardId,
+                        PriceSource.GradingCompany.valueOf(gradingCompany))
                 .flatMap(newest -> bySet(newest.getSnapshotSetId()));
+    }
+
+    /** The card's newest price table for each grading company it has been priced for, by company. */
+    @Transactional(readOnly = true)
+    public Map<String, CardPrices> latestByCompany(UUID catalogCardId) {
+        Map<String, CardPrices> byCompany = new TreeMap<>();
+        for (PriceSource.GradingCompany company : snapshots.findGradingCompaniesByCatalogCardId(catalogCardId)) {
+            latest(catalogCardId, company.name()).ifPresent(p -> byCompany.put(company.name(), p));
+        }
+        return byCompany;
     }
 
     @Transactional(readOnly = true)

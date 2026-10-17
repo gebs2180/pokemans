@@ -34,6 +34,10 @@ import org.springframework.transaction.annotation.Transactional;
  * for every rule. Two passes: observed prices of every card with comps build the era step-down
  * ratio tables, then each card is priced against its era's table.
  *
+ * <p>Each grading company is priced separately, with its own era ratio tables. Sigma comes from
+ * graded sales only (never raw), pooled across companies and grades; the sales rate counts every sale
+ * of the card, since liquidity belongs to the card, not to a grade.
+ *
  * <p>Snapshots hold gross prices. Netting grading costs needs a grading cost and turnaround, which
  * belong to the valuation run (M4), so the pricer runs here with no grading cost and no raw-condition
  * override.
@@ -46,8 +50,12 @@ class PriceSnapshotService {
             new GradingCost(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     private static final int SALES_RATE_DAYS = 90;
 
-    /** What one refresh did: snapshot set per priced card, and why the others weren't priced. */
-    record Result(LocalDate asOf, Map<UUID, UUID> snapshotSets, Map<UUID, String> skipped) {
+    /**
+     * What one refresh did: per priced card, a snapshot set per grading company; and for each card
+     * or company left unpriced, why.
+     */
+    record Result(LocalDate asOf, Map<UUID, Map<PriceSource.GradingCompany, UUID>> snapshotSets,
+                  Map<UUID, List<String>> skipped) {
     }
 
     private final SoldCompRepository comps;
@@ -65,7 +73,11 @@ class PriceSnapshotService {
         this.properties = properties;
     }
 
-    /** Snapshots every identified card and every card with comps, as of {@code asOf}. */
+    /**
+     * Snapshots every identified card and every card with comps, as of {@code asOf}. Each grading
+     * company's comps price that company's grades on their own: a PSA 9 and a CGC 9 are different
+     * markets, so they are never pooled or converted.
+     */
     @Transactional
     Result snapshotAll(LocalDate asOf) {
         ParameterSet params = ParameterSet.load(properties.parameterSet());
@@ -77,50 +89,62 @@ class PriceSnapshotService {
         cardIds.addAll(comps.findCatalogCardIdsSoldBetween(from, asOf));
         List<Catalog.CardSummary> cards = catalog.cards(cardIds);
 
-        // Pass 1: observed prices per card, grouped by era, build each era's ratio table.
+        // Pass 1: observed prices per card and company, grouped by era and company, build the ratio tables.
         Map<UUID, CardComps> compsByCard = new HashMap<>();
         Map<String, List<Map<Grade, BigDecimal>>> observedByEra = new HashMap<>();
         for (Catalog.CardSummary card : cards) {
             CardComps cc = load(card.catalogCardId(), from, asOf);
             compsByCard.put(card.catalogCardId(), cc);
-            Map<Grade, BigDecimal> observed = pricer.observedPrices(asOf, cc.graded());
-            if (!observed.isEmpty()) {
-                observedByEra.computeIfAbsent(era(card), k -> new ArrayList<>()).add(observed);
-            }
+            cc.graded().forEach((company, graded) -> {
+                Map<Grade, BigDecimal> observed = pricer.observedPrices(asOf, graded);
+                if (!observed.isEmpty()) {
+                    observedByEra.computeIfAbsent(era(card, company), k -> new ArrayList<>()).add(observed);
+                }
+            });
         }
         Map<String, StepDownRatios.Table> ratiosByEra = new HashMap<>();
         observedByEra.forEach((era, observed) -> ratiosByEra.put(era, StepDownRatios.compute(observed, properties.minCardsPerRatio())));
 
-        // Pass 2: price each card.
-        Map<UUID, UUID> sets = new LinkedHashMap<>();
-        Map<UUID, String> skipped = new LinkedHashMap<>();
+        // Pass 2: price each card, once per grading company it has sales for.
+        Map<UUID, Map<PriceSource.GradingCompany, UUID>> sets = new LinkedHashMap<>();
+        Map<UUID, List<String>> skipped = new LinkedHashMap<>();
         for (Catalog.CardSummary card : cards) {
             CardComps cc = compsByCard.get(card.catalogCardId());
-            Map<Grade, BigDecimal> ratios = Optional.ofNullable(ratiosByEra.get(era(card)))
-                    .map(StepDownRatios.Table::ratios).orElse(Map.of());
-            GradePriceTable table;
-            try {
-                table = pricer.price(new GradePricer.Input(asOf, cc.graded(), cc.damaged(), properties.bulkFloor(), ratios,
-                        NO_GRADING_COST, Map.of()));
-            } catch (IllegalArgumentException e) {
-                // e.g. no era step-down ratio yet: leave the card unpriced rather than guess.
-                skipped.put(card.catalogCardId(), e.getMessage());
+            if (cc.graded().isEmpty()) {
+                skipped.computeIfAbsent(card.catalogCardId(), k -> new ArrayList<>()).add("No graded sales");
                 continue;
             }
-            UUID setId = UUID.randomUUID();
-            for (GradePrice price : table.all()) {
-                BigDecimal ratio = price.method() == GradePrice.Method.STEP_DOWN ? ratios.get(price.grade()) : null;
-                List<String> trace = table.trace().stepsFor("price[" + price.grade() + "]").stream()
-                        .map(Trace.Step::toString).toList();
-                snapshots.save(new PriceSnapshot(setId, card.catalogCardId(), asOf, properties.gradingCompany(),
-                        properties.currency(), price, ratio, params.version(), trace));
+            // Sigma and the sales rate describe the card's market, so every company's set gets the same values.
+            Optional<Volatility.Estimate> sigma = Volatility.fromSeries(cc.graded().values().stream()
+                    .flatMap(byGrade -> byGrade.values().stream()).toList(), asOf, properties.volatilityMonths());
+            BigDecimal salesPerMonth = salesPerMonth(cc.all(), asOf);
+            for (Map.Entry<PriceSource.GradingCompany, Map<Grade, List<Comp>>> entry : cc.graded().entrySet()) {
+                PriceSource.GradingCompany company = entry.getKey();
+                Map<Grade, BigDecimal> ratios = Optional.ofNullable(ratiosByEra.get(era(card, company)))
+                        .map(StepDownRatios.Table::ratios).orElse(Map.of());
+                GradePriceTable table;
+                try {
+                    table = pricer.price(new GradePricer.Input(asOf, entry.getValue(), cc.damaged(), ratios,
+                            NO_GRADING_COST, Map.of()));
+                } catch (IllegalArgumentException e) {
+                    // e.g. no era step-down ratio yet: leave this company's prices out rather than guess.
+                    skipped.computeIfAbsent(card.catalogCardId(), k -> new ArrayList<>()).add(company + ": " + e.getMessage());
+                    continue;
+                }
+                UUID setId = UUID.randomUUID();
+                for (GradePrice price : table.all()) {
+                    BigDecimal ratio = price.method() == GradePrice.Method.STEP_DOWN ? ratios.get(price.grade()) : null;
+                    List<String> trace = table.trace().stepsFor("price[" + price.grade() + "]").stream()
+                            .map(Trace.Step::toString).toList();
+                    snapshots.save(new PriceSnapshot(setId, card.catalogCardId(), asOf, company,
+                            properties.currency(), price, ratio, params.version(), trace));
+                }
+                stats.save(new PriceStats(setId, card.catalogCardId(), asOf, sigma.map(Volatility.Estimate::sigma).orElse(null),
+                        sigma.map(Volatility.Estimate::changes).orElse(0), salesPerMonth));
+                sets.computeIfAbsent(card.catalogCardId(), k -> new EnumMap<>(PriceSource.GradingCompany.class)).put(company, setId);
             }
-            Optional<Volatility.Estimate> sigma = Volatility.fromComps(cc.graded(), asOf, properties.volatilityMonths());
-            stats.save(new PriceStats(setId, card.catalogCardId(), asOf, sigma.map(Volatility.Estimate::sigma).orElse(null),
-                    sigma.map(Volatility.Estimate::changes).orElse(0), salesPerMonth(cc.all(), asOf)));
-            sets.put(card.catalogCardId(), setId);
         }
-        log.info("Price snapshots as of {}: {} cards priced, {} skipped", asOf, sets.size(), skipped.size());
+        log.info("Price snapshots as of {}: {} cards priced, {} with something skipped", asOf, sets.size(), skipped.size());
         return new Result(asOf, sets, skipped);
     }
 
@@ -129,31 +153,32 @@ class PriceSnapshotService {
         return Math.max(params.extendedWindowDays(), (properties.volatilityMonths() + 1) * Volatility.PERIOD_DAYS);
     }
 
-    private String era(Catalog.CardSummary card) {
-        return properties.eraKey(card.language(), card.setReleaseDate());
+    /** Era key for ratios: grading company, language and era, since each grader's price ladder differs. */
+    private String era(Catalog.CardSummary card, PriceSource.GradingCompany company) {
+        return company + ":" + properties.eraKey(card.language(), card.setReleaseDate());
     }
 
     /**
-     * @param graded  the configured grading company's comps, half grades folded down
+     * @param graded  graded comps per grading company and grade, half grades folded down
      * @param damaged raw damaged or altered sales, for U
-     * @param all     every comp of the card, for its sales rate
+     * @param all     every comp of the card, raw included, for its sales rate
      */
-    private record CardComps(Map<Grade, List<Comp>> graded, List<Comp> damaged, List<SoldComp> all) {
+    private record CardComps(Map<PriceSource.GradingCompany, Map<Grade, List<Comp>>> graded, List<Comp> damaged,
+                             List<SoldComp> all) {
     }
 
     private CardComps load(UUID catalogCardId, LocalDate from, LocalDate asOf) {
         List<SoldComp> all = comps.findByCatalogCardIdAndSoldOnBetween(catalogCardId, from, asOf).stream()
                 .filter(c -> properties.currency().equals(c.getCurrency()))
                 .toList();
-        Map<Grade, List<Comp>> graded = new EnumMap<>(Grade.class);
+        Map<PriceSource.GradingCompany, Map<Grade, List<Comp>>> graded = new EnumMap<>(PriceSource.GradingCompany.class);
         List<Comp> damaged = new ArrayList<>();
         for (SoldComp c : all) {
             Comp comp = new Comp(c.getId().toString(), c.getSoldOn(), c.getPrice());
             if (c.getGrade() != null) {
-                if (c.getGradingCompany() == properties.gradingCompany()) {
-                    // Half grades fold down (their own sales history isn't modelled yet).
-                    graded.computeIfAbsent(Grade.foldHalf(c.getGrade()), g -> new ArrayList<>()).add(comp);
-                }
+                // Half grades fold down (their own sales history isn't modelled yet).
+                graded.computeIfAbsent(c.getGradingCompany(), k -> new EnumMap<>(Grade.class))
+                        .computeIfAbsent(Grade.foldHalf(c.getGrade()), g -> new ArrayList<>()).add(comp);
             } else if (c.getRawCondition() == PriceSource.RawCondition.DAMAGED
                     || c.getRawCondition() == PriceSource.RawCondition.ALTERED) {
                 damaged.add(comp);

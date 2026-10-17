@@ -15,7 +15,6 @@ class GradePricerTest {
 
     private static final LocalDate AS_OF = LocalDate.of(2026, 10, 1);
     private static final GradingCost NO_COST = new GradingCost(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
-    private static final BigDecimal FLOOR = new BigDecimal("2");
 
     private final GradePricer pricer = new GradePricer(ParameterSet.defaults());
     private int nextId;
@@ -37,7 +36,7 @@ class GradePricerTest {
     }
 
     private GradePricer.Input input(Map<Grade, List<Comp>> comps) {
-        return new GradePricer.Input(AS_OF, comps, List.of(), FLOOR, ratios("0.78"), NO_COST, Map.of());
+        return new GradePricer.Input(AS_OF, comps, List.of(), ratios("0.78"), NO_COST, Map.of());
     }
 
     /** The worked example's observed prices, two recent sales each. */
@@ -149,7 +148,7 @@ class GradePricerTest {
         GradingCost cost = new GradingCost(d("25"), d("5"), d("2"), d("0.02"));
         Map<Grade, BigDecimal> raw = Map.of(Grade.G7, d("280"), Grade.G8, d("300"));
 
-        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), FLOOR, ratios("0.78"), cost, raw));
+        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), ratios("0.78"), cost, raw));
 
         assertThat(table.net(Grade.G8)).isEqualByComparingTo("458.00");
         assertThat(table.get(Grade.G8).rawOverride()).isFalse();
@@ -158,16 +157,24 @@ class GradePricerTest {
     }
 
     @Test
-    void pricesUngradableFromDamagedSalesElseTheBulkFloor() {
+    void pricesUngradableFromDamagedSalesElseZero() {
         Map<Grade, List<Comp>> comps = exampleComps(false);
         GradePriceTable withDamaged = pricer.price(new GradePricer.Input(AS_OF, comps,
-                List.of(comp(3, "60"), comp(4, "60")), FLOOR, ratios("0.78"), NO_COST, Map.of()));
+                List.of(comp(3, "60"), comp(4, "60")), ratios("0.78"), NO_COST, Map.of()));
         GradePriceTable withoutDamaged = pricer.price(input(comps));
 
         assertThat(withDamaged.net(Grade.U)).isEqualByComparingTo("60");
         assertThat(withDamaged.get(Grade.U).method()).isEqualTo(GradePrice.Method.OBSERVED);
-        assertThat(withoutDamaged.net(Grade.U)).isEqualByComparingTo("2");
-        assertThat(withoutDamaged.get(Grade.U).method()).isEqualTo(GradePrice.Method.FLOOR);
+        assertThat(withoutDamaged.net(Grade.U)).isEqualByComparingTo("0");
+        assertThat(withoutDamaged.get(Grade.U).method()).isEqualTo(GradePrice.Method.NO_SALES);
+        assertThat(withoutDamaged.get(Grade.U).confidence()).isEqualTo(Confidence.D);
+    }
+
+    @Test
+    void refusesACardWithNoGradedSalesRatherThanFlooringIt() {
+        assertThatThrownBy(() -> pricer.price(input(new EnumMap<>(Grade.class))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No graded sales");
     }
 
     @Test
@@ -175,7 +182,7 @@ class GradePricerTest {
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
         comps.put(Grade.G9, List.of(comp(1, "100"), comp(2, "100")));
 
-        assertThatThrownBy(() -> pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), FLOOR, Map.of(), NO_COST, Map.of())))
+        assertThatThrownBy(() -> pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), Map.of(), NO_COST, Map.of())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("step-down ratio");
     }
@@ -185,7 +192,7 @@ class GradePricerTest {
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
         comps.put(Grade.G9, List.of(comp(1, "100"), comp(2, "100")));
 
-        assertThatThrownBy(() -> pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), FLOOR, ratios("1.05"), NO_COST, Map.of())))
+        assertThatThrownBy(() -> pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), ratios("1.05"), NO_COST, Map.of())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("above 1");
     }
@@ -196,7 +203,7 @@ class GradePricerTest {
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
         comps.put(Grade.G3, List.of(comp(1, "30"), comp(2, "30")));
 
-        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), FLOOR, ratios("0.5"), NO_COST, Map.of()));
+        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), ratios("0.5"), NO_COST, Map.of()));
 
         for (int g = 4; g <= 10; g++) {
             assertThat(table.gross(Grade.of(g))).isEqualByComparingTo("30");

@@ -1,6 +1,5 @@
 package com.pokemans.app.pricing;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -13,10 +12,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * half-life, trimming, confidence thresholds) come from the valuation parameter set, not from here.
  *
  * @param parameterSet         valuation parameter set version used for snapshots
- * @param gradingCompany       whose graded comps price grades 1–10; PSA matches the outcomes we collect
  * @param currency             the only currency accepted (USD in v1); other comps are rejected
- * @param bulkFloor            price of an outcome with no usable comps, e.g. U with no damaged sales.
- *                             Starting value: set it from bulk-lot sales.
  * @param minCardsPerRatio     cards with both adjacent grades observed before an era step-down ratio is used
  * @param volatilityMonths     30-day changes looked back over for σ
  * @param eras                 era boundaries for step-down ratios, by set release date. Starting values.
@@ -24,9 +20,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties("pokemans.pricing")
 record PricingProperties(
         @DefaultValue("1.0.0") String parameterSet,
-        @DefaultValue("PSA") PriceSource.GradingCompany gradingCompany,
         @DefaultValue("USD") String currency,
-        @DefaultValue("0.25") BigDecimal bulkFloor,
         @DefaultValue("3") int minCardsPerRatio,
         @DefaultValue("12") int volatilityMonths,
         List<Era> eras,

@@ -67,23 +67,24 @@ Fixture data only. Nothing calls a real price API or scrapes anything.
 - **Comps browser** in the admin console, plus comp overrides. Overrides would be new rows, never edits.
 - **Step-down ratio tables:** store them per era and recompute weekly, as the HLD says. For now they are rebuilt on each run and only the ratio used is kept on the snapshot.
 - **Half grades with their own sales history.** They are always folded down for now.
+- **Methodology doc:** update the Claude Doc for decision 7 (U is $0 with no damaged sales, no bulk floor).
 - **Raw-condition override** (step 3's "use the raw-sale price if higher"). The pricer supports it, but snapshots pass no raw prices, because nothing maps a raw condition to a grade yet.
 - **Netting grading costs.** It belongs in the valuation run (M4), with the grading cost and turnaround of the day.
 - **The M3 "done when":** snapshots for the controlled set from real comps.
 - **Performance:** each run loads comps per card and does two passes in one transaction. That's fine for tens of cards. Batch it before thousands.
 - **Purging by licence**, if a vendor's terms require it (PriceCharting's purge clause). Provenance is stored per comp to make this possible.
 
-## Open questions (choices made, for Zach to confirm)
+## Decisions (Zach, 2026-10-17)
 
-1. **Grader for grades 1–10:** PSA only, by config (`pokemans.pricing.grading-company`). CGC, BGS and the rest are stored but unused. Should other graders' comps count, perhaps converted, or price separately?
-2. **Confidence on step-down chains:** each step drops one more level, so grade 6 stepped from a stepped grade 7 is two levels below grade 8. That is the conservative reading of "any derived price drops one level". Is the intent a single drop?
-3. **Confidence counts sales before outlier trimming**, so 10 sales trimmed to 8 still count as 10 (A). Using the post-trim count would mean 10–11 sales give B.
-4. **No extra drop for the 180-day window.** Thin data already shows in the low n. Should an extended window also drop a level?
-5. **Era bands** (WotC to May 2003, EX to Black & White, XY to Sun & Moon, Sword & Shield on, split by language) and **3 cards per ratio** are starting values I chose. What makes cards "comparable" may need rarity or holo status as well.
-6. **Missing era ratio:** the card is left unpriced and reported (`skipped`), following the pricer's existing "refuse rather than guess". The alternative is pricing those grades at the bulk floor.
-7. **Bulk floor:** $0.25, a placeholder. It needs a figure from bulk-lot sales.
-8. **σ pooling:** 30-day changes are pooled across grades, from PSA comps only. Raw sales are excluded.
-9. **Sales per month:** every stored comp of the card (all graders and raw) over the last 90 days, per 30 days. Should liquidity be per grade?
-10. **Snapshots are gross.** M4 nets grading costs. The snapshot keeps the market evidence separate from our cost assumptions.
-11. **Scheduling:** `@Scheduled` like the other modules, not JobRunr as the HLD says. Switch when retries or the dashboard are needed.
-12. **Append-only** is enforced by code (no setters, no update paths), not by a database trigger, matching `provider_prediction`. Add a trigger?
+1. **Other graders: priced separately.** Each grading company gets its own table and era ratios. Comps are never pooled or converted across graders. Built in V9.
+2. **Step-down chains drop one level per step.** Explained to Zach; open until he confirms.
+3. **Confidence counts sales before trimming.** Kept.
+4. **No extra drop for the 180-day window, for now.** Later: notch extended-window prices using an overall market trend.
+5. **Era bands and 3 cards per ratio.** Explained to Zach; open until he confirms.
+6. **Missing era ratio: skipped,** not priced at a floor. Kept.
+7. **No bulk floor.** U with no damaged or altered sales is $0. A card with no graded sales is skipped. Low-value cards are excluded by the $25 FMV eligibility minimum (step 5). Built in V9.
+8. **σ always excludes raw sales.** Kept; σ now pools graded sales across graders.
+9. **Liquidity is per card,** not per grade. Kept.
+10. **Snapshots are gross; M4 nets.** Explained to Zach; open until he confirms.
+11. **`@Scheduled` for now.** Fine.
+12. **Append-only enforced in the database:** an update trigger on `sold_comp`, `price_snapshot` and `price_stats` (V9). Deletes stay possible for licence purges.

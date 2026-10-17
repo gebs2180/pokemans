@@ -50,7 +50,7 @@ class PricingUnitTest {
 
     @Test
     void erasSplitByLanguageAndReleaseDate() {
-        PricingProperties properties = new PricingProperties("1.0.0", PriceSource.GradingCompany.PSA, "USD", BigDecimal.ONE, 3, 12,
+        PricingProperties properties = new PricingProperties("1.0.0", "USD", 3, 12,
                 null, new PricingProperties.Ingestion(false, "0 0 0 * * *", Duration.ofDays(400)));
 
         assertThat(properties.eraKey("en", LocalDate.of(1999, 1, 9))).isEqualTo("en:WOTC");
