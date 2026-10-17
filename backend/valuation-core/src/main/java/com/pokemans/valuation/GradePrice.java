@@ -12,6 +12,11 @@ import java.util.List;
  * @param salesUsed   number of sold comps behind an observed price (0 when derived)
  * @param compIds     the comps used, for traceability
  * @param rawOverride true when the raw-sale price beat the net graded price
+ * @param windowDays  comp window an observed price came from (90, or 180 when extended); 0 otherwise
+ * @param salesInWindow sold comps in that window before outlier trimming (0 when derived)
+ * @param basis       for a derived price, the grades it was derived from; empty otherwise
+ * @param confidence  confidence in this one grade's price: observed from its comp count, derived one
+ *                    level below its basis, floor D. Null for prices {@link #given} directly.
  */
 public record GradePrice(
         Grade grade,
@@ -20,10 +25,15 @@ public record GradePrice(
         Method method,
         int salesUsed,
         List<String> compIds,
-        boolean rawOverride) {
+        boolean rawOverride,
+        int windowDays,
+        int salesInWindow,
+        List<Grade> basis,
+        Confidence confidence) {
 
     public GradePrice {
         compIds = List.copyOf(compIds);
+        basis = List.copyOf(basis);
     }
 
     /** Method names match GradePriceSnapshot.method in the HLD. */
@@ -47,6 +57,6 @@ public record GradePrice(
 
     /** A price given directly (e.g. by the reviewer or a test), with the net already computed. */
     public static GradePrice given(Grade grade, BigDecimal net, Method method, int salesUsed) {
-        return new GradePrice(grade, net, net, method, salesUsed, List.of(), false);
+        return new GradePrice(grade, net, net, method, salesUsed, List.of(), false, 0, salesUsed, List.of(), null);
     }
 }

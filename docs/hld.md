@@ -109,8 +109,8 @@ The methodology's worked example (FMV $411 → RV $481 → QSV $314 → stressed
 
 Modules talk through published interfaces and application events (e.g. `PhotosAccepted`, `CardIdentified`, `AssessmentFinalized`, `GradeReturned`), not each other's repositories.
 
-**Built so far (M2, 2026-10-16):** `identity`, `storage`, `intake`, `catalog`, `condition` and `outcomes`.
-- **Published APIs:** each module exposes a small public API: `intake.CardItems` (cards, passing photos, the `CaptureCompleted` event), `catalog.Catalog` (current identity per card) and `identity.Consents`.
+**Built so far (M3 skeleton, 2026-10-16):** `identity`, `storage`, `intake`, `catalog`, `condition`, `outcomes` and `pricing`.
+- **Published APIs:** each module exposes a small public API: `intake.CardItems` (cards, passing photos, the `CaptureCompleted` event), `catalog.Catalog` (current identity per card, and the identified catalog cards), `identity.Consents` and `pricing.Prices` (a card's latest snapshot set).
 - **Review queue:** it lives in `condition`, not `admin`.
 - **Contributor consent:** it lives in `identity` as a versioned terms text plus append-only acceptances that store the hash of the exact text.
 
@@ -199,7 +199,7 @@ Notes on key entities:
 - **ProviderPrediction:** provider, model/version, request id, raw JSONB, normalized 11-outcome distribution, latency. Append-only.
 - **ConditionAssessment:** version, distribution, confidence, author (system or reviewer), the adjustments as a diff, reason. A new version for every change, and one is marked current.
 - **Comp:** source, external id, sold date, price + currency, grader, grade (half grades kept as-is and folded in pricing), raw/damaged flag, listing type. Asking prices are never stored as comps.
-- **GradePriceSnapshot:** per catalog card × grade × date: price, method (`observed`, `interpolated`, `step_down`, `carried_down`, `floor`), comp ids used, n.
+- **GradePriceSnapshot** (`price_snapshot`): per catalog card × grade × date: gross price, method (`OBSERVED`, `INTERPOLATED`, `STEP_DOWN`, `CARRIED_DOWN`, `FLOOR`), comp ids used, n, window, basis grades, step-down ratio, confidence, parameter set and trace. The 11 rows computed together share a `snapshot_set_id`, which a valuation run references. Per-card σ and sales per month sit beside it in `price_stats`.
 - **ParameterSet:** semantic version + JSON body; immutable once any valuation run references it.
 - **ValuationRun / CardValuation:** inputs snapshot (assessment version, price snapshot ids, parameter set), the four values, confidence, eligibility, cap adjustments, trace JSON. Re-running with the same inputs must give the same output.
 - **Report:** type (lender, insurer), run id, PDF key, SHA-256, issued_at.
@@ -282,6 +282,13 @@ docker-compose.yml
 - **Storage:** results become outcomes with source `CONTRIBUTOR`, kept apart from partner submissions so selection bias (people post surprises) can be measured, not mixed in. Photo capture conditions vary, so these are tagged and down-weighted until compared against the capture standard.
 
 Posts are only read by hand to find people to ask. They are never stored.
+
+**M3 status (2026-10-16): skeleton built, on fixture data only.** No price source is licensed yet ([price-data-sources.md](price-data-sources.md)), so nothing calls a real price API.
+- **Module:** `pricing`, with a `PriceSource` port for sold comps. Sales can't be built without a sold date, and there is no listing type for an asking price. The only adapter is a test fixture.
+- **Schema (V8):** append-only `sold_comp` with provenance (source, licence, retrieval time, raw record, ingest run), `comp_ingest_run`, `price_snapshot` and `price_stats`.
+- **Rules:** all step 3 math stays in `valuation-core`. `GradePricer` now also records each grade's window, sales before trimming, basis grades and confidence. New: `StepDownRatios` (era table) and `Volatility.fromComps` (σ from 30-day buckets).
+- **Job:** `PricingRefresh` ingests from every `PriceSource` bean for the identified cards, then snapshots. It runs nightly only with `PRICING_INGESTION_ENABLED=true`. It uses `@Scheduled`, like the other modules, not JobRunr.
+- **Not built yet:** a licensed adapter, manual comp entry (the pilot route), the comps browser, and stored step-down ratio tables. Snapshots are gross: grading costs are netted in the valuation run (M4). Details and open questions are in [m3-progress.md](m3-progress.md).
 
 ## 11. Risks and open decisions
 

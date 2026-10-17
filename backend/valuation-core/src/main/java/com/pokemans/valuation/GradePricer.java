@@ -23,6 +23,8 @@ import java.util.Objects;
  *       grade's price unchanged. Never stepped up.
  *   <li>U from damaged/altered raw sales, else the bulk floor.
  *   <li>Net of grading costs, unless the raw-sale price for that condition is higher.
+ *   <li>Per-grade confidence: observed prices from their comp count, derived prices one level below
+ *       the grades they came from (so a step-down chain drops once per step), floor prices D.
  * </ul>
  */
 public final class GradePricer {
@@ -56,7 +58,8 @@ public final class GradePricer {
         Trace trace = new Trace();
         EnumMap<Grade, BigDecimal> gross = new EnumMap<>(Grade.class);
         EnumMap<Grade, GradePrice.Method> method = new EnumMap<>(Grade.class);
-        EnumMap<Grade, List<Comp>> used = new EnumMap<>(Grade.class);
+        EnumMap<Grade, Observed> observedComps = new EnumMap<>(Grade.class);
+        EnumMap<Grade, List<Grade>> basis = new EnumMap<>(Grade.class);
 
         for (int g = 1; g <= 10; g++) {
             Grade grade = Grade.of(g);
@@ -65,31 +68,41 @@ public final class GradePricer {
             if (observed != null) {
                 gross.put(grade, observed.price());
                 method.put(grade, GradePrice.Method.OBSERVED);
-                used.put(grade, observed.comps());
+                observedComps.put(grade, observed);
             }
         }
 
-        fillMissingGrades(input, gross, method, trace);
+        fillMissingGrades(input, gross, method, basis, trace);
 
         Observed damaged = observe("price[U]", input.damagedRawComps(), input.asOf(), trace);
         if (damaged != null) {
             gross.put(Grade.U, damaged.price());
             method.put(Grade.U, GradePrice.Method.OBSERVED);
-            used.put(Grade.U, damaged.comps());
+            observedComps.put(Grade.U, damaged);
         } else {
             gross.put(Grade.U, input.bulkFloor());
             method.put(Grade.U, GradePrice.Method.FLOOR);
             trace.add("price[U]", "bulk floor", input.bulkFloor(), "no damaged/altered raw sales in window");
         }
 
+        EnumMap<Grade, Confidence> confidence = new EnumMap<>(Grade.class);
+        for (Grade grade : Grade.values()) {
+            confidenceOf(grade, method, observedComps, basis, confidence);
+        }
+
         EnumMap<Grade, GradePrice> prices = new EnumMap<>(Grade.class);
         for (Grade grade : Grade.values()) {
-            List<Comp> comps = used.getOrDefault(grade, List.of());
+            Observed observed = observedComps.get(grade);
+            List<Comp> comps = observed == null ? List.of() : observed.comps();
             List<String> ids = comps.stream().map(Comp::id).toList();
+            int window = observed == null ? 0 : observed.windowDays();
+            int inWindow = observed == null ? 0 : observed.salesInWindow();
+            List<Grade> from = basis.getOrDefault(grade, List.of());
             BigDecimal g = gross.get(grade);
             if (grade.isUngradable()) {
                 // U is already a raw sale price: no grading costs to net.
-                prices.put(grade, new GradePrice(grade, g, g, method.get(grade), comps.size(), ids, false));
+                prices.put(grade, new GradePrice(grade, g, g, method.get(grade), comps.size(), ids, false, window, inWindow, from,
+                        confidence.get(grade)));
                 continue;
             }
             BigDecimal netGraded = Money.max(BigDecimal.ZERO, Money.cents(input.gradingCost().net(g)));
@@ -99,13 +112,67 @@ public final class GradePricer {
             trace.add("net[" + grade + "]", rawWins ? "raw-sale price higher than net graded" : "net of grading cost", net,
                     "gross " + g + " - fixed " + input.gradingCost().fixed() + " - time-to-cash "
                             + Money.cents(input.gradingCost().waitingCost(g)) + (raw == null ? "" : "; raw " + raw));
-            prices.put(grade, new GradePrice(grade, g, net, method.get(grade), comps.size(), ids, rawWins));
+            prices.put(grade, new GradePrice(grade, g, net, method.get(grade), comps.size(), ids, rawWins, window, inWindow, from,
+                    confidence.get(grade)));
         }
         return new GradePriceTable(prices, trace);
     }
 
-    private void fillMissingGrades(Input input, EnumMap<Grade, BigDecimal> gross,
-                                   EnumMap<Grade, GradePrice.Method> method, Trace trace) {
+    /**
+     * Observed (recency-weighted median) price per gradable grade, for grades with sales in the
+     * window. Feeds the era step-down ratio table ({@link StepDownRatios}); no missing-grade rule.
+     */
+    public Map<Grade, BigDecimal> observedPrices(LocalDate asOf, Map<Grade, List<Comp>> gradedComps) {
+        Trace ignored = new Trace();
+        EnumMap<Grade, BigDecimal> observed = new EnumMap<>(Grade.class);
+        for (int g = 1; g <= 10; g++) {
+            Grade grade = Grade.of(g);
+            Observed o = observe("price[" + grade + "]", gradedComps.getOrDefault(grade, List.of()), asOf, ignored);
+            if (o != null) {
+                observed.put(grade, o.price());
+            }
+        }
+        return observed;
+    }
+
+    /** Confidence for one grade's price, from comp count, basis or floor (memoised in {@code out}). */
+    private Confidence confidenceOf(Grade grade, Map<Grade, GradePrice.Method> method, Map<Grade, Observed> observed,
+                                    Map<Grade, List<Grade>> basis, Map<Grade, Confidence> out) {
+        Confidence known = out.get(grade);
+        if (known != null) {
+            return known;
+        }
+        Confidence c = switch (method.get(grade)) {
+            case OBSERVED -> fromCompCount(observed.get(grade).salesInWindow());
+            case FLOOR -> Confidence.D;
+            case INTERPOLATED, STEP_DOWN, CARRIED_DOWN -> {
+                Confidence worst = Confidence.A;
+                for (Grade from : basis.get(grade)) {
+                    worst = worst.worse(confidenceOf(from, method, observed, basis, out));
+                }
+                yield worst.drop();
+            }
+        };
+        out.put(grade, c);
+        return c;
+    }
+
+    private Confidence fromCompCount(int n) {
+        BigDecimal count = BigDecimal.valueOf(n);
+        if (count.compareTo(params.compsForA()) >= 0) {
+            return Confidence.A;
+        }
+        if (count.compareTo(params.compsForB()) >= 0) {
+            return Confidence.B;
+        }
+        if (count.compareTo(params.compsForC()) >= 0) {
+            return Confidence.C;
+        }
+        return Confidence.D;
+    }
+
+    private void fillMissingGrades(Input input, EnumMap<Grade, BigDecimal> gross, EnumMap<Grade, GradePrice.Method> method,
+                                   EnumMap<Grade, List<Grade>> basis, Trace trace) {
         // Observed grades only: derived prices never anchor other derived prices except step-down chains.
         EnumMap<Grade, BigDecimal> observed = new EnumMap<>(gross);
         if (observed.isEmpty()) {
@@ -130,6 +197,7 @@ public final class GradePricer {
                 BigDecimal price = logInterpolate(below, observed.get(below), above, observed.get(above), grade);
                 gross.put(grade, price);
                 method.put(grade, GradePrice.Method.INTERPOLATED);
+                basis.put(grade, List.of(below, above));
                 trace.add(subject, "log interpolation", price, "between grade " + below + " (" + observed.get(below)
                         + ") and grade " + above + " (" + observed.get(above) + ")");
             } else if (above != null) {
@@ -144,11 +212,13 @@ public final class GradePricer {
                 BigDecimal price = Money.cents(gross.get(next).multiply(ratio, Money.MC));
                 gross.put(grade, price);
                 method.put(grade, GradePrice.Method.STEP_DOWN);
+                basis.put(grade, List.of(next));
                 trace.add(subject, "era step-down", price, "grade " + next + " price " + gross.get(next) + " x " + ratio);
             } else {
                 BigDecimal price = observed.get(below);
                 gross.put(grade, price);
                 method.put(grade, GradePrice.Method.CARRIED_DOWN);
+                basis.put(grade, List.of(below));
                 trace.add(subject, "lower grade price, never stepped up", price, "from grade " + below);
             }
         }
@@ -170,7 +240,7 @@ public final class GradePricer {
         return Money.cents(BigDecimal.valueOf(Math.exp(logPrice)));
     }
 
-    private record Observed(BigDecimal price, List<Comp> comps) {
+    private record Observed(BigDecimal price, List<Comp> comps, int windowDays, int salesInWindow) {
     }
 
     /** Recency-weighted median of the comps in the window, or null if there are none. */
@@ -199,7 +269,7 @@ public final class GradePricer {
         BigDecimal price = weightedMedian(sorted, asOf);
         trace.add(subject, "recency-weighted median", price,
                 n + " sales in " + window + "-day window" + trim + ", half-life " + params.halfLifeDays() + "d");
-        return new Observed(price, List.copyOf(sorted));
+        return new Observed(price, List.copyOf(sorted), window, n);
     }
 
     private static List<Comp> within(List<Comp> comps, LocalDate asOf, int days) {

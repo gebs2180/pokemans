@@ -179,4 +179,102 @@ class GradePricerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("step-down ratio");
     }
+
+    @Test
+    void refusesAStepDownRatioThatWouldStepUp() {
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G9, List.of(comp(1, "100"), comp(2, "100")));
+
+        assertThatThrownBy(() -> pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), FLOOR, ratios("1.05"), NO_COST, Map.of())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("above 1");
+    }
+
+    @Test
+    void neverStepsUpEvenWithARatioAvailable() {
+        // Only grade 3 sold. Grades above carry its price unchanged; the ratio is never inverted.
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G3, List.of(comp(1, "30"), comp(2, "30")));
+
+        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), FLOOR, ratios("0.5"), NO_COST, Map.of()));
+
+        for (int g = 4; g <= 10; g++) {
+            assertThat(table.gross(Grade.of(g))).isEqualByComparingTo("30");
+            assertThat(table.get(Grade.of(g)).basis()).containsExactly(Grade.G3);
+        }
+        assertThat(table.gross(Grade.G2)).isEqualByComparingTo("15.00");
+    }
+
+    @Test
+    void observedConfidenceComesFromTheSalesInTheWindowBeforeTrimming() {
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        List<Comp> ten = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            ten.add(comp(i + 1, "1000"));
+        }
+        comps.put(Grade.G10, ten);
+        comps.put(Grade.G8, List.of(comp(1, "500"), comp(2, "500"), comp(3, "500"), comp(4, "500"), comp(5, "500")));
+        comps.put(Grade.G7, List.of(comp(1, "400"), comp(2, "400")));
+        comps.put(Grade.G6, List.of(comp(1, "300")));
+
+        GradePriceTable table = pricer.price(input(comps));
+
+        // 10 sales, 8 left after trimming: confidence still counts the 10.
+        assertThat(table.get(Grade.G10).salesUsed()).isEqualTo(8);
+        assertThat(table.get(Grade.G10).salesInWindow()).isEqualTo(10);
+        assertThat(table.get(Grade.G10).confidence()).isEqualTo(Confidence.A);
+        assertThat(table.get(Grade.G8).confidence()).isEqualTo(Confidence.B);
+        assertThat(table.get(Grade.G7).confidence()).isEqualTo(Confidence.C);
+        // One sale in 180 days.
+        assertThat(table.get(Grade.G6).windowDays()).isEqualTo(180);
+        assertThat(table.get(Grade.G6).confidence()).isEqualTo(Confidence.D);
+        assertThat(table.get(Grade.G8).windowDays()).isEqualTo(90);
+    }
+
+    @Test
+    void derivedPricesDropOneLevelBelowTheirBasis() {
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        List<Comp> ten = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            ten.add(comp(i + 1, "1000"));
+        }
+        comps.put(Grade.G10, ten);
+        comps.put(Grade.G8, List.of(comp(1, "500"), comp(2, "500"), comp(3, "500"), comp(4, "500"), comp(5, "500")));
+
+        GradePriceTable table = pricer.price(input(comps));
+
+        // Interpolated between B and A: the worse (B), dropped once.
+        assertThat(table.get(Grade.G9).method()).isEqualTo(GradePrice.Method.INTERPOLATED);
+        assertThat(table.get(Grade.G9).basis()).containsExactly(Grade.G8, Grade.G10);
+        assertThat(table.get(Grade.G9).confidence()).isEqualTo(Confidence.C);
+        // A step-down chain drops once per step.
+        assertThat(table.get(Grade.G7).confidence()).isEqualTo(Confidence.C);
+        assertThat(table.get(Grade.G6).basis()).containsExactly(Grade.G7);
+        assertThat(table.get(Grade.G6).confidence()).isEqualTo(Confidence.D);
+        // Derived prices carry no comps of their own.
+        assertThat(table.get(Grade.G9).compIds()).isEmpty();
+        assertThat(table.get(Grade.G9).windowDays()).isZero();
+        // No damaged sales: U is the floor, confidence D.
+        assertThat(table.get(Grade.U).confidence()).isEqualTo(Confidence.D);
+    }
+
+    @Test
+    void carriedDownPricesAlsoDropConfidence() {
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G5, List.of(comp(1, "60"), comp(2, "60"), comp(3, "60"), comp(4, "60"), comp(5, "60")));
+
+        GradePriceTable table = pricer.price(input(comps));
+
+        assertThat(table.get(Grade.G5).confidence()).isEqualTo(Confidence.B);
+        assertThat(table.get(Grade.G6).method()).isEqualTo(GradePrice.Method.CARRIED_DOWN);
+        assertThat(table.get(Grade.G6).confidence()).isEqualTo(Confidence.C);
+    }
+
+    @Test
+    void observedPricesSkipTheMissingGradeRule() {
+        Map<Grade, BigDecimal> observed = pricer.observedPrices(AS_OF, exampleComps(false));
+
+        assertThat(observed).containsOnlyKeys(Grade.G5, Grade.G6, Grade.G7, Grade.G8, Grade.G9, Grade.G10);
+        assertThat(observed.get(Grade.G9)).isEqualByComparingTo("900");
+    }
 }

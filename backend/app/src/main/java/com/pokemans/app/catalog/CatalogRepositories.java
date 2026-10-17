@@ -25,6 +25,14 @@ interface CardIdentificationRepository extends JpaRepository<CardIdentification,
     List<CardIdentification> findCurrent(Collection<UUID> cardItemIds);
 
     List<CardIdentification> findByReadingIdOrderByConfidenceDesc(UUID readingId);
+
+    /** Catalog cards that are some physical card's current confirmed identity. */
+    @Query(nativeQuery = true, value = """
+            select distinct catalog_card_id from (
+                select distinct on (card_item_id) catalog_card_id from card_identification
+                where status = 'CONFIRMED'
+                order by card_item_id, created_at desc) current_identity""")
+    List<UUID> findCurrentCatalogCardIds();
 }
 
 interface CardReadingRepository extends JpaRepository<CardReading, UUID> {

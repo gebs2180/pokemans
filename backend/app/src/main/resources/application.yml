@@ -74,6 +74,22 @@ pokemans:
       # Opt the CardGrade account out of AI training in its Settings before enabling.
       enabled: ${CARDGRADE_ENABLED:false}
       api-key: ${CARDGRADE_API_KEY:}
+  pricing:
+    # Valuation parameter set the snapshots are priced with (windows, half-life, trimming, confidence).
+    parameter-set: 1.0.0
+    # Whose graded comps price grades 1-10. Other graders' comps are stored but not used yet.
+    grading-company: PSA
+    currency: USD
+    # Starting values, to be set from real data: the price of an outcome with no usable comps,
+    # and how many cards an era step-down ratio needs.
+    bulk-floor: 0.25
+    min-cards-per-ratio: 3
+    ingestion:
+      # Nightly comp ingestion and snapshot refresh. Off: no price source is licensed yet
+      # (docs/price-data-sources.md). Vendor keys go in the environment, never in this file.
+      enabled: ${PRICING_INGESTION_ENABLED:false}
+      cron: "0 30 6 * * *"
+      lookback: 400d
 
 management:
   endpoints:

@@ -22,6 +22,11 @@ public class Catalog {
                                  String imageUrl) {
     }
 
+    /** A canonical card identity, for modules that work per catalog card (pricing). */
+    public record CardSummary(UUID catalogCardId, String externalId, String language, String setName, LocalDate setReleaseDate,
+                              String number, String name, Edition edition, Variant variant, String stamp, boolean promo) {
+    }
+
     private final CardIdentificationRepository identifications;
     private final CatalogCardRepository catalogCards;
 
@@ -50,5 +55,22 @@ public class Catalog {
                     c.getSetReleaseDate(), c.getNumber(), c.getName(), c.getRarity(), c.getEdition(), c.getVariant(),
                     c.getStamp(), c.isPromo(), c.getAuthenticityRisk(), c.getImageUrl());
         }));
+    }
+
+    /** Catalog cards that some physical card is currently identified as: the cards worth pricing. */
+    @Transactional(readOnly = true)
+    public List<CardSummary> identifiedCards() {
+        return cards(identifications.findCurrentCatalogCardIds());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CardSummary> cards(Collection<UUID> catalogCardIds) {
+        if (catalogCardIds.isEmpty()) {
+            return List.of();
+        }
+        return catalogCards.findAllById(catalogCardIds).stream()
+                .map(c -> new CardSummary(c.getId(), c.getExternalId(), c.getLanguage(), c.getSetName(), c.getSetReleaseDate(),
+                        c.getNumber(), c.getName(), c.getEdition(), c.getVariant(), c.getStamp(), c.isPromo()))
+                .toList();
     }
 }
