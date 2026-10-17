@@ -150,11 +150,124 @@ class CardDetector {
                 bestArea = area;
             }
         }
-        if (best == null || !clearOfFrameEdge(best, small.cols(), small.rows())) {
+
+        // Preferred: the card as the region that differs in colour from the background. It finds
+        // outlines the edge pass misses or overshoots (sparkly holo borders, dark textured cloth, folds
+        // in the cloth joining the card's edge), and tells a card running off the frame apart from a
+        // whole one. The edge pass is the fallback when the background isn't plain enough.
+        Region region = foreground(blurred, owned);
+        if (region != null && region.quad() != null) {
+            best = region.quad();
+            bestArea = Imgproc.contourArea(new MatOfPoint2f(best));
+        }
+        if (best == null) {
+            return null;
+        }
+        if (region != null && region.touchesFrame() && region.area() > 1.2 * bestArea && contains(region.contour(), best)) {
+            return null; // what we found is inside a card that runs off the photo: an inner box, not the card
+        }
+        if (!clearOfFrameEdge(best, small.cols(), small.rows())) {
             return null;
         }
         return best;
     }
+
+    /**
+     * The largest region that differs from the background.
+     *
+     * @param quad         its card-shaped outline, or null if it isn't card-shaped or touches the frame
+     * @param touchesFrame the region runs into the edge of the photo
+     */
+    private record Region(MatOfPoint contour, double area, Point[] quad, boolean touchesFrame) {
+    }
+
+    /**
+     * Segments the card from the background by colour: the background colour is the median of a strip
+     * around the photo's edge (the capture standard asks for a plain background), and a pixel is card
+     * when its Lab distance from that colour is well above how much the background itself varies. A
+     * fixed split such as Otsu's would separate bright from dark instead, and lose a navy border on
+     * black cloth. The largest blob is taken.
+     */
+    private Region foreground(Mat blurred, List<Mat> owned) {
+        Mat lab = track(owned, new Mat());
+        Imgproc.cvtColor(blurred, lab, Imgproc.COLOR_BGR2Lab);
+        int width = lab.cols();
+        int height = lab.rows();
+        byte[] pixels = new byte[width * height * 3];
+        lab.get(0, 0, pixels);
+
+        int strip = Math.max(2, (int) Math.round(0.03 * Math.min(width, height)));
+        List<int[]> samples = new ArrayList<>();
+        for (int y = 0; y < height; y += 2) {
+            for (int x = 0; x < width; x += 2) {
+                if (x < strip || y < strip || x >= width - strip || y >= height - strip) {
+                    int i = (y * width + x) * 3;
+                    samples.add(new int[] {pixels[i] & 0xff, pixels[i + 1] & 0xff, pixels[i + 2] & 0xff});
+                }
+            }
+        }
+        int[] background = new int[3];
+        for (int c = 0; c < 3; c++) {
+            int channel = c;
+            int[] values = samples.stream().mapToInt(v -> v[channel]).sorted().toArray();
+            background[c] = values[values.length / 2];
+        }
+
+        byte[] distance = new byte[width * height];
+        for (int p = 0; p < width * height; p++) {
+            double dl = (pixels[p * 3] & 0xff) - background[0];
+            double da = (pixels[p * 3 + 1] & 0xff) - background[1];
+            double db = (pixels[p * 3 + 2] & 0xff) - background[2];
+            distance[p] = (byte) Math.min(255, (int) Math.round(Math.sqrt(dl * dl + da * da + db * db) * 2));
+        }
+        int[] borderDistances = new int[samples.size()];
+        for (int i = 0; i < samples.size(); i++) {
+            int[] v = samples.get(i);
+            double dl = v[0] - background[0];
+            double da = v[1] - background[1];
+            double db = v[2] - background[2];
+            borderDistances[i] = (int) Math.min(255, Math.round(Math.sqrt(dl * dl + da * da + db * db) * 2));
+        }
+        Arrays.sort(borderDistances);
+        double noise = borderDistances[(int) (0.95 * (borderDistances.length - 1))];
+        double cut = Math.max(16, Math.min(120, noise * 1.5 + 6));
+        Mat mask = track(owned, new Mat(height, width, CvType.CV_8U));
+        mask.put(0, 0, distance);
+        Imgproc.threshold(mask, mask, cut, 255, Imgproc.THRESH_BINARY);
+        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE,
+                track(owned, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(15, 15))));
+        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN,
+                track(owned, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5))));
+
+        List<MatOfPoint> contours = new ArrayList<>();
+        Imgproc.findContours(mask, contours, track(owned, new Mat()), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+        owned.addAll(contours);
+        MatOfPoint largest = contours.stream().max((a, b) -> Double.compare(Imgproc.contourArea(a), Imgproc.contourArea(b))).orElse(null);
+        if (largest == null || Imgproc.contourArea(largest) < 0.03 * width * height) {
+            return null;
+        }
+        double area = Imgproc.contourArea(largest);
+        boolean touches = Arrays.stream(largest.toArray()).anyMatch(p -> p.x < 2 || p.y < 2 || p.x > width - 3 || p.y > height - 3);
+        Point[] quad = quadrilateral(largest, owned);
+        if (quad != null) {
+            double quadArea = Imgproc.contourArea(new MatOfPoint2f(quad));
+            if (touches || area / quadArea < 0.85 || Math.abs(aspect(quad) - CARD_ASPECT) > properties.maxCardAspectError()) {
+                quad = null;
+            }
+        }
+        return new Region(largest, area, quad, touches);
+    }
+
+    /** Every corner of the quad lies inside (or on) the contour. */
+    private static boolean contains(MatOfPoint contour, Point[] quad) {
+        MatOfPoint2f outline = new MatOfPoint2f(contour.toArray());
+        try {
+            return Arrays.stream(quad).allMatch(p -> Imgproc.pointPolygonTest(outline, p, false) >= 0);
+        } finally {
+            outline.release();
+        }
+    }
+
     /** Ordered corners (TL, TR, BR, BL, card upright) if the outline simplifies to a convex quadrilateral. */
     private static Point[] quadrilateral(MatOfPoint contour, List<Mat> owned) {
         MatOfInt hullIdx = track(owned, new MatOfInt());
