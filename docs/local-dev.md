@@ -61,7 +61,7 @@ With a provider on, completing a card's capture queues a request automatically. 
 To run the photo checks over a folder of your own photos and print the measurements, run the command below. It also writes each card crop next to its photo as `<name>.card.jpg`.
 
 ```powershell
-cd backend; $env:POKEMANS_REAL_PHOTOS = "C:\path	o\photos"; .\gradlew.bat :app:test --tests "*RealPhotoCalibrationTest" -i
+cd backend; $env:POKEMANS_REAL_PHOTOS = "C:\Users\you\Pictures\cards"; .\gradlew.bat :app:test --tests "*RealPhotoCalibrationTest" -i
 ```
 
 ## Tests
