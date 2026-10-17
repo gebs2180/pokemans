@@ -56,9 +56,20 @@ class SuggestionMatcher {
                 break;
             }
         }
+        // Anniversary reprints keep the original's printed number (11/113) but the catalog numbers
+        // them within their collection (30th-c 003), so a number search can't find them. The stamp
+        // the reader noticed points at the collection; search it by name.
+        String reprintSet = reprintSet(reading.notes());
+        List<CatalogProvider.Hit> candidates = new ArrayList<>();
+        if (reprintSet != null) {
+            provider.search(names.getLast(), null, language).stream()
+                    .filter(h -> reprintSet.equals(h.setId()))
+                    .forEach(candidates::add);
+        }
+        candidates.addAll(hits);
         List<Match> matches = new ArrayList<>();
-        for (CatalogProvider.Hit hit : hits.stream().limit(MAX_CANDIDATES).toList()) {
-            provider.card(hit.externalId(), language).map(card -> score(reading, card)).ifPresent(matches::add);
+        for (CatalogProvider.Hit hit : candidates.stream().limit(MAX_CANDIDATES).toList()) {
+            provider.card(hit.externalId(), language).map(card -> score(reading, card, reprintSet)).ifPresent(matches::add);
         }
         matches.sort(Comparator.comparingDouble(Match::confidence).reversed());
         // Two candidates scoring the same can't both be likely: lower the confidence of a tie.
@@ -85,9 +96,38 @@ class SuggestionMatcher {
         return Stream.of(trimmed, withoutSubtitles.trim(), firstWord).distinct().toList();
     }
 
-    static Match score(CardReader.Reading reading, CatalogProvider.ProviderCard card) {
+    /**
+     * The reprint collection a stamp in the reader's notes points at, or null. The 30th anniversary
+     * stamp (Pikachu with "30") is checked first: readers also call it "Celebrations-style".
+     */
+    static String reprintSet(String notes) {
+        if (notes == null) {
+            return null;
+        }
+        if (THIRTIETH.matcher(notes).find()) {
+            return "30th-c";
+        }
+        if (TWENTY_FIFTH.matcher(notes).find()) {
+            return "cel25c";
+        }
+        return null;
+    }
+
+    private static final Pattern THIRTIETH = Pattern.compile("(?i)30th|\\b3 0\\b|\"30\"");
+    private static final Pattern TWENTY_FIFTH = Pattern.compile("(?i)25th|celebrations");
+
+    static Match score(CardReader.Reading reading, CatalogProvider.ProviderCard card, String reprintSet) {
         double score = 0;
         List<String> why = new ArrayList<>();
+        if (reprintSet != null) {
+            if (reprintSet.equals(card.setId())) {
+                score += 0.75;
+                why.add("anniversary stamp");
+            } else {
+                score -= 0.3;
+                why.add("stamp says reprint");
+            }
+        }
         if (reading.number() != null && sameNumber(reading.number(), card.number())) {
             score += 0.4;
             why.add("number");
@@ -112,9 +152,11 @@ class SuggestionMatcher {
         }
         Edition edition = Boolean.TRUE.equals(reading.firstEditionStamp()) && card.editions().contains(Edition.FIRST_EDITION)
                 ? Edition.FIRST_EDITION : Edition.UNLIMITED;
-        Variant variant = Optional.ofNullable(reading.finish()).filter(card.variants()::contains)
+        // Some catalog entries are sparse (no rarity, only "normal" listed); there the reader's eye wins.
+        boolean sparse = card.rarity() == null || card.rarity().equalsIgnoreCase("none");
+        Variant variant = Optional.ofNullable(reading.finish()).filter(f -> sparse || card.variants().contains(f))
                 .orElse(card.variants().isEmpty() ? Variant.NORMAL : card.variants().getFirst());
-        return new Match(card, Math.min(0.95, score), edition, variant, String.join(", ", why));
+        return new Match(card, Math.max(0, Math.min(0.95, score)), edition, variant, String.join(", ", why));
     }
 
     private static boolean sameNumber(String read, String catalog) {

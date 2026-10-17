@@ -33,7 +33,9 @@ class ClaudeCardReader implements CardReader {
             Always answer by calling the report_card tool, once. Read, don't guess: leave a field out
             when you can't read it clearly. The collector number is usually at the bottom, like "11/113"
             (number 11, set total 113) or a promo code like "SWSH050" with no total. Give the name exactly
-            as printed, including suffixes such as ex, EX, GX, V, VMAX, VSTAR, Star or the δ (delta) symbol.""";
+            as printed, including suffixes such as ex, EX, GX, V, VMAX, VSTAR, Star or the δ (delta) symbol.
+            Describe any stamp in notes (anniversary Pikachu with a number, 1st Edition, Staff, Prerelease,
+            set logo): stamps tell reprints apart from originals that print the same number.""";
 
     /** JSON schema of the tool input: the fields of {@link CardReader.Reading}. */
     static final Map<String, Object> TOOL = Map.of(

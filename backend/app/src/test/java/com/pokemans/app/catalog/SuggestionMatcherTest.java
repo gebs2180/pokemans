@@ -16,8 +16,11 @@ class SuggestionMatcherTest {
                 name, "Rare Holo", editions, variants, List.of(), false, null, Map.of(), official);
     }
 
-    /** Three Metagross #11s from different sets, as TCGdex lists them. */
+    /** Three Metagross #11s from different sets, and the 30th anniversary reprint, as TCGdex lists them. */
     private static final Map<String, CatalogProvider.ProviderCard> CARDS = Map.of(
+            "30th-c-003", new CatalogProvider.ProviderCard("30th-c-003", "en", "30th-c", "30th Classic Collection", null,
+                    null, "003", "Metagross", "None", List.of(Edition.UNLIMITED), List.of(Variant.NORMAL), List.of(), false,
+                    null, Map.of(), 0),
             "ex5-11", card("ex5-11", "Metagross", "11", 101, 2004, List.of(Edition.UNLIMITED), List.of(Variant.HOLO)),
             "ex11-11", card("ex11-11", "Metagross δ", "11", 113, 2005, List.of(Edition.UNLIMITED), List.of(Variant.HOLO, Variant.REVERSE_HOLO)),
             "ex8-11", card("ex8-11", "Metagross", "11", 107, 2005, List.of(Edition.UNLIMITED), List.of(Variant.HOLO)));
@@ -47,7 +50,11 @@ class SuggestionMatcherTest {
     private final SuggestionMatcher matcher = new SuggestionMatcher(provider);
 
     private static CardReader.Reading reading(String name, String number, Integer total, Variant finish, Integer year) {
-        return new CardReader.Reading(name, number, total, "en", false, finish, year, null, null, "test", Map.of());
+        return reading(name, number, total, finish, year, null);
+    }
+
+    private static CardReader.Reading reading(String name, String number, Integer total, Variant finish, Integer year, String notes) {
+        return new CardReader.Reading(name, number, total, "en", false, finish, year, null, notes, "test", Map.of());
     }
 
     @Test
@@ -93,6 +100,21 @@ class SuggestionMatcherTest {
         assertThat(matches.getFirst().confidence()).isGreaterThan(0.9);
         assertThat(SuggestionMatcher.nameVariants("Metagross Delta Species")).containsExactly(
                 "Metagross Delta Species", "Metagross δ", "Metagross");
+    }
+
+    @Test
+    void anAnniversaryStampPointsAtTheReprintCollection() {
+        // Zach's card: prints 11/113 like the 2005 original, but carries the 30th anniversary stamp.
+        String notes = "Pokémon 30th anniversary-style Pikachu stamp with \"3 0\" on the artwork (Celebrations-style stamp)";
+        List<SuggestionMatcher.Match> matches = matcher.match(reading("Metagross δ Delta Species", "11", 113, Variant.HOLO, 2005, notes));
+
+        assertThat(matches.getFirst().card().externalId()).isEqualTo("30th-c-003");
+        assertThat(matches.getFirst().confidence()).isGreaterThan(0.85);
+        assertThat(matches.getFirst().variant()).isEqualTo(Variant.HOLO); // the catalog's sparse "normal" is overridden
+        assertThat(matches.get(1).card().externalId()).isEqualTo("ex11-11");
+        assertThat(matches.get(1).why()).contains("stamp says reprint");
+        assertThat(SuggestionMatcher.reprintSet("25th anniversary Celebrations stamp")).isEqualTo("cel25c");
+        assertThat(SuggestionMatcher.reprintSet("Staff stamp")).isNull();
     }
 
     @Test
