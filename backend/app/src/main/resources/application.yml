@@ -56,6 +56,12 @@ pokemans:
       # Free, no key; card data MIT-licensed. Off = manual entry only.
       enabled: ${CATALOG_TCGDEX_ENABLED:true}
       base-url: https://api.tcgdex.net/v2
+    # Automatic recognition: Claude reads name and number off the front crop and suggests catalog
+    # matches. Key in the environment only. Front crops are sent to Anthropic's API.
+    reader:
+      enabled: ${CARD_READER_ENABLED:false}
+      api-key: ${ANTHROPIC_API_KEY:}
+      model: ${CARD_READER_MODEL:claude-sonnet-5-5}
   condition:
     worker:
       poll-interval: 15s

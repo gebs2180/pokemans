@@ -1,5 +1,6 @@
 package com.pokemans.app.catalog;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -22,4 +23,17 @@ interface CardIdentificationRepository extends JpaRepository<CardIdentification,
             where card_item_id in (:cardItemIds) and status = 'CONFIRMED'
             order by card_item_id, created_at desc""")
     List<CardIdentification> findCurrent(Collection<UUID> cardItemIds);
+
+    List<CardIdentification> findByReadingIdOrderByConfidenceDesc(UUID readingId);
+}
+
+interface CardReadingRepository extends JpaRepository<CardReading, UUID> {
+
+    @Query("""
+            select r from CardReading r
+            where r.status = com.pokemans.app.catalog.CardReading.Status.PENDING and r.nextAttemptAt <= :now
+            order by r.nextAttemptAt""")
+    List<CardReading> findDue(Instant now);
+
+    List<CardReading> findByCardItemIdOrderByCreatedAtDesc(UUID cardItemId);
 }

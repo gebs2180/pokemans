@@ -267,7 +267,7 @@ docker-compose.yml
 
 **M2 status (2026-10-16): built.** The pieces still open are listed below. All are needed before the "done when" is met:
 - **Pre-grading providers:** the Ximilar and CardGrade.io adapters are built and tested against their published response shapes, but both are off. Each needs written confirmation of its terms and a key, and CardGrade.io also needs its training opt-out. Then run the controlled set through both.
-- **Identification:** the reviewer searches the catalog. There is no photo-based "provider suggestion" yet. Ximilar's TCG identification could add one later.
+- **Identification:** automatic recognition is built and off by default. A `CardReader` port (Claude vision, `ClaudeCardReader`) reads name, number, set size, language, finish and the copyright year from the front crop. `SuggestionMatcher` ranks TCGdex candidates, mostly on number plus set size. Up to three are stored as `SUGGESTED` identifications with a confidence, and the reviewer confirms one. Readings are queued and retried like provider predictions (`card_reading`, V7). CardGrade.io's and Ximilar's identification outputs could be added as further readers. Front crops of partners' cards go to Anthropic's API; partner data-sharing terms should say so.
 - **Authenticity flags:** authenticity-risk categories are computed and shown. The flag lifecycle (verify, zero value until verified) and custody records are still to build, before M4 eligibility.
 - **Cert checks:** they are manual. An automated PSA cert lookup waits on a review of its API terms.
 - **Contributor terms:** the text in `Consents` is a plain-language draft for Zach to review, not reviewed legal wording.

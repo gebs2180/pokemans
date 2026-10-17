@@ -51,7 +51,7 @@ class CatalogFlowTest {
         when(provider.card("base1-4", "en")).thenReturn(Optional.of(new CatalogProvider.ProviderCard("base1-4", "en", "base1",
                 "Base Set", "Base", LocalDate.of(1999, 1, 9), "4", "Charizard", "Rare",
                 List.of(Edition.UNLIMITED, Edition.FIRST_EDITION, Edition.SHADOWLESS), List.of(Variant.HOLO), List.of(), false,
-                "https://img/base1/4", Map.of("id", "base1-4"))));
+                "https://img/base1/4", Map.of("id", "base1-4"), 102)));
     }
 
     @Test

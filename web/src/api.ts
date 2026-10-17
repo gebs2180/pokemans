@@ -243,3 +243,51 @@ export type OutcomeView = {
   lookupUrl: string
   createdAt: string
 }
+
+// Automatic recognition
+
+export type CatalogCardView = {
+  id: string
+  provider: 'TCGDEX' | 'MANUAL'
+  externalId: string | null
+  language: string
+  setId: string | null
+  setName: string
+  seriesName: string | null
+  setReleaseDate: string | null
+  number: string
+  name: string
+  rarity: string | null
+  edition: Edition
+  variant: Variant
+  stamp: string | null
+  promo: boolean
+  authenticityRisk: AuthenticityRisk
+  imageUrl: string | null
+}
+
+export type CardReadingView = {
+  id: string
+  reader: string
+  status: 'PENDING' | 'DONE' | 'FAILED'
+  name: string | null
+  number: string | null
+  setTotal: number | null
+  language: string | null
+  firstEditionStamp: boolean | null
+  finish: Variant | null
+  copyrightYear: number | null
+  notes: string | null
+  error: string | null
+  createdAt: string
+}
+
+export type Suggestion = { id: string; card: CatalogCardView; confidence: number; note: string | null }
+
+export type CardIdentificationView = {
+  cardId: string
+  current: { id: string; card: CatalogCardView } | null
+  recognition: boolean
+  reading: CardReadingView | null
+  suggestions: Suggestion[]
+}

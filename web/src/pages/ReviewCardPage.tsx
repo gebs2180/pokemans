@@ -5,6 +5,7 @@ import {
   useApi,
   type Assessment,
   type CardCondition,
+  type CardIdentificationView,
   type CatalogHit,
   type Confidence,
   type Distribution,
@@ -139,6 +140,7 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
   return (
     <section className="panel">
       <h2>Identity</h2>
+      <Suggestions orgId={data.orgId} cardId={data.cardId} base={base} confirmedId={id?.catalogCardId ?? null} onChange={onChange} />
       {id ? (
         <div className="identity">
           {id.imageUrl && <img src={`${id.imageUrl}/low.webp`} alt="" />}
@@ -237,6 +239,108 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
         {err && <p className="error">{err}</p>}
       </details>
     </section>
+  )
+}
+
+/** What automatic recognition read off the front photo, and the catalog cards it matched. */
+function Suggestions({
+  orgId,
+  cardId,
+  base,
+  confirmedId,
+  onChange,
+}: {
+  orgId: string
+  cardId: string
+  base: string
+  confirmedId: string | null
+  onChange: () => void
+}) {
+  const api = useApi()
+  const { data, reload } = useLoad(
+    () => api<CardIdentificationView>('GET', `/api/orgs/${orgId}/cards/${cardId}/identification`),
+    [api, orgId, cardId],
+  )
+  const [err, setErr] = useState<string | null>(null)
+
+  if (!data || !data.recognition) return null
+  const reading = data.reading
+
+  async function readAgain() {
+    setErr(null)
+    try {
+      await api('POST', `${base}/readings`)
+      reload()
+    } catch (e) {
+      setErr(message(e))
+    }
+  }
+
+  async function confirm(s: CardIdentificationView['suggestions'][number]) {
+    setErr(null)
+    try {
+      await api('POST', `${base}/identifications`, {
+        provider: 'TCGDEX',
+        externalId: s.card.externalId,
+        language: s.card.language,
+        edition: s.card.edition,
+        variant: s.card.variant,
+        promo: s.card.promo,
+        note: `Confirmed suggestion (${Math.round(s.confidence * 100)}%)`,
+      })
+      reload()
+      onChange()
+    } catch (e) {
+      setErr(message(e))
+    }
+  }
+
+  return (
+    <div className="suggestions">
+      {!reading && <p className="muted">Not read automatically yet.</p>}
+      {reading?.status === 'PENDING' && (
+        <p className="muted">
+          Reading the card…{' '}
+          <button className="link" onClick={reload}>
+            Refresh
+          </button>
+        </p>
+      )}
+      {reading?.status === 'FAILED' && <p className="warn">Couldn't read the card: {reading.error}</p>}
+      {reading?.status === 'DONE' && (
+        <p className="muted small">
+          Read: {reading.name ?? '?'} · {reading.number ?? '?'}
+          {reading.setTotal ? `/${reading.setTotal}` : ''} · {reading.language?.toUpperCase() ?? '?'}
+          {reading.firstEditionStamp ? ' · 1st Edition stamp' : ''}
+          {reading.finish ? ` · ${reading.finish.replace('_', ' ').toLowerCase()}` : ''}
+          {reading.copyrightYear ? ` · ©${reading.copyrightYear}` : ''}
+          {reading.notes ? ` · ${reading.notes}` : ''}
+        </p>
+      )}
+      {reading?.status === 'DONE' && data.suggestions.length === 0 && <p className="warn">No catalog match for that reading.</p>}
+      {data.suggestions.map((s) => {
+        const confirmed = s.card.id === confirmedId
+        return (
+          <div key={s.id} className="suggestion">
+            {s.card.imageUrl ? <img src={`${s.card.imageUrl}/low.webp`} alt="" /> : <span className="noimg">No image</span>}
+            <div>
+              <strong>{s.card.name}</strong> · {s.card.setName} {s.card.number} · {s.card.language.toUpperCase()}
+              <div className="muted small">
+                {[s.card.edition, s.card.variant, s.card.rarity, s.card.setReleaseDate?.slice(0, 4)].filter(Boolean).join(' · ')}
+              </div>
+              <div className="small">
+                {Math.round(s.confidence * 100)}% · {s.note}
+              </div>
+            </div>
+            {confirmed ? <span className="ok small">Confirmed</span> : <button onClick={() => confirm(s)}>Confirm</button>}
+          </div>
+        )
+      })}
+      <button className="link small" onClick={readAgain}>
+        Read the card again
+      </button>
+      {err && <p className="error">{err}</p>}
+    </div>
   )
 }
 

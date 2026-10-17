@@ -56,6 +56,16 @@ $env:CARDGRADE_ENABLED = "true"; $env:CARDGRADE_API_KEY = "cgrd_<full-access key
 
 With a provider on, completing a card's capture queues a request automatically. A background job sends it and polls every 15 s, and a system distribution appears once every provider has answered. **Ask again** on the review page queues another request.
 
+### Automatic card recognition
+
+When it's on, each card's front crop is sent to Claude to read its name, number (e.g. `11/113`), language and finish. The reading is matched in TCGdex, and the review page shows up to three suggestions with a confidence and a **Confirm** button. Nothing is confirmed without you. Every reading and suggestion is kept, so accuracy can be measured later.
+
+```powershell
+$env:CARD_READER_ENABLED = "true"; $env:ANTHROPIC_API_KEY = "<your personal key>"
+```
+
+Cards completed while it was off can be read from the review page with **Read the card again**. A reading costs under a cent with the default model (`CARD_READER_MODEL` to change it). Photos without a card crop (taken before the whole-card check existed) can't be read; retake the front.
+
 ### Tuning photo checks on real photos
 
 To run the photo checks over a folder of your own photos and print the measurements, run the command below. It also writes each card crop next to its photo as `<name>.card.jpg`.

@@ -34,10 +34,11 @@ interface CatalogProvider {
      * @param stamps      distinguishing stamps seen on some prints
      * @param promo       whether the provider lists it as a promo
      * @param payload     the provider's response as received, kept for the record
+     * @param setOfficialCount the set size printed after the slash (113 in 11/113), when known
      */
     record ProviderCard(String externalId, String language, String setId, String setName, String seriesName,
                         LocalDate setReleaseDate, String number, String name, String rarity, List<Edition> editions,
                         List<Variant> variants, List<String> stamps, boolean promo, String imageUrl,
-                        Map<String, Object> payload) {
+                        Map<String, Object> payload, Integer setOfficialCount) {
     }
 }

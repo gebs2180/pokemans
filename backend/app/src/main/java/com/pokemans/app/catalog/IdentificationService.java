@@ -69,14 +69,26 @@ class IdentificationService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "externalId is required for a catalog card");
             }
             CatalogProvider.ProviderCard card = providerCard(choice.externalId(), choice.language());
-            identity = fromProvider(card, choice);
+            identity = identity(card, choice.edition(), choice.variant(), blankToNull(choice.stamp()), choice.promo());
             payload = card.payload();
         }
-        Optional<CatalogCard> existing = catalogCards.findByIdentityKey(identity.key());
-        CatalogCard catalogCard = existing.isPresent() ? existing.get() : catalogCards.save(
-                new CatalogCard(identity, AuthenticityRisk.of(identity, LocalDate.now()), payload, currentUser.id()));
+        CatalogCard catalogCard = findOrCreate(identity, payload, currentUser.id());
         return identifications.save(CardIdentification.confirmedByReviewer(orgId, cardId, catalogCard.getId(),
                 blankToNull(choice.note()), currentUser.id()));
+    }
+
+    /** The catalog identity with this key, created on first use. {@code createdBy} is null for a reader's suggestion. */
+    CatalogCard findOrCreate(CardIdentity identity, Map<String, Object> payload, UUID createdBy) {
+        Optional<CatalogCard> existing = catalogCards.findByIdentityKey(identity.key());
+        return existing.isPresent() ? existing.get() : catalogCards.save(
+                new CatalogCard(identity, AuthenticityRisk.of(identity, LocalDate.now()), payload, createdBy));
+    }
+
+    /** The identity a provider card and chosen print make. */
+    static CardIdentity identity(CatalogProvider.ProviderCard card, Edition edition, Variant variant, String stamp, Boolean promo) {
+        return new CardIdentity(CatalogCard.Provider.TCGDEX, card.externalId(), card.language(), card.setId(),
+                card.setName(), card.seriesName(), card.setReleaseDate(), card.number(), card.name(), card.rarity(),
+                edition, variant, stamp, promo != null ? promo : card.promo(), card.imageUrl());
     }
 
     /** Current identification first, then earlier ones. */
@@ -88,13 +100,6 @@ class IdentificationService {
     @Transactional(readOnly = true)
     Optional<CatalogCard> catalogCard(UUID id) {
         return catalogCards.findById(id);
-    }
-
-    private static CardIdentity fromProvider(CatalogProvider.ProviderCard card, Choice choice) {
-        return new CardIdentity(CatalogCard.Provider.TCGDEX, card.externalId(), card.language(), card.setId(),
-                card.setName(), card.seriesName(), card.setReleaseDate(), card.number(), card.name(), card.rarity(),
-                choice.edition(), choice.variant(), blankToNull(choice.stamp()),
-                choice.promo() != null ? choice.promo() : card.promo(), card.imageUrl());
     }
 
     private static CardIdentity manual(Choice choice) {

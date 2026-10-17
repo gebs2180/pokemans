@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -53,8 +54,22 @@ class CatalogController {
                               CatalogCardView card, String note, UUID createdBy, Instant createdAt) {
     }
 
-    /** @param current the latest confirmed identification, or null if the card hasn't been identified */
-    record CardIdentificationView(UUID cardId, IdentificationView current, List<IdentificationView> history) {
+    /**
+     * @param current         the latest confirmed identification, or null if the card hasn't been identified
+     * @param recognition     whether automatic recognition is turned on
+     * @param reading         the latest automatic reading of the card, or null
+     * @param suggestions     what that reading matched in the catalog, best first
+     */
+    record CardIdentificationView(UUID cardId, IdentificationView current, List<IdentificationView> history,
+                                  boolean recognition, ReadingView reading, List<SuggestionView> suggestions) {
+    }
+
+    record ReadingView(UUID id, String reader, CardReading.Status status, String name, String number, Integer setTotal,
+                       String language, Boolean firstEditionStamp, Variant finish, Integer copyrightYear, String notes,
+                       String error, Instant createdAt) {
+    }
+
+    record SuggestionView(UUID id, CatalogCardView card, BigDecimal confidence, String note) {
     }
 
     /** A provider card without the raw payload. */
@@ -64,10 +79,12 @@ class CatalogController {
     }
 
     private final IdentificationService identification;
+    private final RecognitionService recognition;
     private final CardItems cardItems;
 
-    CatalogController(IdentificationService identification, CardItems cardItems) {
+    CatalogController(IdentificationService identification, RecognitionService recognition, CardItems cardItems) {
         this.identification = identification;
+        this.recognition = recognition;
         this.cardItems = cardItems;
     }
 
@@ -95,6 +112,14 @@ class CatalogController {
         return view(cardId);
     }
 
+    /** Reads the card (again) from its latest front photo; suggestions follow within a minute. */
+    @PostMapping("/api/admin/orgs/{orgId}/cards/{cardId}/readings")
+    @ResponseStatus(HttpStatus.CREATED)
+    CardIdentificationView read(@PathVariable UUID orgId, @PathVariable UUID cardId) {
+        recognition.requestReading(orgId, cardId);
+        return view(cardId);
+    }
+
     @GetMapping("/api/orgs/{orgId}/cards/{cardId}/identification")
     CardIdentificationView identification(@PathVariable UUID orgId, @PathVariable UUID cardId) {
         cardItems.requireAccessible(orgId, cardId);
@@ -102,16 +127,29 @@ class CatalogController {
     }
 
     private CardIdentificationView view(UUID cardId) {
-        List<IdentificationView> history = identification.history(cardId).stream().map(this::view).toList();
-        IdentificationView current = history.stream()
-                .filter(i -> i.status() == CardIdentification.Status.CONFIRMED)
-                .findFirst().orElse(null);
-        return new CardIdentificationView(cardId, current, history);
+        List<IdentificationView> history = identification.history(cardId).stream()
+                .filter(i -> i.getStatus() == CardIdentification.Status.CONFIRMED)
+                .map(this::view).toList();
+        IdentificationView current = history.isEmpty() ? null : history.getFirst();
+        CardReading reading = recognition.latestReading(cardId).orElse(null);
+        List<SuggestionView> suggestions = reading == null ? List.of() : recognition.suggestions(reading.getId()).stream()
+                .map(s -> new SuggestionView(s.getId(), view(identification.catalogCard(s.getCatalogCardId()).orElseThrow()),
+                        s.getConfidence(), s.getNote()))
+                .toList();
+        return new CardIdentificationView(cardId, current, history, recognition.enabled(),
+                reading == null ? null : view(reading), suggestions);
     }
 
     private IdentificationView view(CardIdentification i) {
         CatalogCard c = identification.catalogCard(i.getCatalogCardId()).orElseThrow();
         return new IdentificationView(i.getId(), i.getSource(), i.getStatus(), view(c), i.getNote(), i.getCreatedBy(), i.getCreatedAt());
+    }
+
+    private static ReadingView view(CardReading r) {
+        CardReader.Reading read = r.reading();
+        return new ReadingView(r.getId(), r.getReader(), r.getStatus(), read.name(), read.number(), read.setTotal(),
+                read.language(), read.firstEditionStamp(), read.finish(), read.copyrightYear(), read.notes(), r.getLastError(),
+                r.getCreatedAt());
     }
 
     static CatalogCardView view(CatalogCard c) {

@@ -153,7 +153,11 @@ class TcgdexCatalogProvider implements CatalogProvider {
         return Optional.of(new ProviderCard(externalId, language, setId, setName, string(serie, "name"),
                 release == null ? null : LocalDate.parse(release.substring(0, 10)), string(card, "localId"),
                 string(card, "name"), string(card, "rarity"), editions, finishes, List.copyOf(stamps), promo,
-                string(card, "image"), card));
+                string(card, "image"), card, officialCount(set)));
+    }
+
+    private static Integer officialCount(Map<String, Object> set) {
+        return map(set, "cardCount").get("official") instanceof Number n ? n.intValue() : null;
     }
 
     private Map<String, Object> set(String setId, String language) {
