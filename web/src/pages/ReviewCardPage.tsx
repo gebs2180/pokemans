@@ -299,12 +299,15 @@ function Suggestions({
     <div className="suggestions">
       {!reading && <p className="muted">Not read automatically yet.</p>}
       {reading?.status === 'PENDING' && (
-        <p className="muted">
-          Reading the card…{' '}
-          <button className="link" onClick={reload}>
-            Refresh
-          </button>
-        </p>
+        <>
+          <p className="muted">
+            Reading the card…{' '}
+            <button className="link" onClick={reload}>
+              Refresh
+            </button>
+          </p>
+          {reading.error && <p className="warn small">Last attempt failed, retrying: {reading.error}</p>}
+        </>
       )}
       {reading?.status === 'FAILED' && <p className="warn">Couldn't read the card: {reading.error}</p>}
       {reading?.status === 'DONE' && (

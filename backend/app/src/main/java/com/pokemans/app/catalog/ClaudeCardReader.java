@@ -14,8 +14,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 /**
- * Reads a card with Claude's vision through the Messages API. A forced tool call makes the answer
- * structured. Under Anthropic's commercial API terms, inputs and outputs aren't used for training
+ * Reads a card with Claude's vision through the Messages API. The model is asked to answer by
+ * calling a reporting tool, which makes the answer structured. The tool isn't forced with
+ * {@code tool_choice}: current models reject a forced tool choice. Under Anthropic's commercial API terms, inputs and outputs aren't used for training
  * by default.
  */
 @Component
@@ -29,7 +30,7 @@ class ClaudeCardReader implements CardReader {
 
     static final String PROMPT = """
             This is a photo of the front of a Pokémon trading card, cropped to the card and straightened.
-            Report what is printed on it using the report_card tool. Read, don't guess: leave a field out
+            Always answer by calling the report_card tool, once. Read, don't guess: leave a field out
             when you can't read it clearly. The collector number is usually at the bottom, like "11/113"
             (number 11, set total 113) or a promo code like "SWSH050" with no total. Give the name exactly
             as printed, including suffixes such as ex, EX, GX, V, VMAX, VSTAR, Star or the δ (delta) symbol.""";
@@ -84,7 +85,6 @@ class ClaudeCardReader implements CardReader {
                 "model", model,
                 "max_tokens", 1024,
                 "tools", List.of(TOOL),
-                "tool_choice", Map.of("type", "tool", "name", "report_card"),
                 "messages", List.of(Map.of("role", "user", "content", List.of(
                         Map.of("type", "image", "source", Map.of("type", "base64", "media_type", contentType,
                                 "data", Base64.getEncoder().encodeToString(image))),

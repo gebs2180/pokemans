@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class ClaudeCardReaderTest {
 
     @Test
-    void sendsTheImageWithAForcedToolCallAndReadsTheReport() throws Exception {
+    void sendsTheImageWithTheReportToolAndReadsTheReport() throws Exception {
         AtomicReference<String> body = new AtomicReference<>();
         AtomicReference<String> key = new AtomicReference<>();
         AtomicReference<String> version = new AtomicReference<>();
@@ -45,7 +45,8 @@ class ClaudeCardReaderTest {
 
             assertThat(key.get()).isEqualTo("sk-test");
             assertThat(version.get()).isEqualTo("2023-06-01");
-            assertThat(body.get()).contains("\"tool_choice\"", "\"report_card\"", "\"media_type\":\"image/jpeg\"", "\"data\":\"AQID\"");
+            assertThat(body.get()).contains("\"report_card\"", "\"media_type\":\"image/jpeg\"", "\"data\":\"AQID\"")
+                    .doesNotContain("tool_choice");
             assertThat(reading.name()).isEqualTo("Metagross δ");
             assertThat(reading.number()).isEqualTo("11");
             assertThat(reading.setTotal()).isEqualTo(113);
