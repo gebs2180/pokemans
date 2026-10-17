@@ -3,6 +3,7 @@ package com.pokemans.app.catalog;
 import java.net.http.HttpClient;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -48,24 +49,55 @@ class TcgdexCatalogProvider implements CatalogProvider {
 
     @Override
     public List<Hit> search(String name, String number, String language) {
+        // TCGdex matches the name as one phrase, so "metagross delta" or "charizard base set holo"
+        // find nothing. Query by the first word and keep names containing every other word.
+        List<String> words = Arrays.stream(name.trim().toLowerCase(Locale.ROOT).split("\\s+"))
+                .map(TcgdexCatalogProvider::normalizeWord)
+                .filter(w -> !w.isEmpty())
+                .toList();
+        if (words.isEmpty()) {
+            return List.of();
+        }
         List<Map<String, Object>> results = http.get()
-                .uri("/{lang}/cards?name={name}", language, name.trim())
+                .uri("/{lang}/cards?name={name}", language, words.getFirst())
                 .retrieve()
                 .body(LIST);
         if (results == null) {
             return List.of();
         }
-        String wantedNumber = number == null || number.isBlank() ? null : stripLeadingZeros(number);
+        String wantedNumber = normalizeNumber(number);
         List<Hit> hits = new ArrayList<>();
         for (Map<String, Object> r : results) {
             String id = string(r, "id");
             String localId = string(r, "localId");
-            if (wantedNumber != null && !wantedNumber.equals(stripLeadingZeros(localId))) {
+            String cardName = string(r, "name");
+            if (wantedNumber != null && !wantedNumber.equals(normalizeNumber(localId))) {
                 continue;
             }
-            hits.add(new Hit(id, localId, string(r, "name"), setIdOf(id, localId), string(r, "image")));
+            String haystack = cardName == null ? "" : cardName.toLowerCase(Locale.ROOT);
+            if (!words.stream().skip(1).allMatch(haystack::contains)) {
+                continue;
+            }
+            hits.add(new Hit(id, localId, cardName, setIdOf(id, localId), string(r, "image")));
         }
         return hits;
+    }
+
+    /** "delta" and "δ" both mean the Delta Species symbol TCGdex puts in names. */
+    private static String normalizeWord(String word) {
+        return word.equals("delta") ? "δ" : word;
+    }
+
+    /**
+     * The collector number as TCGdex stores it: "11/113" (as printed) becomes "11", "011" becomes
+     * "11". Null when none was given.
+     */
+    static String normalizeNumber(String number) {
+        if (number == null || number.isBlank()) {
+            return null;
+        }
+        String beforeSlash = number.trim().split("/")[0].trim();
+        return beforeSlash.replaceFirst("^0+(?=.)", "").toLowerCase(Locale.ROOT);
     }
 
     @Override
@@ -141,11 +173,6 @@ class TcgdexCatalogProvider implements CatalogProvider {
             return id.substring(0, id.length() - localId.length() - 1);
         }
         return null;
-    }
-
-    private static String stripLeadingZeros(String number) {
-        String trimmed = number.trim().replaceFirst("^0+(?=.)", "");
-        return trimmed.toLowerCase(Locale.ROOT);
     }
 
     @SuppressWarnings("unchecked")

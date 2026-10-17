@@ -159,8 +159,8 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
       <details open={!id}>
         <summary>{id ? 'Change identity' : 'Identify'}</summary>
         <form onSubmit={search} className="row">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. Metagross" required />
-          <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="Number" className="narrow" />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name as printed, e.g. Metagross δ or Metagross V" required />
+          <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="No. e.g. 11/113" className="narrow" />
           <select value={language} onChange={(e) => setLanguage(e.target.value)}>
             <option value="en">English</option>
             <option value="ja">Japanese</option>

@@ -20,6 +20,7 @@ class TcgdexCatalogProviderTest {
     private static final Map<String, String> RESPONSES = Map.of(
             "/v2/en/cards", """
                     [{"id":"ex5-11","localId":"11","name":"Metagross","image":"https://assets.tcgdex.net/en/ex/ex5/11"},
+                     {"id":"ex11-11","localId":"11","name":"Metagross δ","image":"https://assets.tcgdex.net/en/ex/ex11/11"},
                      {"id":"swsh6-112","localId":"112","name":"Metagross V","image":"https://assets.tcgdex.net/en/swsh/swsh6/112"},
                      {"id":"30th-c-003","localId":"003","name":"Metagross"}]""",
             "/v2/en/cards/base1-4", """
@@ -57,14 +58,24 @@ class TcgdexCatalogProviderTest {
 
     @Test
     void searchFiltersByExactNumberIgnoringLeadingZeros() {
-        assertThat(provider.search("metagross", null, "en")).hasSize(3);
-        assertThat(provider.search("metagross", "11", "en")).singleElement()
-                .satisfies(hit -> {
-                    assertThat(hit.externalId()).isEqualTo("ex5-11");
-                    assertThat(hit.setId()).isEqualTo("ex5");
-                });
+        assertThat(provider.search("metagross", null, "en")).hasSize(4);
+        assertThat(provider.search("metagross", "11", "en")).extracting(CatalogProvider.Hit::externalId)
+                .containsExactly("ex5-11", "ex11-11");
+        assertThat(provider.search("metagross", "11", "en").getFirst().setId()).isEqualTo("ex5");
         assertThat(provider.search("metagross", "3", "en")).singleElement()
                 .satisfies(hit -> assertThat(hit.setId()).isEqualTo("30th-c"));
+    }
+
+    @Test
+    void searchAcceptsTheNumberAsPrintedAndExtraWords() {
+        // TCGdex matches names as one phrase; we query by the first word and filter on the rest.
+        assertThat(provider.search("Metagross delta", "11/113", "en")).singleElement()
+                .satisfies(hit -> assertThat(hit.externalId()).isEqualTo("ex11-11"));
+        assertThat(provider.search("metagross V", null, "en")).singleElement()
+                .satisfies(hit -> assertThat(hit.externalId()).isEqualTo("swsh6-112"));
+        assertThat(provider.search("metagross holo", null, "en")).isEmpty();
+        assertThat(TcgdexCatalogProvider.normalizeNumber(" 011/113 ")).isEqualTo("11");
+        assertThat(TcgdexCatalogProvider.normalizeNumber("SWSH050")).isEqualTo("swsh050");
     }
 
     @Test
