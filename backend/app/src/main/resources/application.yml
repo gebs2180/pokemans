@@ -56,6 +56,18 @@ pokemans:
       # Free, no key; card data MIT-licensed. Off = manual entry only.
       enabled: ${CATALOG_TCGDEX_ENABLED:true}
       base-url: https://api.tcgdex.net/v2
+  condition:
+    worker:
+      poll-interval: 15s
+    # Pre-grading providers stay off until their terms are confirmed in writing
+    # (docs/pregrade-providers.md) and a key is set in the environment, never in this file.
+    ximilar:
+      enabled: ${XIMILAR_ENABLED:false}
+      api-key: ${XIMILAR_API_KEY:}
+    cardgrade:
+      # Opt the CardGrade account out of AI training in its Settings before enabling.
+      enabled: ${CARDGRADE_ENABLED:false}
+      api-key: ${CARDGRADE_API_KEY:}
 
 management:
   endpoints:

@@ -17,7 +17,7 @@ public enum AuthenticityRisk {
     /** Top-rarity cards from sets released in the last three years. */
     RECENT_CHASE;
 
-    static final LocalDate END_OF_WOTC_ERA = LocalDate.of(2003, 7, 1);
+    public static final LocalDate END_OF_WOTC_ERA = LocalDate.of(2003, 7, 1);
 
     private static final Set<String> CHASE_RARITIES = Set.of(
             "secret rare", "hyper rare", "special illustration rare", "illustration rare", "ultra rare",
