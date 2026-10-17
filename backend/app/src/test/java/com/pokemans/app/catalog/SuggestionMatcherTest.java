@@ -85,6 +85,17 @@ class SuggestionMatcherTest {
     }
 
     @Test
+    void printedSubtitlesAreDropped() {
+        // As Claude read Zach's card: the catalog name is just "Metagross δ".
+        List<SuggestionMatcher.Match> matches = matcher.match(reading("Metagross δ Delta Species", "11", 113, Variant.HOLO, 2005));
+
+        assertThat(matches.getFirst().card().externalId()).isEqualTo("ex11-11");
+        assertThat(matches.getFirst().confidence()).isGreaterThan(0.9);
+        assertThat(SuggestionMatcher.nameVariants("Metagross Delta Species")).containsExactly(
+                "Metagross Delta Species", "Metagross δ", "Metagross");
+    }
+
+    @Test
     void noNameNoSuggestions() {
         assertThat(matcher.match(reading(null, "11", 113, null, null))).isEmpty();
     }

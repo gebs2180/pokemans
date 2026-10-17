@@ -1,11 +1,15 @@
 package com.pokemans.app.catalog;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Turns a reading into ranked catalog candidates. The collector number and set total do most of the
@@ -35,10 +39,22 @@ class SuggestionMatcher {
             return List.of();
         }
         String language = reading.language() == null ? "en" : reading.language();
-        List<CatalogProvider.Hit> hits = provider.search(reading.name(), reading.number(), language);
-        if (hits.isEmpty() && reading.number() != null) {
-            // The number may be misread; fall back to the name alone, scored lower.
-            hits = provider.search(reading.name(), null, language);
+        List<CatalogProvider.Hit> hits = List.of();
+        // Readers often include subtitles the catalog leaves out ("Metagross δ Delta Species"), so
+        // try the name as read, then without known subtitles, then its first word. With the number
+        // first; then without it, in case the number was misread (scored lower).
+        List<String> names = nameVariants(reading.name());
+        for (String number : reading.number() == null ? Collections.<String>singletonList(null)
+                : Arrays.asList(reading.number(), null)) {
+            for (String name : names) {
+                hits = provider.search(name, number, language);
+                if (!hits.isEmpty()) {
+                    break;
+                }
+            }
+            if (!hits.isEmpty()) {
+                break;
+            }
         }
         List<Match> matches = new ArrayList<>();
         for (CatalogProvider.Hit hit : hits.stream().limit(MAX_CANDIDATES).toList()) {
@@ -52,6 +68,23 @@ class SuggestionMatcher {
         return matches.stream().filter(m -> m.confidence() >= 0.2).limit(3).toList();
     }
 
+    /** Printed subtitles that aren't part of the card's name in the catalog. */
+    private static final List<String> SUBTITLES = List.of("delta species", "δ delta species", "pokémon", "pokemon");
+
+    /** The name as read, then without subtitles, then its first word; no repeats. */
+    static List<String> nameVariants(String name) {
+        String trimmed = name.trim().replaceAll("\\s+", " ");
+        String withoutSubtitles = trimmed;
+        for (String subtitle : SUBTITLES) {
+            withoutSubtitles = withoutSubtitles.replaceAll("(?i)\\s*" + Pattern.quote(subtitle) + "\\b", "");
+        }
+        if (trimmed.toLowerCase(Locale.ROOT).contains("delta species") && !withoutSubtitles.contains("δ")) {
+            withoutSubtitles = withoutSubtitles + " δ";
+        }
+        String firstWord = trimmed.split(" ")[0];
+        return Stream.of(trimmed, withoutSubtitles.trim(), firstWord).distinct().toList();
+    }
+
     static Match score(CardReader.Reading reading, CatalogProvider.ProviderCard card) {
         double score = 0;
         List<String> why = new ArrayList<>();
@@ -63,7 +96,7 @@ class SuggestionMatcher {
             score += 0.35;
             why.add("set size");
         }
-        if (normalize(reading.name()).equals(normalize(card.name()))) {
+        if (nameVariants(reading.name()).stream().anyMatch(n -> normalize(n).equals(normalize(card.name())))) {
             score += 0.15;
             why.add("exact name");
         } else {
