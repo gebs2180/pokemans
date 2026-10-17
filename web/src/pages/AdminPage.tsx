@@ -37,6 +37,9 @@ export function AdminPage() {
 
   return (
     <>
+      <p>
+        <Link to="/admin/review">Review queue →</Link>
+      </p>
       <h1>Orgs</h1>
       <form onSubmit={createOrg} className="row">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Org name" required maxLength={200} />

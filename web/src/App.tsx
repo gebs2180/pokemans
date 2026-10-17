@@ -6,13 +6,15 @@ import { ContainerPage } from './pages/ContainerPage'
 import { HomePage } from './pages/HomePage'
 import { InvitePage } from './pages/InvitePage'
 import { OrgPage } from './pages/OrgPage'
+import { ReviewCardPage } from './pages/ReviewCardPage'
+import { ReviewQueuePage } from './pages/ReviewQueuePage'
 
 function App() {
   const { isLoading, isAuthenticated, user, error, loginWithRedirect, logout } = useAuth0()
   const location = useLocation()
 
   return (
-    <div className="shell">
+    <div className={location.pathname.startsWith('/admin/review') ? 'shell wide' : 'shell'}>
       <header className="topbar">
         <Link to="/" className="brand">
           pokemans
@@ -42,6 +44,8 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/review" element={<ReviewQueuePage />} />
+            <Route path="/admin/review/:orgId/:cardId" element={<ReviewCardPage />} />
             <Route path="/invite/:token" element={<InvitePage />} />
             <Route path="/orgs/:orgId" element={<OrgPage />} />
             <Route path="/orgs/:orgId/:kind/:containerId" element={<ContainerPage />} />

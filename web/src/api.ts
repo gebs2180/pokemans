@@ -101,3 +101,120 @@ export async function uploadToStorage(slot: UploadSlot, file: Blob): Promise<voi
     throw new Error(`Upload to storage failed: ${response.status}`)
   }
 }
+
+// Review (admin): identification and condition
+
+export type Edition = 'UNLIMITED' | 'FIRST_EDITION' | 'SHADOWLESS'
+export type Variant = 'NORMAL' | 'HOLO' | 'REVERSE_HOLO'
+export type Confidence = 'A' | 'B' | 'C' | 'D'
+export type AuthenticityRisk = 'NONE' | 'VINTAGE_HOLO' | 'JAPANESE_PROMO' | 'RECENT_CHASE'
+
+export type QueueItem = {
+  cardId: string
+  orgId: string
+  label: string
+  createdAt: string
+  identified: boolean
+  identifiedAs: string | null
+  assessment: 'NONE' | 'SYSTEM' | 'REVIEWER'
+  confidence: Confidence | null
+  openRequests: number
+}
+
+export type CatalogHit = { externalId: string; number: string; name: string; setId: string | null; imageUrl: string | null }
+
+export type ProviderCard = {
+  externalId: string
+  language: string
+  setId: string | null
+  setName: string
+  seriesName: string | null
+  setReleaseDate: string | null
+  number: string
+  name: string
+  rarity: string | null
+  editions: Edition[]
+  variants: Variant[]
+  stamps: string[]
+  promo: boolean
+  imageUrl: string | null
+}
+
+export type IdentifiedCard = {
+  cardItemId: string
+  catalogCardId: string
+  language: string
+  setName: string
+  seriesName: string | null
+  setReleaseDate: string | null
+  number: string
+  name: string
+  rarity: string | null
+  edition: Edition
+  variant: Variant
+  stamp: string | null
+  promo: boolean
+  authenticityRisk: AuthenticityRisk
+  imageUrl: string | null
+}
+
+export type ReviewPhoto = { id: string; side: Side; url: string; cropUrl: string | null; capturedAt: string | null }
+
+export type PredictionRequestView = {
+  id: string
+  provider: string
+  status: 'PENDING' | 'SUBMITTED' | 'DONE' | 'FAILED'
+  attempts: number
+  lastError: string | null
+  createdAt: string
+  finishedAt: string | null
+}
+
+export type Prediction = {
+  id: string
+  provider: string
+  modelVersion: string | null
+  succeeded: boolean
+  overallGrade: number | null
+  psaGrade: number | null
+  centering: number | null
+  corners: number | null
+  edges: number | null
+  surface: number | null
+  details: Record<string, unknown> | null
+  error: string | null
+  latencyMs: number | null
+  createdAt: string
+}
+
+/** Outcome ("U", "1" … "10") to probability. */
+export type Distribution = Record<string, number>
+
+export type Assessment = {
+  id: string
+  version: number
+  current: boolean
+  distribution: Distribution
+  median: string
+  confidence: Confidence
+  authorType: 'SYSTEM' | 'REVIEWER'
+  authorId: string | null
+  reason: string | null
+  adjustments: Distribution | null
+  basis: Record<string, unknown>
+  createdAt: string
+}
+
+export type CardCondition = {
+  cardId: string
+  orgId: string
+  label: string
+  enabledProviders: string[]
+  photos: ReviewPhoto[]
+  identification: IdentifiedCard | null
+  requests: PredictionRequestView[]
+  predictions: Prediction[]
+  assessments: Assessment[]
+}
+
+export const OUTCOMES = ['U', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const
