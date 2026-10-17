@@ -37,6 +37,33 @@ The phone has to reach both the web app and MinIO, because uploads go straight t
 
 Browsers only allow camera capture and PWA install on `https` or `localhost`. Over plain LAN http, the file picker still offers the camera on most phones, but installing the app needs https (e.g. a tunnel, or the deployed site later).
 
+## Try the M2 flow
+
+1. As a collector or partner, capture a card's front and back. Photos now need the whole card in frame, with a little space around it. Cut-off, too-small and blurry cards get a retake reason.
+2. As ADMIN, open **Admin → Review queue** and pick the card.
+3. **Identity:** search TCGdex by name, and optionally number, then pick the print, edition, finish, stamp and promo, and confirm. If a card isn't listed, enter it by hand.
+4. **Condition:** with no provider enabled, enter the distribution by hand (percentages per grade, plus a reason). Each save is a new version.
+5. **Contributors:** create a *Contributor* org and invite someone. They accept the data-use terms, add a card with raw front and back photos, then the grader, cert and grade. Check the cert under **Admin → Graded results to check**.
+
+### Pre-grading providers
+
+Both are off by default. Turn one on only after its terms are confirmed in writing ([pregrade-providers.md](pregrade-providers.md)). Set its key in the environment, never in a file:
+
+```powershell
+$env:XIMILAR_ENABLED = "true"; $env:XIMILAR_API_KEY = "<token>"
+$env:CARDGRADE_ENABLED = "true"; $env:CARDGRADE_API_KEY = "cgrd_<full-access key>"   # opt the account out of AI training first
+```
+
+With a provider on, completing a card's capture queues a request automatically. A background job sends it and polls every 15 s, and a system distribution appears once every provider has answered. **Ask again** on the review page queues another request.
+
+### Tuning photo checks on real photos
+
+To run the photo checks over a folder of your own photos and print the measurements, run the command below. It also writes each card crop next to its photo as `<name>.card.jpg`.
+
+```powershell
+cd backend; $env:POKEMANS_REAL_PHOTOS = "C:\path	o\photos"; .\gradlew.bat :app:test --tests "*RealPhotoCalibrationTest" -i
+```
+
 ## Tests
 
 ```powershell

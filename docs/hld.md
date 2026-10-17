@@ -109,6 +109,11 @@ The methodology's worked example (FMV $411 → RV $481 → QSV $314 → stressed
 
 Modules talk through published interfaces and application events (e.g. `PhotosAccepted`, `CardIdentified`, `AssessmentFinalized`, `GradeReturned`), not each other's repositories.
 
+**Built so far (M2, 2026-10-16):** `identity`, `storage`, `intake`, `catalog`, `condition` and `outcomes`.
+- **Published APIs:** each module exposes a small public API: `intake.CardItems` (cards, passing photos, the `CaptureCompleted` event), `catalog.Catalog` (current identity per card) and `identity.Consents`.
+- **Review queue:** it lives in `condition`, not `admin`.
+- **Contributor consent:** it lives in `identity` as a versioned terms text plus append-only acceptances that store the hash of the exact text.
+
 ### 3.3 Frontend
 
 One React + TypeScript + Vite SPA with role-based areas:
@@ -260,6 +265,14 @@ docker-compose.yml
 - **Checked on real photos:** the four M1 test photos (half card, cut-off top, blurry with no card, one good back) all get the right result. `RealPhotoCalibrationTest` reruns this against any local folder of photos (`POKEMANS_REAL_PHOTOS`). Real photos are kept out of the repo.
 - **Centering is not measured by us yet.** Refining corners to sub-pixel accuracy on real backgrounds (fabric, wood grain) wasn't reliable. A few pixels of corner error moves border widths by several percent, which is the same size as the centering differences that matter. Centering comes from the pre-grading providers for now. Our own measurement waits until the controlled PSA set gives ground truth to validate it against.
 
+**M2 status (2026-10-16): built.** The pieces still open are listed below. All are needed before the "done when" is met:
+- **Pre-grading providers:** the Ximilar and CardGrade.io adapters are built and tested against their published response shapes, but both are off. Each needs written confirmation of its terms and a key, and CardGrade.io also needs its training opt-out. Then run the controlled set through both.
+- **Identification:** the reviewer searches the catalog. There is no photo-based "provider suggestion" yet. Ximilar's TCG identification could add one later.
+- **Authenticity flags:** authenticity-risk categories are computed and shown. The flag lifecycle (verify, zero value until verified) and custody records are still to build, before M4 eligibility.
+- **Cert checks:** they are manual. An automated PSA cert lookup waits on a review of its API terms.
+- **Contributor terms:** the text in `Consents` is a plain-language draft for Zach to review, not reviewed legal wording.
+- **System distribution parameters:** spread, confidence penalties and the holo shift are starting values in `pokemans.condition`. Each assessment stores the values it was built with, so they can be tuned against returned grades in M5.
+
 **M2 contributor upload (2026-10-16):** "guess the grade" posts (Reddit and forums) pair raw photos with the returned grade, which makes them labelled examples. Scraping them is out: Reddit's Data API terms bar AI training without the posters' permission and require a separate agreement for commercial use, and the photos belong to the posters. Instead, Zach contacts posters by hand and offers a free collection report. Contributors use a consent-first upload, built on M1 intake:
 - **Who and where:** a `CONTRIBUTOR` org type, reached by invite like the others.
 - **Each submission:** raw front and back photos run through the same quality checks, plus the grader and cert number.
@@ -275,6 +288,7 @@ Posts are only read by hand to find people to ask. They are never stored.
 |---|---|
 | Employment agreement / IP | Zach is proceeding without clearance and believes it only matters if he charges. Invention-assignment clauses often cover inventions related to the employer's business regardless of monetization, and lending tech is adjacent. Personal accounts and devices only. Revisit before charging, publicizing, or approaching lenders. |
 | Price data licensing | Which sources allow commercial use and storage. `PriceDataProvider` keeps this swappable. |
+| Contributor terms wording | Draft in `identity.Consents`. Review before inviting the first contributor; a changed text needs a new version string. |
 | Pre-grading API terms | Reviewed 2026-10-16 in `docs/pregrade-providers.md`. Plan: Ximilar plus CardGrade.io (opted out of training). CardGrader.AI is out: its terms ban storing results and training on them. Get storage, training and lender-report rights confirmed in writing before production data. |
 | Lender error tolerance | Drives confidence thresholds and α ranges; ask during pilots. |
 | Custody | Whether to partner with an existing vault. Out of v1; CustodyRecord is manual. |
