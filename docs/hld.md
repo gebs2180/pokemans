@@ -293,7 +293,8 @@ Posts are only read by hand to find people to ask. They are never stored.
   - **No bulk floor.** U with no damaged or altered sales is $0 (`NO_SALES`), and a card with no graded sales is left unpriced. Low-value cards are kept out by the $25 FMV eligibility minimum instead.
   - **σ** comes from graded sales only (raw never), pooled across graders and grades. The sales rate is per card.
   - **Append-only tables** (`sold_comp`, `price_snapshot`, `price_stats`) refuse updates with a database trigger. Deletes stay possible for licence purges.
-- **Not built yet:** a licensed adapter, manual comp entry (the pilot route), the comps browser, and stored step-down ratio tables. Snapshots are gross: grading costs are netted in the valuation run (M4). Details and open questions are in [m3-progress.md](m3-progress.md).
+- **Manual comp entry (2026-10-17):** the pilot route. `PricingController` under `/api/admin/catalog-cards/{id}`: `POST comps`, `GET prices`, `POST prices/refresh`. The review page shows the panel once the card is identified.
+- **Not built yet:** a licensed adapter, excluding a mistaken comp, the comps browser, and stored step-down ratio tables. Snapshots are gross: grading costs are netted in the valuation run (M4). Details and open questions are in [m3-progress.md](m3-progress.md).
 
 ## 11. Risks and open decisions
 

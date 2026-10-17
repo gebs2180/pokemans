@@ -14,6 +14,7 @@ import {
   type Variant,
 } from '../api'
 import { useLoad } from '../useLoad'
+import { PricesPanel } from './PricesPanel'
 
 const EDITIONS: Edition[] = ['UNLIMITED', 'FIRST_EDITION', 'SHADOWLESS']
 const VARIANTS: Variant[] = ['NORMAL', 'HOLO', 'REVERSE_HOLO']
@@ -62,6 +63,14 @@ export function ReviewCardPage() {
       </section>
 
       <Identification data={data} base={base} onChange={reload} />
+      {data.identification ? (
+        <PricesPanel key={data.identification.catalogCardId} catalogCardId={data.identification.catalogCardId} />
+      ) : (
+        <section className="panel">
+          <h2>Sold comps and prices</h2>
+          <p className="muted">Confirm the card's identity first: comps and prices attach to the catalog card.</p>
+        </section>
+      )}
       <Predictions data={data} base={base} onChange={reload} />
       <AssessmentPanel key={current?.id ?? 'none'} data={data} current={current} base={base} onChange={reload} />
     </>

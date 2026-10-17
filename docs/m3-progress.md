@@ -63,8 +63,9 @@ Fixture data only. Nothing calls a real price API or scrapes anything.
 ## What's left
 
 - **A licensed adapter.** It waits on the vendor replies ([price-vendor-emails.md](price-vendor-emails.md)). PokeTrace Pro or Scale is the planned pilot source. Map its grader/grade/condition fields onto `Sale`, and keep its key in the environment.
-- **Manual comp entry** for the pilot: an admin endpoint and UI that record a comp with marketplace, URL, date, grade and price, with `source = MANUAL`. This is the recommended route for any report shown to a lender.
-- **Comps browser** in the admin console, plus comp overrides. Overrides would be new rows, never edits.
+- **Manual comp entry: built 2026-10-17.** The review page has a "Sold comps and prices" panel: enter a sold listing (grader and grade or raw condition, price, date, listing type, marketplace, URL), list the card's comps, **Refresh prices**, and see each grader's table. Stored with `source = MANUAL`, licence "manual entry", and who entered it. A listing URL can only be entered once. Tested by `ManualCompFlowTest`.
+- **Excluding a wrong comp.** Comps can't be edited (the database refuses updates). A mistaken entry needs an exclusion: a new row that tells the snapshot to skip a comp, or a delete with a reason. Not built yet.
+- **Comps browser** across cards in the admin console.
 - **Step-down ratio tables:** store them per era and recompute weekly, as the HLD says. For now they are rebuilt on each run and only the ratio used is kept on the snapshot.
 - **Half grades with their own sales history.** They are always folded down for now.
 - **Methodology doc:** update the Claude Doc for decision 7 (U is $0 with no damaged sales, no bulk floor).

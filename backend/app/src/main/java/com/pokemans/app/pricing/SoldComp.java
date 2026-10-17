@@ -99,4 +99,24 @@ class SoldComp {
     LocalDate getSoldOn() {
         return soldOn;
     }
+
+    PriceSource.ListingType getListingType() {
+        return listingType;
+    }
+
+    String getUrl() {
+        return url;
+    }
+
+    String getLicence() {
+        return licence;
+    }
+
+    Map<String, Object> getRaw() {
+        return raw;
+    }
+
+    Instant getCreatedAt() {
+        return createdAt;
+    }
 }

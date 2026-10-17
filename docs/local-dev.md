@@ -66,6 +66,16 @@ $env:CARD_READER_ENABLED = "true"; $env:ANTHROPIC_API_KEY = "<your personal key>
 
 Cards completed while it was off can be read from the review page with **Read the card again**. A reading costs under a cent with the default model (`CARD_READER_MODEL` to change it). Photos without a card crop (taken before the whole-card check existed) can't be read; retake the front.
 
+### Sold comps and prices
+
+Until a price source is licensed, comps are entered by hand. On a card's review page, once its identity is confirmed:
+
+1. Look up **sold** listings for that exact card, for example eBay's sold filter or 130point. Never use asking prices.
+2. Enter each sale under **Sold comps and prices**: the grader and grade (or the raw condition), price, sold date, listing type, marketplace and the listing URL.
+3. Click **Refresh prices**. Each grader with sales gets a table of U and grades 1 to 10, showing each grade's price, how it was set and its confidence.
+
+A grader can come back as "Not priced" when the missing grades need an era step-down ratio. Building a ratio takes at least 3 cards of the same era with sales in both grades. To get a full table from one card, enter sales at a low grade and a high grade, so the grades between them can be interpolated.
+
 ### Tuning photo checks on real photos
 
 To run the photo checks over a folder of your own photos and print the measurements, run the command below. It also writes each card crop next to its photo as `<name>.card.jpg`.

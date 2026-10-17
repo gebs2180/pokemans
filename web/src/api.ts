@@ -291,3 +291,63 @@ export type CardIdentificationView = {
   reading: CardReadingView | null
   suggestions: Suggestion[]
 }
+
+// Pricing (admin): sold comps entered by hand and per-grader price tables
+
+export type GradingCompany = 'PSA' | 'BGS' | 'CGC' | 'SGC' | 'TAG' | 'ACE'
+export type RawCondition = 'NEAR_MINT' | 'LIGHTLY_PLAYED' | 'MODERATELY_PLAYED' | 'HEAVILY_PLAYED' | 'DAMAGED' | 'ALTERED'
+export type ListingType = 'AUCTION' | 'FIXED_PRICE' | 'BEST_OFFER_ACCEPTED' | 'PRIVATE_SALE' | 'UNKNOWN'
+export type PriceMethod = 'OBSERVED' | 'INTERPOLATED' | 'STEP_DOWN' | 'CARRIED_DOWN' | 'NO_SALES'
+
+export type CompRequest = {
+  gradingCompany: GradingCompany | null
+  grade: number | null
+  rawCondition: RawCondition | null
+  price: number
+  soldOn: string
+  listingType: ListingType
+  marketplace: string
+  url: string | null
+  note: string | null
+}
+
+export type CompView = {
+  id: string
+  source: string
+  gradingCompany: GradingCompany | null
+  grade: number | null
+  rawCondition: RawCondition | null
+  price: number
+  currency: string
+  soldOn: string
+  listingType: ListingType
+  url: string | null
+  licence: string
+  details: Record<string, unknown>
+  createdAt: string
+}
+
+export type GradeRow = {
+  grade: string
+  price: number
+  method: PriceMethod
+  confidence: Confidence
+  n: number
+  compIds: string[]
+  windowDays: number | null
+  basis: string[]
+  stepDownRatio: number | null
+}
+
+export type PriceTable = {
+  gradingCompany: GradingCompany
+  snapshotSetId: string
+  asOf: string
+  parameterSet: string
+  grades: GradeRow[]
+  sigma: number | null
+  sigmaChanges: number
+  salesPerMonth: number
+}
+
+export type PricesView = { catalogCardId: string; comps: CompView[]; tables: PriceTable[]; skipped: string[] }

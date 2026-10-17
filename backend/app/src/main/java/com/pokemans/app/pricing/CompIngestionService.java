@@ -71,6 +71,30 @@ class CompIngestionService {
         return runs.save(run);
     }
 
+    /** Source name of comps a reviewer entered by hand from a sold listing they looked at. */
+    static final String MANUAL = "MANUAL";
+
+    /**
+     * Stores one sold sale a reviewer entered by hand. The same checks as ingestion apply; a
+     * listing URL entered twice is refused as a duplicate.
+     *
+     * @throws IllegalArgumentException with the reason, if the sale isn't a usable comp
+     */
+    @Transactional
+    SoldComp recordManual(PriceSource.Sale sale) {
+        String problem = problem(sale, LocalDate.now(ZoneOffset.UTC));
+        if (problem == null && !MANUAL.equals(sale.source())) {
+            problem = "source " + sale.source() + " is not " + MANUAL;
+        }
+        if (problem != null) {
+            throw new IllegalArgumentException(problem);
+        }
+        if (comps.existsBySourceAndExternalSaleId(sale.source(), sale.externalSaleId())) {
+            throw new IllegalArgumentException("This sale is already recorded");
+        }
+        return comps.save(new SoldComp(sale, "manual entry", Instant.now(), null));
+    }
+
     /** Why a sale can't be stored as a comp, or null if it can. */
     private String problem(PriceSource source, Catalog.CardSummary card, PriceSource.Sale sale, LocalDate today) {
         if (!source.name().equals(sale.source())) {
@@ -79,6 +103,10 @@ class CompIngestionService {
         if (!card.catalogCardId().equals(sale.catalogCardId())) {
             return "sale is for catalog card " + sale.catalogCardId() + ", asked for " + card.catalogCardId();
         }
+        return problem(sale, today);
+    }
+
+    private String problem(PriceSource.Sale sale, LocalDate today) {
         if (!properties.currency().equals(sale.currency())) {
             return "currency " + sale.currency() + " (only " + properties.currency() + " in v1)";
         }
