@@ -1,5 +1,6 @@
 package com.pokemans.app.identity;
 
+import java.util.Arrays;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -23,10 +24,11 @@ public class OrgAccess {
         this.currentUser = currentUser;
     }
 
+    /** The org, if the caller may use it and it is one of the expected types; otherwise 404. */
     @Transactional(readOnly = true)
-    public Org require(UUID orgId, OrgType expectedType) {
+    public Org require(UUID orgId, OrgType... expectedTypes) {
         Org org = orgs.findById(orgId).orElseThrow(OrgAccess::notFound);
-        if (org.getType() != expectedType) {
+        if (!Arrays.asList(expectedTypes).contains(org.getType())) {
             throw notFound();
         }
         if (!currentUser.isAdmin() && memberships.findByOrgIdAndUserId(orgId, currentUser.id()).isEmpty()) {

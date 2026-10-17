@@ -1,7 +1,8 @@
-import { useState, type ChangeEvent } from 'react'
+import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { uploadToStorage, useApi, type CardView, type PhotoView, type Side, type UploadSlot } from '../api'
+import { uploadToStorage, useApi, type CardView, type Grader, type OutcomeView, type PhotoView, type Side, type UploadSlot } from '../api'
 import { useLoad } from '../useLoad'
+import { useOrg } from '../useOrg'
 
 const SIDE_LABEL: Record<Side, string> = { FRONT: 'Front', BACK: 'Back', DETAIL: 'Close-up' }
 
@@ -13,6 +14,7 @@ export function CardPage() {
   const { data: card, error, reload } = useLoad(() => api<CardView>('GET', `/api/orgs/${orgId}/cards/${cardId}`), [api, orgId, cardId])
   const [busy, setBusy] = useState<Side | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const { data: org } = useOrg(orgId)
 
   async function capture(side: Side, e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -84,7 +86,68 @@ export function CardPage() {
           </section>
         )
       })}
+      {org?.type === 'CONTRIBUTOR' && !card.lot && <GradedResult orgId={orgId} cardId={cardId} ready={card.captureComplete} />}
     </>
+  )
+}
+
+const GRADERS: Grader[] = ['PSA', 'BGS', 'CGC', 'SGC', 'TAG']
+const STATUS_LABEL: Record<OutcomeView['status'], string> = {
+  UNVERIFIED: 'Waiting for us to check the cert',
+  VERIFIED: 'Cert checked',
+  MISMATCH: "Cert didn't match this card",
+}
+
+/** Contributors: the grade this card came back with, after the raw photos above. */
+function GradedResult({ orgId, cardId, ready }: { orgId: string; cardId: string; ready: boolean }) {
+  const api = useApi()
+  const path = `/api/orgs/${orgId}/cards/${cardId}/outcomes`
+  const { data: outcomes, reload } = useLoad(() => api<OutcomeView[]>('GET', path), [api, path])
+  const [grader, setGrader] = useState<Grader>('PSA')
+  const [certNumber, setCertNumber] = useState('')
+  const [grade, setGrade] = useState('')
+  const [gradeLabel, setGradeLabel] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setErr(null)
+    try {
+      await api('POST', path, { grader, certNumber, grade: grade === '' ? null : Number(grade), gradeLabel })
+      setCertNumber('')
+      setGrade('')
+      setGradeLabel('')
+      reload()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  return (
+    <section className="side">
+      <h2>Graded result</h2>
+      {outcomes?.map((o) => (
+        <p key={o.id} className={o.status === 'MISMATCH' ? 'warn' : o.status === 'VERIFIED' ? 'ok' : ''}>
+          {o.grader} {o.grade ?? o.gradeLabel} · cert {o.certNumber} · {STATUS_LABEL[o.status]}
+        </p>
+      ))}
+      {!ready ? (
+        <p className="muted">Add the raw front and back photos first (taken before the card was graded).</p>
+      ) : (
+        <form onSubmit={submit} className="row">
+          <select value={grader} onChange={(e) => setGrader(e.target.value as Grader)}>
+            {GRADERS.map((g) => (
+              <option key={g}>{g}</option>
+            ))}
+          </select>
+          <input value={certNumber} onChange={(e) => setCertNumber(e.target.value)} placeholder="Cert number" required pattern="[A-Za-z0-9-]+" />
+          <input value={grade} onChange={(e) => setGrade(e.target.value)} placeholder="Grade" inputMode="decimal" className="narrow" />
+          <input value={gradeLabel} onChange={(e) => setGradeLabel(e.target.value)} placeholder="Label, e.g. GEM MT" />
+          <button type="submit">Save</button>
+        </form>
+      )}
+      {err && <p className="error">{err}</p>}
+    </section>
   )
 }
 

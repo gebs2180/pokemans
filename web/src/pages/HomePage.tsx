@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { useApi, type Me } from '../api'
+import { ORG_TYPE_LABEL, useApi, type Me } from '../api'
 import { useLoad } from '../useLoad'
 
 export function HomePage() {
@@ -20,7 +20,7 @@ export function HomePage() {
         {me.memberships.map((m) => (
           <li key={m.orgId}>
             <Link to={`/orgs/${m.orgId}`}>{m.orgName}</Link>{' '}
-            <span className="muted">{m.orgType === 'PARTNER' ? 'Partner' : 'Collector'}</span>
+            <span className="muted">{ORG_TYPE_LABEL[m.orgType]}</span>
           </li>
         ))}
       </ul>

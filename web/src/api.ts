@@ -1,7 +1,9 @@
 import { useAuth0 } from '@auth0/auth0-react'
 import { useCallback } from 'react'
 
-export type OrgType = 'PARTNER' | 'COLLECTOR'
+export type OrgType = 'PARTNER' | 'COLLECTOR' | 'CONTRIBUTOR'
+
+export const ORG_TYPE_LABEL: Record<OrgType, string> = { PARTNER: 'Partner', COLLECTOR: 'Collector', CONTRIBUTOR: 'Contributor' }
 export type Side = 'FRONT' | 'BACK' | 'DETAIL'
 export type PhotoStatus = 'AWAITING_UPLOAD' | 'PASSED' | 'RETAKE'
 
@@ -218,3 +220,26 @@ export type CardCondition = {
 }
 
 export const OUTCOMES = ['U', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const
+
+// Contributors: consent and grading results
+
+export type ConsentStatus = { version: string; text: string; acceptedAt: string | null }
+
+export type Grader = 'PSA' | 'BGS' | 'CGC' | 'SGC' | 'TAG'
+
+export type OutcomeView = {
+  id: string
+  orgId: string
+  cardId: string
+  cardLabel: string
+  source: 'CONTRIBUTOR' | 'PARTNER' | 'ADMIN'
+  grader: Grader
+  certNumber: string
+  grade: number | null
+  gradeLabel: string | null
+  gradedOn: string | null
+  status: 'UNVERIFIED' | 'VERIFIED' | 'MISMATCH'
+  verificationNote: string | null
+  lookupUrl: string
+  createdAt: string
+}

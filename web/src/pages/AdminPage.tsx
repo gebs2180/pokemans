@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { useApi, type CreatedInvite, type Org, type OrgType } from '../api'
+import { ORG_TYPE_LABEL, useApi, type CreatedInvite, type Org, type OrgType } from '../api'
 import { useLoad } from '../useLoad'
 
 export function AdminPage() {
@@ -38,7 +38,7 @@ export function AdminPage() {
   return (
     <>
       <p>
-        <Link to="/admin/review">Review queue →</Link>
+        <Link to="/admin/review">Review queue →</Link> · <Link to="/admin/outcomes">Graded results to check →</Link>
       </p>
       <h1>Orgs</h1>
       <form onSubmit={createOrg} className="row">
@@ -46,6 +46,7 @@ export function AdminPage() {
         <select value={type} onChange={(e) => setType(e.target.value as OrgType)}>
           <option value="PARTNER">Partner</option>
           <option value="COLLECTOR">Collector</option>
+          <option value="CONTRIBUTOR">Contributor (shares graded cards)</option>
         </select>
         <button type="submit">Create</button>
       </form>
@@ -60,7 +61,7 @@ export function AdminPage() {
             <li key={org.id}>
               <Link to={`/orgs/${org.id}`}>{org.name}</Link>{' '}
               <span className="muted">
-                {org.type === 'PARTNER' ? 'Partner' : 'Collector'} · {org.members} member{org.members === 1 ? '' : 's'}
+                {ORG_TYPE_LABEL[org.type]} · {org.members} member{org.members === 1 ? '' : 's'}
               </span>{' '}
               <button className="link" onClick={() => createInvite(org.id)}>
                 New invite link

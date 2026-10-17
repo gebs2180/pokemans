@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router'
 import { useApi, type InvitePreview } from '../api'
 import { useLoad } from '../useLoad'
 
+const ROLE_LABEL: Record<string, string> = { PARTNER: 'submission partner', COLLECTOR: 'collector', CONTRIBUTOR: 'contributor' }
+
 export function InvitePage() {
   const { token = '' } = useParams()
   const api = useApi()
@@ -26,7 +28,7 @@ export function InvitePage() {
     <>
       <h1>Join {invite.orgName}</h1>
       <p>
-        You have been invited as a {invite.role === 'PARTNER' ? 'submission partner' : 'collector'}.
+        You have been invited as a {ROLE_LABEL[invite.role] ?? invite.role.toLowerCase()}.
       </p>
       {invite.usable ? (
         <button onClick={accept}>Accept invite</button>

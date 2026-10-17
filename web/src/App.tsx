@@ -1,5 +1,6 @@
 import { useAuth0 } from '@auth0/auth0-react'
 import { Link, Route, Routes, useLocation } from 'react-router'
+import { AdminOutcomesPage } from './pages/AdminOutcomesPage'
 import { AdminPage } from './pages/AdminPage'
 import { CardPage } from './pages/CardPage'
 import { ContainerPage } from './pages/ContainerPage'
@@ -45,6 +46,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/review" element={<ReviewQueuePage />} />
+            <Route path="/admin/outcomes" element={<AdminOutcomesPage />} />
             <Route path="/admin/review/:orgId/:cardId" element={<ReviewCardPage />} />
             <Route path="/invite/:token" element={<InvitePage />} />
             <Route path="/orgs/:orgId" element={<OrgPage />} />

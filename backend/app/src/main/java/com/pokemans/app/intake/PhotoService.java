@@ -1,6 +1,9 @@
 package com.pokemans.app.intake;
 
+import com.pokemans.app.identity.Consents;
 import com.pokemans.app.identity.CurrentUser;
+import com.pokemans.app.identity.OrgAccess;
+import com.pokemans.app.identity.OrgType;
 import com.pokemans.app.intake.IntakeViews.PhotoView;
 import com.pokemans.app.intake.IntakeViews.UploadSlot;
 import com.pokemans.app.storage.BlobStore;
@@ -34,9 +37,12 @@ class PhotoService {
     private final StorageProperties storage;
     private final QualityChecker quality;
     private final ApplicationEventPublisher events;
+    private final OrgAccess access;
+    private final Consents consents;
 
     PhotoService(IntakeService intake, CurrentUser currentUser, PhotoRepository photos, BlobStore blobs,
-                 StorageProperties storage, QualityProperties qualityProperties, ApplicationEventPublisher events) {
+                 StorageProperties storage, QualityProperties qualityProperties, ApplicationEventPublisher events,
+                 OrgAccess access, Consents consents) {
         this.intake = intake;
         this.currentUser = currentUser;
         this.photos = photos;
@@ -44,11 +50,16 @@ class PhotoService {
         this.storage = storage;
         this.quality = new QualityChecker(qualityProperties);
         this.events = events;
+        this.access = access;
+        this.consents = consents;
     }
 
     @Transactional
     UploadSlot requestUpload(UUID orgId, UUID cardId, Photo.Side side, String contentType, long sizeBytes) {
         CardItem card = intake.requireCard(orgId, cardId);
+        if (access.require(orgId, OrgType.values()).getType() == OrgType.CONTRIBUTOR) {
+            consents.requireAccepted(orgId);
+        }
         if (!ACCEPTED_TYPES.contains(contentType)) {
             throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Photos must be JPEG or PNG");
         }

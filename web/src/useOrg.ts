@@ -22,7 +22,7 @@ export function useOrg(orgId: string) {
   }, [api, orgId])
 }
 
-/** URL segment and labels for an org's containers: batches for partners, collections for collectors. */
+/** URL segment and labels for an org's containers: batches for partners, collections for collectors and contributors. */
 export function containerKind(type: OrgType) {
   return type === 'PARTNER'
     ? { path: 'batches', singular: 'batch', plural: 'Batches' }

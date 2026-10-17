@@ -16,9 +16,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Batches (partner orgs), collections (collector orgs) and the cards in them. */
+/** Batches (partner orgs), collections (collector and contributor orgs) and the cards in them. */
 @Service
 class IntakeService {
+
+    /** Org types whose cards live in collections. */
+    static final OrgType[] COLLECTION_ORGS = {OrgType.COLLECTOR, OrgType.CONTRIBUTOR};
 
     private final OrgAccess access;
     private final CurrentUser currentUser;
@@ -74,14 +77,14 @@ class IntakeService {
 
     @Transactional
     ContainerSummary createCollection(UUID orgId, String name) {
-        Org org = access.require(orgId, OrgType.COLLECTOR);
+        Org org = access.require(orgId, COLLECTION_ORGS);
         CardCollection collection = collections.save(new CardCollection(org.getId(), name, currentUser.id()));
         return new ContainerSummary(collection.getId(), collection.getName(), collection.getCreatedAt(), 0);
     }
 
     @Transactional(readOnly = true)
     List<ContainerSummary> listCollections(UUID orgId) {
-        access.require(orgId, OrgType.COLLECTOR);
+        access.require(orgId, COLLECTION_ORGS);
         return collections.findByOrgIdOrderByCreatedAtDesc(orgId).stream()
                 .map(c -> new ContainerSummary(c.getId(), c.getName(), c.getCreatedAt(), cards.countByCollectionId(c.getId())))
                 .toList();
@@ -89,7 +92,7 @@ class IntakeService {
 
     @Transactional(readOnly = true)
     ContainerDetail collection(UUID orgId, UUID collectionId) {
-        access.require(orgId, OrgType.COLLECTOR);
+        access.require(orgId, COLLECTION_ORGS);
         CardCollection collection = collections.findByIdAndOrgId(collectionId, orgId).orElseThrow(() -> notFound("Collection"));
         return new ContainerDetail(collection.getId(), collection.getName(), collection.getCreatedAt(),
                 cardViews(cards.findByCollectionIdOrderByCreatedAtAsc(collectionId)));
@@ -97,7 +100,7 @@ class IntakeService {
 
     @Transactional
     CardView addCardToCollection(UUID orgId, UUID collectionId, String label, boolean lot, int quantity) {
-        access.require(orgId, OrgType.COLLECTOR);
+        access.require(orgId, COLLECTION_ORGS);
         collections.findByIdAndOrgId(collectionId, orgId).orElseThrow(() -> notFound("Collection"));
         CardItem card = cards.save(CardItem.inCollection(orgId, collectionId, label, lot, quantity, currentUser.id()));
         return IntakeViews.card(card, List.of());
@@ -106,7 +109,11 @@ class IntakeService {
     /** A card in any org the caller can reach, whichever kind it is. */
     CardItem requireCard(UUID orgId, UUID cardId) {
         CardItem card = cards.findByIdAndOrgId(cardId, orgId).orElseThrow(() -> notFound("Card"));
-        access.require(orgId, card.getBatchId() != null ? OrgType.PARTNER : OrgType.COLLECTOR);
+        if (card.getBatchId() != null) {
+            access.require(orgId, OrgType.PARTNER);
+        } else {
+            access.require(orgId, COLLECTION_ORGS);
+        }
         return card;
     }
 

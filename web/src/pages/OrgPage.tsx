@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
-import { useApi, type ContainerSummary } from '../api'
+import { useApi, type ConsentStatus, type ContainerSummary } from '../api'
 import { useLoad } from '../useLoad'
 import { containerKind, useOrg } from '../useOrg'
 
@@ -9,7 +9,45 @@ export function OrgPage() {
   const { data: org, error: orgError } = useOrg(orgId)
   if (orgError) return <p className="error">{orgError}</p>
   if (!org) return <p>Loading…</p>
-  return <Containers orgId={orgId} orgName={org.name} kind={containerKind(org.type)} />
+  const containers = <Containers orgId={orgId} orgName={org.name} kind={containerKind(org.type)} />
+  return org.type === 'CONTRIBUTOR' ? <ConsentGate orgId={orgId}>{containers}</ConsentGate> : containers
+}
+
+/** Contributors read and accept the data-use terms before sharing anything. */
+function ConsentGate({ orgId, children }: { orgId: string; children: ReactNode }) {
+  const api = useApi()
+  const { data, error, reload } = useLoad(() => api<ConsentStatus>('GET', `/api/orgs/${orgId}/consent`), [api, orgId])
+  const [acceptError, setAcceptError] = useState<string | null>(null)
+
+  async function accept() {
+    setAcceptError(null)
+    try {
+      await api('POST', `/api/orgs/${orgId}/consent`, { version: data?.version })
+      reload()
+    } catch (err) {
+      setAcceptError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  if (error) return <p className="error">{error}</p>
+  if (!data) return <p>Loading…</p>
+  if (data.acceptedAt) {
+    return (
+      <>
+        {children}
+        <p className="muted small">You accepted the data-use terms on {new Date(data.acceptedAt).toLocaleDateString()}.</p>
+      </>
+    )
+  }
+  return (
+    <>
+      <h1>Before you share</h1>
+      <p>Please read how we use the photos and grades you share.</p>
+      <pre className="terms">{data.text}</pre>
+      <button onClick={accept}>I agree</button>
+      {acceptError && <p className="error">{acceptError}</p>}
+    </>
+  )
 }
 
 function Containers({ orgId, orgName, kind }: { orgId: string; orgName: string; kind: ReturnType<typeof containerKind> }) {
