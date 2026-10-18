@@ -1,6 +1,8 @@
 package com.pokemans.valuation;
 
 import java.math.BigDecimal;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -66,9 +68,10 @@ public final class CardValuator {
                 ? params.stressShiftGradesConfidenceC()
                 : params.stressShiftGrades();
         GradeDistribution stressed = in.distribution().shiftDown(shift);
-        BigDecimal stressedFmv = expectedValue(stressed, in.prices());
-        trace.add("FMV_stressed", "distribution shifted " + shift + " grades down, floor 1, U held",
-                Money.cents(stressedFmv), describe(stressed, in.prices()));
+        Map<Grade, BigDecimal> stressedPrices = neverUp(in.prices());
+        BigDecimal stressedFmv = expectedValue(stressed, stressedPrices);
+        trace.add("FMV_stressed", "distribution shifted " + shift + " grades down, floor 1, U held; each grade priced"
+                        + " at most the grade above", Money.cents(stressedFmv), describe(stressed, stressedPrices));
 
         BigDecimal shock = volatilityShock(in.monthlyVolatility());
         trace.add("volatility_shock", "1 - k x sigma x sqrt(t)", shock,
@@ -96,11 +99,41 @@ public final class CardValuator {
     }
 
     static BigDecimal expectedValue(GradeDistribution distribution, GradePriceTable prices) {
+        return expectedValue(distribution, net(prices));
+    }
+
+    static BigDecimal expectedValue(GradeDistribution distribution, Map<Grade, BigDecimal> prices) {
         BigDecimal sum = BigDecimal.ZERO;
         for (Grade grade : Grade.values()) {
-            sum = sum.add(distribution.p(grade).multiply(prices.net(grade), Money.MC));
+            sum = sum.add(distribution.p(grade).multiply(prices.get(grade), Money.MC));
         }
         return sum;
+    }
+
+    private static Map<Grade, BigDecimal> net(GradePriceTable prices) {
+        EnumMap<Grade, BigDecimal> net = new EnumMap<>(Grade.class);
+        for (Grade grade : Grade.values()) {
+            net.put(grade, prices.net(grade));
+        }
+        return net;
+    }
+
+    /**
+     * Net prices for the stressed value: each gradable grade at most the grade above it. Shifting a
+     * distribution down must never raise its value, but some grades sell above the grades over them
+     * (PSA 1s have their own collectors), and the stress pushes probability into grade 1. U is kept.
+     */
+    static Map<Grade, BigDecimal> neverUp(GradePriceTable prices) {
+        EnumMap<Grade, BigDecimal> capped = new EnumMap<>(Grade.class);
+        capped.put(Grade.U, prices.net(Grade.U));
+        BigDecimal cap = null;
+        for (int g = 10; g >= 1; g--) {
+            Grade grade = Grade.of(g);
+            BigDecimal price = prices.net(grade);
+            cap = cap == null ? price : Money.min(cap, price);
+            capped.put(grade, cap);
+        }
+        return capped;
     }
 
     BigDecimal volatilityShock(BigDecimal sigma) {
@@ -162,12 +195,16 @@ public final class CardValuator {
     }
 
     private static String describe(GradeDistribution distribution, GradePriceTable prices) {
+        return describe(distribution, net(prices));
+    }
+
+    private static String describe(GradeDistribution distribution, Map<Grade, BigDecimal> prices) {
         StringBuilder sb = new StringBuilder();
         for (Grade grade : Grade.values()) {
             BigDecimal p = distribution.p(grade);
             if (p.signum() > 0) {
                 sb.append(sb.isEmpty() ? "" : " + ").append(p.stripTrailingZeros().toPlainString())
-                        .append(" x ").append(prices.net(grade)).append(" [").append(grade).append(']');
+                        .append(" x ").append(prices.get(grade)).append(" [").append(grade).append(']');
             }
         }
         return sb.toString();

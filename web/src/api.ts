@@ -297,7 +297,7 @@ export type CardIdentificationView = {
 export type GradingCompany = 'PSA' | 'BGS' | 'CGC' | 'SGC' | 'TAG' | 'ACE'
 export type RawCondition = 'NEAR_MINT' | 'LIGHTLY_PLAYED' | 'MODERATELY_PLAYED' | 'HEAVILY_PLAYED' | 'DAMAGED' | 'ALTERED'
 export type ListingType = 'AUCTION' | 'FIXED_PRICE' | 'BEST_OFFER_ACCEPTED' | 'PRIVATE_SALE' | 'UNKNOWN'
-export type PriceMethod = 'OBSERVED' | 'INTERPOLATED' | 'STEP_DOWN' | 'CARRIED_DOWN' | 'NO_SALES'
+export type PriceMethod = 'OBSERVED' | 'INTERPOLATED' | 'STEP_DOWN' | 'CARD_STEP_DOWN' | 'CARRIED_DOWN' | 'NO_SALES'
 
 export type CompRequest = {
   gradingCompany: GradingCompany | null

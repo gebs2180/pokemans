@@ -72,7 +72,7 @@ class ManualCompFlowTest {
                 .andExpect(jsonPath("$.licence").value("manual entry"))
                 .andExpect(jsonPath("$.details.marketplace").value("eBay"));
         api.postJson(comps, graded("PSA", "10", "520", 9, null), api.admin()).andExpect(status().isCreated());
-        api.postJson(comps, graded("PSA", "1", "20", 5, null), api.admin()).andExpect(status().isCreated());
+        api.postJson(comps, graded("PSA", "2", "20", 5, null), api.admin()).andExpect(status().isCreated());
         api.postJson(comps, graded("CGC", "9.5", "300", 4, null), api.admin()).andExpect(status().isCreated());
         api.postJson(comps, "{\"rawCondition\":\"DAMAGED\",\"price\":5,\"soldOn\":\"" + TODAY.minusDays(2)
                 + "\",\"listingType\":\"FIXED_PRICE\",\"marketplace\":\"TCGplayer\"}", api.admin()).andExpect(status().isCreated());
@@ -95,7 +95,7 @@ class ManualCompFlowTest {
                 .andExpect(jsonPath("$.comps.length()").value(5))
                 .andExpect(jsonPath("$.tables.length()").value(0));
 
-        // PSA: 1 and 10 observed, 2-9 interpolated. CGC: only a 9.5 (folded to 9), so 1-8 need an era ratio: skipped.
+        // PSA: 2 and 10 observed, 3-9 interpolated, 1 stepped down with the card ladder. CGC: only a 9.5 (folded to 9), so 1-8 need an era ratio: skipped.
         api.postJson("/api/admin/catalog-cards/" + card + "/prices/refresh", "", api.admin()).andExpect(status().isOk())
                 .andExpect(jsonPath("$.tables.length()").value(1))
                 .andExpect(jsonPath("$.tables[0].gradingCompany").value("PSA"))
@@ -106,12 +106,29 @@ class ManualCompFlowTest {
                 .andExpect(jsonPath("$.tables[0].grades[10].method").value("OBSERVED"))
                 .andExpect(jsonPath("$.tables[0].grades[10].n").value(2))
                 .andExpect(jsonPath("$.tables[0].grades[5].method").value("INTERPOLATED"))
-                .andExpect(jsonPath("$.tables[0].grades[5].basis", org.hamcrest.Matchers.contains("1", "10")))
+                .andExpect(jsonPath("$.tables[0].grades[5].basis", org.hamcrest.Matchers.contains("2", "10")))
                 .andExpect(jsonPath("$.skipped", hasItem(containsString("CGC: No era step-down ratio"))));
 
         // The table is kept: reading it again needs no refresh.
         String setId = TestApi.read(api.get("/api/admin/catalog-cards/" + card + "/prices", api.admin()), "$.tables[0].snapshotSetId");
         assertThat(UUID.fromString(setId)).isNotNull();
+    }
+
+    @Test
+    void aSpreadOfGradesIsEnoughWithoutLowGradeSales() throws Exception {
+        // Sales at 10, 8 and 6 only, in an era with no step-down ratios: grades below 6 step down with the card's own ladder.
+        String card = identified("Manual Spread", LocalDate.of(2031, 3, 1));
+        String comps = "/api/admin/catalog-cards/" + card + "/comps";
+        api.postJson(comps, graded("PSA", "10", "1000", 3, null), api.admin()).andExpect(status().isCreated());
+        api.postJson(comps, graded("PSA", "8", "400", 4, null), api.admin()).andExpect(status().isCreated());
+        api.postJson(comps, graded("PSA", "6", "300", 5, null), api.admin()).andExpect(status().isCreated());
+
+        api.postJson("/api/admin/catalog-cards/" + card + "/prices/refresh", "", api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.skipped.length()").value(0))
+                .andExpect(jsonPath("$.tables[0].grades[5].method").value("CARD_STEP_DOWN"))
+                .andExpect(jsonPath("$.tables[0].grades[5].stepDownRatio").value(0.632455))
+                .andExpect(jsonPath("$.tables[0].grades[1].method").value("CARD_STEP_DOWN"))
+                .andExpect(jsonPath("$.tables[0].grades[9].method").value("INTERPOLATED"));
     }
 
     @Test

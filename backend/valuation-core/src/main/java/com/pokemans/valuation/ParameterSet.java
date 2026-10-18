@@ -22,6 +22,8 @@ public record ParameterSet(
         int minSalesInWindow,
         int outlierTrimMinSales,
         BigDecimal outlierTrimFraction,
+        int cardLadderMinGrades,
+        int cardLadderMinSpan,
         // Liquidity tiers (sales per month)
         BigDecimal highLiquidityAbove,
         BigDecimal lowLiquidityBelow,
@@ -93,6 +95,8 @@ public record ParameterSet(
                 integer(p, "pricing.minSalesInWindow"),
                 integer(p, "pricing.outlierTrimMinSales"),
                 decimal(p, "pricing.outlierTrimFraction"),
+                integer(p, "pricing.cardLadder.minGrades"),
+                integer(p, "pricing.cardLadder.minSpan"),
                 decimal(p, "liquidity.highAbove"),
                 decimal(p, "liquidity.lowBelow"),
                 decimal(p, "values.sellingFees"),

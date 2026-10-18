@@ -133,11 +133,10 @@ class PriceSnapshotService {
                 }
                 UUID setId = UUID.randomUUID();
                 for (GradePrice price : table.all()) {
-                    BigDecimal ratio = price.method() == GradePrice.Method.STEP_DOWN ? ratios.get(price.grade()) : null;
                     List<String> trace = table.trace().stepsFor("price[" + price.grade() + "]").stream()
                             .map(Trace.Step::toString).toList();
                     snapshots.save(new PriceSnapshot(setId, card.catalogCardId(), asOf, company,
-                            properties.currency(), price, ratio, params.version(), trace));
+                            properties.currency(), price, price.stepDownRatio(), params.version(), trace));
                 }
                 stats.save(new PriceStats(setId, card.catalogCardId(), asOf, sigma.map(Volatility.Estimate::sigma).orElse(null),
                         sigma.map(Volatility.Estimate::changes).orElse(0), salesPerMonth));

@@ -71,6 +71,22 @@ class WorkedExampleGoldenTest {
     }
 
     @Test
+    void theStressNeverGainsFromAGradeOnePremium() {
+        // A PSA 1 premium (PSA 1 collectors) above grades 2-4: the stress shifts a grade 3 card into grade 1,
+        // which must not raise its value. Stressed prices are capped at the grade above, so grade 1 counts at 85.
+        Map<Grade, GradePrice> prices = new EnumMap<>(examplePrices().all().stream()
+                .collect(java.util.stream.Collectors.toMap(GradePrice::grade, p -> p)));
+        prices.put(Grade.G1, GradePrice.given(Grade.G1, d("500"), GradePrice.Method.OBSERVED, 12));
+        Map<Grade, BigDecimal> p = new EnumMap<>(Grade.class);
+        p.put(Grade.G3, d("1"));
+        CardValuation value = new CardValuator(params).value(new CardValuator.Input("grade-one-premium",
+                GradeDistribution.of(p), new GradePriceTable(prices, new Trace()), d("0.08"), d("10"), 1, Confidence.A));
+
+        assertThat(value.fmv()).isEqualByComparingTo("104.00");
+        assertThat(value.stressedFmv()).isEqualByComparingTo("85.00");
+    }
+
+    @Test
     void stressedDistributionMatchesTheDocTable() {
         GradeDistribution stressed = exampleDistribution().shiftDown(2);
 

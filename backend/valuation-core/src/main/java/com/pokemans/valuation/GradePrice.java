@@ -16,7 +16,8 @@ import java.util.List;
  * @param salesInWindow sold comps in that window before outlier trimming (0 when derived)
  * @param basis       for a derived price, the grades it was derived from; empty otherwise
  * @param confidence  confidence in this one grade's price: observed from its comp count, derived one
- *                    level below its basis, floor D. Null for prices {@link #given} directly.
+ *                    level below its basis, U with no sales D. Null for prices {@link #given} directly.
+ * @param stepDownRatio the ratio applied to the grade above, for a step-down price; null otherwise
  */
 public record GradePrice(
         Grade grade,
@@ -29,7 +30,8 @@ public record GradePrice(
         int windowDays,
         int salesInWindow,
         List<Grade> basis,
-        Confidence confidence) {
+        Confidence confidence,
+        BigDecimal stepDownRatio) {
 
     public GradePrice {
         compIds = List.copyOf(compIds);
@@ -44,6 +46,11 @@ public record GradePrice(
         INTERPOLATED,
         /** Higher observed grade times the era step-down ratio. */
         STEP_DOWN,
+        /**
+         * No era ratio yet: the grade above times the card's own steepest per-grade ratio, from its
+         * sales across a spread of grades.
+         */
+        CARD_STEP_DOWN,
         /** Only lower grades observed: the lower grade's price, unchanged (never stepped up). */
         CARRIED_DOWN,
         /** U only: no damaged or altered raw sales, so it is valued at zero. There is no bulk floor. */
@@ -52,11 +59,12 @@ public record GradePrice(
 
     /** True for prices from the missing-grade rule; these drop confidence one level. */
     public boolean derived() {
-        return method == Method.INTERPOLATED || method == Method.STEP_DOWN || method == Method.CARRIED_DOWN;
+        return method == Method.INTERPOLATED || method == Method.STEP_DOWN || method == Method.CARD_STEP_DOWN
+                || method == Method.CARRIED_DOWN;
     }
 
     /** A price given directly (e.g. by the reviewer or a test), with the net already computed. */
     public static GradePrice given(Grade grade, BigDecimal net, Method method, int salesUsed) {
-        return new GradePrice(grade, net, net, method, salesUsed, List.of(), false, 0, salesUsed, List.of(), null);
+        return new GradePrice(grade, net, net, method, salesUsed, List.of(), false, 0, salesUsed, List.of(), null, null);
     }
 }

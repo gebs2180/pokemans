@@ -21,8 +21,9 @@ Collateral reports for raw-heavy Pokémon card collections: what a collection re
 2. **Condition distribution.** A photo model scores centering, corners, edges and surface, and a human reviewer adjusts early on (each adjustment is training data). Half grades are folded down unless that half grade has its own sales history. Low photo confidence shifts probability *down*. Modern holos/full arts get a default downward surface shift unless a close-up clears them.
 3. **Per-grade prices.** Sold comps of that exact grade, 90-day window, recency-weighted (30-day half-life); extend to 180 days if fewer than 2 sales. Price = recency-weighted median, outlier-trimmed when n ≥ 10.
    - Missing grade, sales on both sides → interpolate on log price.
-   - Sales only above → higher grade × era step-down ratio (median adjacent-grade price ratio across comparable same-era cards).
+   - Sales only above → higher grade × era step-down ratio (median adjacent-grade price ratio across comparable same-era cards). With no era ratio yet, use the card's own steepest per-grade ratio if it has sales in at least 2 grades at least 2 apart; otherwise leave it unpriced (Zach, 2026-10-17; not yet in the methodology doc).
    - Sales only below → use the lower grade's price unchanged. **Never step up.**
+   - Grade 1 is priced from its own sales only and never anchors another grade: PSA 1s have their own collectors and often sell above 2–4 (Zach, 2026-10-17).
    - Any derived price → confidence drops one level.
    - Each grading company (PSA, CGC, BGS, …) is priced separately from its own comps, never pooled or converted.
    - U priced from damaged/altered raw sales, else $0. No bulk floor (Zach, 2026-10-17; the methodology doc still says bulk floor and needs updating). Low-value cards are excluded by the $25 FMV minimum instead.
@@ -32,7 +33,7 @@ Collateral reports for raw-heavy Pokémon card collections: what a collection re
    - `FMV_i = Σ_g p_ig · P_ig`
    - `RV_i = FMV_i · (1 + b + s_i)`, using the central (unstressed) distribution. b = 12% buyer costs; s = search premium of 0% (>20 sales/mo), 5% (5–20), 10% (<5).
    - `QSV_i = FMV_i · (1 − f) · (1 − d_i)`. f = 15% fees+shipping; d = 5% (>20 sales/mo), 10% (5–20), 20% (<5).
-   - `FLV_i = FMV↓_i · (1 − f) · (1 − k·σ_i·√t) · (1 − ℓ_i)`. FMV↓ shifts the distribution 2 grades down (3 if confidence C), floored at grade 1, with U probability unchanged. k = 2, t = 2 months, ℓ = market-depth discount (share of a month's volume to sell), floor 10%, cap 50%.
+   - `FLV_i = FMV↓_i · (1 − f) · (1 − k·σ_i·√t) · (1 − ℓ_i)`. FMV↓ shifts the distribution 2 grades down (3 if confidence C), floored at grade 1, with U probability unchanged; each grade is priced at most the grade above it, so the shift can't gain from a PSA 1 premium. k = 2, t = 2 months, ℓ = market-depth discount (share of a month's volume to sell), floor 10%, cap 50%.
    - Confidence A–D from photo quality and comp counts. D is excluded from the collateral base.
 5. **Portfolio.** Eligible = not D, no unresolved auth flag, FMV ≥ $25. Single card ≤ 20% of base; top five ≤ 50%; >40% of base in one set or character → extra 10% off that slice. Report raw vs graded share. `Advance = α · Σ min(FLV_i, cap_i)`. α is the **lender's** choice: suggest a range (e.g. 50–70%), never set it.
 6. **Grade-first list.** `Lift_i = (FLV_graded − FLV_raw − C_i) / C_i`, where C = fee + shipping + insurance + waiting cost. Recommend lift > 1.0 and show the top 20 with expected grade and cost.

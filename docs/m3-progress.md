@@ -68,7 +68,7 @@ Fixture data only. Nothing calls a real price API or scrapes anything.
 - **Comps browser** across cards in the admin console.
 - **Step-down ratio tables:** store them per era and recompute weekly, as the HLD says. For now they are rebuilt on each run and only the ratio used is kept on the snapshot.
 - **Half grades with their own sales history.** They are always folded down for now.
-- **Methodology doc:** update the Claude Doc for decision 7 (U is $0 with no damaged sales, no bulk floor).
+- **Methodology doc:** update the Claude Doc for decisions 6 (the card's own ladder), 6a (grade 1 stands alone, and the stress cap) and 7 (U is $0 with no damaged sales, no bulk floor).
 - **Raw-condition override** (step 3's "use the raw-sale price if higher"). The pricer supports it, but snapshots pass no raw prices, because nothing maps a raw condition to a grade yet.
 - **Netting grading costs.** It belongs in the valuation run (M4), with the grading cost and turnaround of the day.
 - **The M3 "done when":** snapshots for the controlled set from real comps.
@@ -82,7 +82,8 @@ Fixture data only. Nothing calls a real price API or scrapes anything.
 3. **Confidence counts sales before trimming.** Kept.
 4. **No extra drop for the 180-day window, for now.** Later: notch extended-window prices using an overall market trend.
 5. **Era bands and 3 cards per ratio.** Explained to Zach; open until he confirms.
-6. **Missing era ratio: skipped,** not priced at a floor. Kept.
+6. **Missing era ratio: the card's own ladder, else skipped.** Revised the same day: a reasonable spread of grades is enough, with no grade 1 sale needed. Below the lowest sold grade, with no era ratio, the card's own steepest per-grade ratio steps down (`CARD_STEP_DOWN`, V10). It needs sales in at least 2 grades at least 2 apart (`pricing.cardLadder.*` in the parameter set). The ratio is capped at 1, and an era ratio still wins when one exists. Without a spread, the grader is skipped, never floored.
+6a. **Grade 1 stands alone** (2026-10-17). PSA 1s have their own collectors and often sell above grades 2 to 4, so a grade 1 sale prices grade 1 only. It is never an interpolation anchor, a carried-down price, or part of the card's ladder. The FLV stress caps each grade at the grade above it, so shifting probability into grade 1 can't raise value.
 7. **No bulk floor.** U with no damaged or altered sales is $0. A card with no graded sales is skipped. Low-value cards are excluded by the $25 FMV eligibility minimum (step 5). Built in V9.
 8. **σ always excludes raw sales.** Kept; σ now pools graded sales across graders.
 9. **Liquidity is per card,** not per grade. Kept.

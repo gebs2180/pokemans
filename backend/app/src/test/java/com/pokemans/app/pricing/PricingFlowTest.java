@@ -112,7 +112,7 @@ class PricingFlowTest {
         source.raw(target, RawCondition.DAMAGED, "15", daysAgo(7));
         source.raw(target, RawCondition.DAMAGED, "15", daysAgo(14));
         source.graded(target, GradingCompany.CGC, "10", "5000", daysAgo(2)); // CGC is priced on its own
-        source.graded(target, GradingCompany.CGC, "1", "30", daysAgo(3));
+        source.graded(target, GradingCompany.CGC, "2", "30", daysAgo(3));
         source.raw(target, RawCondition.NEAR_MINT, "200", daysAgo(2));       // stored, not used for grades
         PriceSource.Sale twice = source.graded(target, GradingCompany.PSA, "9", "400", daysAgo(20));
         source.add(twice);                                                    // the source repeats a sale
@@ -205,7 +205,7 @@ class PricingFlowTest {
         assertThat(cgc.grades().get(Grade.G10).compIds()).singleElement().satisfies(compId ->
                 assertThat(jdbc.queryForObject("select grading_company from sold_comp where id = ?", String.class, compId)).isEqualTo("CGC"));
         assertThat(cgc.grades().get(Grade.G5).method()).isEqualTo(GradePrice.Method.INTERPOLATED);
-        assertThat(cgc.grades().get(Grade.G5).basis()).containsExactly(Grade.G1, Grade.G10);
+        assertThat(cgc.grades().get(Grade.G5).basis()).containsExactly(Grade.G2, Grade.G10);
         assertThat(cgc.grades().get(Grade.U).price()).isEqualByComparingTo("15"); // damaged raw sales serve every table
         assertThat(cgc.sigma()).isEqualByComparingTo(card.sigma());               // σ belongs to the card
         assertThat(cgc.salesPerMonth()).isEqualByComparingTo(card.salesPerMonth());

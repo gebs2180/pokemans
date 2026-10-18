@@ -187,6 +187,96 @@ class GradePricerTest {
                 .hasMessageContaining("step-down ratio");
     }
 
+    private Map<Grade, List<Comp>> spread() {
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G10, List.of(comp(1, "1000"), comp(2, "1000")));
+        comps.put(Grade.G8, List.of(comp(1, "400"), comp(2, "400")));
+        comps.put(Grade.G6, List.of(comp(1, "300"), comp(2, "300")));
+        return comps;
+    }
+
+    @Test
+    void withoutAnEraRatioASpreadOfGradesStepsDownWithTheCardsOwnSteepestRatio() {
+        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, spread(), List.of(), Map.of(), NO_COST, Map.of()));
+
+        // Per-grade ratios: 6 to 8 is sqrt(300/400) = 0.866, 8 to 10 is sqrt(400/1000) = 0.632. The steeper one wins.
+        GradePrice g5 = table.get(Grade.G5);
+        assertThat(g5.method()).isEqualTo(GradePrice.Method.CARD_STEP_DOWN);
+        assertThat(g5.stepDownRatio()).isEqualByComparingTo("0.632455");
+        assertThat(g5.gross()).isEqualByComparingTo("189.74");
+        assertThat(g5.basis()).containsExactly(Grade.G6);
+        assertThat(g5.confidence()).isEqualTo(Confidence.D); // one below grade 6's C
+        assertThat(table.gross(Grade.G4)).isLessThan(g5.gross());
+        assertThat(table.get(Grade.G9).method()).isEqualTo(GradePrice.Method.INTERPOLATED);
+        assertThat(table.get(Grade.G9).stepDownRatio()).isNull();
+        assertThat(table.trace().stepsFor("price[5]").getFirst().rule()).isEqualTo("card's own step-down");
+    }
+
+    @Test
+    void anEraRatioStillWinsOverTheCardsOwnLadder() {
+        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, spread(), List.of(), ratios("0.78"), NO_COST, Map.of()));
+
+        assertThat(table.get(Grade.G5).method()).isEqualTo(GradePrice.Method.STEP_DOWN);
+        assertThat(table.get(Grade.G5).stepDownRatio()).isEqualByComparingTo("0.78");
+    }
+
+    @Test
+    void aGradeOnePremiumNeverLiftsGradesTwoToFour() {
+        // PSA 1s have their own collectors: here a 1 sold above the 5. Grade 1 keeps its own price,
+        // but grades 2-4 step down from the 5 instead of being interpolated up towards the 1.
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G10, List.of(comp(1, "1000"), comp(2, "1000")));
+        comps.put(Grade.G5, List.of(comp(1, "100"), comp(2, "100")));
+        comps.put(Grade.G1, List.of(comp(1, "200"), comp(2, "200")));
+
+        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), Map.of(), NO_COST, Map.of()));
+
+        assertThat(table.get(Grade.G1).method()).isEqualTo(GradePrice.Method.OBSERVED);
+        assertThat(table.gross(Grade.G1)).isEqualByComparingTo("200");
+        // The ladder ignores grade 1 too: (100 / 1000) ^ (1/5) per grade.
+        assertThat(table.get(Grade.G4).method()).isEqualTo(GradePrice.Method.CARD_STEP_DOWN);
+        assertThat(table.get(Grade.G4).stepDownRatio()).isEqualByComparingTo("0.630957");
+        assertThat(table.gross(Grade.G4)).isEqualByComparingTo("63.10");
+        for (int g = 2; g <= 4; g++) {
+            assertThat(table.gross(Grade.of(g))).isLessThan(table.gross(Grade.G5));
+            assertThat(table.get(Grade.of(g)).basis()).doesNotContain(Grade.G1);
+        }
+    }
+
+    @Test
+    void gradeOneSalesAloneCannotPriceTheOtherGrades() {
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G1, List.of(comp(1, "200"), comp(2, "200")));
+
+        assertThatThrownBy(() -> pricer.price(input(comps)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only grade 1 sales");
+    }
+
+    @Test
+    void adjacentGradesAreNotASpread() {
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G10, List.of(comp(1, "1000"), comp(2, "1000")));
+        comps.put(Grade.G9, List.of(comp(1, "500"), comp(2, "500")));
+
+        assertThatThrownBy(() -> pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), Map.of(), NO_COST, Map.of())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("too few grades");
+    }
+
+    @Test
+    void theCardsOwnLadderNeverStepsUp() {
+        // The 8 sold above the 10: the ladder is capped at 1, so lower grades carry the 8's price, never more.
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G10, List.of(comp(1, "400"), comp(2, "400")));
+        comps.put(Grade.G8, List.of(comp(1, "500"), comp(2, "500")));
+
+        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), Map.of(), NO_COST, Map.of()));
+
+        assertThat(table.get(Grade.G7).stepDownRatio()).isEqualByComparingTo("1");
+        assertThat(table.gross(Grade.G1)).isEqualByComparingTo("500");
+    }
+
     @Test
     void refusesAStepDownRatioThatWouldStepUp() {
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);

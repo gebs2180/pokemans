@@ -21,6 +21,11 @@ import java.util.Objects;
  *   <li>Missing grades: log interpolation between observed grades on both sides; the era step-down
  *       ratio from the nearest observed grade above; or, with only lower grades observed, the lower
  *       grade's price unchanged. Never stepped up.
+ *   <li>Grade 1 is priced from its own sales only and never anchors another grade: PSA 1s have
+ *       their own collectors and often sell above grades 2 to 4, so using them would step those up.
+ *   <li>Below the lowest observed grade with no era ratio yet: the card's own ladder. With sales in
+ *       enough grades across enough of a spread, the steepest per-grade ratio between its observed
+ *       grades steps the lower grades down. Otherwise the card is refused rather than guessed.
  *   <li>U from damaged/altered raw sales, else zero. There is no bulk floor: low-value cards are
  *       kept out by the portfolio's FMV minimum, not propped up here.
  *   <li>No graded sales in any grade: refused, so the caller leaves the card unpriced.
@@ -60,6 +65,7 @@ public final class GradePricer {
         EnumMap<Grade, GradePrice.Method> method = new EnumMap<>(Grade.class);
         EnumMap<Grade, Observed> observedComps = new EnumMap<>(Grade.class);
         EnumMap<Grade, List<Grade>> basis = new EnumMap<>(Grade.class);
+        EnumMap<Grade, BigDecimal> ratioUsed = new EnumMap<>(Grade.class);
 
         for (int g = 1; g <= 10; g++) {
             Grade grade = Grade.of(g);
@@ -72,7 +78,7 @@ public final class GradePricer {
             }
         }
 
-        fillMissingGrades(input, gross, method, basis, trace);
+        fillMissingGrades(input, gross, method, basis, ratioUsed, trace);
 
         Observed damaged = observe("price[U]", input.damagedRawComps(), input.asOf(), trace);
         if (damaged != null) {
@@ -102,7 +108,7 @@ public final class GradePricer {
             if (grade.isUngradable()) {
                 // U is already a raw sale price: no grading costs to net.
                 prices.put(grade, new GradePrice(grade, g, g, method.get(grade), comps.size(), ids, false, window, inWindow, from,
-                        confidence.get(grade)));
+                        confidence.get(grade), null));
                 continue;
             }
             BigDecimal netGraded = Money.max(BigDecimal.ZERO, Money.cents(input.gradingCost().net(g)));
@@ -113,7 +119,7 @@ public final class GradePricer {
                     "gross " + g + " - fixed " + input.gradingCost().fixed() + " - time-to-cash "
                             + Money.cents(input.gradingCost().waitingCost(g)) + (raw == null ? "" : "; raw " + raw));
             prices.put(grade, new GradePrice(grade, g, net, method.get(grade), comps.size(), ids, rawWins, window, inWindow, from,
-                    confidence.get(grade)));
+                    confidence.get(grade), ratioUsed.get(grade)));
         }
         return new GradePriceTable(prices, trace);
     }
@@ -145,7 +151,7 @@ public final class GradePricer {
         Confidence c = switch (method.get(grade)) {
             case OBSERVED -> fromCompCount(observed.get(grade).salesInWindow());
             case NO_SALES -> Confidence.D;
-            case INTERPOLATED, STEP_DOWN, CARRIED_DOWN -> {
+            case INTERPOLATED, STEP_DOWN, CARD_STEP_DOWN, CARRIED_DOWN -> {
                 Confidence worst = Confidence.A;
                 for (Grade from : basis.get(grade)) {
                     worst = worst.worse(confidenceOf(from, method, observed, basis, out));
@@ -172,50 +178,88 @@ public final class GradePricer {
     }
 
     private void fillMissingGrades(Input input, EnumMap<Grade, BigDecimal> gross, EnumMap<Grade, GradePrice.Method> method,
-                                   EnumMap<Grade, List<Grade>> basis, Trace trace) {
+                                   EnumMap<Grade, List<Grade>> basis, EnumMap<Grade, BigDecimal> ratioUsed, Trace trace) {
         // Observed grades only: derived prices never anchor other derived prices except step-down chains.
         EnumMap<Grade, BigDecimal> observed = new EnumMap<>(gross);
         if (observed.isEmpty()) {
             throw new IllegalArgumentException("No graded sales for any grade");
         }
+        // Grade 1 sales price grade 1 only: a PSA 1 premium must not lift grades 2 to 4.
+        EnumMap<Grade, BigDecimal> anchors = new EnumMap<>(observed);
+        anchors.remove(Grade.G1);
+        if (anchors.isEmpty()) {
+            throw new IllegalArgumentException("Only grade 1 sales: grade 1 prices can't price the other grades");
+        }
+        BigDecimal cardRatio = cardLadderRatio(anchors);
         // Walk downward so step-down chains use the already-derived grade above.
         for (int g = 10; g >= 1; g--) {
             Grade grade = Grade.of(g);
             if (observed.containsKey(grade)) {
                 continue;
             }
-            Grade below = nearestObserved(observed, g - 1, -1);
-            Grade above = nearestObserved(observed, g + 1, +1);
+            Grade below = nearestObserved(anchors, g - 1, -1);
+            Grade above = nearestObserved(anchors, g + 1, +1);
             String subject = "price[" + grade + "]";
             if (below != null && above != null) {
-                BigDecimal price = logInterpolate(below, observed.get(below), above, observed.get(above), grade);
+                BigDecimal price = logInterpolate(below, anchors.get(below), above, anchors.get(above), grade);
                 gross.put(grade, price);
                 method.put(grade, GradePrice.Method.INTERPOLATED);
                 basis.put(grade, List.of(below, above));
-                trace.add(subject, "log interpolation", price, "between grade " + below + " (" + observed.get(below)
-                        + ") and grade " + above + " (" + observed.get(above) + ")");
+                trace.add(subject, "log interpolation", price, "between grade " + below + " (" + anchors.get(below)
+                        + ") and grade " + above + " (" + anchors.get(above) + ")");
             } else if (above != null) {
                 Grade next = Grade.of(g + 1);
                 BigDecimal ratio = input.stepDownRatios().get(grade);
+                GradePrice.Method stepMethod = GradePrice.Method.STEP_DOWN;
                 if (ratio == null) {
-                    throw new IllegalArgumentException("No era step-down ratio for grade " + grade + " to " + next);
+                    if (cardRatio == null) {
+                        throw new IllegalArgumentException("No era step-down ratio for grade " + grade + " to " + next
+                                + ", and sales in too few grades to step down from the card's own prices (need "
+                                + params.cardLadderMinGrades() + " grades at least " + params.cardLadderMinSpan() + " apart)");
+                    }
+                    ratio = cardRatio;
+                    stepMethod = GradePrice.Method.CARD_STEP_DOWN;
                 }
                 if (ratio.compareTo(BigDecimal.ONE) > 0) {
                     throw new IllegalArgumentException("Step-down ratio above 1 for grade " + grade + ": " + ratio);
                 }
                 BigDecimal price = Money.cents(gross.get(next).multiply(ratio, Money.MC));
                 gross.put(grade, price);
-                method.put(grade, GradePrice.Method.STEP_DOWN);
+                method.put(grade, stepMethod);
                 basis.put(grade, List.of(next));
-                trace.add(subject, "era step-down", price, "grade " + next + " price " + gross.get(next) + " x " + ratio);
+                ratioUsed.put(grade, ratio);
+                trace.add(subject, stepMethod == GradePrice.Method.STEP_DOWN ? "era step-down" : "card's own step-down", price,
+                        "grade " + next + " price " + gross.get(next) + " x " + ratio);
             } else {
-                BigDecimal price = observed.get(below);
+                BigDecimal price = anchors.get(below);
                 gross.put(grade, price);
                 method.put(grade, GradePrice.Method.CARRIED_DOWN);
                 basis.put(grade, List.of(below));
                 trace.add(subject, "lower grade price, never stepped up", price, "from grade " + below);
             }
         }
+    }
+
+    /**
+     * The card's own per-grade step-down: between each pair of neighbouring observed grades, the
+     * per-grade ratio (lower price / higher price) ^ (1 / grades apart); the steepest (smallest) wins,
+     * capped at 1 so it never steps up. Null without enough grades across enough of a spread.
+     */
+    private BigDecimal cardLadderRatio(Map<Grade, BigDecimal> observed) {
+        List<Grade> grades = observed.keySet().stream().filter(g -> !g.isUngradable()).sorted().toList();
+        if (grades.size() < params.cardLadderMinGrades()
+                || grades.getLast().number() - grades.getFirst().number() < params.cardLadderMinSpan()) {
+            return null;
+        }
+        double steepest = 1;
+        for (int i = 1; i < grades.size(); i++) {
+            Grade lo = grades.get(i - 1);
+            Grade hi = grades.get(i);
+            double perGrade = Math.pow(observed.get(lo).doubleValue() / observed.get(hi).doubleValue(),
+                    1.0 / (hi.number() - lo.number()));
+            steepest = Math.min(steepest, perGrade);
+        }
+        return BigDecimal.valueOf(steepest).setScale(6, RoundingMode.FLOOR);
     }
 
     private static Grade nearestObserved(Map<Grade, BigDecimal> observed, int start, int direction) {

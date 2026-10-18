@@ -291,6 +291,8 @@ Posts are only read by hand to find people to ask. They are never stored.
 - **Decisions (2026-10-17, V9):**
   - **Graders priced separately.** Each grading company's sales price that company's grades, with its own era ratio tables, and are never pooled or converted. `Prices.latest(card, company)` and `latestByCompany(card)`.
   - **No bulk floor.** U with no damaged or altered sales is $0 (`NO_SALES`), and a card with no graded sales is left unpriced. Low-value cards are kept out by the $25 FMV eligibility minimum instead.
+  - **The card's own ladder:** with no era step-down ratio yet, grades below the lowest sale step down by the card's steepest per-grade ratio, if it sold in at least 2 grades at least 2 apart (`CARD_STEP_DOWN`, V10).
+  - **Grade 1 stands alone:** PSA 1 sales price grade 1 only, never other grades. In `CardValuator`, the stressed FMV caps each grade at the grade above it.
   - **σ** comes from graded sales only (raw never), pooled across graders and grades. The sales rate is per card.
   - **Append-only tables** (`sold_comp`, `price_snapshot`, `price_stats`) refuse updates with a database trigger. Deletes stay possible for licence purges.
 - **Manual comp entry (2026-10-17):** the pilot route. `PricingController` under `/api/admin/catalog-cards/{id}`: `POST comps`, `GET prices`, `POST prices/refresh`. The review page shows the panel once the card is identified.

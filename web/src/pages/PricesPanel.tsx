@@ -18,6 +18,7 @@ const METHOD_LABEL = {
   OBSERVED: 'sold comps',
   INTERPOLATED: 'interpolated',
   STEP_DOWN: 'era step-down',
+  CARD_STEP_DOWN: "card's own step-down",
   CARRIED_DOWN: 'lower grade, never stepped up',
   NO_SALES: 'no sales, $0',
 } as const

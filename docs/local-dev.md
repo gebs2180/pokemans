@@ -74,7 +74,7 @@ Until a price source is licensed, comps are entered by hand. On a card's review 
 2. Enter each sale under **Sold comps and prices**: the grader and grade (or the raw condition), price, sold date, listing type, marketplace and the listing URL.
 3. Click **Refresh prices**. Each grader with sales gets a table of U and grades 1 to 10, showing each grade's price, how it was set and its confidence.
 
-A grader can come back as "Not priced" when the missing grades need an era step-down ratio. Building a ratio takes at least 3 cards of the same era with sales in both grades. To get a full table from one card, enter sales at a low grade and a high grade, so the grades between them can be interpolated.
+One card needs sales in at least 2 grades, at least 2 apart, for example PSA 10 and 8. Grades between sales are interpolated, and grades above the highest sale carry its price. Grades below the lowest sale step down by the card's own steepest per-grade ratio, until era ratios exist (3 or more same-era cards with sales in both grades). With sales in only one grade, or two adjacent grades, the grader shows "Not priced".
 
 ### Tuning photo checks on real photos
 
