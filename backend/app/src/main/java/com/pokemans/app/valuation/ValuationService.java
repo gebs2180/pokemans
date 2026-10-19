@@ -182,7 +182,7 @@ class ValuationService {
                     .toList();
             CardInputs.Identity identity = id == null ? null : new CardInputs.Identity(id.catalogCardId(), id.name(), id.setName(),
                     id.number(), id.language(), id.setReleaseDate(), id.edition().name(), id.variant().name(), id.promo(),
-                    id.authenticityRisk().name());
+                    id.authenticityRisk().name(), id.dexIds());
             Assessments.Current a = current.get(item.id());
             CardInputs.Assessment assessment = a == null ? null
                     : new CardInputs.Assessment(a.assessmentId(), a.version(), a.distribution().asMap(), a.confidence());
@@ -208,7 +208,7 @@ class ValuationService {
                 }
             }
             String setKey = identity == null ? null : CorrelationKeys.set(identity.language(), identity.setName());
-            String characterKey = identity == null ? null : CorrelationKeys.character(identity.name());
+            String characterKey = identity == null ? null : CorrelationKeys.character(identity.name(), identity.dexIds());
             drafts.add(new Draft(item, identity, assessment, graded, table, prov, photos, setKey, characterKey, reason));
         }
 

@@ -38,8 +38,10 @@ public record CardInputs(
         List<Photo> photos,
         String unvaluedReason) {
 
+    /** @param dexIds National Pokedex numbers the catalog gave for the card; empty if unknown */
     public record Identity(UUID catalogCardId, String name, String setName, String number, String language,
-                           LocalDate setReleaseDate, String edition, String variant, boolean promo, String authenticityRisk) {
+                           LocalDate setReleaseDate, String edition, String variant, boolean promo, String authenticityRisk,
+                           List<Integer> dexIds) {
     }
 
     /** @param photoConfidence the assessment's photo confidence */

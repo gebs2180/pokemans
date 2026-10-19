@@ -1,0 +1,33 @@
+# Characters by collector demand, most popular first: a National Pokedex number per line, then its name.
+# A tag team card counts toward its most popular partner here (Zach, 2026-10-19); partners not listed come
+# after every listed one, and a tie goes to the partner named first. Starting values for Zach to review.
+6 Charizard
+25 Pikachu
+197 Umbreon
+151 Mew
+150 Mewtwo
+249 Lugia
+384 Rayquaza
+94 Gengar
+133 Eevee
+196 Espeon
+700 Sylveon
+471 Glaceon
+470 Leafeon
+134 Vaporeon
+135 Jolteon
+136 Flareon
+130 Gyarados
+9 Blastoise
+3 Venusaur
+448 Lucario
+658 Greninja
+143 Snorlax
+149 Dragonite
+487 Giratina
+493 Arceus
+250 Ho-Oh
+382 Kyogre
+383 Groudon
+445 Garchomp
+282 Gardevoir

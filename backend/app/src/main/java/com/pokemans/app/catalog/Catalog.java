@@ -22,11 +22,12 @@ public class Catalog {
      * @param identifiedSince when the card was first confirmed as this catalog card, counting from the
      *                        last time it was confirmed as a different one: findings made before then
      *                        were about another identity
+     * @param dexIds          National Pokedex numbers of the Pokemon on the card, from the provider; empty if unknown
      */
     public record IdentifiedCard(UUID cardItemId, UUID catalogCardId, String language, String setName, String seriesName,
                                  LocalDate setReleaseDate, String number, String name, String rarity, Edition edition,
                                  Variant variant, String stamp, boolean promo, AuthenticityRisk authenticityRisk,
-                                 String imageUrl, Instant identifiedSince) {
+                                 String imageUrl, Instant identifiedSince, List<Integer> dexIds) {
     }
 
     /** A canonical card identity, for modules that work per catalog card (pricing). */
@@ -73,7 +74,7 @@ public class Catalog {
             CatalogCard c = cards.get(current.getCatalogCardId());
             return new IdentifiedCard(current.getCardItemId(), c.getId(), c.getLanguage(), c.getSetName(), c.getSeriesName(),
                     c.getSetReleaseDate(), c.getNumber(), c.getName(), c.getRarity(), c.getEdition(), c.getVariant(),
-                    c.getStamp(), c.isPromo(), c.getAuthenticityRisk(), c.getImageUrl(), since);
+                    c.getStamp(), c.isPromo(), c.getAuthenticityRisk(), c.getImageUrl(), since, c.getDexIds());
         }));
     }
 

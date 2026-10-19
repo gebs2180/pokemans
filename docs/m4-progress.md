@@ -34,9 +34,13 @@ Status 2026-10-18 · branch `claude/beautiful-rhodes-f0e445`.
   - The run stores the parameter-set body and the grading cost, plus a SHA-256 over all of it.
   - `GET /api/admin/valuation-runs/{id}/replay` re-values the run from the stored JSON alone and lists any number that differs.
 - **Copies held** (the depth discount's numerator) counts items in the run with the same catalog card and graded state.
-- **Correlation keys:**
+- **Correlation keys** (Zach, 2026-10-19):
   - The set key is language plus set name.
-  - The character key is the name without an owner prefix (Dark, Light, "X's") or a mechanic suffix (ex, GX, V, VMAX, VSTAR, LV.X, δ, ☆…). `CorrelationKeysTest` lists the cases.
+  - The character key is the National Pokédex species, named in English. Every card of one Pokémon shares a slice, whatever its language, form, owner or mechanic: Charizard ex, Dark Charizard, Mega Charizard X and リザードン are all "charizard".
+  - The species comes from the catalog's Pokédex numbers when TCGdex gave them (`dexId`, now on `Catalog.IdentifiedCard`). Otherwise it comes from the name: the longest English species name as whole words, or the longest Japanese one anywhere in it. Names are matched against a bundled table of 1,025 species (`resources/valuation/species.csv`, from PokéAPI under BSD 3-Clause).
+  - A tag team counts toward its more popular partner, using the ranking in `resources/valuation/character-popularity.txt` (starting values, for Zach to review). Unranked partners come last, and a tie goes to the partner named first.
+  - A card with no species in its name, such as a trainer, is keyed by its own name.
+  - `CorrelationKeysTest` lists the cases.
 - **Flyway V13:** `valuation_run`, `card_valuation` and `report`, all refusing updates.
 
 **app, new `reporting` module:**
@@ -96,7 +100,7 @@ Status 2026-10-18 · branch `claude/beautiful-rhodes-f0e445`.
    - **The golden fixture:** ten eligible cards with FLV from $64 to $519 give an eligible FLV of $1,608. Every card is capped at $64.01, which is the smallest card's FLV, so the base is $589.
    - **Is this what you want?** Alternatives would be to measure the caps against the uncapped base, to apply only the 20% single-card cap below some count, or to raise `portfolio.capsMinCards`.
 2. ~~**Graded cards get no condition stress.**~~ Confirmed by Zach, 2026-10-19: a graded card is priced at its grade, whatever its condition. The volatility shock, the depth discount and FLV ≤ QSV still apply.
-3. **Character keys.** The normalization rules above decide which cards share a correlation slice. Check them against your sense of "same character".
+3. ~~**Character keys.**~~ Decided 2026-10-19: Mega and regional forms count as the base species, a tag team counts toward its more popular partner, and Japanese and English cards share a slice. Still to review: the popularity ranking in `character-popularity.txt`. Also note that named variants such as Flying Pikachu now group with Pikachu.
 4. **Methodology doc.** It needs the 2026-10-18 decisions now in CLAUDE.md:
    - PSA only for raw cards;
    - grading cost per run;

@@ -103,7 +103,7 @@ public final class ValuationFixtures {
         return new CardInputs(id, name + " #" + next, false, 1, identity,
                 new CardInputs.Assessment(uuid(500 + next), 2, distribution, Confidence.A), null,
                 prices(id, top, n, sigma, salesPerMonth, stale ? 40 : 1, stale ? 2 : 0), 1,
-                CorrelationKeys.set("EN", set), CorrelationKeys.character(name), state, photos(id), null);
+                CorrelationKeys.set("EN", set), CorrelationKeys.character(name, List.of()), state, photos(id), null);
     }
 
     private static CardInputs graded(String name, String set, String number, String released, String top,
@@ -113,7 +113,7 @@ public final class ValuationFixtures {
                 custody.custodyState(), custody.custodyVerifiedUntil());
         return new CardInputs(id, name + " slab", false, 1, identity(id, name, set, number, released, "VINTAGE_HOLO", "HOLO"), null,
                 new CardInputs.Graded(uuid(700), "PSA", new BigDecimal("9"), Grade.G9, "81234567"),
-                prices(id, top, 15, "0.06", 8, 1, 0), 1, CorrelationKeys.set("EN", set), CorrelationKeys.character(name), state,
+                prices(id, top, 15, "0.06", 8, 1, 0), 1, CorrelationKeys.set("EN", set), CorrelationKeys.character(name, List.of()), state,
                 photos(id), null);
     }
 
@@ -126,7 +126,7 @@ public final class ValuationFixtures {
     private static CardInputs.Identity identity(UUID id, String name, String set, String number, String released, String risk,
                                                 String variant) {
         return new CardInputs.Identity(uuid(300 + next), name, set, number, "EN", LocalDate.parse(released),
-                "UNLIMITED", variant, false, risk);
+                "UNLIMITED", variant, false, risk, List.of());
     }
 
     /** A PSA ladder: 10 at {@code top}, each grade 0.7 of the one above; 7 to 10 observed, below that stepped down. */
