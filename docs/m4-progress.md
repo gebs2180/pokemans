@@ -94,7 +94,7 @@ Status 2026-10-18 · branch `claude/beautiful-rhodes-f0e445`.
 1. **Caps squeeze small pledges hard.** Measured against the final base, "top five ≤ 50%" means the five smallest eligible cards must add up to the five largest. With 10 to about 15 eligible cards, the cap level falls to roughly the smallest cards' FLV.
    - **The golden fixture:** ten eligible cards with FLV from $64 to $519 give an eligible FLV of $1,608. Every card is capped at $64.01, which is the smallest card's FLV, so the base is $589.
    - **Is this what you want?** Alternatives would be to measure the caps against the uncapped base, to apply only the 20% single-card cap below some count, or to raise `portfolio.capsMinCards`.
-2. **Graded cards get no condition stress.** This was my reading of "valued as graded". The volatility shock, the depth discount and FLV ≤ QSV still apply. Confirm or reverse it.
+2. ~~**Graded cards get no condition stress.**~~ Confirmed by Zach, 2026-10-19: a graded card is priced at its grade, whatever its condition. The volatility shock, the depth discount and FLV ≤ QSV still apply.
 3. **Character keys.** The normalization rules above decide which cards share a correlation slice. Check them against your sense of "same character".
 4. **Methodology doc.** It needs the 2026-10-18 decisions now in CLAUDE.md:
    - PSA only for raw cards;
