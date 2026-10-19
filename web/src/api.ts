@@ -417,6 +417,8 @@ export type VerificationView = {
   catalogCardId: string
   /** False once the card has been re-identified as something else. */
   forCurrentIdentity: boolean
+  /** The card's photos the finding was based on. */
+  photoIds: string[]
   verifiedBy: string
   createdAt: string
 }
@@ -451,7 +453,7 @@ export type ProvenanceView = {
   custodyHistory: CustodyView[]
 }
 
-export type VerifyRequest = { status: Finding; method: AuthMethod; note: string | null }
+export type VerifyRequest = { status: Finding; method: AuthMethod; note: string | null; photoIds: string[] }
 
 export type CustodyRequest = {
   holderType: HolderType

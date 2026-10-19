@@ -271,7 +271,7 @@ docker-compose.yml
 - **Pre-grading providers:** the Ximilar and CardGrade.io adapters are built and tested against their published response shapes, but both are off. Each needs written confirmation of its terms and a key, and CardGrade.io also needs its training opt-out. Then run the controlled set through both.
 - **Identification:** automatic recognition is built and off by default. A `CardReader` port (Claude vision, `ClaudeCardReader`) reads name, number, set size, language, finish and the copyright year from the front crop. `SuggestionMatcher` ranks TCGdex candidates, mostly on number plus set size. Up to three are stored as `SUGGESTED` identifications with a confidence, and the reviewer confirms one. Readings are queued and retried like provider predictions (`card_reading`, V7). CardGrade.io's and Ximilar's identification outputs could be added as further readers. Front crops of partners' cards go to Anthropic's API; partner data-sharing terms should say so.
 - **Authenticity flags and custody (built 2026-10-18, V12):** the `provenance` module. Both tables are append-only, and the latest row counts. The review page has a panel for both. The capture page lets partners and collectors record custody.
-  - **Findings:** an admin records VERIFIED_AUTHENTIC, SUSPECTED_COUNTERFEIT or COUNTERFEIT, with the method (in-hand inspection, grader slab, third-party authentication, photo review) and a note. Each finding is stored against the catalog card the card was identified as at the time.
+  - **Findings:** an admin records VERIFIED_AUTHENTIC, SUSPECTED_COUNTERFEIT or COUNTERFEIT, with the method (in-hand inspection, grader slab, third-party authentication, photo review), a note, and the card's photos it was based on (any number, `authenticity_verification_photo`). A photo review has to name its photos, and all of them must be the card's passing photos. Each finding is stored against the catalog card the card was identified as at the time.
   - **Lifecycle:** a card is unresolved, so it has zero collateral value, in three cases:
     - it isn't identified;
     - it is in a risk category with no verification;
@@ -280,7 +280,8 @@ docker-compose.yml
     A finding, whether a verification or a doubt, counts only for the identity it was made against, from when the card got that identity. Re-identifying the card as a different catalog card, even briefly, starts again from the new identity's risk category (Zach, 2026-10-18).
   - **Risk tiers (decided 2026-10-18):**
     - **High risk:** vintage holos and 1st Editions, and Japanese promos. They are the most faked and the hardest to judge from photos, so only an in-hand inspection, a grader's slab or a third-party authentication verifies them.
-    - **Recent chase cards:** lower risk. A review of a passing close-up (DETAIL) photo can verify them too.
+    - **Recent chase cards:** lower risk. A photo review can verify them too, if the photos it names include a passing close-up (DETAIL).
+    - **Every card gets both gates (Zach, 2026-10-18):** this covers every card at or above the $25 minimum and unidentified cards, which count as unresolved. Bulk lots aren't really supported.
     - **Any risk:** every method can record a doubt.
   - **Custody:** holder type and name, location, held since, and whether it was checked (in person, vault statement, grader receipt, video call) and by whom.
     - **Who records it:** members of the card's org record custody, always unverified. Only an admin records a check.

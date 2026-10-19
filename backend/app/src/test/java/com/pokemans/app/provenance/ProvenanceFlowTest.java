@@ -11,9 +11,11 @@ import com.pokemans.app.identity.SecurityProperties;
 import com.pokemans.app.intake.TestImages;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -121,8 +123,10 @@ class ProvenanceFlowTest {
         read().andExpect(jsonPath("$.authState").value("AWAITING_VERIFICATION"));
 
         // Any method can raise a doubt. Like a verification, it was about the identity the card had then.
-        verify("SUSPECTED_COUNTERFEIT", "PHOTO_REVIEW").andExpect(jsonPath("$.authState").value("SUSPECTED_COUNTERFEIT"))
-                .andExpect(jsonPath("$.authFlagUnresolved").value(true));
+        verify("SUSPECTED_COUNTERFEIT", "PHOTO_REVIEW", photo("FRONT", TestImages.goodFront()))
+                .andExpect(jsonPath("$.authState").value("SUSPECTED_COUNTERFEIT"))
+                .andExpect(jsonPath("$.authFlagUnresolved").value(true))
+                .andExpect(jsonPath("$.verifications[0].photoIds.length()").value(1));
         identify(COMMON);
         read().andExpect(jsonPath("$.authenticityRisk").value("NONE"))
                 .andExpect(jsonPath("$.authState").value("NOT_FLAGGED"))
@@ -155,12 +159,22 @@ class ProvenanceFlowTest {
         read().andExpect(jsonPath("$.authenticityRisk").value("RECENT_CHASE"))
                 .andExpect(jsonPath("$.authState").value("AWAITING_VERIFICATION"))
                 .andExpect(jsonPath("$.verifyMethods.length()").value(4));
-        verify("VERIFIED_AUTHENTIC", "PHOTO_REVIEW").andExpect(status().isConflict())
+        String front = photo("FRONT", TestImages.goodFront());
+        // A photo review names its photos, all of them this card's, with a close-up among them.
+        verify("VERIFIED_AUTHENTIC", "PHOTO_REVIEW").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Name the photos")));
+        verify("VERIFIED_AUTHENTIC", "PHOTO_REVIEW", front).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("close-up")));
+        verify("VERIFIED_AUTHENTIC", "PHOTO_REVIEW", front, UUID.randomUUID().toString()).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("passing photos")));
 
-        api.uploadPhoto(orgId, cardId, "DETAIL", TestImages.goodBack(), collector).andExpect(jsonPath("$.status").value("PASSED"));
-        verify("VERIFIED_AUTHENTIC", "PHOTO_REVIEW").andExpect(status().isCreated())
-                .andExpect(jsonPath("$.authState").value("VERIFIED_AUTHENTIC"));
+        String closeUp = photo("DETAIL", TestImages.goodBack());
+        verify("VERIFIED_AUTHENTIC", "PHOTO_REVIEW", front, closeUp).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.authState").value("VERIFIED_AUTHENTIC"))
+                .andExpect(jsonPath("$.verifications[0].photoIds.length()").value(2))
+                .andExpect(jsonPath("$.verifications[0].photoIds", org.hamcrest.Matchers.containsInAnyOrder(front, closeUp)));
+        assertThatThrownBy(() -> jdbc.update("update authenticity_verification_photo set photo_id = ? where photo_id = ?",
+                UUID.fromString(front), UUID.fromString(closeUp))).hasMessageContaining("append-only");
     }
 
     @Test
@@ -260,9 +274,15 @@ class ProvenanceFlowTest {
         api.postJson(adminBase() + "/identifications", json, api.admin()).andExpect(status().isCreated());
     }
 
-    private ResultActions verify(String finding, String method) throws Exception {
-        return api.postJson(adminBase() + "/authenticity-verifications",
-                "{\"status\":\"" + finding + "\",\"method\":\"" + method + "\",\"note\":\"checked\"}", api.admin());
+    private ResultActions verify(String finding, String method, String... photoIds) throws Exception {
+        String photos = Arrays.stream(photoIds).map(id -> "\"" + id + "\"").collect(Collectors.joining(","));
+        return api.postJson(adminBase() + "/authenticity-verifications", "{\"status\":\"" + finding + "\",\"method\":\"" + method
+                + "\",\"note\":\"checked\",\"photoIds\":[" + photos + "]}", api.admin());
+    }
+
+    /** Uploads a passing photo of the card and returns its id. */
+    private String photo(String side, byte[] png) throws Exception {
+        return TestApi.read(api.uploadPhoto(orgId, cardId, side, png, collector).andExpect(jsonPath("$.status").value("PASSED")), "$.id");
     }
 
     private ResultActions custody(String holderType, String holder, String location, String since, String method) throws Exception {

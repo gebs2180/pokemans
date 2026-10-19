@@ -23,6 +23,16 @@ create table authenticity_verification (
 
 create index authenticity_verification_card_idx on authenticity_verification (card_item_id, created_at);
 
+-- The card's photos a finding was based on, any number. A photo review has to name them, and a
+-- photo-review verification needs a passing close-up among them.
+create table authenticity_verification_photo (
+    verification_id uuid not null references authenticity_verification (id) on delete cascade,
+    photo_id        uuid not null references photo (id),
+    primary key (verification_id, photo_id)
+);
+
+create index authenticity_verification_photo_idx on authenticity_verification_photo (photo_id);
+
 -- Who holds a card, where, and since when. The latest row is current custody; a move or a check is
 -- a new row. Members of the card's org can record custody; only an admin can mark a row verified,
 -- with how it was checked, and a check lapses after pokemans.provenance.custody-check-valid-for.
@@ -48,6 +58,8 @@ create index custody_record_card_idx on custody_record (card_item_id, created_at
 
 -- refuse_update() is from V9. Deletes stay possible, for data-deletion requests.
 create trigger authenticity_verification_append_only before update on authenticity_verification
+    for each row execute function refuse_update();
+create trigger authenticity_verification_photo_append_only before update on authenticity_verification_photo
     for each row execute function refuse_update();
 create trigger custody_record_append_only before update on custody_record
     for each row execute function refuse_update();

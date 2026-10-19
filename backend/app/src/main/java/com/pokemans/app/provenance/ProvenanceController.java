@@ -27,7 +27,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 class ProvenanceController {
 
-    record VerifyRequest(@NotNull Provenance.Finding status, @NotNull Provenance.AuthMethod method, @Size(max = 2000) String note) {
+    /** @param photoIds the card's photos the finding was based on; required for a photo review */
+    record VerifyRequest(@NotNull Provenance.Finding status, @NotNull Provenance.AuthMethod method, @Size(max = 2000) String note,
+                         @Size(max = 50) List<UUID> photoIds) {
     }
 
     /** @param verificationMethod how custody was checked; null records it unverified */
@@ -41,7 +43,7 @@ class ProvenanceController {
 
     /** @param forCurrentIdentity whether the finding was made against the identity the card has now, since it got it */
     record VerificationView(UUID id, Provenance.Finding status, Provenance.AuthMethod method, String note, UUID catalogCardId,
-                            boolean forCurrentIdentity, UUID verifiedBy, Instant createdAt) {
+                            boolean forCurrentIdentity, List<UUID> photoIds, UUID verifiedBy, Instant createdAt) {
     }
 
     record CustodyView(UUID id, Provenance.HolderType holderType, String holderName, String location, LocalDate heldSince,
@@ -78,7 +80,7 @@ class ProvenanceController {
     @PostMapping("/api/admin/orgs/{orgId}/cards/{cardId}/authenticity-verifications")
     @ResponseStatus(HttpStatus.CREATED)
     ProvenanceView verify(@PathVariable UUID orgId, @PathVariable UUID cardId, @Valid @RequestBody VerifyRequest r) {
-        service.verify(orgId, cardId, r.status(), r.method(), r.note());
+        service.verify(orgId, cardId, r.status(), r.method(), r.note(), r.photoIds());
         return view(cardId);
     }
 
@@ -102,7 +104,8 @@ class ProvenanceController {
         Catalog.IdentifiedCard identity = catalog.current(cardId).orElse(null);
         List<VerificationView> findings = service.verifications(cardId).stream()
                 .map(v -> new VerificationView(v.getId(), v.getStatus(), v.getMethod(), v.getNote(), v.getCatalogCardId(),
-                        Provenance.countsFor(v, identity), v.getVerifiedBy(), v.getCreatedAt()))
+                        Provenance.countsFor(v, identity), v.getPhotoIds().stream().sorted().toList(), v.getVerifiedBy(),
+                        v.getCreatedAt()))
                 .toList();
         List<CustodyView> custody = service.custody(cardId).stream()
                 .map(c -> new CustodyView(c.getId(), c.getHolderType(), c.getHolderName(), c.getLocation(), c.getHeldSince(),

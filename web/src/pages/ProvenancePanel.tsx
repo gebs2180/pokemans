@@ -10,6 +10,7 @@ import {
   type Finding,
   type HolderType,
   type ProvenanceView,
+  type ReviewPhoto,
   type VerifyRequest,
 } from '../api'
 import { useLoad } from '../useLoad'
@@ -52,7 +53,18 @@ function today() {
  * A card's authenticity findings and custody, the two gates on collateral eligibility. Members see
  * both and record custody; only an admin records findings and checks custody.
  */
-export function ProvenancePanel({ orgId, cardId, admin }: { orgId: string; cardId: string; admin: boolean }) {
+export function ProvenancePanel({
+  orgId,
+  cardId,
+  admin,
+  photos = [],
+}: {
+  orgId: string
+  cardId: string
+  admin: boolean
+  /** The card's passing photos, for an admin to name as a finding's evidence. */
+  photos?: ReviewPhoto[]
+}) {
   const api = useApi()
   const { data, error, reload } = useLoad(
     () => api<ProvenanceView>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}/provenance`),
@@ -74,6 +86,7 @@ export function ProvenancePanel({ orgId, cardId, admin }: { orgId: string; cardI
               {data.verifications.map((v) => (
                 <li key={v.id}>
                   {label(v.status)} · {label(v.method)} · {new Date(v.createdAt).toLocaleString()}
+                  {v.photoIds.length > 0 && ` · from ${v.photoIds.length} photo${v.photoIds.length > 1 ? 's' : ''}`}
                   {!v.forCurrentIdentity && <span className="muted small"> · for an earlier identity</span>}
                   {v.note && <div className="muted small">{v.note}</div>}
                 </li>
@@ -84,7 +97,7 @@ export function ProvenancePanel({ orgId, cardId, admin }: { orgId: string; cardI
             (data.authState === 'NOT_IDENTIFIED' ? (
               <p className="muted">Confirm the card's identity first: a finding is made against it.</p>
             ) : (
-              <VerificationForm base={adminBase} verifyMethods={data.verifyMethods} onSaved={reload} />
+              <VerificationForm base={adminBase} verifyMethods={data.verifyMethods} photos={photos} onSaved={reload} />
             ))}
 
           <h3>Custody</h3>
@@ -110,21 +123,35 @@ export function ProvenancePanel({ orgId, cardId, admin }: { orgId: string; cardI
   )
 }
 
+const SIDE_NAME = { FRONT: 'front', BACK: 'back', DETAIL: 'close-up' } as const
+
 export function VerificationForm({
   base,
   verifyMethods,
+  photos,
   onSaved,
 }: {
   base: string
   verifyMethods: AuthMethod[]
+  photos: ReviewPhoto[]
   onSaved: () => void
 }) {
   const api = useApi()
   const [finding, setFinding] = useState<Finding>('VERIFIED_AUTHENTIC')
   const [method, setMethod] = useState<AuthMethod>('IN_HAND_INSPECTION')
   const [note, setNote] = useState('')
+  const [picked, setPicked] = useState<string[]>([])
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // A photo review names the photos it was based on; verifying from photos needs a close-up among them.
+  const photoReview = method === 'PHOTO_REVIEW'
+  const missing = !photoReview
+    ? null
+    : picked.length === 0
+      ? 'Tick the photos the review was based on.'
+      : finding === 'VERIFIED_AUTHENTIC' && !photos.some((p) => p.side === 'DETAIL' && picked.includes(p.id))
+        ? 'Verifying from photos needs a passing close-up among them.'
+        : null
   // Any method can raise a doubt; which can verify depends on the card's risk category.
   const methods = finding === 'VERIFIED_AUTHENTIC' ? AUTH_METHODS.filter((m) => verifyMethods.includes(m)) : AUTH_METHODS
 
@@ -138,9 +165,10 @@ export function VerificationForm({
     setErr(null)
     setBusy(true)
     try {
-      const body: VerifyRequest = { status: finding, method, note: note.trim() || null }
+      const body: VerifyRequest = { status: finding, method, note: note.trim() || null, photoIds: picked }
       await api('POST', `${base}/authenticity-verifications`, body)
       setNote('')
+      setPicked([])
       onSaved()
     } catch (e) {
       setErr(message(e))
@@ -167,9 +195,27 @@ export function VerificationForm({
           ))}
         </select>
       </div>
-      {finding === 'VERIFIED_AUTHENTIC' && method === 'PHOTO_REVIEW' && (
-        <p className="muted small">Needs a passing close-up photo of the card.</p>
+      {photos.length > 0 && (
+        <fieldset className="row">
+          <legend className="small">{photoReview ? 'Based on these photos' : 'Photos (optional)'}</legend>
+          {photos.map((p, i) => {
+            const name = `${SIDE_NAME[p.side]} photo ${photos.filter((q, j) => q.side === p.side && j <= i).length}`
+            return (
+              <label key={p.id} className="small">
+                <input
+                  type="checkbox"
+                  checked={picked.includes(p.id)}
+                  onChange={(e) => setPicked((ids) => (e.target.checked ? [...ids, p.id] : ids.filter((id) => id !== p.id)))}
+                  aria-label={`Use ${name}`}
+                />{' '}
+                {name}
+              </label>
+            )
+          })}
+        </fieldset>
       )}
+      {photoReview && photos.length === 0 && <p className="warn small">This card has no passing photos to review.</p>}
+      {missing && photos.length > 0 && <p className="muted small">{missing}</p>}
       <input
         value={note}
         onChange={(e) => setNote(e.target.value)}
@@ -178,7 +224,7 @@ export function VerificationForm({
         maxLength={2000}
       />
       <div>
-        <button type="submit" disabled={busy}>
+        <button type="submit" disabled={busy || missing !== null}>
           Record finding
         </button>
       </div>

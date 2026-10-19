@@ -80,6 +80,7 @@ export function ReviewCardPage() {
         orgId={orgId}
         cardId={cardId}
         admin
+        photos={data.photos}
       />
       <Predictions data={data} base={base} onChange={reload} />
       <AssessmentPanel key={current?.id ?? 'none'} data={data} current={current} base={base} onChange={reload} />

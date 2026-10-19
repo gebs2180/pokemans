@@ -1,12 +1,17 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { AuthMethod, ProvenanceView } from '../api'
+import type { AuthMethod, ProvenanceView, ReviewPhoto } from '../api'
 import { respond } from '../test/auth0'
 import { CustodyForm, ProvenancePanel, VerificationForm } from './ProvenancePanel'
 
 const base = '/api/admin/orgs/org1/cards/card1'
 const HIGH_RISK_METHODS: AuthMethod[] = ['IN_HAND_INSPECTION', 'GRADER_SLAB', 'THIRD_PARTY_AUTHENTICATION']
+const PHOTOS: ReviewPhoto[] = [
+  { id: 'p1', side: 'FRONT', url: 'https://s/p1', cropUrl: null, capturedAt: null },
+  { id: 'p2', side: 'DETAIL', url: 'https://s/p2', cropUrl: null, capturedAt: null },
+  { id: 'p3', side: 'DETAIL', url: 'https://s/p3', cropUrl: null, capturedAt: null },
+]
 
 /** The URL and JSON body of the first request a stubbed fetch got. */
 function sent(fetch: { mock: { calls: unknown[][] } }) {
@@ -17,7 +22,7 @@ function sent(fetch: { mock: { calls: unknown[][] } }) {
 describe('VerificationForm', () => {
   it("doesn't offer photo review to verify a high-risk card, only to doubt one", async () => {
     const user = userEvent.setup()
-    render(<VerificationForm base={base} verifyMethods={HIGH_RISK_METHODS} onSaved={() => {}} />)
+    render(<VerificationForm base={base} verifyMethods={HIGH_RISK_METHODS} photos={PHOTOS} onSaved={() => {}} />)
     const methods = () => within(screen.getByLabelText('How it was checked')).getAllByRole('option').map((o) => o.textContent)
 
     expect(methods()).not.toContain('photo review')
@@ -36,7 +41,7 @@ describe('VerificationForm', () => {
     const fetch = vi.fn(() => new Promise<Response>((r) => (finish = r)))
     vi.stubGlobal('fetch', fetch)
     const onSaved = vi.fn()
-    render(<VerificationForm base={base} verifyMethods={HIGH_RISK_METHODS} onSaved={onSaved} />)
+    render(<VerificationForm base={base} verifyMethods={HIGH_RISK_METHODS} photos={PHOTOS} onSaved={onSaved} />)
 
     await user.selectOptions(screen.getByLabelText('How it was checked'), 'GRADER_SLAB')
     await user.type(screen.getByLabelText('Finding note'), 'PSA cert 12345678')
@@ -46,7 +51,7 @@ describe('VerificationForm', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
     expect(record).toBeDisabled()
     expect(sent(fetch).url).toBe(`${base}/authenticity-verifications`)
-    expect(sent(fetch).body).toEqual({ status: 'VERIFIED_AUTHENTIC', method: 'GRADER_SLAB', note: 'PSA cert 12345678' })
+    expect(sent(fetch).body).toEqual({ status: 'VERIFIED_AUTHENTIC', method: 'GRADER_SLAB', note: 'PSA cert 12345678', photoIds: [] })
     finish(respond(201, {}))
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(record).toBeEnabled()
@@ -54,12 +59,25 @@ describe('VerificationForm', () => {
 })
 
 describe('VerificationForm for a recent chase card', () => {
-  it('offers photo review and says it needs a close-up', async () => {
+  it('sends the photos a review was based on, once a close-up is among them', async () => {
     const user = userEvent.setup()
-    render(<VerificationForm base={base} verifyMethods={[...HIGH_RISK_METHODS, 'PHOTO_REVIEW']} onSaved={() => {}} />)
+    const fetch = vi.fn(async () => respond(201, {}))
+    vi.stubGlobal('fetch', fetch)
+    render(<VerificationForm base={base} verifyMethods={[...HIGH_RISK_METHODS, 'PHOTO_REVIEW']} photos={PHOTOS} onSaved={() => {}} />)
+    const record = screen.getByRole('button', { name: 'Record finding' })
 
     await user.selectOptions(screen.getByLabelText('How it was checked'), 'PHOTO_REVIEW')
-    expect(screen.getByText('Needs a passing close-up photo of the card.')).toBeInTheDocument()
+    expect(record).toBeDisabled()
+    expect(screen.getByText('Tick the photos the review was based on.')).toBeInTheDocument()
+    await user.click(screen.getByLabelText('Use front photo 1'))
+    expect(record).toBeDisabled()
+    expect(screen.getByText('Verifying from photos needs a passing close-up among them.')).toBeInTheDocument()
+    await user.click(screen.getByLabelText('Use close-up photo 2'))
+    expect(record).toBeEnabled()
+
+    await user.click(record)
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+    expect(sent(fetch).body).toMatchObject({ method: 'PHOTO_REVIEW', photoIds: ['p1', 'p3'] })
   })
 })
 
@@ -113,7 +131,7 @@ describe('ProvenancePanel', () => {
     verifyMethods: HIGH_RISK_METHODS,
     verifications: [{
       id: 'v1', status: 'VERIFIED_AUTHENTIC', method: 'IN_HAND_INSPECTION', note: null, catalogCardId: 'old',
-      forCurrentIdentity: false, verifiedBy: 'u1', createdAt: '2026-10-01T00:00:00Z',
+      forCurrentIdentity: false, photoIds: [], verifiedBy: 'u1', createdAt: '2026-10-01T00:00:00Z',
     }],
     custodyVerified: false,
     custodyState: 'NOT_RECORDED',

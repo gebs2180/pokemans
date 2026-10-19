@@ -6,7 +6,10 @@ import com.pokemans.app.intake.CardItems;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,23 +39,38 @@ class ProvenanceService {
         this.currentUser = currentUser;
     }
 
-    /** Records a finding against the card's current identity. The card must belong to the org. */
+    /**
+     * Records a finding against the card's current identity, with the photos it was based on. The
+     * card must belong to the org.
+     */
     @Transactional
-    AuthenticityVerification verify(UUID orgId, UUID cardId, Provenance.Finding finding, Provenance.AuthMethod method, String note) {
+    AuthenticityVerification verify(UUID orgId, UUID cardId, Provenance.Finding finding, Provenance.AuthMethod method, String note,
+                                    List<UUID> photoIds) {
         cardItems.requireAccessible(orgId, cardId);
         Catalog.IdentifiedCard identity = catalog.current(cardId).orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
                 "Confirm the card's identity first: a verification is made against it"));
+        // The photos named must be this card's passing photos.
+        Map<UUID, CardItems.PhotoRef> passed = cardItems.passedPhotos(cardId).stream()
+                .collect(Collectors.toMap(CardItems.PhotoRef::id, Function.identity()));
+        List<UUID> evidence = photoIds == null ? List.of() : photoIds.stream().distinct().toList();
+        if (!passed.keySet().containsAll(evidence)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Name only this card's passing photos");
+        }
+        if (method == Provenance.AuthMethod.PHOTO_REVIEW && evidence.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Name the photos the review was based on");
+        }
         if (finding == Provenance.Finding.VERIFIED_AUTHENTIC && method == Provenance.AuthMethod.PHOTO_REVIEW) {
             if (!Provenance.canVerify(identity.authenticityRisk(), method)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A high-risk card (vintage holo, 1st Edition or Japanese "
                         + "promo) can't be verified from photos: inspect it in hand, or use a slab or an authentication service");
             }
-            if (cardItems.passedPhotos(cardId).stream().noneMatch(p -> p.side().equals("DETAIL"))) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Verifying from photos needs a passing close-up photo of the card");
+            if (evidence.stream().noneMatch(id -> passed.get(id).side().equals("DETAIL"))) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Verifying from photos needs a passing close-up of the card among the photos named");
             }
         }
         return verifications.save(new AuthenticityVerification(orgId, cardId, identity.catalogCardId(), finding, method,
-                blankToNull(note), currentUser.id()));
+                blankToNull(note), evidence, currentUser.id()));
     }
 
     /**
