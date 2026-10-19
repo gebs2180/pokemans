@@ -13,7 +13,7 @@ export function ReviewQueuePage() {
   const api = useApi()
   const { data: items, error, reload } = useLoad(() => api<QueueItem[]>('GET', '/api/admin/review-queue'), [api])
 
-  if (error) return <p className="error">{error}</p>
+  if (error) return <p className="error" role="alert">{error}</p>
   if (!items) return <p>Loading…</p>
 
   const todo = items.filter((i) => !i.identified || i.assessment !== 'REVIEWER')

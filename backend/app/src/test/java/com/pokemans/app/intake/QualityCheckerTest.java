@@ -171,6 +171,13 @@ class QualityCheckerTest {
     }
 
     @Test
+    void aDecompressionBombIsUnreadableWithoutBeingDecoded() {
+        // 30000 x 30000 claimed in a few dozen bytes: decoding it would need ~3.6 GB.
+        assertThat(checker.check(com.pokemans.app.storage.ImageGuardTest.pngClaiming(30_000, 30_000)).reasons())
+                .containsExactly(RetakeReason.UNREADABLE);
+    }
+
+    @Test
     void notAnImageIsUnreadable() {
         assertThat(checker.check("not an image".getBytes()).reasons()).containsExactly(RetakeReason.UNREADABLE);
     }

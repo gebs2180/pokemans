@@ -3,6 +3,8 @@ package com.pokemans.app.intake;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -29,6 +31,10 @@ interface CardItemRepository extends JpaRepository<CardItem, UUID> {
 
     Optional<CardItem> findByIdAndOrgId(UUID id, UUID orgId);
 
+    /** Row-locked: serialises photo confirms on one card, so finishing its capture is seen exactly once. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<CardItem> findLockedByIdAndOrgId(UUID id, UUID orgId);
+
     long countByBatchId(UUID batchId);
 
     long countByCollectionId(UUID collectionId);
@@ -43,6 +49,9 @@ interface CardItemRepository extends JpaRepository<CardItem, UUID> {
 }
 
 interface PhotoRepository extends JpaRepository<Photo, UUID> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Photo> findLockedByIdAndOrgId(UUID id, UUID orgId);
 
     List<Photo> findByCardItemIdInOrderByCreatedAtAsc(List<UUID> cardItemIds);
 

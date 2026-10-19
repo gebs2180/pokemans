@@ -43,6 +43,19 @@ class AuthenticityRiskTest {
     }
 
     @Test
+    void aMissingReleaseDateIsTreatedAsRisky() {
+        // A hand-entered Base Set Charizard with no date must not slip through as NONE.
+        assertThat(AuthenticityRisk.of(card("en", null, "Rare Holo", Edition.UNLIMITED, Variant.HOLO, false), TODAY))
+                .isEqualTo(AuthenticityRisk.VINTAGE_HOLO);
+        assertThat(AuthenticityRisk.of(card("en", null, "Common", Edition.FIRST_EDITION, Variant.NORMAL, false), TODAY))
+                .isEqualTo(AuthenticityRisk.VINTAGE_HOLO);
+        assertThat(AuthenticityRisk.of(card("en", null, "Special Illustration Rare", Edition.UNLIMITED, Variant.NORMAL, false), TODAY))
+                .isEqualTo(AuthenticityRisk.RECENT_CHASE);
+        assertThat(AuthenticityRisk.of(card("en", null, "Common", Edition.UNLIMITED, Variant.NORMAL, false), TODAY))
+                .isEqualTo(AuthenticityRisk.NONE);
+    }
+
+    @Test
     void manualEntriesOfTheSameCardShareAKey() {
         CardIdentity a = new CardIdentity(CatalogCard.Provider.MANUAL, null, "en", null, " Base  Set", null, null, "4",
                 "Charizard", null, Edition.UNLIMITED, Variant.HOLO, null, false, null);

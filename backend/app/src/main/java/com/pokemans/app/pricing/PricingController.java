@@ -8,6 +8,7 @@ import com.pokemans.valuation.GradePrice;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -20,8 +21,12 @@ import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,6 +46,9 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/admin/catalog-cards/{catalogCardId}")
 class PricingController {
 
+    private static final Pattern EBAY_HOST = Pattern.compile("(^|\\.)ebay\\.(com|ca|co\\.uk|com\\.au|de|fr|it|es)$");
+    private static final Pattern EBAY_ITEM = Pattern.compile("^/itm/(?:[^/]+/)?(\\d{9,15})/?$");
+
     /**
      * Graded sales give a grading company and grade (half grades as sold, e.g. 8.5); raw sales give
      * a raw condition instead.
@@ -50,7 +58,7 @@ class PricingController {
     record CompRequest(PriceSource.GradingCompany gradingCompany,
                        @DecimalMin("1") @DecimalMax("10") BigDecimal grade,
                        PriceSource.RawCondition rawCondition,
-                       @NotNull @Positive BigDecimal price,
+                       @NotNull @Positive @Digits(integer = 10, fraction = 2) BigDecimal price,
                        @NotNull LocalDate soldOn,
                        @NotNull PriceSource.ListingType listingType,
                        @NotBlank @Size(max = 100) String marketplace,
@@ -117,8 +125,11 @@ class PricingController {
         if (request.note() != null && !request.note().isBlank()) {
             details.put("note", request.note().trim());
         }
+        if (request.url() != null && !listingUrl(request.url())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The listing URL must be an http or https link");
+        }
         // A listing entered twice is the same sale: key it by URL. Without a URL each entry is its own sale.
-        String externalId = request.url() == null ? "manual:" + UUID.randomUUID() : "url:" + request.url();
+        String externalId = request.url() == null ? "manual:" + UUID.randomUUID() : saleKey(request.url());
         PriceSource.Sale sale;
         try {
             sale = new PriceSource.Sale(CompIngestionService.MANUAL, externalId, catalogCardId, request.gradingCompany(),
@@ -127,6 +138,9 @@ class PricingController {
             return view(ingestion.recordManual(sale));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (DataIntegrityViolationException e) {
+            // Two reviewers entering the same listing at once: the unique key catches the second.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This sale is already recorded");
         }
     }
 
@@ -167,5 +181,25 @@ class PricingController {
     private static CompView view(SoldComp c) {
         return new CompView(c.getId(), c.getSource(), c.getGradingCompany(), c.getGrade(), c.getRawCondition(), c.getPrice(),
                 c.getCurrency(), c.getSoldOn(), c.getListingType(), c.getUrl(), c.getLicence(), c.getRaw(), c.getCreatedAt());
+    }
+
+    static boolean listingUrl(URI url) {
+        String scheme = url.getScheme();
+        return url.isAbsolute() && url.getHost() != null
+                && ("https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme));
+    }
+
+    /**
+     * The key that makes one listing one sale. An eBay item is keyed by its item number, so the same
+     * sale pasted with different tracking parameters isn't counted twice; other links drop the fragment.
+     */
+    static String saleKey(URI url) {
+        String host = url.getHost().toLowerCase(Locale.ROOT);
+        Matcher item = EBAY_ITEM.matcher(url.getRawPath() == null ? "" : url.getRawPath());
+        if (EBAY_HOST.matcher(host).find() && item.matches()) {
+            return "ebay:" + item.group(1);
+        }
+        return "url:" + url.getScheme().toLowerCase(Locale.ROOT) + "://" + url.getRawAuthority().toLowerCase(Locale.ROOT)
+                + (url.getRawPath() == null ? "" : url.getRawPath()) + (url.getRawQuery() == null ? "" : "?" + url.getRawQuery());
     }
 }

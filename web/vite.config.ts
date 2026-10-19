@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -29,6 +30,20 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rolldownOptions: {
+      output: {
+        // React, the router and Auth0 change rarely: their own chunk caches across deploys of our code.
+        advancedChunks: {
+          groups: [{ name: 'vendor', test: /node_modules[\\/](react|react-dom|react-router|@auth0|scheduler)/ }],
+        },
+      },
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['src/test/setup.ts'],
+  },
   server: {
     // The Spring Boot app serves the API on 8080 in local development.
     proxy: {

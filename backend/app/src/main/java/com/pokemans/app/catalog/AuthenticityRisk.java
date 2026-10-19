@@ -7,7 +7,8 @@ import java.util.Set;
 /**
  * Categories the methodology treats as high counterfeit risk (CLAUDE.md pipeline step 1). A card in
  * one carries zero collateral value until verified. "High-value" for Japanese promos needs prices,
- * so every Japanese promo is flagged for now; conservative by default.
+ * so every Japanese promo is flagged for now; conservative by default. So is a missing release date:
+ * a holo or 1st Edition with no date might be vintage, and a top rarity with no date might be recent.
  */
 public enum AuthenticityRisk {
     NONE,
@@ -33,7 +34,10 @@ public enum AuthenticityRisk {
         if ("ja".equals(card.language()) && card.promo()) {
             return JAPANESE_PROMO;
         }
-        if (released != null && released.isAfter(today.minusYears(3)) && card.rarity() != null
+        if (released == null && holoOrFirst) {
+            return VINTAGE_HOLO;
+        }
+        if ((released == null || released.isAfter(today.minusYears(3))) && card.rarity() != null
                 && CHASE_RARITIES.contains(card.rarity().toLowerCase(Locale.ROOT))) {
             return RECENT_CHASE;
         }

@@ -30,4 +30,12 @@ public record StorageProperties(
         @DefaultValue("15m") Duration downloadUrlTtl,
         @DefaultValue("26214400") long maxUploadBytes,
         @DefaultValue("false") boolean autoCreateBuckets) {
+
+    /** Never prints the secret key. */
+    @Override
+    public String toString() {
+        return "StorageProperties[endpoint=" + endpoint + ", region=" + region + ", accessKey=" + accessKey
+                + ", secretKey=" + (secretKey == null || secretKey.isBlank() ? "unset" : "***")
+                + ", photoBucket=" + photoBucket + ", maxUploadBytes=" + maxUploadBytes + "]";
+    }
 }

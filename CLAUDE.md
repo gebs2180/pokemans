@@ -23,7 +23,7 @@ Collateral reports for raw-heavy Pokémon card collections: what a collection re
    - Missing grade, sales on both sides → interpolate on log price.
    - Sales only above → higher grade × era step-down ratio (median adjacent-grade price ratio across comparable same-era cards). With no era ratio yet, use the card's own steepest per-grade ratio if it has sales in at least 2 grades at least 2 apart; otherwise leave it unpriced (Zach, 2026-10-17; not yet in the methodology doc).
    - Sales only below → use the lower grade's price unchanged. **Never step up.**
-   - Grade 1 is priced from its own sales only and never anchors another grade: PSA 1s have their own collectors and often sell above 2–4 (Zach, 2026-10-17).
+   - Grade 1 is priced from its own sales only and never anchors another grade: PSA 1s have their own collectors and often sell above 2–4 (Zach, 2026-10-17). So there is no era 1-to-2 ratio either: a grade 1 without its own sales borrows the era's 2-to-3 ratio, else the card's own ladder (review, 2026-10-17; needs Zach's OK).
    - Any derived price → confidence drops one level.
    - Each grading company (PSA, CGC, BGS, …) is priced separately from its own comps, never pooled or converted.
    - U priced from damaged/altered raw sales, else $0. No bulk floor (Zach, 2026-10-17; the methodology doc still says bulk floor and needs updating). Low-value cards are excluded by the $25 FMV minimum instead.

@@ -34,5 +34,12 @@ record CatalogProperties(@DefaultValue Tcgdex tcgdex, @DefaultValue Reader reade
                   @DefaultValue("true") boolean workerEnabled,
                   @DefaultValue("15s") Duration pollInterval,
                   @DefaultValue("5") int maxAttempts) {
+
+        /** Never prints the key. */
+        @Override
+        public String toString() {
+            return "Reader[enabled=" + enabled + ", apiKey=" + (apiKey == null || apiKey.isBlank() ? "unset" : "***")
+                    + ", model=" + model + ", baseUrl=" + baseUrl + "]";
+        }
     }
 }

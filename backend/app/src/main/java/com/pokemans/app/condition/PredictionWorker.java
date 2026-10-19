@@ -55,7 +55,11 @@ class PredictionWorker {
         List<UUID> due = requests.findDue(Instant.now()).stream().map(PredictionRequest::getId).toList();
         for (UUID id : due) {
             try {
-                transactions.executeWithoutResult(status -> handle(requests.findById(id).orElseThrow()));
+                PredictionRequest finished = transactions.execute(status -> handle(requests.findById(id).orElseThrow()));
+                if (finished != null) {
+                    // Its own transaction: a failed rebuild must not roll back the stored prediction.
+                    transactions.executeWithoutResult(status -> afterFinished(finished));
+                }
             } catch (RuntimeException e) {
                 log.warn("Prediction request {} failed unexpectedly", id, e);
             }
@@ -63,44 +67,40 @@ class PredictionWorker {
         return due.size();
     }
 
-    private void handle(PredictionRequest request) {
+    /** Advances one request; returns it when it has just finished (so the assessment may need rebuilding), else null. */
+    private PredictionRequest handle(PredictionRequest request) {
         if (!request.isOpen()) {
-            return;
+            return null;
         }
         PreGradeProvider provider = providers.get(request.getProvider());
         if (provider == null) {
             request.callFailed("Provider " + request.getProvider() + " is not enabled", properties.worker().maxAttempts());
-            return;
+            return request.isOpen() ? null : request;
         }
         long started = System.nanoTime();
         try {
             if (request.getStatus() == PredictionRequest.Status.PENDING) {
                 request.submitted(provider.submit(photos(request), request.getId().toString()));
-                return;
+                return null;
             }
             switch (provider.poll(request.getExternalRequestId())) {
-                case PreGradeProvider.Pending pending -> request.stillPending(Duration.ofSeconds(10));
+                case PreGradeProvider.Pending pending -> request.stillPending(Duration.ofSeconds(10), properties.worker().maxPending());
                 case PreGradeProvider.Done done -> {
                     predictions.save(ProviderPrediction.succeeded(request, done.reading(), withoutImages(done.raw()), elapsedMs(started)));
                     request.done();
-                    afterFinished(request);
                 }
                 case PreGradeProvider.Failed failed -> {
                     predictions.save(ProviderPrediction.rejected(request, failed.reason(), withoutImages(failed.raw()), elapsedMs(started)));
                     request.rejected(failed.reason());
-                    afterFinished(request);
                 }
             }
         } catch (RuntimeException e) {
             request.callFailed(e.getClass().getSimpleName() + ": " + e.getMessage(), properties.worker().maxAttempts());
-            if (!request.isOpen()) {
-                afterFinished(request);
-            }
         }
+        return request.isOpen() ? null : request;
     }
 
     private void afterFinished(PredictionRequest request) {
-        requests.flush();
         if (requests.findByCardItemIdOrderByCreatedAtDesc(request.getCardItemId()).stream().noneMatch(PredictionRequest::isOpen)) {
             condition.rebuildSystemAssessment(request.getCardItemId());
         }

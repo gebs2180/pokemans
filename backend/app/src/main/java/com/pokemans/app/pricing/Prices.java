@@ -80,9 +80,7 @@ public class Prices {
         String gradingCompany = null;
         for (PriceSnapshot row : rows) {
             Grade grade = parse(row.getGrade());
-            if (row.getGradingCompany() != null) {
-                gradingCompany = row.getGradingCompany().name();
-            }
+            gradingCompany = row.getGradingCompany().name(); // NOT NULL since V9
             grades.put(grade, new GradeSnapshot(grade, row.getPrice(), row.getCurrency(), row.getMethod(), row.getN(),
                     row.getCompIds().stream().map(UUID::fromString).toList(), row.getWindowDays(),
                     row.getBasisGrades().stream().map(Prices::parse).toList(), row.getStepDownRatio(), row.getConfidence()));

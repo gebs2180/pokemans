@@ -75,8 +75,13 @@ class PhotoService {
     /** Idempotent: confirming a photo that was already checked returns the stored result. */
     @Transactional
     PhotoView confirm(UUID orgId, UUID photoId) {
-        Photo photo = photos.findByIdAndOrgId(photoId, orgId).orElseThrow(() -> IntakeService.notFound("Photo"));
-        CardItem card = intake.requireCard(orgId, photo.getCardItemId());
+        if (access.require(orgId, OrgType.values()).getType() == OrgType.CONTRIBUTOR) {
+            consents.requireAccepted(orgId);
+        }
+        // Locks photo then card: a repeated confirm waits and sees the stored result, and confirms of the
+        // card's other photos run one at a time, so the capture finishing is published exactly once.
+        Photo photo = photos.findLockedByIdAndOrgId(photoId, orgId).orElseThrow(() -> IntakeService.notFound("Photo"));
+        CardItem card = intake.requireCardLocked(orgId, photo.getCardItemId());
         if (photo.getStatus() != Photo.Status.AWAITING_UPLOAD) {
             return IntakeViews.photo(photo);
         }

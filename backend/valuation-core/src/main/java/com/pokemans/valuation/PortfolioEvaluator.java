@@ -1,6 +1,7 @@
 package com.pokemans.valuation;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -18,6 +19,15 @@ import java.util.function.Function;
  * is not driven to zero by its own caps. Order: single-card cap, top-five cap, then the correlation
  * haircut on the capped values. A card in an over-concentrated set and an over-concentrated
  * character takes both haircuts.
+ *
+ * <p>Open question for the owner: because caps are measured against the pre-cap eligible FLV, a
+ * capped card can end up well above 20% of the final base. One card with FLV 2,500 beside ten
+ * cards of 100 is capped at 700 (20% of 3,500) and is then 41% of the 1,700 base. The semantics
+ * are kept as they are until that is decided.
+ *
+ * <p>Capped amounts are rounded down to the cent, so a capped value never exceeds its limit. When the
+ * top five are scaled, every other card is held at or below the smallest scaled value, so no card
+ * outside the five can overtake one of them and take the five over their limit.
  *
  * <p>α is the lender's choice: the result suggests a range and computes an advance only for an α the
  * caller supplies.
@@ -70,6 +80,9 @@ public final class PortfolioEvaluator {
         List<Card> eligible = new ArrayList<>();
         for (Card card : cards) {
             CardValuation v = card.valuation();
+            if (reasons.containsKey(v.cardId())) {
+                throw new IllegalArgumentException("Duplicate card id " + v.cardId() + ": each copy needs its own id");
+            }
             List<String> why = new ArrayList<>();
             if (v.confidence() == Confidence.D) {
                 why.add("confidence D");
@@ -96,7 +109,7 @@ public final class PortfolioEvaluator {
         trace.add("eligible_flv", "sum of eligible FLV", eligibleFlv, eligible.size() + " cards");
 
         // Single-card cap.
-        BigDecimal singleCap = Money.cents(eligibleFlv.multiply(params.singleCardCap(), Money.MC));
+        BigDecimal singleCap = centsDown(eligibleFlv.multiply(params.singleCardCap(), Money.MC));
         for (Map.Entry<String, BigDecimal> e : value.entrySet()) {
             if (e.getValue().compareTo(singleCap) > 0) {
                 trace.add("capped[" + e.getKey() + "]", "single-card cap " + params.singleCardCap() + " of eligible FLV",
@@ -116,7 +129,19 @@ public final class PortfolioEvaluator {
         if (topFiveSum.compareTo(topFiveLimit) > 0) {
             BigDecimal scale = topFiveLimit.divide(topFiveSum, Money.MC);
             for (String id : topFive) {
-                value.put(id, Money.cents(value.get(id).multiply(scale, Money.MC)));
+                // Rounded down: rounding each card to the nearest cent could push the five over the limit.
+                value.put(id, centsDown(value.get(id).multiply(scale, Money.MC)));
+            }
+            // A card just outside the five (often a tie with the fifth) could now be worth more than a scaled
+            // one and so join the top five, taking it over the limit. Hold every other card at or below the
+            // smallest scaled value, so the scaled five stay the top five and tied cards are treated alike.
+            BigDecimal smallestScaled = topFive.stream().map(value::get).min(Comparator.naturalOrder()).orElseThrow();
+            for (Map.Entry<String, BigDecimal> e : value.entrySet()) {
+                if (!topFive.contains(e.getKey()) && e.getValue().compareTo(smallestScaled) > 0) {
+                    trace.add("capped[" + e.getKey() + "]", "held at the smallest scaled top-five value", smallestScaled,
+                            "FLV " + e.getValue());
+                    e.setValue(smallestScaled);
+                }
             }
             trace.add("top_five_cap", "top five scaled to " + params.topFiveCap() + " of eligible FLV",
                     Money.cents(topFiveLimit), "top five were " + topFiveSum + ", scale " + Money.cents(scale.movePointRight(2)) + "%");
@@ -199,6 +224,10 @@ public final class PortfolioEvaluator {
                             Money.cents(slice.getValue().multiply(params.correlationHaircut(), Money.MC)),
                             "share " + share.setScale(4, java.math.RoundingMode.HALF_EVEN));
                 });
+    }
+
+    private static BigDecimal centsDown(BigDecimal amount) {
+        return amount.setScale(2, RoundingMode.DOWN);
     }
 
     private static BigDecimal sum(Iterable<BigDecimal> values) {

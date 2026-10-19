@@ -3,6 +3,7 @@ package com.pokemans.app.catalog;
 import com.pokemans.app.identity.CurrentUser;
 import com.pokemans.app.intake.CardItems;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -81,7 +82,7 @@ class IdentificationService {
     CatalogCard findOrCreate(CardIdentity identity, Map<String, Object> payload, UUID createdBy) {
         Optional<CatalogCard> existing = catalogCards.findByIdentityKey(identity.key());
         return existing.isPresent() ? existing.get() : catalogCards.save(
-                new CatalogCard(identity, AuthenticityRisk.of(identity, LocalDate.now()), payload, createdBy));
+                new CatalogCard(identity, AuthenticityRisk.of(identity, LocalDate.now(ZoneOffset.UTC)), payload, createdBy));
     }
 
     /** The identity a provider card and chosen print make. */
@@ -105,6 +106,13 @@ class IdentificationService {
     private static CardIdentity manual(Choice choice) {
         if (isBlank(choice.setName()) || isBlank(choice.number()) || isBlank(choice.name())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Set, number and name are required for a manual entry");
+        }
+        // The release date drives the vintage and recent-chase authenticity flags, so it can't be left out.
+        if (choice.setReleaseDate() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The set's release date is required for a manual entry");
+        }
+        if (choice.setReleaseDate().isAfter(LocalDate.now(ZoneOffset.UTC))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The set's release date can't be in the future");
         }
         return new CardIdentity(CatalogCard.Provider.MANUAL, null, choice.language(), null, choice.setName().trim(), null,
                 choice.setReleaseDate(), choice.number().trim(), choice.name().trim(), blankToNull(choice.rarity()),

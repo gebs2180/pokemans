@@ -103,7 +103,7 @@ class CatalogFlowTest {
         String first = api.card(orgId, "Odd promo", api.admin());
         String second = api.card(orgId, "Same promo, second copy", api.admin());
         String manual = "{\"provider\":\"MANUAL\",\"language\":\"ja\",\"edition\":\"UNLIMITED\",\"variant\":\"HOLO\",\"promo\":true,"
-                + "\"setName\":\"Pokemon Center Promo\",\"number\":\"001/SV-P\",\"name\":\"Pikachu\"}";
+                + "\"setName\":\"Pokemon Center Promo\",\"setReleaseDate\":\"2023-01-01\",\"number\":\"001/SV-P\",\"name\":\"Pikachu\"}";
 
         String catalogCardId = TestApi.read(api.postJson("/api/admin/orgs/" + orgId + "/cards/" + first + "/identifications", manual, api.admin())
                 .andExpect(status().isCreated())
@@ -115,6 +115,14 @@ class CatalogFlowTest {
 
         api.postJson("/api/admin/orgs/" + orgId + "/cards/" + first + "/identifications",
                         "{\"provider\":\"MANUAL\",\"language\":\"en\",\"edition\":\"UNLIMITED\",\"variant\":\"HOLO\"}", api.admin())
+                .andExpect(status().isBadRequest());
+        // The release date decides the authenticity flags, so a manual entry can't leave it out or put it ahead.
+        api.postJson("/api/admin/orgs/" + orgId + "/cards/" + first + "/identifications",
+                        manual.replace(",\"setReleaseDate\":\"2023-01-01\"", ""), api.admin())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("release date is required")));
+        api.postJson("/api/admin/orgs/" + orgId + "/cards/" + first + "/identifications",
+                        manual.replace("2023-01-01", java.time.LocalDate.now(java.time.ZoneOffset.UTC).plusDays(2).toString()), api.admin())
                 .andExpect(status().isBadRequest());
         // The card must belong to the org in the path.
         String otherOrg = api.collectorOrg("Other Collector", "auth0|other-collector");

@@ -6,7 +6,7 @@ export function HomePage() {
   const api = useApi()
   const { data: me, error } = useLoad(() => api<Me>('GET', '/api/me'), [api])
 
-  if (error) return <p className="error">{error}</p>
+  if (error) return <p className="error" role="alert">{error}</p>
   if (!me) return <p>Loading…</p>
 
   const admin = me.roles.includes('ADMIN')

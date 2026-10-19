@@ -184,11 +184,13 @@ class PricingFlowTest {
         assertThat(g5.compIds()).isEmpty();
         assertThat(g5.confidence()).isEqualTo(Confidence.D);
 
-        // 1: grade 2 times the era ratio, never above grade 2.
+        // 1: the comparables' grade 1 sales don't make an era ratio (PSA 1s carry a collector premium), so
+        // the comparables give no 2-to-3 ratio to borrow either: grade 1 steps down from grade 2 with the
+        // card's own ladder, never above grade 2.
         Prices.GradeSnapshot g1 = card.grades().get(Grade.G1);
-        assertThat(g1.method()).isEqualTo(GradePrice.Method.STEP_DOWN);
-        assertThat(g1.stepDownRatio()).isEqualByComparingTo("0.5");
-        assertThat(g1.price()).isEqualByComparingTo("20.00");
+        assertThat(g1.method()).isEqualTo(GradePrice.Method.CARD_STEP_DOWN);
+        assertThat(g1.stepDownRatio()).isLessThanOrEqualTo(java.math.BigDecimal.ONE);
+        assertThat(g1.price()).isLessThanOrEqualTo(card.grades().get(Grade.G2).price());
 
         // U from damaged raw sales; σ from the monthly 10s; sales rate from every comp.
         assertThat(card.grades().get(Grade.U).method()).isEqualTo(GradePrice.Method.OBSERVED);

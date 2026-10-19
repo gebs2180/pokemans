@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { useApi, type OutcomeView } from '../api'
+import { apiPath, useApi, type OutcomeView } from '../api'
+import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 
 type Filter = 'UNVERIFIED' | 'VERIFIED' | 'MISMATCH' | 'ALL'
@@ -11,7 +12,7 @@ export function AdminOutcomesPage() {
   const [filter, setFilter] = useState<Filter>('UNVERIFIED')
   const { data, error, reload } = useLoad(() => api<OutcomeView[]>('GET', `/api/admin/outcomes?status=${filter}`), [api, filter])
 
-  if (error) return <p className="error">{error}</p>
+  if (error) return <p className="error" role="alert">{error}</p>
   return (
     <>
       <p>
@@ -40,14 +41,19 @@ function OutcomeRow({ outcome: o, onChange }: { outcome: OutcomeView; onChange: 
   const api = useApi()
   const [note, setNote] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const lookup = safeHref(o.lookupUrl)
 
   async function verify(status: 'VERIFIED' | 'MISMATCH') {
     setErr(null)
+    setBusy(true)
     try {
-      await api('POST', `/api/admin/outcomes/${o.id}/verifications`, { status, note })
+      await api('POST', apiPath`/api/admin/outcomes/${o.id}/verifications`, { status, note })
       onChange()
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -58,9 +64,13 @@ function OutcomeRow({ outcome: o, onChange }: { outcome: OutcomeView; onChange: 
           {o.grader} {o.grade ?? ''} {o.gradeLabel ?? ''}
         </strong>{' '}
         · cert{' '}
-        <a href={o.lookupUrl} target="_blank" rel="noreferrer">
-          {o.certNumber}
-        </a>{' '}
+        {lookup ? (
+          <a href={lookup} target="_blank" rel="noreferrer">
+            {o.certNumber}
+          </a>
+        ) : (
+          o.certNumber
+        )}{' '}
         · <Link to={`/admin/review/${o.orgId}/${o.cardId}`}>{o.cardLabel}</Link>
       </p>
       <p className="muted small">
@@ -68,13 +78,15 @@ function OutcomeRow({ outcome: o, onChange }: { outcome: OutcomeView; onChange: 
         {o.verificationNote && ` · ${o.verificationNote}`} · shared {new Date(o.createdAt).toLocaleDateString()}
       </p>
       <div className="row">
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What the cert page shows" />
-        <button onClick={() => verify('VERIFIED')}>Matches</button>
-        <button className="link" onClick={() => verify('MISMATCH')}>
+        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What the cert page shows" aria-label="What the cert page shows" />
+        <button onClick={() => verify('VERIFIED')} disabled={busy}>
+          Matches
+        </button>
+        <button className="link" onClick={() => verify('MISMATCH')} disabled={busy}>
           Doesn't match
         </button>
       </div>
-      {err && <p className="error">{err}</p>}
+      {err && <p className="error" role="alert">{err}</p>}
     </section>
   )
 }

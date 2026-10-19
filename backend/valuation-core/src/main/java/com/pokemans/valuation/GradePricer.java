@@ -23,6 +23,8 @@ import java.util.Objects;
  *       grade's price unchanged. Never stepped up.
  *   <li>Grade 1 is priced from its own sales only and never anchors another grade: PSA 1s have
  *       their own collectors and often sell above grades 2 to 4, so using them would step those up.
+ *       For the same reason there is no era 1-to-2 ratio: a grade 1 with no sales of its own steps
+ *       down from grade 2 with the era's 2-to-3 ratio, else the card's own ladder.
  *   <li>Below the lowest observed grade with no era ratio yet: the card's own ladder. With sales in
  *       enough grades across enough of a spread, the steepest per-grade ratio between its observed
  *       grades steps the lower grades down. Otherwise the card is refused rather than guessed.
@@ -46,7 +48,8 @@ public final class GradePricer {
      * @param asOf               valuation date; comps after it are ignored
      * @param gradedComps        sold comps per gradable grade (half grades already folded)
      * @param damagedRawComps    raw sales of damaged or altered copies, used for U
-     * @param stepDownRatios     for grade g, the era median ratio of price(g) to price(g + 1)
+     * @param stepDownRatios     for grade g (2 to 9), the era median ratio of price(g) to price(g + 1);
+     *                           a grade 1 entry is ignored, and grade 1 uses grade 2's
      * @param gradingCost        cost of grading, netted from graded prices
      * @param rawConditionPrices optional raw-sale price for a card in the condition of each grade
      */
@@ -57,6 +60,14 @@ public final class GradePricer {
             Map<Grade, BigDecimal> stepDownRatios,
             GradingCost gradingCost,
             Map<Grade, BigDecimal> rawConditionPrices) {
+        public Input {
+            Objects.requireNonNull(asOf, "asOf");
+            Objects.requireNonNull(gradedComps, "gradedComps (pass an empty map, not null)");
+            Objects.requireNonNull(damagedRawComps, "damagedRawComps (pass an empty list, not null)");
+            Objects.requireNonNull(stepDownRatios, "stepDownRatios (pass an empty map, not null)");
+            Objects.requireNonNull(gradingCost, "gradingCost");
+            Objects.requireNonNull(rawConditionPrices, "rawConditionPrices (pass an empty map, not null)");
+        }
     }
 
     public GradePriceTable price(Input input) {
@@ -112,7 +123,7 @@ public final class GradePricer {
                 continue;
             }
             BigDecimal netGraded = Money.max(BigDecimal.ZERO, Money.cents(input.gradingCost().net(g)));
-            BigDecimal raw = input.rawConditionPrices() == null ? null : input.rawConditionPrices().get(grade);
+            BigDecimal raw = input.rawConditionPrices().get(grade);
             boolean rawWins = raw != null && raw.compareTo(netGraded) > 0;
             BigDecimal net = rawWins ? raw : netGraded;
             trace.add("net[" + grade + "]", rawWins ? "raw-sale price higher than net graded" : "net of grading cost", net,
@@ -201,34 +212,44 @@ public final class GradePricer {
             Grade above = nearestObserved(anchors, g + 1, +1);
             String subject = "price[" + grade + "]";
             if (below != null && above != null) {
-                BigDecimal price = logInterpolate(below, anchors.get(below), above, anchors.get(above), grade);
+                BigDecimal interpolated = logInterpolate(below, anchors.get(below), above, anchors.get(above), grade);
+                // Out-of-order anchors (the lower grade sold for more) would put this grade above the grade
+                // over it. Never step up: cap at the higher grade's price.
+                BigDecimal price = interpolated.min(anchors.get(above));
                 gross.put(grade, price);
                 method.put(grade, GradePrice.Method.INTERPOLATED);
                 basis.put(grade, List.of(below, above));
                 trace.add(subject, "log interpolation", price, "between grade " + below + " (" + anchors.get(below)
-                        + ") and grade " + above + " (" + anchors.get(above) + ")");
+                        + ") and grade " + above + " (" + anchors.get(above) + ")"
+                        + (price.compareTo(interpolated) < 0 ? "; capped at grade " + above + "'s price" : ""));
             } else if (above != null) {
                 Grade next = Grade.of(g + 1);
-                BigDecimal ratio = input.stepDownRatios().get(grade);
+                // No era 1-to-2 ratio, even if the caller passes one: grade 1 prices are their own market
+                // (PSA 1 collectors), so it would carry other cards' grade 1 premiums into this card.
+                // StepDownRatios never builds one. Grade 1 reuses the era's 2-to-3 ratio instead, built
+                // from grades 2 and 3 only; ladders flatten at the bottom, so that errs low.
+                BigDecimal ratio = input.stepDownRatios().get(grade == Grade.G1 ? Grade.G2 : grade);
                 GradePrice.Method stepMethod = GradePrice.Method.STEP_DOWN;
                 if (ratio == null) {
                     if (cardRatio == null) {
                         throw new IllegalArgumentException("No era step-down ratio for grade " + grade + " to " + next
+                                + (grade == Grade.G1 ? " (grade 1 borrows the era's 2-to-3 ratio: there is none)" : "")
                                 + ", and sales in too few grades to step down from the card's own prices (need "
                                 + params.cardLadderMinGrades() + " grades at least " + params.cardLadderMinSpan() + " apart)");
                     }
                     ratio = cardRatio;
                     stepMethod = GradePrice.Method.CARD_STEP_DOWN;
                 }
-                if (ratio.compareTo(BigDecimal.ONE) > 0) {
-                    throw new IllegalArgumentException("Step-down ratio above 1 for grade " + grade + ": " + ratio);
+                if (ratio.compareTo(BigDecimal.ONE) > 0 || ratio.signum() <= 0) {
+                    throw new IllegalArgumentException("Step-down ratio must be above 0 and at most 1 for grade " + grade + ": " + ratio);
                 }
                 BigDecimal price = Money.cents(gross.get(next).multiply(ratio, Money.MC));
                 gross.put(grade, price);
                 method.put(grade, stepMethod);
                 basis.put(grade, List.of(next));
                 ratioUsed.put(grade, ratio);
-                trace.add(subject, stepMethod == GradePrice.Method.STEP_DOWN ? "era step-down" : "card's own step-down", price,
+                trace.add(subject, stepMethod == GradePrice.Method.CARD_STEP_DOWN ? "card's own step-down"
+                                : grade == Grade.G1 ? "era step-down (the 2-to-3 ratio; grade 1 has none)" : "era step-down", price,
                         "grade " + next + " price " + gross.get(next) + " x " + ratio);
             } else {
                 BigDecimal price = anchors.get(below);

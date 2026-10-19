@@ -1,13 +1,13 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
-import { useApi, type ConsentStatus, type ContainerSummary } from '../api'
+import { apiPath, useApi, type ConsentStatus, type ContainerSummary } from '../api'
 import { useLoad } from '../useLoad'
 import { containerKind, useOrg } from '../useOrg'
 
 export function OrgPage() {
   const { orgId = '' } = useParams()
   const { data: org, error: orgError } = useOrg(orgId)
-  if (orgError) return <p className="error">{orgError}</p>
+  if (orgError) return <p className="error" role="alert">{orgError}</p>
   if (!org) return <p>Loading…</p>
   const containers = <Containers orgId={orgId} orgName={org.name} kind={containerKind(org.type)} />
   return org.type === 'CONTRIBUTOR' ? <ConsentGate orgId={orgId}>{containers}</ConsentGate> : containers
@@ -16,20 +16,20 @@ export function OrgPage() {
 /** Contributors read and accept the data-use terms before sharing anything. */
 function ConsentGate({ orgId, children }: { orgId: string; children: ReactNode }) {
   const api = useApi()
-  const { data, error, reload } = useLoad(() => api<ConsentStatus>('GET', `/api/orgs/${orgId}/consent`), [api, orgId])
+  const { data, error, reload } = useLoad(() => api<ConsentStatus>('GET', apiPath`/api/orgs/${orgId}/consent`), [api, orgId])
   const [acceptError, setAcceptError] = useState<string | null>(null)
 
   async function accept() {
     setAcceptError(null)
     try {
-      await api('POST', `/api/orgs/${orgId}/consent`, { version: data?.version })
+      await api('POST', apiPath`/api/orgs/${orgId}/consent`, { version: data?.version })
       reload()
     } catch (err) {
       setAcceptError(err instanceof Error ? err.message : String(err))
     }
   }
 
-  if (error) return <p className="error">{error}</p>
+  if (error) return <p className="error" role="alert">{error}</p>
   if (!data) return <p>Loading…</p>
   if (data.acceptedAt) {
     return (
@@ -45,7 +45,7 @@ function ConsentGate({ orgId, children }: { orgId: string; children: ReactNode }
       <p>Please read how we use the photos and grades you share.</p>
       <pre className="terms">{data.text}</pre>
       <button onClick={accept}>I agree</button>
-      {acceptError && <p className="error">{acceptError}</p>}
+      {acceptError && <p className="error" role="alert">{acceptError}</p>}
     </>
   )
 }
@@ -53,20 +53,25 @@ function ConsentGate({ orgId, children }: { orgId: string; children: ReactNode }
 function Containers({ orgId, orgName, kind }: { orgId: string; orgName: string; kind: ReturnType<typeof containerKind> }) {
   const api = useApi()
   const { data, error, reload } = useLoad(
-    () => api<ContainerSummary[]>('GET', `/api/orgs/${orgId}/${kind.path}`),
+    () => api<ContainerSummary[]>('GET', apiPath`/api/orgs/${orgId}/${kind.path}`),
     [api, orgId, kind.path],
   )
   const [name, setName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
   async function create(e: FormEvent) {
     e.preventDefault()
+    setCreateError(null)
+    setCreating(true)
     try {
-      await api('POST', `/api/orgs/${orgId}/${kind.path}`, { name })
+      await api('POST', apiPath`/api/orgs/${orgId}/${kind.path}`, { name })
       setName('')
       reload()
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -75,11 +80,13 @@ function Containers({ orgId, orgName, kind }: { orgId: string; orgName: string; 
       <h1>{orgName}</h1>
       <h2>{kind.plural}</h2>
       <form onSubmit={create} className="row">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={`New ${kind.singular} name`} required maxLength={200} />
-        <button type="submit">Create</button>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={`New ${kind.singular} name`} aria-label={`New ${kind.singular} name`} required maxLength={200} />
+        <button type="submit" disabled={creating}>
+          Create
+        </button>
       </form>
-      {createError && <p className="error">{createError}</p>}
-      {error && <p className="error">{error}</p>}
+      {createError && <p className="error" role="alert">{createError}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       {data && data.length === 0 && <p className="muted">No {kind.plural.toLowerCase()} yet.</p>}
       <ul className="list">
         {data?.map((c) => (

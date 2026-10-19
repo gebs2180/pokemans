@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { ORG_TYPE_LABEL, useApi, type CreatedInvite, type Org, type OrgType } from '../api'
+import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type Org, type OrgType } from '../api'
 import { useLoad } from '../useLoad'
 
 export function AdminPage() {
@@ -10,30 +10,38 @@ export function AdminPage() {
   const [type, setType] = useState<OrgType>('PARTNER')
   const [invites, setInvites] = useState<Record<string, CreatedInvite>>({})
   const [actionError, setActionError] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
   async function createOrg(e: FormEvent) {
     e.preventDefault()
     setActionError(null)
+    setCreating(true)
     try {
       await api('POST', '/api/admin/orgs', { name, type })
       setName('')
       reload()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCreating(false)
     }
   }
 
   async function createInvite(orgId: string) {
     setActionError(null)
     try {
-      const invite = await api<CreatedInvite>('POST', `/api/admin/orgs/${orgId}/invites`, {})
+      const invite = await api<CreatedInvite>('POST', apiPath`/api/admin/orgs/${orgId}/invites`, {})
       setInvites((current) => ({ ...current, [orgId]: invite }))
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err))
     }
   }
 
-  if (error) return <p className="error">{error}</p>
+  function copy(link: string) {
+    navigator.clipboard.writeText(link).catch(() => setActionError('Could not copy; select the link and copy it by hand.'))
+  }
+
+  if (error) return <p className="error" role="alert">{error}</p>
 
   return (
     <>
@@ -42,15 +50,17 @@ export function AdminPage() {
       </p>
       <h1>Orgs</h1>
       <form onSubmit={createOrg} className="row">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Org name" required maxLength={200} />
-        <select value={type} onChange={(e) => setType(e.target.value as OrgType)}>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Org name" aria-label="Org name" required maxLength={200} />
+        <select value={type} onChange={(e) => setType(e.target.value as OrgType)} aria-label="Org type">
           <option value="PARTNER">Partner</option>
           <option value="COLLECTOR">Collector</option>
           <option value="CONTRIBUTOR">Contributor (shares graded cards)</option>
         </select>
-        <button type="submit">Create</button>
+        <button type="submit" disabled={creating}>
+          Create
+        </button>
       </form>
-      {actionError && <p className="error">{actionError}</p>}
+      {actionError && <p className="error" role="alert">{actionError}</p>}
 
       {!orgs && <p>Loading…</p>}
       <ul className="list">
@@ -68,8 +78,8 @@ export function AdminPage() {
               </button>
               {link && (
                 <div className="invite">
-                  <input readOnly value={link} onFocus={(e) => e.target.select()} />
-                  <button onClick={() => navigator.clipboard.writeText(link)}>Copy</button>
+                  <input readOnly value={link} onFocus={(e) => e.target.select()} aria-label="Invite link" />
+                  <button onClick={() => copy(link)}>Copy</button>
                   <span className="muted">
                     Single use, expires {new Date(invite.expiresAt).toLocaleDateString()}. It is shown only once.
                   </span>

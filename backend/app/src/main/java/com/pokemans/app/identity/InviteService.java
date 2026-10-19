@@ -61,7 +61,8 @@ class InviteService {
     /** Accepting twice as the same user is harmless; a used or expired invite is gone. */
     @Transactional
     Membership accept(String token) {
-        Invite invite = find(token);
+        Invite invite = invites.findLockedByTokenHash(hash(token))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invite not found"));
         UUID userId = currentUser.id();
         var existing = memberships.findByOrgIdAndUserId(invite.getOrgId(), userId);
         if (existing.isPresent()) {

@@ -39,6 +39,24 @@ public final class CardValuator {
             BigDecimal salesPerMonth,
             int copiesHeld,
             Confidence photoConfidence) {
+        public Input {
+            Objects.requireNonNull(cardId, "cardId");
+            Objects.requireNonNull(distribution, "distribution");
+            Objects.requireNonNull(prices, "prices");
+            Objects.requireNonNull(monthlyVolatility, "monthlyVolatility");
+            Objects.requireNonNull(salesPerMonth, "salesPerMonth");
+            Objects.requireNonNull(photoConfidence, "photoConfidence");
+            if (monthlyVolatility.signum() < 0) {
+                throw new IllegalArgumentException("Monthly volatility can't be negative: " + monthlyVolatility);
+            }
+            // Zero is allowed: no recent sales takes the depth discount's cap.
+            if (salesPerMonth.signum() < 0) {
+                throw new IllegalArgumentException("Sales per month can't be negative: " + salesPerMonth);
+            }
+            if (copiesHeld < 1) {
+                throw new IllegalArgumentException("Copies held must be at least 1: " + copiesHeld);
+            }
+        }
     }
 
     public CardValuation value(Input in) {
@@ -64,9 +82,7 @@ public final class CardValuator {
                 .multiply(BigDecimal.ONE.subtract(d), Money.MC);
         trace.add("QSV", "FMV x (1 - f) x (1 - d)", Money.cents(qsv), "f " + f + ", d " + d + " (" + tier + " liquidity)");
 
-        int shift = confidence == Confidence.C || confidence == Confidence.D
-                ? params.stressShiftGradesConfidenceC()
-                : params.stressShiftGrades();
+        int shift = stressShift(confidence);
         GradeDistribution stressed = in.distribution().shiftDown(shift);
         Map<Grade, BigDecimal> stressedPrices = neverUp(in.prices());
         BigDecimal stressedFmv = expectedValue(stressed, stressedPrices);
@@ -150,17 +166,26 @@ public final class CardValuator {
         return Money.clamp(share, params.depthDiscountFloor(), params.depthDiscountCap());
     }
 
+    /** Grades the FLV stress shifts the distribution down: more at confidence C (and D). */
+    private int stressShift(Confidence confidence) {
+        return confidence == Confidence.C || confidence == Confidence.D
+                ? params.stressShiftGradesConfidenceC()
+                : params.stressShiftGrades();
+    }
+
     /**
      * Base confidence is the worse of photo confidence and comp confidence (probability-weighted count
      * of observed sales behind the prices). Any derived price that carries probability in the central
-     * or default-stressed distribution drops it one level.
+     * or stressed distribution drops it one level. The stress checked is the one the base confidence
+     * gets (3 grades at C or D, else 2): a drop from B to C deepens the stress, but by then it has
+     * already dropped, so checking the base's stress is enough.
      */
     private Confidence confidence(Input in, Trace trace) {
         BigDecimal weightedComps = BigDecimal.ZERO;
         for (Grade grade : Grade.values()) {
             GradePrice price = in.prices().get(grade);
             if (price.method() == GradePrice.Method.OBSERVED) {
-                weightedComps = weightedComps.add(in.distribution().p(grade).multiply(BigDecimal.valueOf(price.salesUsed()), Money.MC));
+                weightedComps = weightedComps.add(in.distribution().p(grade).multiply(BigDecimal.valueOf(price.salesInWindow()), Money.MC));
             }
         }
         Confidence fromComps;
@@ -177,7 +202,7 @@ public final class CardValuator {
         trace.add("confidence_base", "worse of photo and comps", base,
                 "photo " + in.photoConfidence() + ", comps " + fromComps + " (weighted sales " + Money.cents(weightedComps) + ")");
 
-        GradeDistribution stressed = in.distribution().shiftDown(params.stressShiftGrades());
+        GradeDistribution stressed = in.distribution().shiftDown(stressShift(base));
         StringBuilder derived = new StringBuilder();
         for (Grade grade : Grade.values()) {
             boolean inPlay = in.distribution().p(grade).signum() > 0 || stressed.p(grade).signum() > 0;

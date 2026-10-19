@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import {
+  apiPath,
   useApi,
   type CompRequest,
   type CompView,
@@ -9,6 +10,7 @@ import {
   type PricesView,
   type RawCondition,
 } from '../api'
+import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 
 const COMPANIES: GradingCompany[] = ['PSA', 'CGC', 'BGS', 'SGC', 'TAG', 'ACE']
@@ -35,14 +37,15 @@ function money(value: number) {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+/** Today as YYYY-MM-DD in the reviewer's own time zone. */
 function today() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('en-CA')
 }
 
 /** Admin: sold comps for the identified catalog card, entered by hand, and its price table per grader. */
 export function PricesPanel({ catalogCardId }: { catalogCardId: string }) {
   const api = useApi()
-  const base = `/api/admin/catalog-cards/${catalogCardId}`
+  const base = apiPath`/api/admin/catalog-cards/${catalogCardId}`
   const { data, error, reload } = useLoad(() => api<PricesView>('GET', `${base}/prices`), [api, base])
   const [skipped, setSkipped] = useState<string[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -69,7 +72,7 @@ export function PricesPanel({ catalogCardId }: { catalogCardId: string }) {
         Enter sold listings only, never asking prices. Prices are gross, before grading costs, and each grader is priced
         on its own.
       </p>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
       <CompForm base={base} onAdded={reload} />
       {data && <CompList comps={data.comps} />}
       <p>
@@ -98,12 +101,12 @@ export function PricesPanel({ catalogCardId }: { catalogCardId: string }) {
           </p>
         </div>
       ))}
-      {err && <p className="error">{err}</p>}
+      {err && <p className="error" role="alert">{err}</p>}
     </section>
   )
 }
 
-function CompForm({ base, onAdded }: { base: string; onAdded: () => void }) {
+export function CompForm({ base, onAdded }: { base: string; onAdded: () => void }) {
   const api = useApi()
   const [kind, setKind] = useState<'graded' | 'raw'>('graded')
   const [company, setCompany] = useState<GradingCompany>('PSA')
@@ -117,6 +120,7 @@ function CompForm({ base, onAdded }: { base: string; onAdded: () => void }) {
   const [note, setNote] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -133,6 +137,7 @@ function CompForm({ base, onAdded }: { base: string; onAdded: () => void }) {
       url: url.trim() || null,
       note: note.trim() || null,
     }
+    setBusy(true)
     try {
       await api('POST', `${base}/comps`, body)
       setSaved(`Saved ${kind === 'graded' ? `${company} ${grade}` : label(raw)} at ${money(body.price)}.`)
@@ -142,19 +147,21 @@ function CompForm({ base, onAdded }: { base: string; onAdded: () => void }) {
       onAdded()
     } catch (e) {
       setErr(message(e))
+    } finally {
+      setBusy(false)
     }
   }
 
   return (
     <form onSubmit={submit} className="stack">
       <div className="row">
-        <select value={kind} onChange={(e) => setKind(e.target.value as 'graded' | 'raw')}>
+        <select value={kind} onChange={(e) => setKind(e.target.value as 'graded' | 'raw')} aria-label="Sale type">
           <option value="graded">Graded sale</option>
           <option value="raw">Raw sale</option>
         </select>
         {kind === 'graded' ? (
           <>
-            <select value={company} onChange={(e) => setCompany(e.target.value as GradingCompany)}>
+            <select value={company} onChange={(e) => setCompany(e.target.value as GradingCompany)} aria-label="Grading company">
               {COMPANIES.map((c) => (
                 <option key={c}>{c}</option>
               ))}
@@ -167,11 +174,12 @@ function CompForm({ base, onAdded }: { base: string; onAdded: () => void }) {
               value={grade}
               onChange={(e) => setGrade(e.target.value)}
               placeholder="Grade, e.g. 9 or 8.5"
+              aria-label="Grade"
               required
             />
           </>
         ) : (
-          <select value={raw} onChange={(e) => setRaw(e.target.value as RawCondition)}>
+          <select value={raw} onChange={(e) => setRaw(e.target.value as RawCondition)} aria-label="Raw condition">
             {RAW_CONDITIONS.map((c) => (
               <option key={c} value={c}>
                 {label(c)}
@@ -188,10 +196,11 @@ function CompForm({ base, onAdded }: { base: string; onAdded: () => void }) {
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           placeholder="Sold price (USD)"
+          aria-label="Sold price (USD)"
           required
         />
-        <input type="date" value={soldOn} max={today()} onChange={(e) => setSoldOn(e.target.value)} required />
-        <select value={listingType} onChange={(e) => setListingType(e.target.value as ListingType)}>
+        <input type="date" value={soldOn} max={today()} onChange={(e) => setSoldOn(e.target.value)} aria-label="Sold on" required />
+        <select value={listingType} onChange={(e) => setListingType(e.target.value as ListingType)} aria-label="Listing type">
           {LISTING_TYPES.map((t) => (
             <option key={t} value={t}>
               {label(t)}
@@ -200,15 +209,17 @@ function CompForm({ base, onAdded }: { base: string; onAdded: () => void }) {
         </select>
       </div>
       <div className="row">
-        <input value={marketplace} onChange={(e) => setMarketplace(e.target.value)} placeholder="Marketplace" required />
-        <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Sold listing URL" />
+        <input value={marketplace} onChange={(e) => setMarketplace(e.target.value)} placeholder="Marketplace" aria-label="Marketplace" required />
+        <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Sold listing URL" aria-label="Sold listing URL" />
       </div>
-      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" />
+      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" aria-label="Note" />
       <div>
-        <button type="submit">Add sold comp</button>
+        <button type="submit" disabled={busy}>
+          Add sold comp
+        </button>
       </div>
       {saved && <p className="ok small">{saved}</p>}
-      {err && <p className="error">{err}</p>}
+      {err && <p className="error" role="alert">{err}</p>}
     </form>
   )
 }
@@ -227,24 +238,27 @@ function CompList({ comps }: { comps: CompView[] }) {
         </tr>
       </thead>
       <tbody>
-        {comps.map((c) => (
-          <tr key={c.id}>
-            <td>{c.soldOn}</td>
-            <td>{c.gradingCompany ? `${c.gradingCompany} ${c.grade}` : `raw, ${label(c.rawCondition ?? '')}`}</td>
-            <td>{money(c.price)}</td>
-            <td>
-              {c.url ? (
-                <a href={c.url} target="_blank" rel="noreferrer">
-                  {String(c.details.marketplace ?? 'listing')}
-                </a>
-              ) : (
-                String(c.details.marketplace ?? '–')
-              )}{' '}
-              <span className="muted small">{label(c.listingType)}</span>
-            </td>
-            <td className="muted small">{c.source.toLowerCase()}</td>
-          </tr>
-        ))}
+        {comps.map((c) => {
+          const href = safeHref(c.url)
+          return (
+            <tr key={c.id}>
+              <td>{c.soldOn}</td>
+              <td>{c.gradingCompany ? `${c.gradingCompany} ${c.grade}` : `raw, ${label(c.rawCondition ?? '')}`}</td>
+              <td>{money(c.price)}</td>
+              <td>
+                {href ? (
+                  <a href={href} target="_blank" rel="noreferrer">
+                    {String(c.details.marketplace ?? 'listing')}
+                  </a>
+                ) : (
+                  String(c.details.marketplace ?? '–')
+                )}{' '}
+                <span className="muted small">{label(c.listingType)}</span>
+              </td>
+              <td className="muted small">{c.source.toLowerCase()}</td>
+            </tr>
+          )
+        })}
       </tbody>
     </table>
   )

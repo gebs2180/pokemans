@@ -49,7 +49,8 @@ record ConditionProperties(
      */
     record Worker(@DefaultValue("true") boolean enabled,
                   @DefaultValue("15s") Duration pollInterval,
-                  @DefaultValue("8") int maxAttempts) {
+                  @DefaultValue("8") int maxAttempts,
+                  @DefaultValue("24h") Duration maxPending) {
     }
 
     /** Off until the account's terms are confirmed in writing and a key is set. */
@@ -57,6 +58,12 @@ record ConditionProperties(
                    String apiKey,
                    @DefaultValue("https://api.ximilar.com") URI baseUrl,
                    @DefaultValue("30s") Duration timeout) {
+
+        /** Never prints the key. */
+        @Override
+        public String toString() {
+            return "Ximilar[enabled=" + enabled + ", apiKey=" + redacted(apiKey) + ", baseUrl=" + baseUrl + "]";
+        }
     }
 
     /**
@@ -70,5 +77,16 @@ record ConditionProperties(
                      @DefaultValue("https://cardgrade.io") URI baseUrl,
                      @DefaultValue("PSA") String gradingCompany,
                      @DefaultValue("30s") Duration timeout) {
+
+        /** Never prints the key. */
+        @Override
+        public String toString() {
+            return "CardGrade[enabled=" + enabled + ", apiKey=" + redacted(apiKey) + ", baseUrl=" + baseUrl
+                    + ", gradingCompany=" + gradingCompany + "]";
+        }
+    }
+
+    private static String redacted(String secret) {
+        return secret == null || secret.isBlank() ? "unset" : "***";
     }
 }

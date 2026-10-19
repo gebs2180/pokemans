@@ -117,7 +117,7 @@ class ManualCompFlowTest {
     @Test
     void aSpreadOfGradesIsEnoughWithoutLowGradeSales() throws Exception {
         // Sales at 10, 8 and 6 only, in an era with no step-down ratios: grades below 6 step down with the card's own ladder.
-        String card = identified("Manual Spread", LocalDate.of(2031, 3, 1));
+        String card = identified("Manual Spread", LocalDate.of(2022, 6, 1));
         String comps = "/api/admin/catalog-cards/" + card + "/comps";
         api.postJson(comps, graded("PSA", "10", "1000", 3, null), api.admin()).andExpect(status().isCreated());
         api.postJson(comps, graded("PSA", "8", "400", 4, null), api.admin()).andExpect(status().isCreated());
@@ -129,6 +129,38 @@ class ManualCompFlowTest {
                 .andExpect(jsonPath("$.tables[0].grades[5].stepDownRatio").value(0.632455))
                 .andExpect(jsonPath("$.tables[0].grades[1].method").value("CARD_STEP_DOWN"))
                 .andExpect(jsonPath("$.tables[0].grades[9].method").value("INTERPOLATED"));
+    }
+
+    @Test
+    void listingLinksAreCheckedAndOneEbayItemIsOneSale() throws Exception {
+        String card = identified("Manual Links", LocalDate.of(2005, 8, 1));
+        String comps = "/api/admin/catalog-cards/" + card + "/comps";
+        long item = 100_000_000_000L + (long) (Math.random() * 1_000_000_000L);
+
+        api.postJson(comps, graded("PSA", "9", "100", 3, "javascript:alert(1)"), api.admin()).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("http or https")));
+        api.postJson(comps, graded("PSA", "9", "100", 3, "ftp://example.com/x"), api.admin()).andExpect(status().isBadRequest());
+        // Above the stored precision: refused up front, not a database error.
+        api.postJson(comps, graded("PSA", "9", "123456789012", 3, null), api.admin()).andExpect(status().isBadRequest());
+        api.postJson(comps, graded("PSA", "9", "10.001", 3, null), api.admin()).andExpect(status().isBadRequest());
+
+        api.postJson(comps, graded("PSA", "9", "100", 3, "https://www.ebay.com/itm/" + item + "?_trksid=abc"), api.admin())
+                .andExpect(status().isCreated());
+        api.postJson(comps, graded("PSA", "9", "100", 3, "https://www.ebay.com/itm/Charizard-PSA-9/" + item + "#seller"), api.admin())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("already recorded")));
+    }
+
+    @Test
+    void saleKeysIgnoreTrackingButKeepOtherListingsApart() {
+        assertThat(PricingController.saleKey(java.net.URI.create("https://www.ebay.com/itm/123456789012?hash=x&_trkparms=y")))
+                .isEqualTo("ebay:123456789012");
+        assertThat(PricingController.saleKey(java.net.URI.create("https://EBAY.co.uk/itm/some-title/123456789012/")))
+                .isEqualTo("ebay:123456789012");
+        assertThat(PricingController.saleKey(java.net.URI.create("https://www.tcgplayer.com/product/1?Condition=Lightly#top")))
+                .isEqualTo("url:https://www.tcgplayer.com/product/1?Condition=Lightly");
+        assertThat(PricingController.saleKey(java.net.URI.create("https://notebay.com/itm/123456789012")))
+                .startsWith("url:");
     }
 
     @Test

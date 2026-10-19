@@ -65,13 +65,43 @@ export class ApiError extends Error {
   }
 }
 
-/** Fetch wrapper that adds the access token and turns problem-detail responses into ApiError. */
+/** Builds an API path, URL-encoding every interpolated segment: apiPath`/api/orgs/${orgId}`. */
+export function apiPath(strings: TemplateStringsArray, ...values: (string | number)[]) {
+  return strings.reduce((out, s, i) => out + s + (i < values.length ? encodeURIComponent(values[i]) : ''), '')
+}
+
+/** Auth0 errors that mean the session is gone and only a new login helps. */
+const LOGIN_ERRORS = new Set(['login_required', 'missing_refresh_token', 'invalid_grant', 'consent_required'])
+
+/** Fetch wrapper that adds the access token and turns problem-detail responses into ApiError; a lost session goes back to login. */
 export function useApi() {
-  const { getAccessTokenSilently } = useAuth0()
+  const { getAccessTokenSilently, loginWithRedirect } = useAuth0()
 
   return useCallback(
     async <T,>(method: string, path: string, body?: unknown): Promise<T> => {
-      const token = await getAccessTokenSilently()
+      const relogin = async () => {
+        // A backend that rejects every token (no issuer configured, wrong audience) would loop through
+        // login forever: redirect at most once a minute, otherwise just report the 401.
+        const key = 'pokemans.reloginAt'
+        let last = 0
+        try {
+          last = Number(sessionStorage.getItem(key) ?? 0)
+          sessionStorage.setItem(key, String(Date.now()))
+        } catch {
+          // storage blocked: redirect anyway
+        }
+        if (Date.now() - last < 60_000) {
+          throw new ApiError(401, 'Not signed in: the API rejected your login. Check the API issuer and audience settings.')
+        }
+        await loginWithRedirect({ appState: { returnTo: window.location.pathname + window.location.search } })
+      }
+      const token = await getAccessTokenSilently().catch(async (e: unknown) => {
+        if (LOGIN_ERRORS.has((e as { error?: string }).error ?? '')) {
+          await relogin()
+          throw new ApiError(401, 'Your session has ended. Redirecting to log in…')
+        }
+        throw e
+      })
       const response = await fetch(path, {
         method,
         headers: {
@@ -80,6 +110,10 @@ export function useApi() {
         },
         body: body === undefined ? undefined : JSON.stringify(body),
       })
+      if (response.status === 401) {
+        await relogin()
+        throw new ApiError(401, 'Your session has ended. Redirecting to log in…')
+      }
       if (!response.ok) {
         let detail = `${method} ${path} failed: ${response.status}`
         try {
@@ -90,9 +124,10 @@ export function useApi() {
         }
         throw new ApiError(response.status, detail)
       }
-      return (response.status === 204 ? undefined : await response.json()) as T
+      const text = await response.text()
+      return (text ? JSON.parse(text) : undefined) as T
     },
-    [getAccessTokenSilently],
+    [getAccessTokenSilently, loginWithRedirect],
   )
 }
 

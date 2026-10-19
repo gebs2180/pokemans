@@ -14,7 +14,7 @@ class DistributionBuilderTest {
 
     static ConditionProperties defaults() {
         return new ConditionProperties(null, 1.5, new BigDecimal("0.10"), new BigDecimal("0.25"), new BigDecimal("0.25"),
-                new ConditionProperties.Worker(false, Duration.ofSeconds(15), 8),
+                new ConditionProperties.Worker(false, Duration.ofSeconds(15), 8, Duration.ofHours(24)),
                 new ConditionProperties.Ximilar(false, null, null, Duration.ofSeconds(30)),
                 new ConditionProperties.CardGrade(false, null, null, "PSA", Duration.ofSeconds(30)));
     }

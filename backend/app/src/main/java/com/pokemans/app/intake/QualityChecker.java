@@ -1,5 +1,6 @@
 package com.pokemans.app.intake;
 
+import com.pokemans.app.storage.ImageGuard;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -42,6 +43,10 @@ class QualityChecker {
      *                          table, a close-up of a corner); those skip the card checks
      */
     Result check(byte[] imageBytes, boolean wholeCardExpected) {
+        // Header first: refuse non-JPEG/PNG bytes and decompression bombs before ImageIO or OpenCV decode them.
+        if (ImageGuard.safeHeader(imageBytes).isEmpty()) {
+            return new Result(null, null, null, null, null, List.of(RetakeReason.UNREADABLE));
+        }
         BufferedImage image;
         try {
             image = ImageIO.read(new ByteArrayInputStream(imageBytes));

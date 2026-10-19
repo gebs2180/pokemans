@@ -55,4 +55,47 @@ class GradeFirstRankerTest {
         assertThat(top).extracting(GradeFirstRanker.Recommendation::cardId).containsExactly("great", "good");
         assertThat(ranker.score(List.of(candidate("flat", "100"))).getFirst().lift()).isLessThan(BigDecimal.ONE);
     }
+
+    @Test
+    void liftOfExactlyOneIsNotRecommended() {
+        GradeFirstRanker.Candidate probe = candidate("edge", "1000");
+        BigDecimal flvGraded = ranker.score(List.of(probe)).getFirst().flvGraded();
+        // FLV_raw chosen so that FLV_graded - FLV_raw - C = C exactly: lift 1.0.
+        BigDecimal flvRaw = flvGraded.subtract(new BigDecimal("64"));
+        CardValuation raw = probe.rawValuation();
+        CardValuation atEdge = new CardValuation(raw.cardId(), raw.fmv(), raw.rv(), raw.qsv(), raw.stressedFmv(), flvRaw,
+                raw.confidence(), raw.stressShift(), raw.liquidityTier(), raw.searchPremium(), raw.speedDiscount(),
+                raw.volatilityShock(), raw.depthDiscount(), raw.trace());
+
+        GradeFirstRanker.Recommendation r = ranker.score(List.of(new GradeFirstRanker.Candidate(probe.input(), atEdge, cost))).getFirst();
+
+        assertThat(r.lift()).isEqualByComparingTo("1");
+        assertThat(r.recommended()).isFalse();
+    }
+
+    @Test
+    void showsOnlyTheTopTwentyInLiftOrder() {
+        List<GradeFirstRanker.Candidate> candidates = new java.util.ArrayList<>();
+        for (int i = 0; i < 25; i++) {
+            candidates.add(candidate(String.format("card-%02d", i), Integer.toString(1000 + 100 * i)));
+        }
+
+        List<GradeFirstRanker.Recommendation> top = ranker.topRecommendations(candidates);
+
+        assertThat(top).hasSize(20);
+        assertThat(top.getFirst().cardId()).isEqualTo("card-24");
+        assertThat(top.getLast().cardId()).isEqualTo("card-05");
+        assertThat(top).extracting(GradeFirstRanker.Recommendation::lift).isSortedAccordingTo(java.util.Comparator.reverseOrder());
+    }
+
+    @Test
+    void zeroCostGivesZeroLift() {
+        GradingCost free = new GradingCost(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        GradeFirstRanker.Candidate c = candidate("free", "1000");
+
+        GradeFirstRanker.Recommendation r = ranker.score(List.of(new GradeFirstRanker.Candidate(c.input(), c.rawValuation(), free))).getFirst();
+
+        assertThat(r.lift()).isEqualByComparingTo("0");
+        assertThat(r.recommended()).isFalse();
+    }
 }

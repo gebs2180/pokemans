@@ -85,6 +85,11 @@ class CardReading {
         this.finishedAt = Instant.now();
     }
 
+    /** Read and stored, but matching it to the catalog failed: the reading stands, a reviewer identifies by hand. */
+    void matchFailed(String error) {
+        this.lastError = "Matching failed: " + error;
+    }
+
     /** A call failed (outage, rate limit): retry with backoff, until the limit. */
     void callFailed(String error, int maxAttempts) {
         this.attempts++;

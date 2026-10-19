@@ -106,4 +106,68 @@ class PortfolioEvaluatorTest {
         assertThatThrownBy(() -> PortfolioEvaluator.advance(d("100"), d("1.5")))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void rejectsADuplicateCardId() {
+        List<PortfolioEvaluator.Card> cards = List.of(card("same", "100", "a", false), card("same", "200", "b", false));
+
+        assertThatThrownBy(() -> evaluator.evaluate(cards, Optional.empty()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Duplicate card id same");
+    }
+
+    @Test
+    void theTopFiveScaleRoundsDownSoTheCapIsNeverExceeded() {
+        // Top five at 100.01, 100, 100, 100, 100 with a tail of 495: eligible 995.01, limit 497.505.
+        // Rounding each scaled card to the nearest cent would give 497.51; rounding down keeps it within.
+        List<PortfolioEvaluator.Card> cards = new ArrayList<>();
+        cards.add(card("top-a", "100.01", "top-a", false));
+        for (int i = 0; i < 4; i++) {
+            cards.add(card("top-" + i, "100", "top-" + i, false));
+        }
+        for (int i = 0; i < 99; i++) {
+            cards.add(card("tail-" + i, "5", "tail-" + i, false));
+        }
+
+        PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
+
+        BigDecimal topFive = contribution(result, "top-a");
+        for (int i = 0; i < 4; i++) {
+            topFive = topFive.add(contribution(result, "top-" + i));
+        }
+        assertThat(topFive).isLessThanOrEqualTo(result.eligibleFlv().multiply(d("0.5")));
+        assertThat(result.trace().stepsFor("top_five_cap")).hasSize(1);
+    }
+
+    @Test
+    void suggestsARangeWithAnEmptyBase() {
+        PortfolioEvaluator.Result result = evaluator.evaluate(List.of(), Optional.of(d("0.5")));
+
+        assertThat(result.collateralBase()).isEqualByComparingTo("0");
+        assertThat(result.rawShare()).isEqualByComparingTo("0");
+        assertThat(result.advance()).contains(d("0.00"));
+    }
+
+    @Test
+    void alphaBelowZeroIsRefused() {
+        assertThatThrownBy(() -> PortfolioEvaluator.advance(d("100"), d("-0.1")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aCardTiedWithTheFifthCantOvertakeTheScaledTopFive() {
+        // Found by ValuationPropertiesTest: six equal cards. Scaling only five let the sixth, unscaled, rejoin
+        // the top five and take it over 50%. It is now held at the scaled value, like its equals.
+        List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(6, "100", "tie"));
+        cards.addAll(cards(5, "8", "tail"));
+
+        PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
+
+        // Eligible 640, limit 320: the five scale to 64 each and the sixth is held at 64 too.
+        for (int i = 0; i < 6; i++) {
+            assertThat(contribution(result, "tie-" + i)).isEqualByComparingTo("64.00");
+        }
+        assertThat(contribution(result, "tail-0")).isEqualByComparingTo("8");
+        assertThat(result.collateralBase()).isEqualByComparingTo("424.00");
+    }
 }

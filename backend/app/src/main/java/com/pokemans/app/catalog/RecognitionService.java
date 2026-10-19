@@ -93,12 +93,18 @@ class RecognitionService {
         return readings.save(new CardReading(card.orgId(), card.id(), front.id(), reader.orElseThrow().name(), requestedBy));
     }
 
-    /** One pass over due readings, each in its own transaction. Returns how many were looked at. */
+    /**
+     * One pass over due readings. Returns how many were looked at. The reading commits on its own
+     * before matching, so a catalog outage can't roll it back and have the (paid) read run again.
+     */
     int runOnce() {
         List<UUID> due = readings.findDue(Instant.now()).stream().map(CardReading::getId).toList();
         for (UUID id : due) {
             try {
-                transactions.executeWithoutResult(status -> process(readings.findById(id).orElseThrow()));
+                CardReader.Reading result = transactions.execute(status -> process(readings.findById(id).orElseThrow()));
+                if (result != null && provider.isPresent()) {
+                    suggest(id, result);
+                }
             } catch (RuntimeException e) {
                 log.warn("Card reading {} failed unexpectedly", id, e);
             }
@@ -106,31 +112,43 @@ class RecognitionService {
         return due.size();
     }
 
-    private void process(CardReading reading) {
+    private void suggest(UUID readingId, CardReader.Reading result) {
+        try {
+            transactions.executeWithoutResult(status -> match(readings.findById(readingId).orElseThrow(), result));
+        } catch (RuntimeException e) {
+            log.warn("Matching card reading {} to the catalog failed", readingId, e);
+            transactions.executeWithoutResult(status -> readings.findById(readingId).orElseThrow()
+                    .matchFailed(e.getClass().getSimpleName() + ": " + e.getMessage()));
+        }
+    }
+
+    /** Reads the card; the reading to match when it was read, else null. */
+    private CardReader.Reading process(CardReading reading) {
         if (reading.getStatus() != CardReading.Status.PENDING) {
-            return;
+            return null;
         }
         if (reader.isEmpty()) {
             reading.failed("Card recognition is not enabled");
-            return;
+            return null;
         }
         Optional<CardItems.PhotoRef> photo = cardItems.passedPhotos(reading.getCardItemId()).stream()
                 .filter(p -> p.id().equals(reading.getPhotoId())).findFirst();
         if (photo.isEmpty() || photo.get().cropKey() == null) {
             reading.failed("No card crop to read: retake the front so the whole card is found");
-            return;
+            return null;
         }
         CardReader.Reading result;
         try {
             result = reader.get().read(blobs.read(storage.photoBucket(), photo.get().cropKey()), "image/jpeg");
         } catch (RuntimeException e) {
             reading.callFailed(e.getClass().getSimpleName() + ": " + e.getMessage(), properties.reader().maxAttempts());
-            return;
+            return null;
         }
         reading.done(result);
-        if (provider.isEmpty()) {
-            return;
-        }
+        return result;
+    }
+
+    private void match(CardReading reading, CardReader.Reading result) {
         for (SuggestionMatcher.Match match : new SuggestionMatcher(provider.get()).match(result)) {
             CatalogCard card = identification.findOrCreate(
                     IdentificationService.identity(match.card(), match.edition(), match.variant(), null, null),

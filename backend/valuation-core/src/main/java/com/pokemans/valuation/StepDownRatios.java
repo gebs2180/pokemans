@@ -18,12 +18,17 @@ import java.util.Map;
  *       (the pricer then refuses to step down rather than guess).
  *   <li>With an even number of cards, the lower of the two middle ratios (conservative).
  *   <li>Capped at 1: stepping down never raises a price.
+ *   <li>No ratio for grade 1 to 2. PSA 1s have their own collectors and often sell above grades 2
+ *       to 4, so grade 1 sales would pull the era ratio towards 1 (or past it, before the cap) and
+ *       price other cards' grade 1 too high. Grade 1 stands alone: a card without grade 1 sales
+ *       steps grade 1 down from grade 2 with the 2-to-3 ratio ({@link GradePricer}), else its own
+ *       ladder, which excludes grade 1 sales too.
  * </ul>
  */
 public final class StepDownRatios {
 
     /**
-     * @param ratios    ratio per grade g (price of g relative to g + 1), for grades 1 to 9 that had enough cards
+     * @param ratios    ratio per grade g (price of g relative to g + 1), for grades 2 to 9 that had enough cards
      * @param cardCount cards behind each ratio
      */
     public record Table(Map<Grade, BigDecimal> ratios, Map<Grade, Integer> cardCount) {
@@ -43,7 +48,8 @@ public final class StepDownRatios {
         }
         EnumMap<Grade, BigDecimal> ratios = new EnumMap<>(Grade.class);
         EnumMap<Grade, Integer> counts = new EnumMap<>(Grade.class);
-        for (int g = 1; g <= 9; g++) {
+        // From grade 2: grade 1 prices never feed the table (see the class comment).
+        for (int g = 2; g <= 9; g++) {
             Grade lower = Grade.of(g);
             Grade upper = Grade.of(g + 1);
             List<BigDecimal> cardRatios = new ArrayList<>();

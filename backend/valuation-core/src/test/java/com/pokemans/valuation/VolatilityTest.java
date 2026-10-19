@@ -79,4 +79,45 @@ class VolatilityTest {
     void needsAtLeastTwoMonths() {
         assertThatThrownBy(() -> Volatility.fromComps(Map.of(), AS_OF, 1)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void neverPoolsRawUngradableSales() {
+        Map<Grade, List<Comp>> comps = Map.of(
+                Grade.G9, List.of(comp(30, "100"), comp(0, "110")),
+                Grade.U, List.of(comp(30, "10"), comp(0, "20")));
+
+        assertThatThrownBy(() -> Volatility.fromComps(comps, AS_OF, 12))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("graded sales only");
+    }
+
+    @Test
+    void monthlyRefusesAZeroOrNegativePrice() {
+        assertThatThrownBy(() -> Volatility.monthly(List.of(new BigDecimal("100"), BigDecimal.ZERO, new BigDecimal("99"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+        assertThatThrownBy(() -> Volatility.monthly(List.of(new BigDecimal("100"), new BigDecimal("-1"), new BigDecimal("99"))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void monthlyNeedsThreePoints() {
+        assertThatThrownBy(() -> Volatility.monthly(List.of(new BigDecimal("100"), new BigDecimal("110"))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void anEvenBucketTakesTheLowerMiddleSale() {
+        // Bucket ending today: 100 and 120, median taken as 100 (conservative); the one before: 100 and 80, so 80.
+        Map<Grade, List<Comp>> comps = Map.of(Grade.G9, List.of(
+                comp(31, "100"), comp(40, "80"), comp(0, "100"), comp(1, "120"),
+                comp(61, "100")));
+
+        Optional<Volatility.Estimate> estimate = Volatility.fromComps(comps, AS_OF, 12);
+
+        assertThat(estimate).isPresent();
+        assertThat(estimate.get().changes()).isEqualTo(2);
+        assertThat(estimate.get().sigma()).isEqualByComparingTo(
+                Volatility.monthly(List.of(new BigDecimal("100"), new BigDecimal("80"), new BigDecimal("100"))));
+    }
 }

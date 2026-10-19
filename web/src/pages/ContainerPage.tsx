@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
-import { useApi, type ContainerDetail } from '../api'
+import { apiPath, useApi, type ContainerDetail } from '../api'
 import { useLoad } from '../useLoad'
 
 /** A batch or collection: its cards and their capture status. */
@@ -8,30 +8,35 @@ export function ContainerPage() {
   const { orgId = '', kind = '', containerId = '' } = useParams()
   const api = useApi()
   const { data, error, reload } = useLoad(
-    () => api<ContainerDetail>('GET', `/api/orgs/${orgId}/${kind}/${containerId}`),
+    () => api<ContainerDetail>('GET', apiPath`/api/orgs/${orgId}/${kind}/${containerId}`),
     [api, orgId, kind, containerId],
   )
   const [label, setLabel] = useState('')
   const [lot, setLot] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [addError, setAddError] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
 
   if (kind !== 'batches' && kind !== 'collections') return <p>Page not found.</p>
 
   async function addCard(e: FormEvent) {
     e.preventDefault()
+    setAddError(null)
+    setAdding(true)
     try {
-      await api('POST', `/api/orgs/${orgId}/${kind}/${containerId}/cards`, { label, lot, quantity: lot ? quantity : 1 })
+      await api('POST', apiPath`/api/orgs/${orgId}/${kind}/${containerId}/cards`, { label, lot, quantity: lot ? quantity : 1 })
       setLabel('')
       setLot(false)
       setQuantity(1)
       reload()
     } catch (err) {
       setAddError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setAdding(false)
     }
   }
 
-  if (error) return <p className="error">{error}</p>
+  if (error) return <p className="error" role="alert">{error}</p>
   if (!data) return <p>Loading…</p>
 
   const complete = data.cards.filter((c) => c.captureComplete).length
@@ -50,6 +55,7 @@ export function ContainerPage() {
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="Card, e.g. Charizard Base Set Unlimited 4/102"
+          aria-label="Card"
           required
           maxLength={300}
         />
@@ -66,9 +72,11 @@ export function ContainerPage() {
             />
           )}
         </label>
-        <button type="submit">Add card</button>
+        <button type="submit" disabled={adding}>
+          Add card
+        </button>
       </form>
-      {addError && <p className="error">{addError}</p>}
+      {addError && <p className="error" role="alert">{addError}</p>}
 
       <ul className="list">
         {data.cards.map((card) => (

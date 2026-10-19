@@ -54,4 +54,19 @@ class StepDownRatiosTest {
 
         assertThat(table.ratios().get(Grade.G8)).isEqualByComparingTo("1");
     }
+
+    @Test
+    void gradeOneNeverFeedsTheTable() {
+        // PSA 1 premiums: grade 1 sold above grade 2 on every card. No grade 1 ratio is built at all.
+        List<Map<Grade, BigDecimal>> cards = List.of(
+                Map.of(Grade.G1, new BigDecimal("150"), Grade.G2, new BigDecimal("100"), Grade.G3, new BigDecimal("125")),
+                Map.of(Grade.G1, new BigDecimal("90"), Grade.G2, new BigDecimal("100"), Grade.G3, new BigDecimal("125")),
+                Map.of(Grade.G1, new BigDecimal("200"), Grade.G2, new BigDecimal("100"), Grade.G3, new BigDecimal("125")));
+
+        StepDownRatios.Table table = StepDownRatios.compute(cards, 3);
+
+        assertThat(table.ratios()).containsOnlyKeys(Grade.G2);
+        assertThat(table.ratios().get(Grade.G2)).isEqualByComparingTo("0.8");
+        assertThat(table.cardCount()).doesNotContainKey(Grade.G1);
+    }
 }

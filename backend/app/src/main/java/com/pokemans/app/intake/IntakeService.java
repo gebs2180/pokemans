@@ -108,7 +108,18 @@ class IntakeService {
 
     /** A card in any org the caller can reach, whichever kind it is. */
     CardItem requireCard(UUID orgId, UUID cardId) {
-        CardItem card = cards.findByIdAndOrgId(cardId, orgId).orElseThrow(() -> notFound("Card"));
+        return checkKind(orgId, cards.findByIdAndOrgId(cardId, orgId));
+    }
+
+    /** {@link #requireCard}, holding the card's row lock until the transaction ends. */
+    CardItem requireCardLocked(UUID orgId, UUID cardId) {
+        return checkKind(orgId, cards.findLockedByIdAndOrgId(cardId, orgId));
+    }
+
+    private CardItem checkKind(UUID orgId, java.util.Optional<CardItem> found) {
+        // Membership first, so outsiders can't tell whether a card id exists in the org.
+        access.require(orgId, OrgType.values());
+        CardItem card = found.orElseThrow(() -> notFound("Card"));
         if (card.getBatchId() != null) {
             access.require(orgId, OrgType.PARTNER);
         } else {

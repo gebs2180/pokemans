@@ -26,6 +26,12 @@ public final class Volatility {
         if (pricesAt30DayIntervals.size() < 3) {
             throw new IllegalArgumentException("Need at least 3 price points for two changes");
         }
+        for (BigDecimal price : pricesAt30DayIntervals) {
+            // A change from a zero price is undefined (division by zero); a negative price is not a price.
+            if (price == null || price.signum() <= 0) {
+                throw new IllegalArgumentException("Prices must be positive: " + pricesAt30DayIntervals);
+            }
+        }
         return sampleStdDev(changes(pricesAt30DayIntervals));
     }
 
@@ -43,9 +49,16 @@ public final class Volatility {
      * same grade, so a gap is never bridged. Changes from every grade are pooled: σ is a property of
      * the card's market, and grades move together.
      *
+     * <p>σ comes from graded sales only. Grade U (damaged or altered raw sales) is refused rather than
+     * pooled: raw prices are a different market.
+     *
      * @return empty when fewer than two changes exist; the caller must not invent a σ
+     * @throws IllegalArgumentException if {@code compsByGrade} has a U entry
      */
     public static Optional<Estimate> fromComps(Map<Grade, List<Comp>> compsByGrade, LocalDate asOf, int months) {
+        if (compsByGrade.containsKey(Grade.U)) {
+            throw new IllegalArgumentException("Volatility is from graded sales only: drop the U (raw) comps");
+        }
         return fromSeries(compsByGrade.values(), asOf, months);
     }
 

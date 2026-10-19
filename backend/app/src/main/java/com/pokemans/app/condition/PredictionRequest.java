@@ -58,9 +58,16 @@ class PredictionRequest {
         this.nextAttemptAt = Instant.now().plusSeconds(10);
     }
 
-    /** Still running at the provider: look again shortly. */
-    void stillPending(Duration wait) {
-        this.nextAttemptAt = Instant.now().plus(wait);
+    /** Still running at the provider: look again shortly, unless it has been running longer than {@code maxPending}. */
+    void stillPending(Duration wait, Duration maxPending) {
+        Instant now = Instant.now();
+        if (createdAt.plus(maxPending).isBefore(now)) {
+            this.status = Status.FAILED;
+            this.lastError = "Still pending at the provider after " + maxPending + "; gave up";
+            this.finishedAt = now;
+            return;
+        }
+        this.nextAttemptAt = now.plus(wait);
     }
 
     void done() {

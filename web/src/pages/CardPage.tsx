@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { uploadToStorage, useApi, type CardView, type Grader, type OutcomeView, type PhotoView, type Side, type UploadSlot } from '../api'
+import { apiPath, uploadToStorage, useApi, type CardView, type Grader, type OutcomeView, type PhotoView, type Side, type UploadSlot } from '../api'
 import { useLoad } from '../useLoad'
 import { useOrg } from '../useOrg'
 
@@ -11,7 +11,7 @@ export function CardPage() {
   const { orgId = '', cardId = '' } = useParams()
   const api = useApi()
   const navigate = useNavigate()
-  const { data: card, error, reload } = useLoad(() => api<CardView>('GET', `/api/orgs/${orgId}/cards/${cardId}`), [api, orgId, cardId])
+  const { data: card, error, reload } = useLoad(() => api<CardView>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}`), [api, orgId, cardId])
   const [busy, setBusy] = useState<Side | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const { data: org } = useOrg(orgId)
@@ -23,13 +23,13 @@ export function CardPage() {
     setBusy(side)
     setUploadError(null)
     try {
-      const slot = await api<UploadSlot>('POST', `/api/orgs/${orgId}/cards/${cardId}/photos`, {
+      const slot = await api<UploadSlot>('POST', apiPath`/api/orgs/${orgId}/cards/${cardId}/photos`, {
         side,
         contentType: file.type,
         sizeBytes: file.size,
       })
       await uploadToStorage(slot, file)
-      await api<PhotoView>('POST', `/api/orgs/${orgId}/photos/${slot.photoId}/confirm`)
+      await api<PhotoView>('POST', apiPath`/api/orgs/${orgId}/photos/${slot.photoId}/confirm`)
       reload()
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : String(err))
@@ -38,7 +38,7 @@ export function CardPage() {
     }
   }
 
-  if (error) return <p className="error">{error}</p>
+  if (error) return <p className="error" role="alert">{error}</p>
   if (!card) return <p>Loading…</p>
 
   const sides: Side[] = card.lot ? ['FRONT', 'DETAIL'] : ['FRONT', 'BACK', 'DETAIL']
@@ -56,7 +56,7 @@ export function CardPage() {
           : `Still needed: ${card.missingSides.map((s) => SIDE_LABEL[s].toLowerCase()).join(' and ')}.`}
       </p>
       {card.lot && <p className="muted">Lot of {card.quantity}: one photo of the whole lot, laid out flat, is enough.</p>}
-      {uploadError && <p className="error">{uploadError}</p>}
+      {uploadError && <p className="error" role="alert">{uploadError}</p>}
 
       {sides.map((side) => {
         const photos = card.photos.filter((p) => p.side === side && p.status !== 'AWAITING_UPLOAD')
@@ -101,25 +101,34 @@ const STATUS_LABEL: Record<OutcomeView['status'], string> = {
 /** Contributors: the grade this card came back with, after the raw photos above. */
 function GradedResult({ orgId, cardId, ready }: { orgId: string; cardId: string; ready: boolean }) {
   const api = useApi()
-  const path = `/api/orgs/${orgId}/cards/${cardId}/outcomes`
+  const path = apiPath`/api/orgs/${orgId}/cards/${cardId}/outcomes`
   const { data: outcomes, reload } = useLoad(() => api<OutcomeView[]>('GET', path), [api, path])
   const [grader, setGrader] = useState<Grader>('PSA')
   const [certNumber, setCertNumber] = useState('')
   const [grade, setGrade] = useState('')
   const [gradeLabel, setGradeLabel] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    const gradeValue = grade === '' ? null : Number(grade)
+    if (gradeValue !== null && !Number.isFinite(gradeValue)) {
+      setErr('Grade must be a number from 1 to 10.')
+      return
+    }
     setErr(null)
+    setBusy(true)
     try {
-      await api('POST', path, { grader, certNumber, grade: grade === '' ? null : Number(grade), gradeLabel })
+      await api('POST', path, { grader, certNumber, grade: gradeValue, gradeLabel })
       setCertNumber('')
       setGrade('')
       setGradeLabel('')
       reload()
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -135,18 +144,30 @@ function GradedResult({ orgId, cardId, ready }: { orgId: string; cardId: string;
         <p className="muted">Add the raw front and back photos first (taken before the card was graded).</p>
       ) : (
         <form onSubmit={submit} className="row">
-          <select value={grader} onChange={(e) => setGrader(e.target.value as Grader)}>
+          <select value={grader} onChange={(e) => setGrader(e.target.value as Grader)} aria-label="Grader">
             {GRADERS.map((g) => (
               <option key={g}>{g}</option>
             ))}
           </select>
-          <input value={certNumber} onChange={(e) => setCertNumber(e.target.value)} placeholder="Cert number" required pattern="[A-Za-z0-9-]+" />
-          <input value={grade} onChange={(e) => setGrade(e.target.value)} placeholder="Grade" inputMode="decimal" className="narrow" />
-          <input value={gradeLabel} onChange={(e) => setGradeLabel(e.target.value)} placeholder="Label, e.g. GEM MT" />
-          <button type="submit">Save</button>
+          <input value={certNumber} onChange={(e) => setCertNumber(e.target.value)} placeholder="Cert number" aria-label="Cert number" required pattern="[A-Za-z0-9-]+" />
+          <input
+            type="number"
+            min={1}
+            max={10}
+            step={0.5}
+            value={grade}
+            onChange={(e) => setGrade(e.target.value)}
+            placeholder="Grade"
+            aria-label="Grade"
+            className="narrow"
+          />
+          <input value={gradeLabel} onChange={(e) => setGradeLabel(e.target.value)} placeholder="Label, e.g. GEM MT" aria-label="Grade label" />
+          <button type="submit" disabled={busy}>
+            Save
+          </button>
         </form>
       )}
-      {err && <p className="error">{err}</p>}
+      {err && <p className="error" role="alert">{err}</p>}
     </section>
   )
 }

@@ -27,12 +27,23 @@ class GradePricerTest {
         return new Comp("c" + nextId++, AS_OF.minusDays(daysAgo), d(price));
     }
 
+    /** An era ratio table: grades 2 to 9, as StepDownRatios builds it (no grade 1 ratio). */
     private static Map<Grade, BigDecimal> ratios(String ratio) {
         Map<Grade, BigDecimal> ratios = new EnumMap<>(Grade.class);
-        for (int g = 1; g <= 9; g++) {
+        for (int g = 2; g <= 9; g++) {
             ratios.put(Grade.of(g), d(ratio));
         }
         return ratios;
+    }
+
+    /**
+     * Adds grade 1 sales of its own. Grade 1 has no era ratio, so a card with sales in one grade (or
+     * adjacent grades only) can't price grade 1 otherwise. Grade 1 never anchors another grade, so
+     * this changes nothing else in the table.
+     */
+    private Map<Grade, List<Comp>> withGradeOne(Map<Grade, List<Comp>> comps) {
+        comps.put(Grade.G1, List.of(comp(1, "5"), comp(2, "5")));
+        return comps;
     }
 
     private GradePricer.Input input(Map<Grade, List<Comp>> comps) {
@@ -71,7 +82,9 @@ class GradePricerTest {
         assertThat(table.get(Grade.G4).method()).isEqualTo(GradePrice.Method.INTERPOLATED);
         assertThat(table.gross(Grade.G4)).isEqualByComparingTo("134.93");
         assertThat(table.gross(Grade.G3)).isEqualByComparingTo("107.09");
-        // Below the lowest observed grade, step-down applies.
+        // Grade 1 has no era ratio of its own: grade 2 times the era 2-to-3 ratio (85 x 0.78), the doc's 66.
+        assertThat(table.get(Grade.G1).method()).isEqualTo(GradePrice.Method.STEP_DOWN);
+        assertThat(table.get(Grade.G1).stepDownRatio()).isEqualByComparingTo("0.78");
         assertThat(table.gross(Grade.G1)).isEqualByComparingTo("66.30");
     }
 
@@ -81,7 +94,7 @@ class GradePricerTest {
         comps.put(Grade.G4, List.of(comp(5, "40"), comp(6, "40")));
         comps.put(Grade.G5, List.of(comp(5, "60"), comp(6, "60")));
 
-        GradePriceTable table = pricer.price(input(comps));
+        GradePriceTable table = pricer.price(input(withGradeOne(comps)));
 
         for (int g = 6; g <= 10; g++) {
             assertThat(table.gross(Grade.of(g))).isEqualByComparingTo("60");
@@ -94,7 +107,7 @@ class GradePricerTest {
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
         comps.put(Grade.G8, List.of(comp(0, "100"), comp(60, "200"), comp(60, "210")));
 
-        GradePriceTable table = pricer.price(input(comps));
+        GradePriceTable table = pricer.price(input(withGradeOne(comps)));
 
         // Weights 1, 0.25, 0.25: the recent sale alone carries more than half.
         assertThat(table.gross(Grade.G8)).isEqualByComparingTo("100");
@@ -106,7 +119,7 @@ class GradePricerTest {
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
         comps.put(Grade.G8, List.of(comp(10, "100"), comp(120, "90"), comp(200, "10")));
 
-        GradePriceTable table = pricer.price(input(comps));
+        GradePriceTable table = pricer.price(input(withGradeOne(comps)));
 
         assertThat(table.get(Grade.G8).salesUsed()).isEqualTo(2);
         assertThat(table.trace().stepsFor("price[8]").getFirst().detail()).contains("180-day window");
@@ -117,7 +130,7 @@ class GradePricerTest {
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
         comps.put(Grade.G8, List.of(comp(5, "100"), comp(6, "100"), comp(-3, "900")));
 
-        GradePriceTable table = pricer.price(input(comps));
+        GradePriceTable table = pricer.price(input(withGradeOne(comps)));
 
         assertThat(table.get(Grade.G8).salesUsed()).isEqualTo(2);
         assertThat(table.gross(Grade.G8)).isEqualByComparingTo("100");
@@ -133,7 +146,7 @@ class GradePricerTest {
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
         comps.put(Grade.G9, sales);
 
-        GradePriceTable table = pricer.price(input(comps));
+        GradePriceTable table = pricer.price(input(withGradeOne(comps)));
 
         assertThat(table.get(Grade.G9).salesUsed()).isEqualTo(8);
         assertThat(table.get(Grade.G9).compIds()).doesNotContain(sales.getLast().id());
@@ -148,7 +161,7 @@ class GradePricerTest {
         GradingCost cost = new GradingCost(d("25"), d("5"), d("2"), d("0.02"));
         Map<Grade, BigDecimal> raw = Map.of(Grade.G7, d("280"), Grade.G8, d("300"));
 
-        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), ratios("0.78"), cost, raw));
+        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, withGradeOne(comps), List.of(), ratios("0.78"), cost, raw));
 
         assertThat(table.net(Grade.G8)).isEqualByComparingTo("458.00");
         assertThat(table.get(Grade.G8).rawOverride()).isFalse();
@@ -284,7 +297,10 @@ class GradePricerTest {
 
         assertThatThrownBy(() -> pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), ratios("1.05"), NO_COST, Map.of())))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("above 1");
+                .hasMessageContaining("above 0 and at most 1");
+        assertThatThrownBy(() -> pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), ratios("0"), NO_COST, Map.of())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("above 0 and at most 1");
     }
 
     @Test
@@ -293,7 +309,7 @@ class GradePricerTest {
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
         comps.put(Grade.G3, List.of(comp(1, "30"), comp(2, "30")));
 
-        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), ratios("0.5"), NO_COST, Map.of()));
+        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, withGradeOne(comps), List.of(), ratios("0.5"), NO_COST, Map.of()));
 
         for (int g = 4; g <= 10; g++) {
             assertThat(table.gross(Grade.of(g))).isEqualByComparingTo("30");
@@ -351,7 +367,7 @@ class GradePricerTest {
         // Derived prices carry no comps of their own.
         assertThat(table.get(Grade.G9).compIds()).isEmpty();
         assertThat(table.get(Grade.G9).windowDays()).isZero();
-        // No damaged sales: U is the floor, confidence D.
+        // No damaged sales: U is valued at zero (no bulk floor), confidence D.
         assertThat(table.get(Grade.U).confidence()).isEqualTo(Confidence.D);
     }
 
@@ -360,7 +376,7 @@ class GradePricerTest {
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
         comps.put(Grade.G5, List.of(comp(1, "60"), comp(2, "60"), comp(3, "60"), comp(4, "60"), comp(5, "60")));
 
-        GradePriceTable table = pricer.price(input(comps));
+        GradePriceTable table = pricer.price(input(withGradeOne(comps)));
 
         assertThat(table.get(Grade.G5).confidence()).isEqualTo(Confidence.B);
         assertThat(table.get(Grade.G6).method()).isEqualTo(GradePrice.Method.CARRIED_DOWN);
@@ -373,5 +389,161 @@ class GradePricerTest {
 
         assertThat(observed).containsOnlyKeys(Grade.G5, Grade.G6, Grade.G7, Grade.G8, Grade.G9, Grade.G10);
         assertThat(observed.get(Grade.G9)).isEqualByComparingTo("900");
+    }
+
+    @Test
+    void interpolationIsCappedAtTheHigherAnchorWhenAnchorsAreOutOfOrder() {
+        // The 8 sold above the 10: interpolating 9 between them would put it above the 10.
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G10, List.of(comp(1, "400"), comp(2, "400")));
+        comps.put(Grade.G8, List.of(comp(1, "500"), comp(2, "500")));
+
+        GradePriceTable table = pricer.price(input(comps));
+
+        assertThat(table.get(Grade.G9).method()).isEqualTo(GradePrice.Method.INTERPOLATED);
+        assertThat(table.gross(Grade.G9)).isEqualByComparingTo("400");
+        assertThat(table.trace().stepsFor("price[9]").getFirst().detail()).contains("capped");
+    }
+
+    @Test
+    void inOrderInterpolationIsNotMarkedCapped() {
+        GradePriceTable table = pricer.price(input(spread()));
+
+        assertThat(table.trace().stepsFor("price[9]").getFirst().detail()).doesNotContain("capped");
+    }
+
+    @Test
+    void gradeOneIgnoresAnEraOneToTwoRatioAndBorrowsTheTwoToThree() {
+        // Sales at 10 and 2 only. A grade 1 ratio of 0.99 is passed (other cards' PSA 1 premiums): ignored.
+        // Grade 1 steps down from 2 with the era's 2-to-3 ratio instead.
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G10, List.of(comp(1, "1000"), comp(2, "1000")));
+        comps.put(Grade.G2, List.of(comp(1, "100"), comp(2, "100")));
+        Map<Grade, BigDecimal> ratios = new EnumMap<>(ratios("0.78"));
+        ratios.put(Grade.G1, d("0.99"));
+
+        GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), ratios, NO_COST, Map.of()));
+
+        GradePrice g1 = table.get(Grade.G1);
+        assertThat(g1.method()).isEqualTo(GradePrice.Method.STEP_DOWN);
+        assertThat(g1.stepDownRatio()).isEqualByComparingTo("0.78");
+        assertThat(g1.gross()).isEqualByComparingTo("78.00");
+        assertThat(g1.basis()).containsExactly(Grade.G2);
+        assertThat(table.trace().stepsFor("price[1]").getFirst().rule()).contains("2-to-3");
+        for (int g = 3; g <= 9; g++) {
+            assertThat(table.get(Grade.of(g)).method()).isEqualTo(GradePrice.Method.INTERPOLATED);
+        }
+    }
+
+    @Test
+    void gradeOneWithoutAnEraTwoToThreeRatioUsesTheCardsLadder() {
+        // No era ratios at all, sales at 10 and 2: grade 1 from the card's own ladder, (100 / 1000) ^ (1/8).
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G10, List.of(comp(1, "1000"), comp(2, "1000")));
+        comps.put(Grade.G2, List.of(comp(1, "100"), comp(2, "100")));
+
+        GradePrice g1 = pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), Map.of(), NO_COST, Map.of())).get(Grade.G1);
+
+        assertThat(g1.method()).isEqualTo(GradePrice.Method.CARD_STEP_DOWN);
+        assertThat(g1.stepDownRatio()).isEqualByComparingTo("0.749894");
+        assertThat(g1.gross()).isEqualByComparingTo("74.99");
+    }
+
+    @Test
+    void oneSoldGradeWithAnEraTablePricesEveryGradeBelow() {
+        // One sold grade and era ratios for 2-9: grades 8 down to 2 step down, and grade 1 borrows 2-to-3.
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G9, List.of(comp(1, "100"), comp(2, "100")));
+
+        GradePriceTable table = pricer.price(input(comps));
+
+        assertThat(table.get(Grade.G1).method()).isEqualTo(GradePrice.Method.STEP_DOWN);
+        assertThat(table.gross(Grade.G1)).isLessThanOrEqualTo(table.gross(Grade.G2));
+    }
+
+    @Test
+    void withNoEraRatioAndNoLadderTheCardIsRefused() {
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G9, List.of(comp(1, "100"), comp(2, "100")));
+
+        assertThatThrownBy(() -> pricer.price(new GradePricer.Input(AS_OF, comps, List.of(), Map.of(), NO_COST, Map.of())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No era step-down ratio for grade 8 to 9");
+    }
+
+    @Test
+    void refusesNullInputsWithAClearMessage() {
+        Map<Grade, List<Comp>> comps = exampleComps(false);
+        assertThatThrownBy(() -> new GradePricer.Input(AS_OF, null, List.of(), Map.of(), NO_COST, Map.of()))
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("gradedComps");
+        assertThatThrownBy(() -> new GradePricer.Input(AS_OF, comps, null, Map.of(), NO_COST, Map.of()))
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("damagedRawComps");
+        assertThatThrownBy(() -> new GradePricer.Input(AS_OF, comps, List.of(), null, NO_COST, Map.of()))
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("stepDownRatios");
+        assertThatThrownBy(() -> new GradePricer.Input(AS_OF, comps, List.of(), Map.of(), NO_COST, null))
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("rawConditionPrices");
+        assertThatThrownBy(() -> new GradePricer.Input(AS_OF, comps, List.of(), Map.of(), null, Map.of()))
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("gradingCost");
+        assertThatThrownBy(() -> new GradePricer.Input(null, comps, List.of(), Map.of(), NO_COST, Map.of()))
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("asOf");
+    }
+
+    // Window boundaries: the window is inclusive of asOf and of the day exactly windowDays before it.
+
+    private GradePrice gradeEightWith(Comp... sales) {
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G8, List.of(sales));
+        return pricer.price(input(withGradeOne(comps))).get(Grade.G8);
+    }
+
+    @Test
+    void aSaleExactly90DaysBackIsInTheWindow() {
+        GradePrice g8 = gradeEightWith(comp(5, "100"), comp(6, "100"), comp(90, "100"));
+
+        assertThat(g8.windowDays()).isEqualTo(90);
+        assertThat(g8.salesInWindow()).isEqualTo(3);
+    }
+
+    @Test
+    void aSale91DaysBackIsOutOfTheWindow() {
+        GradePrice g8 = gradeEightWith(comp(5, "100"), comp(6, "100"), comp(91, "100"));
+
+        assertThat(g8.windowDays()).isEqualTo(90);
+        assertThat(g8.salesInWindow()).isEqualTo(2);
+    }
+
+    @Test
+    void aSaleExactly180DaysBackIsInTheExtendedWindow() {
+        GradePrice g8 = gradeEightWith(comp(5, "100"), comp(180, "100"));
+
+        assertThat(g8.windowDays()).isEqualTo(180);
+        assertThat(g8.salesInWindow()).isEqualTo(2);
+    }
+
+    @Test
+    void aSale181DaysBackIsOutOfTheExtendedWindow() {
+        GradePrice g8 = gradeEightWith(comp(5, "100"), comp(181, "100"));
+
+        assertThat(g8.windowDays()).isEqualTo(180);
+        assertThat(g8.salesInWindow()).isEqualTo(1);
+    }
+
+    @Test
+    void aSaleOnTheValuationDateCounts() {
+        GradePrice g8 = gradeEightWith(comp(0, "100"), comp(1, "100"));
+
+        assertThat(g8.windowDays()).isEqualTo(90);
+        assertThat(g8.salesInWindow()).isEqualTo(2);
+    }
+
+    @Test
+    void aGradeWithAllSalesOutsideTheExtendedWindowIsNotObserved() {
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G10, List.of(comp(1, "1000"), comp(2, "1000")));
+        comps.put(Grade.G8, List.of(comp(200, "500")));
+
+        GradePriceTable table = pricer.price(input(withGradeOne(comps)));
+
+        assertThat(table.get(Grade.G8).method()).isEqualTo(GradePrice.Method.STEP_DOWN);
     }
 }

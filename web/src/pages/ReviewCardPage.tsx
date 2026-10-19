@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import {
+  apiPath,
   OUTCOMES,
   useApi,
   type Assessment,
@@ -13,6 +14,7 @@ import {
   type ProviderCard,
   type Variant,
 } from '../api'
+import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { PricesPanel } from './PricesPanel'
 
@@ -33,10 +35,10 @@ function message(err: unknown) {
 export function ReviewCardPage() {
   const { orgId = '', cardId = '' } = useParams()
   const api = useApi()
-  const base = `/api/admin/orgs/${orgId}/cards/${cardId}`
+  const base = apiPath`/api/admin/orgs/${orgId}/cards/${cardId}`
   const { data, error, reload } = useLoad(() => api<CardCondition>('GET', `${base}/condition`), [api, base])
 
-  if (error) return <p className="error">{error}</p>
+  if (error) return <p className="error" role="alert">{error}</p>
   if (!data) return <p>Loading…</p>
 
   const current = data.assessments.find((a) => a.current) ?? null
@@ -51,8 +53,8 @@ export function ReviewCardPage() {
         <h2>Photos</h2>
         <div className="photos">
           {data.photos.map((p) => (
-            <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="photo">
-              <img src={p.cropUrl ?? p.url} alt={`${p.side} photo`} />
+            <a key={p.id} href={safeHref(p.url)} target="_blank" rel="noreferrer" className="photo">
+              <img src={safeHref(p.cropUrl) ?? safeHref(p.url)} alt={`${p.side} photo`} />
               <span className="muted small">
                 {p.side.toLowerCase()}
                 {p.cropUrl ? ' · card crop, tap for original' : ''}
@@ -90,6 +92,8 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
   const [promo, setPromo] = useState(false)
   const [manual, setManual] = useState(false)
   const [setName_, setSetName] = useState('')
+  const [released, setReleased] = useState('')
+  const [todayLocal] = useState(() => new Date().toLocaleDateString('en-CA'))
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -114,7 +118,7 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
   async function pick(hit: CatalogHit) {
     setErr(null)
     try {
-      const card = await api<ProviderCard>('GET', `/api/admin/catalog/cards/${encodeURIComponent(hit.externalId)}?language=${language}`)
+      const card = await api<ProviderCard>('GET', apiPath`/api/admin/catalog/cards/${hit.externalId}?language=${language}`)
       setPicked(card)
       setEdition(card.editions[0] ?? 'UNLIMITED')
       setVariant(card.variants[0] ?? 'NORMAL')
@@ -131,7 +135,7 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
     setBusy(true)
     try {
       const body = manual
-        ? { provider: 'MANUAL', language, edition, variant, stamp, promo, setName: setName_, number, name, note }
+        ? { provider: 'MANUAL', language, edition, variant, stamp, promo, setName: setName_, setReleaseDate: released, number, name, note }
         : { provider: 'TCGDEX', externalId: picked?.externalId, language, edition, variant, stamp, promo, note }
       await api('POST', `${base}/identifications`, body)
       setHits(null)
@@ -170,9 +174,9 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
       <details open={!id}>
         <summary>{id ? 'Change identity' : 'Identify'}</summary>
         <form onSubmit={search} className="row">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name as printed, e.g. Metagross δ or Metagross V" required />
-          <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="No. e.g. 11/113" className="narrow" />
-          <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name as printed, e.g. Metagross δ or Metagross V" aria-label="Name as printed" required />
+          <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="No. e.g. 11/113" aria-label="Number" className="narrow" />
+          <select value={language} onChange={(e) => setLanguage(e.target.value)} aria-label="Language">
             <option value="en">English</option>
             <option value="ja">Japanese</option>
           </select>
@@ -209,10 +213,24 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
               </p>
             )}
             {manual && (
-              <input value={setName_} onChange={(e) => setSetName(e.target.value)} placeholder="Set name" required />
+              <div className="row">
+                <input value={setName_} onChange={(e) => setSetName(e.target.value)} placeholder="Set name" aria-label="Set name" required />
+                {/* Required: the release date decides the vintage and recent-chase authenticity flags. */}
+                <label>
+                  Set released{' '}
+                  <input
+                    type="date"
+                    value={released}
+                    max={todayLocal}
+                    onChange={(e) => setReleased(e.target.value)}
+                    aria-label="Set release date"
+                    required
+                  />
+                </label>
+              </div>
             )}
             <div className="row">
-              <select value={edition} onChange={(e) => setEdition(e.target.value as Edition)}>
+              <select value={edition} onChange={(e) => setEdition(e.target.value as Edition)} aria-label="Edition">
                 {EDITIONS.map((v) => (
                   <option key={v} value={v}>
                     {v.replace('_', ' ').toLowerCase()}
@@ -220,7 +238,7 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
                   </option>
                 ))}
               </select>
-              <select value={variant} onChange={(e) => setVariant(e.target.value as Variant)}>
+              <select value={variant} onChange={(e) => setVariant(e.target.value as Variant)} aria-label="Variant">
                 {VARIANTS.map((v) => (
                   <option key={v} value={v}>
                     {v.replace('_', ' ').toLowerCase()}
@@ -232,12 +250,13 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
                 value={stamp}
                 onChange={(e) => setStamp(e.target.value)}
                 placeholder={picked?.stamps.length ? `Stamp: ${picked.stamps.join(', ')}` : 'Stamp (if any)'}
+                aria-label="Stamp"
               />
               <label>
                 <input type="checkbox" checked={promo} onChange={(e) => setPromo(e.target.checked)} /> Promo
               </label>
             </div>
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" />
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" aria-label="Note" />
             <div>
               <button type="submit" disabled={busy}>
                 Confirm identity
@@ -245,7 +264,7 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
             </div>
           </form>
         )}
-        {err && <p className="error">{err}</p>}
+        {err && <p className="error" role="alert">{err}</p>}
       </details>
     </section>
   )
@@ -267,7 +286,7 @@ function Suggestions({
 }) {
   const api = useApi()
   const { data, reload } = useLoad(
-    () => api<CardIdentificationView>('GET', `/api/orgs/${orgId}/cards/${cardId}/identification`),
+    () => api<CardIdentificationView>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}/identification`),
     [api, orgId, cardId],
   )
   const [err, setErr] = useState<string | null>(null)
@@ -288,13 +307,21 @@ function Suggestions({
   async function confirm(s: CardIdentificationView['suggestions'][number]) {
     setErr(null)
     try {
+      const c = s.card
       await api('POST', `${base}/identifications`, {
-        provider: 'TCGDEX',
-        externalId: s.card.externalId,
-        language: s.card.language,
-        edition: s.card.edition,
-        variant: s.card.variant,
-        promo: s.card.promo,
+        provider: c.provider,
+        externalId: c.externalId,
+        language: c.language,
+        edition: c.edition,
+        variant: c.variant,
+        stamp: c.stamp,
+        promo: c.promo,
+        // A manual catalog card has no provider record to look up, so it's named by its own fields.
+        setName: c.setName,
+        number: c.number,
+        name: c.name,
+        rarity: c.rarity,
+        setReleaseDate: c.setReleaseDate,
         note: `Confirmed suggestion (${Math.round(s.confidence * 100)}%)`,
       })
       reload()
@@ -351,7 +378,7 @@ function Suggestions({
       <button className="link small" onClick={readAgain}>
         Read the card again
       </button>
-      {err && <p className="error">{err}</p>}
+      {err && <p className="error" role="alert">{err}</p>}
     </div>
   )
 }
@@ -434,7 +461,7 @@ function Predictions({ data, base, onChange }: { data: CardCondition; base: stri
           </tbody>
         </table>
       )}
-      {err && <p className="error">{err}</p>}
+      {err && <p className="error" role="alert">{err}</p>}
     </section>
   )
 }
@@ -443,7 +470,7 @@ function percent(p: number) {
   return `${Math.round(p * 1000) / 10}%`
 }
 
-function AssessmentPanel({
+export function AssessmentPanel({
   data,
   current,
   base,
@@ -524,14 +551,14 @@ function AssessmentPanel({
           </div>
           <p className={totalOk ? 'muted small' : 'warn small'}>Total {Math.round(total * 10) / 10}% (must be 100%)</p>
           <div className="row">
-            <select value={confidence} onChange={(e) => setConfidence(e.target.value as Confidence)}>
+            <select value={confidence} onChange={(e) => setConfidence(e.target.value as Confidence)} aria-label="Confidence">
               {(['A', 'B', 'C', 'D'] as Confidence[]).map((c) => (
                 <option key={c} value={c}>
                   Confidence {c}
                 </option>
               ))}
             </select>
-            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why (required)" required maxLength={2000} />
+            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why (required)" aria-label="Why" required maxLength={2000} />
           </div>
           <div className="row">
             <button type="submit" disabled={busy || !totalOk}>
@@ -545,7 +572,7 @@ function AssessmentPanel({
           </div>
         </form>
       </details>
-      {err && <p className="error">{err}</p>}
+      {err && <p className="error" role="alert">{err}</p>}
 
       {data.assessments.length > 1 && (
         <details>

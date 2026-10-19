@@ -1,5 +1,6 @@
 package com.pokemans.app.condition;
 
+import com.pokemans.app.storage.ImageGuard;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -17,6 +18,9 @@ final class ImageResizer {
 
     /** A JPEG of the image, scaled down in 15% steps until it fits under {@code maxBytes}. */
     static PreGradeProvider.Image jpegUnder(PreGradeProvider.Image image, int maxBytes) {
+        if (ImageGuard.safeHeader(image.bytes()).isEmpty()) {
+            throw new IllegalArgumentException("Not a JPEG or PNG within the size limits");
+        }
         try {
             BufferedImage source = ImageIO.read(new ByteArrayInputStream(image.bytes()));
             if (source == null) {
