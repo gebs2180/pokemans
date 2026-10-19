@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { respond } from '../test/auth0'
-import { CompForm } from './PricesPanel'
+import { CompForm, PricesPanel } from './PricesPanel'
 
 describe('CompForm', () => {
   it("defaults the sold date to the reviewer's local date, not UTC", () => {
@@ -36,5 +36,39 @@ describe('CompForm', () => {
     await waitFor(() => expect(onAdded).toHaveBeenCalledTimes(1))
     expect(add).toBeEnabled()
     expect(fetch).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('PricesPanel', () => {
+  const grade = (g: string, confidence: string, pricedConfidence: string) => ({
+    grade: g, price: 100, method: 'OBSERVED', confidence, pricedConfidence, n: 10, compIds: [], windowDays: 90, basis: [],
+    stepDownRatio: null,
+  })
+  const view = (staleLevels: number, daysOld: number, confidence: string) => ({
+    catalogCardId: 'c1',
+    comps: [],
+    skipped: [],
+    tables: [{
+      gradingCompany: 'PSA', snapshotSetId: 's1', asOf: '2026-09-08', parameterSet: '1.0.0', sigma: null, sigmaChanges: 0,
+      salesPerMonth: 3, daysOld, staleLevels, grades: [grade('U', 'D', 'D'), grade('10', confidence, 'A')],
+    }],
+  })
+
+  it('says a table is stale and shows the confidence it was priced at', async () => {
+    vi.stubGlobal('fetch', async () => respond(200, view(2, 40, 'C')))
+    render(<PricesPanel catalogCardId="c1" />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('priced 40 days ago')
+    expect(screen.getByRole('alert')).toHaveTextContent('down 2 levels')
+    expect(screen.getByText('(was A)')).toBeInTheDocument()
+  })
+
+  it('says nothing for a fresh table', async () => {
+    vi.stubGlobal('fetch', async () => respond(200, view(0, 1, 'A')))
+    render(<PricesPanel catalogCardId="c1" />)
+
+    expect(await screen.findByText('PSA')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText(/\(was /)).not.toBeInTheDocument()
   })
 })

@@ -366,7 +366,9 @@ export type GradeRow = {
   grade: string
   price: number
   method: PriceMethod
+  /** Today's: lowered when no refresh has replaced the table. */
   confidence: Confidence
+  pricedConfidence: Confidence
   n: number
   compIds: string[]
   windowDays: number | null
@@ -383,6 +385,9 @@ export type PriceTable = {
   sigma: number | null
   sigmaChanges: number
   salesPerMonth: number
+  daysOld: number
+  /** Confidence levels lost because no refresh has replaced this table. */
+  staleLevels: number
 }
 
 export type PricesView = { catalogCardId: string; comps: CompView[]; tables: PriceTable[]; skipped: string[] }

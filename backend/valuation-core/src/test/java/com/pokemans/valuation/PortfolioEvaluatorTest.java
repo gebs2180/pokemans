@@ -57,25 +57,59 @@ class PortfolioEvaluatorTest {
     }
 
     @Test
-    void capsASingleCardAtTwentyPercentOfEligibleFlv() {
+    void capsAreMeasuredAgainstTheFinalBase() {
+        // 2,500 beside ten 100s. Capping every card at 200 gives a base of 1,200: the big card is 16.7% of it
+        // and the top five (200 + 4 x 100) exactly half. Measured before capping it would have kept 700 (41%).
+        List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(10, "100", "small"));
+        cards.add(card("big", "2500", "big", false));
+
+        PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
+
+        assertThat(contribution(result, "big")).isEqualByComparingTo("200.00");
+        assertThat(contribution(result, "small-0")).isEqualByComparingTo("100");
+        assertThat(result.collateralBase()).isEqualByComparingTo("1200.00");
+    }
+
+    @Test
+    void theTopFiveCapCanBindBeforeTheSingleCardCap() {
+        // Nine 50s and a 550: the single-card cap alone would allow 112.50, but then the top five are
+        // 112.50 + 200 of 562.50, over half. Only 50 keeps them at half: every card at 50, base 500.
         List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(9, "50", "small"));
         cards.add(card("big", "550", "big", false));
 
         PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
 
-        assertThat(contribution(result, "big")).isEqualByComparingTo("200");
-        assertThat(result.collateralBase()).isEqualByComparingTo("650");
+        assertThat(contribution(result, "big")).isEqualByComparingTo("50.00");
+        assertThat(result.collateralBase()).isEqualByComparingTo("500.00");
     }
 
     @Test
-    void capsTheTopFiveAtHalfOfEligibleFlv() {
+    void capsTheTopFiveAtHalfOfTheFinalBase() {
+        // Five 180s and ten 10s: at a cap of 20 the five are 100 of a 200 base.
         List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(5, "180", "top"));
         cards.addAll(cards(10, "10", "tail"));
 
         PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
 
-        assertThat(contribution(result, "top-0")).isEqualByComparingTo("100.00");
-        assertThat(result.collateralBase()).isEqualByComparingTo("600");
+        assertThat(contribution(result, "top-0")).isEqualByComparingTo("20.00");
+        assertThat(contribution(result, "tail-0")).isEqualByComparingTo("10");
+        assertThat(result.collateralBase()).isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    void fewerThanTenCardsAreNotCapped() {
+        // The caps can't hold for a small pledge (one card can never be 20% of its own base), so they are
+        // left off and the trace says so. The worked example's single card keeps its full FLV.
+        List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(8, "50", "small"));
+        cards.add(card("big", "550", "big", false));
+
+        PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
+
+        // Uncapped; it is still 58% of the base in its own set and character, so both 10% haircuts apply.
+        assertThat(contribution(result, "big")).isEqualByComparingTo("445.50");
+        assertThat(contribution(result, "small-0")).isEqualByComparingTo("50");
+        assertThat(result.collateralBase()).isEqualByComparingTo("845.50");
+        assertThat(result.trace().stepsFor("concentration_caps").getFirst().rule()).contains("fewer than 10");
     }
 
     @Test
@@ -117,9 +151,9 @@ class PortfolioEvaluatorTest {
     }
 
     @Test
-    void theTopFiveScaleRoundsDownSoTheCapIsNeverExceeded() {
-        // Top five at 100.01, 100, 100, 100, 100 with a tail of 495: eligible 995.01, limit 497.505.
-        // Rounding each scaled card to the nearest cent would give 497.51; rounding down keeps it within.
+    void theCapLevelIsInWholeCentsAndNeverOverTheLimits() {
+        // Top five at 100.01 and four 100s with 99 cards of 5: the cap level lands on a cent, and the
+        // capped top five never exceed half the base.
         List<PortfolioEvaluator.Card> cards = new ArrayList<>();
         cards.add(card("top-a", "100.01", "top-a", false));
         for (int i = 0; i < 4; i++) {
@@ -135,8 +169,10 @@ class PortfolioEvaluatorTest {
         for (int i = 0; i < 4; i++) {
             topFive = topFive.add(contribution(result, "top-" + i));
         }
-        assertThat(topFive).isLessThanOrEqualTo(result.eligibleFlv().multiply(d("0.5")));
-        assertThat(result.trace().stepsFor("top_five_cap")).hasSize(1);
+        assertThat(contribution(result, "top-a").scale()).isLessThanOrEqualTo(2);
+        assertThat(topFive).isLessThanOrEqualTo(result.collateralBase().multiply(d("0.5")));
+        assertThat(contribution(result, "top-a")).isLessThanOrEqualTo(result.collateralBase().multiply(d("0.2")));
+        assertThat(result.trace().stepsFor("concentration_caps")).hasSize(1);
     }
 
     @Test
@@ -155,19 +191,18 @@ class PortfolioEvaluatorTest {
     }
 
     @Test
-    void aCardTiedWithTheFifthCantOvertakeTheScaledTopFive() {
-        // Found by ValuationPropertiesTest: six equal cards. Scaling only five let the sixth, unscaled, rejoin
-        // the top five and take it over 50%. It is now held at the scaled value, like its equals.
+    void tiedCardsAreCappedAlike() {
+        // Six equal cards and five small ones: one level caps all six the same, 10 each, so the top five are
+        // 50 of a 100 base whichever five they are.
         List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(6, "100", "tie"));
         cards.addAll(cards(5, "8", "tail"));
 
         PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
 
-        // Eligible 640, limit 320: the five scale to 64 each and the sixth is held at 64 too.
         for (int i = 0; i < 6; i++) {
-            assertThat(contribution(result, "tie-" + i)).isEqualByComparingTo("64.00");
+            assertThat(contribution(result, "tie-" + i)).isEqualByComparingTo("10.00");
         }
         assertThat(contribution(result, "tail-0")).isEqualByComparingTo("8");
-        assertThat(result.collateralBase()).isEqualByComparingTo("424.00");
+        assertThat(result.collateralBase()).isEqualByComparingTo("100.00");
     }
 }

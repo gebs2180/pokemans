@@ -97,10 +97,14 @@ public final class CardValuator {
         trace.add("depth_discount", "copies / monthly sales, floor " + params.depthDiscountFloor() + ", cap "
                 + params.depthDiscountCap(), depth, in.copiesHeld() + " copies, " + in.salesPerMonth() + " sales/mo");
 
-        BigDecimal flv = stressedFmv.multiply(BigDecimal.ONE.subtract(f), Money.MC)
+        BigDecimal formula = stressedFmv.multiply(BigDecimal.ONE.subtract(f), Money.MC)
                 .multiply(shock, Money.MC)
                 .multiply(BigDecimal.ONE.subtract(depth), Money.MC);
-        trace.add("FLV", "FMV_stressed x (1 - f) x shock x (1 - l)", Money.cents(flv), "f " + f);
+        // A 60-day forced sale never recovers more than a 30-day quick sale (Zach, 2026-10-18). The 1.0.0
+        // parameters keep the depth discount at or above d, so this only binds if a parameter set changes that.
+        BigDecimal flv = formula.min(qsv);
+        trace.add("FLV", "FMV_stressed x (1 - f) x shock x (1 - l), at most QSV", Money.cents(flv),
+                "f " + f + (flv.compareTo(formula) < 0 ? "; formula gave " + Money.cents(formula) + ", capped at QSV" : ""));
 
         return new CardValuation(in.cardId(), Money.cents(fmv), Money.cents(rv), Money.cents(qsv),
                 Money.cents(stressedFmv), Money.cents(flv), confidence, shift, tier, s, d, shock, depth, trace);

@@ -72,14 +72,22 @@ class PricingController {
                     Instant createdAt) {
     }
 
-    /** One grade of a price table; gross, before grading costs. */
-    record GradeRow(String grade, BigDecimal price, GradePrice.Method method, Confidence confidence, int n,
-                    List<UUID> compIds, Integer windowDays, List<String> basis, BigDecimal stepDownRatio) {
+    /**
+     * One grade of a price table; gross, before grading costs.
+     *
+     * @param confidence       today's, lowered when the table is stale
+     * @param pricedConfidence when the table was priced
+     */
+    record GradeRow(String grade, BigDecimal price, GradePrice.Method method, Confidence confidence, Confidence pricedConfidence,
+                    int n, List<UUID> compIds, Integer windowDays, List<String> basis, BigDecimal stepDownRatio) {
     }
 
-    /** @param grades U, then 1 to 10 */
+    /**
+     * @param grades      U, then 1 to 10
+     * @param staleLevels confidence levels lost because no refresh has replaced this table
+     */
     record TableView(String gradingCompany, UUID snapshotSetId, LocalDate asOf, String parameterSet, List<GradeRow> grades,
-                     BigDecimal sigma, int sigmaChanges, BigDecimal salesPerMonth) {
+                     BigDecimal sigma, int sigmaChanges, BigDecimal salesPerMonth, long daysOld, int staleLevels) {
     }
 
     /**
@@ -171,11 +179,11 @@ class PricingController {
     private static TableView view(Prices.CardPrices p) {
         List<GradeRow> rows = p.grades().values().stream()
                 .sorted(Comparator.comparingInt(g -> g.grade().number()))
-                .map(g -> new GradeRow(g.grade().toString(), g.price(), g.method(), g.confidence(), g.n(), g.compIds(),
+                .map(g -> new GradeRow(g.grade().toString(), g.price(), g.method(), g.confidence(), g.pricedConfidence(), g.n(), g.compIds(),
                         g.windowDays(), g.basis().stream().map(Grade::toString).toList(), g.stepDownRatio()))
                 .toList();
         return new TableView(p.gradingCompany(), p.snapshotSetId(), p.asOf(), p.parameterSet(), rows, p.sigma(),
-                p.sigmaChanges(), p.salesPerMonth());
+                p.sigmaChanges(), p.salesPerMonth(), p.daysOld(), p.staleLevels());
     }
 
     private static CompView view(SoldComp c) {

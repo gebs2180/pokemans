@@ -37,6 +37,9 @@ class ManualCompFlowTest {
     @Autowired
     private SecurityProperties security;
 
+    @Autowired
+    private PriceSnapshotService snapshots;
+
     private TestApi api;
     private String orgId;
 
@@ -161,6 +164,27 @@ class ManualCompFlowTest {
                 .isEqualTo("url:https://www.tcgplayer.com/product/1?Condition=Lightly");
         assertThat(PricingController.saleKey(java.net.URI.create("https://notebay.com/itm/123456789012")))
                 .startsWith("url:");
+    }
+
+    @Test
+    void aTableNoRefreshHasReplacedKeepsItsPricesAtLowerConfidence() throws Exception {
+        // Priced 40 days ago and never replaced: still served, but 40 days is past the 7-day grace and into
+        // the second 30-day period, so every grade has dropped two levels (A at pricing, C today).
+        String card = identified("Manual Stale", LocalDate.of(2005, 8, 1));
+        String comps = "/api/admin/catalog-cards/" + card + "/comps";
+        for (int i = 0; i < 10; i++) {
+            api.postJson(comps, graded("PSA", "10", "1000", 41 + i, null), api.admin()).andExpect(status().isCreated());
+            api.postJson(comps, graded("PSA", "8", "400", 41 + i, null), api.admin()).andExpect(status().isCreated());
+        }
+        snapshots.snapshotAll(TODAY.minusDays(40));
+
+        api.get("/api/admin/catalog-cards/" + card + "/prices", api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.tables[0].asOf").value(TODAY.minusDays(40).toString()))
+                .andExpect(jsonPath("$.tables[0].daysOld").value(40))
+                .andExpect(jsonPath("$.tables[0].staleLevels").value(2))
+                .andExpect(jsonPath("$.tables[0].grades[10].price").value(1000))
+                .andExpect(jsonPath("$.tables[0].grades[10].pricedConfidence").value("A"))
+                .andExpect(jsonPath("$.tables[0].grades[10].confidence").value("C"));
     }
 
     @Test

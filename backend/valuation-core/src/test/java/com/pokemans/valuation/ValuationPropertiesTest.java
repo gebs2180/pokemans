@@ -23,9 +23,6 @@ import net.jqwik.api.constraints.IntRange;
  * Invariants the methodology promises, over random inputs: probability never gains mass or moves
  * up, prices are never stepped up, grade 1 never anchors, stress and liquidity only ever lower FLV,
  * and the portfolio caps hold.
- *
- * <p>Not asserted: FLV ≤ QSV. It does not always hold (σ = 0, under 5 sales a month and one copy gives
- * FLV 0.765 × stressed FMV against QSV 0.68 × FMV), which is an open methodology question.
  */
 class ValuationPropertiesTest {
 
@@ -234,7 +231,7 @@ class ValuationPropertiesTest {
             assertThat(v.qsv()).isLessThan(v.fmv());
             assertThat(v.fmv()).isLessThan(v.rv());
         }
-        // FLV <= QSV is deliberately not asserted: see the class comment.
+        assertThat(v.flv()).isLessThanOrEqualTo(v.qsv());
     }
 
     @Property
@@ -297,11 +294,18 @@ class ValuationPropertiesTest {
         assertThat(result.collateralBase()).isLessThanOrEqualTo(eligible);
         List<BigDecimal> contributions = result.cards().stream().map(PortfolioEvaluator.Contribution::contribution)
                 .sorted(Comparator.reverseOrder()).toList();
-        for (BigDecimal contribution : contributions) {
-            assertThat(contribution).isLessThanOrEqualTo(eligible.multiply(params.singleCardCap()).add(cent));
+        long eligibleCards = result.cards().stream().filter(PortfolioEvaluator.Contribution::eligible).count();
+        if (eligibleCards >= params.capsMinCards()) {
+            // Caps hold against the capped base; the correlation haircut after them takes at most 19% more off
+            // (two 10% slices), so against the final base allow that much.
+            BigDecimal haircutRoom = BigDecimal.ONE.subtract(params.correlationHaircut()).pow(2);
+            BigDecimal preHaircut = result.collateralBase().divide(haircutRoom, Money.MC);
+            for (BigDecimal contribution : contributions) {
+                assertThat(contribution).isLessThanOrEqualTo(preHaircut.multiply(params.singleCardCap()).add(cent));
+            }
+            BigDecimal topFive = contributions.stream().limit(5).reduce(BigDecimal.ZERO, BigDecimal::add);
+            assertThat(topFive).isLessThanOrEqualTo(preHaircut.multiply(params.topFiveCap()).add(cent));
         }
-        BigDecimal topFive = contributions.stream().limit(5).reduce(BigDecimal.ZERO, BigDecimal::add);
-        assertThat(topFive).isLessThanOrEqualTo(eligible.multiply(params.topFiveCap()).add(new BigDecimal("0.05")));
         for (PortfolioEvaluator.Contribution c : result.cards()) {
             if (!c.eligible()) {
                 assertThat(c.contribution()).isEqualByComparingTo("0");

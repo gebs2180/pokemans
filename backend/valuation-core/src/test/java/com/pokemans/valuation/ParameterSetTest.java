@@ -25,6 +25,7 @@ class ParameterSetTest {
         assertThat(p.extendedWindowDays()).isEqualTo(180);
         assertThat(p.singleCardCap()).isEqualByComparingTo("0.20");
         assertThat(p.topFiveCap()).isEqualByComparingTo("0.50");
+        assertThat(p.capsMinCards()).isEqualTo(10);
         assertThat(p.correlationThreshold()).isEqualByComparingTo("0.40");
     }
 

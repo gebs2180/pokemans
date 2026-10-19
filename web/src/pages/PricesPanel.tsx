@@ -94,6 +94,12 @@ export function PricesPanel({ catalogCardId }: { catalogCardId: string }) {
           <h3>
             {t.gradingCompany} <span className="muted small">as of {t.asOf}</span>
           </h3>
+          {t.staleLevels > 0 && (
+            <p className="error" role="alert">
+              Stale: priced {t.daysOld} days ago and not replaced by a newer refresh, so confidence is down{' '}
+              {t.staleLevels} level{t.staleLevels > 1 ? 's' : ''}.
+            </p>
+          )}
           <PriceTableView grades={t.grades} />
           <p className="muted small">
             σ {t.sigma === null ? `not enough history (${t.sigmaChanges} monthly changes)` : `${(t.sigma * 100).toFixed(1)}%`} ·{' '}
@@ -286,7 +292,10 @@ function PriceTableView({ grades }: { grades: GradeRow[] }) {
               {g.basis.length > 0 && <span className="muted"> from {g.basis.join(' & ')}</span>}
               {g.stepDownRatio !== null && <span className="muted"> × {g.stepDownRatio}</span>}
             </td>
-            <td>{g.confidence}</td>
+            <td>
+              {g.confidence}
+              {g.confidence !== g.pricedConfidence && <span className="muted small"> (was {g.pricedConfidence})</span>}
+            </td>
             <td className="muted small">{g.method === 'OBSERVED' ? `${g.n} in ${g.windowDays} days` : '–'}</td>
           </tr>
         ))}

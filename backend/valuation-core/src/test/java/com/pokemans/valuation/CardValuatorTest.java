@@ -53,6 +53,24 @@ class CardValuatorTest {
     }
 
     @Test
+    void flvNeverExceedsQsv() throws Exception {
+        // With the 1.0.0 parameters the depth discount is always at least d, so FLV stays under QSV anyway.
+        // A parameter set with a steeper speed discount (30% at mid liquidity) breaks that: one copy at
+        // 10 sales a month and no volatility gives 1000 x 0.85 x 1 x 0.90 = 765, above QSV 1000 x 0.85 x 0.70
+        // = 595. FLV is held at QSV.
+        java.util.Properties p = new java.util.Properties();
+        try (var in = ParameterSet.class.getResourceAsStream("/parameter-sets/1.0.0.properties")) {
+            p.load(in);
+        }
+        p.setProperty("values.speedDiscount.mid", "0.30");
+        CardValuation v = new CardValuator(ParameterSet.fromProperties(p)).value(input(prices("1000"), Confidence.A, "0", "10", 1));
+
+        assertThat(v.qsv()).isEqualByComparingTo("595.00");
+        assertThat(v.flv()).isEqualByComparingTo("595.00");
+        assertThat(v.trace().stepsFor("FLV").getFirst().detail()).contains("formula gave 765.00, capped at QSV");
+    }
+
+    @Test
     void compConfidenceCountsSalesInTheWindowBeforeTrimming() {
         // A real pricer table: ten sales per grade, trimmed to eight. Ten count towards confidence A.
         Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
