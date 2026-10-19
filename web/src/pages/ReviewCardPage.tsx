@@ -79,6 +79,7 @@ export function ReviewCardPage() {
         key={data.identification ? `${data.identification.catalogCardId}@${data.identification.identifiedSince}` : 'none'}
         orgId={orgId}
         cardId={cardId}
+        admin
       />
       <Predictions data={data} base={base} onChange={reload} />
       <AssessmentPanel key={current?.id ?? 'none'} data={data} current={current} base={base} onChange={reload} />

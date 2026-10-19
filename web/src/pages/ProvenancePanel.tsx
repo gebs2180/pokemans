@@ -32,6 +32,7 @@ const CUSTODY_LABEL: Record<CustodyState, { text: string; className: string }> =
   NOT_RECORDED: { text: 'No custody recorded: no advance.', className: 'warn' },
   UNVERIFIED: { text: 'Custody not verified: no advance.', className: 'warn' },
   VERIFIED: { text: 'Custody verified.', className: 'ok' },
+  LAPSED: { text: 'Custody check lapsed: no advance until it is checked again.', className: 'warn' },
 }
 
 function message(err: unknown) {
@@ -47,14 +48,18 @@ function today() {
   return new Date().toLocaleDateString('en-CA')
 }
 
-/** Admin: the card's authenticity findings and custody, the two gates on collateral eligibility. */
-export function ProvenancePanel({ orgId, cardId }: { orgId: string; cardId: string }) {
+/**
+ * A card's authenticity findings and custody, the two gates on collateral eligibility. Members see
+ * both and record custody; only an admin records findings and checks custody.
+ */
+export function ProvenancePanel({ orgId, cardId, admin }: { orgId: string; cardId: string; admin: boolean }) {
   const api = useApi()
   const { data, error, reload } = useLoad(
     () => api<ProvenanceView>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}/provenance`),
     [api, orgId, cardId],
   )
-  const base = apiPath`/api/admin/orgs/${orgId}/cards/${cardId}`
+  const adminBase = apiPath`/api/admin/orgs/${orgId}/cards/${cardId}`
+  const memberBase = apiPath`/api/orgs/${orgId}/cards/${cardId}`
 
   return (
     <section className="panel">
@@ -75,14 +80,18 @@ export function ProvenancePanel({ orgId, cardId }: { orgId: string; cardId: stri
               ))}
             </ul>
           )}
-          {data.authState === 'NOT_IDENTIFIED' ? (
-            <p className="muted">Confirm the card's identity first: a finding is made against it.</p>
-          ) : (
-            <VerificationForm base={base} onSaved={reload} />
-          )}
+          {admin &&
+            (data.authState === 'NOT_IDENTIFIED' ? (
+              <p className="muted">Confirm the card's identity first: a finding is made against it.</p>
+            ) : (
+              <VerificationForm base={adminBase} verifyMethods={data.verifyMethods} onSaved={reload} />
+            ))}
 
           <h3>Custody</h3>
-          <p className={CUSTODY_LABEL[data.custodyState].className}>{CUSTODY_LABEL[data.custodyState].text}</p>
+          <p className={CUSTODY_LABEL[data.custodyState].className}>
+            {CUSTODY_LABEL[data.custodyState].text}
+            {data.custodyVerifiedUntil && ` Check good until ${new Date(data.custodyVerifiedUntil).toLocaleDateString()}.`}
+          </p>
           {data.custodyHistory.length > 0 && (
             <ul className="list">
               {data.custodyHistory.map((c) => (
@@ -94,26 +103,34 @@ export function ProvenancePanel({ orgId, cardId }: { orgId: string; cardId: stri
               ))}
             </ul>
           )}
-          <CustodyForm base={base} onSaved={reload} />
+          <CustodyForm base={memberBase} canCheck={admin} onSaved={reload} />
         </>
       )}
     </section>
   )
 }
 
-export function VerificationForm({ base, onSaved }: { base: string; onSaved: () => void }) {
+export function VerificationForm({
+  base,
+  verifyMethods,
+  onSaved,
+}: {
+  base: string
+  verifyMethods: AuthMethod[]
+  onSaved: () => void
+}) {
   const api = useApi()
   const [finding, setFinding] = useState<Finding>('VERIFIED_AUTHENTIC')
   const [method, setMethod] = useState<AuthMethod>('IN_HAND_INSPECTION')
   const [note, setNote] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  // Photos can raise a doubt but can't clear one.
-  const methods = finding === 'VERIFIED_AUTHENTIC' ? AUTH_METHODS.filter((m) => m !== 'PHOTO_REVIEW') : AUTH_METHODS
+  // Any method can raise a doubt; which can verify depends on the card's risk category.
+  const methods = finding === 'VERIFIED_AUTHENTIC' ? AUTH_METHODS.filter((m) => verifyMethods.includes(m)) : AUTH_METHODS
 
   function changeFinding(next: Finding) {
     setFinding(next)
-    if (next === 'VERIFIED_AUTHENTIC' && method === 'PHOTO_REVIEW') setMethod('IN_HAND_INSPECTION')
+    if (next === 'VERIFIED_AUTHENTIC' && !verifyMethods.includes(method)) setMethod('IN_HAND_INSPECTION')
   }
 
   async function submit(e: FormEvent) {
@@ -150,6 +167,9 @@ export function VerificationForm({ base, onSaved }: { base: string; onSaved: () 
           ))}
         </select>
       </div>
+      {finding === 'VERIFIED_AUTHENTIC' && method === 'PHOTO_REVIEW' && (
+        <p className="muted small">Needs a passing close-up photo of the card.</p>
+      )}
       <input
         value={note}
         onChange={(e) => setNote(e.target.value)}
@@ -167,7 +187,8 @@ export function VerificationForm({ base, onSaved }: { base: string; onSaved: () 
   )
 }
 
-export function CustodyForm({ base, onSaved }: { base: string; onSaved: () => void }) {
+/** @param canCheck whether the user may record custody as checked (admins only) */
+export function CustodyForm({ base, canCheck, onSaved }: { base: string; canCheck: boolean; onSaved: () => void }) {
   const api = useApi()
   const [holderType, setHolderType] = useState<HolderType>('OWNER')
   const [holderName, setHolderName] = useState('')
@@ -189,7 +210,7 @@ export function CustodyForm({ base, onSaved }: { base: string; onSaved: () => vo
         holderName: holderName.trim(),
         location: location.trim(),
         heldSince,
-        verificationMethod: checked ? method : null,
+        verificationMethod: canCheck && checked ? method : null,
         note: note.trim() || null,
       }
       await api('POST', `${base}/custody-records`, body)
@@ -221,10 +242,12 @@ export function CustodyForm({ base, onSaved }: { base: string; onSaved: () => vo
         </label>
       </div>
       <div className="row">
-        <label>
-          <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} aria-label="Custody checked" /> Checked
-        </label>
-        {checked && (
+        {canCheck && (
+          <label>
+            <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} aria-label="Custody checked" /> Checked
+          </label>
+        )}
+        {canCheck && checked && (
           <select value={method} onChange={(e) => setMethod(e.target.value as CustodyMethod)} aria-label="How custody was checked">
             {CUSTODY_METHODS.map((m) => (
               <option key={m} value={m}>

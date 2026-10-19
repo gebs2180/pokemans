@@ -87,6 +87,10 @@ pokemans:
       enabled: ${PRICING_INGESTION_ENABLED:false}
       cron: "0 30 6 * * *"
       lookback: 400d
+  provenance:
+    # A custody check (vault statement, in-person visit, ...) counts this long, then lapses and the
+    # card gets no advance until it is checked again.
+    custody-check-valid-for: 90d
 
 management:
   endpoints:

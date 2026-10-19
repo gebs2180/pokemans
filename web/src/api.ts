@@ -407,7 +407,7 @@ export type AuthState =
   | 'COUNTERFEIT'
 export type HolderType = 'OWNER' | 'PARTNER' | 'VAULT' | 'GRADER' | 'LENDER' | 'OTHER'
 export type CustodyMethod = 'IN_PERSON' | 'VAULT_STATEMENT' | 'GRADER_RECEIPT' | 'VIDEO_CALL'
-export type CustodyState = 'NOT_RECORDED' | 'UNVERIFIED' | 'VERIFIED'
+export type CustodyState = 'NOT_RECORDED' | 'UNVERIFIED' | 'VERIFIED' | 'LAPSED'
 
 export type VerificationView = {
   id: string
@@ -440,9 +440,13 @@ export type ProvenanceView = {
   authFlagUnresolved: boolean
   authState: AuthState
   authenticityRisk: AuthenticityRisk | null
+  /** Methods that can verify this card as genuine (photo review only below high risk); any method can record a doubt. */
+  verifyMethods: AuthMethod[]
   verifications: VerificationView[]
   custodyVerified: boolean
   custodyState: CustodyState
+  /** When the current custody check lapses; null unless custody is verified. */
+  custodyVerifiedUntil: string | null
   custody: CustodyView | null
   custodyHistory: CustodyView[]
 }

@@ -4,7 +4,7 @@
 
 -- An admin's finding on whether a card is genuine. The latest row is the card's status, but only
 -- while the card still has the identity the finding was made against: re-identifying it as a
--- different catalog card makes it unresolved again.
+-- different catalog card starts again from that card's risk category, doubts included.
 create table authenticity_verification (
     id              uuid primary key,
     org_id          uuid        not null references org (id),
@@ -15,15 +15,17 @@ create table authenticity_verification (
                                                            'PHOTO_REVIEW')),
     note            text,
     verified_by     uuid        not null references app_user (id),
-    created_at      timestamptz not null,
-    -- Photos can raise a doubt but can't clear one.
-    constraint authenticity_verification_photo_check check (not (status = 'VERIFIED_AUTHENTIC' and method = 'PHOTO_REVIEW'))
+    -- Which methods can verify depends on the card's risk category, so the app checks it: photo
+    -- review (of a passing close-up) can verify a recent chase card but not a vintage holo or a
+    -- Japanese promo.
+    created_at      timestamptz not null
 );
 
 create index authenticity_verification_card_idx on authenticity_verification (card_item_id, created_at);
 
 -- Who holds a card, where, and since when. The latest row is current custody; a move or a check is
--- a new row. Only a row marked verified, with how it was checked, makes custody verified.
+-- a new row. Members of the card's org can record custody; only an admin can mark a row verified,
+-- with how it was checked, and a check lapses after pokemans.provenance.custody-check-valid-for.
 create table custody_record (
     id                  uuid primary key,
     org_id              uuid        not null references org (id),

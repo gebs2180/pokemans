@@ -270,11 +270,22 @@ docker-compose.yml
 **M2 status (2026-10-16): built.** The pieces still open are listed below. All are needed before the "done when" is met:
 - **Pre-grading providers:** the Ximilar and CardGrade.io adapters are built and tested against their published response shapes, but both are off. Each needs written confirmation of its terms and a key, and CardGrade.io also needs its training opt-out. Then run the controlled set through both.
 - **Identification:** automatic recognition is built and off by default. A `CardReader` port (Claude vision, `ClaudeCardReader`) reads name, number, set size, language, finish and the copyright year from the front crop. `SuggestionMatcher` ranks TCGdex candidates, mostly on number plus set size. Up to three are stored as `SUGGESTED` identifications with a confidence, and the reviewer confirms one. Readings are queued and retried like provider predictions (`card_reading`, V7). CardGrade.io's and Ximilar's identification outputs could be added as further readers. Front crops of partners' cards go to Anthropic's API; partner data-sharing terms should say so.
-- **Authenticity flags and custody (built 2026-10-18, V12):** the `provenance` module. Both tables are append-only, and the latest row counts. The review page has a panel to record each.
+- **Authenticity flags and custody (built 2026-10-18, V12):** the `provenance` module. Both tables are append-only, and the latest row counts. The review page has a panel for both. The capture page lets partners and collectors record custody.
   - **Findings:** an admin records VERIFIED_AUTHENTIC, SUSPECTED_COUNTERFEIT or COUNTERFEIT, with the method (in-hand inspection, grader slab, third-party authentication, photo review) and a note. Each finding is stored against the catalog card the card was identified as at the time.
-  - **Lifecycle:** a card is unresolved, so it has zero collateral value, when it isn't identified, when it is in a risk category with no verification, or when its latest finding is a doubt. A verification counts only for the identity it was made against, since the card got that identity. Re-identifying the card as a different catalog card, even briefly, makes it unresolved again. A doubt sticks to the physical card whatever it is re-identified as, until someone verifies it genuine.
-  - **Photos can't clear a flag:** photo review can record a doubt, but not a verification. The API and the database both refuse it.
-  - **Custody:** holder type and name, location, held since, and whether it was checked (in person, vault statement, grader receipt, video call) and by whom. Custody is verified only while the latest record was checked, so a move to a new holder needs checking again. A card with no custody record has no verified custody.
+  - **Lifecycle:** a card is unresolved, so it has zero collateral value, in three cases:
+    - it isn't identified;
+    - it is in a risk category with no verification;
+    - its latest finding is a doubt.
+
+    A finding, whether a verification or a doubt, counts only for the identity it was made against, from when the card got that identity. Re-identifying the card as a different catalog card, even briefly, starts again from the new identity's risk category (Zach, 2026-10-18).
+  - **Risk tiers (decided 2026-10-18):**
+    - **High risk:** vintage holos and 1st Editions, and Japanese promos. They are the most faked and the hardest to judge from photos, so only an in-hand inspection, a grader's slab or a third-party authentication verifies them.
+    - **Recent chase cards:** lower risk. A review of a passing close-up (DETAIL) photo can verify them too.
+    - **Any risk:** every method can record a doubt.
+  - **Custody:** holder type and name, location, held since, and whether it was checked (in person, vault statement, grader receipt, video call) and by whom.
+    - **Who records it:** members of the card's org record custody, always unverified. Only an admin records a check.
+    - **When it counts:** custody is verified only while the latest record was checked within the last 90 days (`pokemans.provenance.custody-check-valid-for`). After that it is LAPSED and gets no advance until checked again. A move to a new holder needs a new check.
+    - **No record:** a card with no custody record has no verified custody.
 - **Cert checks:** they are manual. An automated PSA cert lookup waits on a review of its API terms.
 - **Contributor terms:** the text in `Consents` is a plain-language draft for Zach to review, not reviewed legal wording.
 - **System distribution parameters:** spread, confidence penalties and the holo shift are starting values in `pokemans.condition`. Each assessment stores the values it was built with, so they can be tuned against returned grades in M5.

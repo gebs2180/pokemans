@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.pokemans.app.TestApi;
 import com.pokemans.app.TestcontainersConfiguration;
 import com.pokemans.app.identity.SecurityProperties;
+import com.pokemans.app.intake.TestImages;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -26,8 +27,9 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Authenticity flags stay unresolved until an admin verifies the card as the identity it has, and
- * custody counts only when its latest record was checked. Both histories are kept.
+ * Authenticity flags stay unresolved until an admin verifies the card as the identity it has, by a
+ * method its risk category allows, and custody counts only while its latest record's check is
+ * recent. Both histories are kept.
  */
 @SpringBootTest(properties = "pokemans.condition.worker.enabled=false")
 @AutoConfigureMockMvc
@@ -41,6 +43,12 @@ class ProvenanceFlowTest {
     /** A common modern English card: no risk category. */
     private static final String COMMON = "{\"provider\":\"MANUAL\",\"language\":\"en\",\"edition\":\"UNLIMITED\",\"variant\":\"NORMAL\","
             + "\"setName\":\"Roaring Skies\",\"setReleaseDate\":\"2015-05-06\",\"number\":\"1/108\",\"name\":\"Ledyba\",\"rarity\":\"Common\"}";
+
+    /** A recent top-rarity card: an authenticity risk, but not a high one. */
+    private static final String CHASE = "{\"provider\":\"MANUAL\",\"language\":\"en\",\"edition\":\"UNLIMITED\","
+            + "\"variant\":\"HOLO\",\"setName\":\"Recent Set\",\"setReleaseDate\":\""
+            + LocalDate.now(ZoneOffset.UTC).minusMonths(6) + "\",\"number\":\"199/165\",\"name\":\"Charizard ex\","
+            + "\"rarity\":\"Special Illustration Rare\"}";
 
     @Autowired
     private MockMvc mvc;
@@ -82,10 +90,12 @@ class ProvenanceFlowTest {
                 .andExpect(jsonPath("$.authenticityRisk").value("JAPANESE_PROMO"))
                 .andExpect(jsonPath("$.authFlagUnresolved").value(true));
 
-        // Members can read but not verify; photos can't clear a flag.
+        // Members can read but not verify; photos can't clear a high-risk card.
         api.postJson(adminBase() + "/authenticity-verifications",
                 "{\"status\":\"VERIFIED_AUTHENTIC\",\"method\":\"IN_HAND_INSPECTION\"}", collector).andExpect(status().isForbidden());
         verify("VERIFIED_AUTHENTIC", "PHOTO_REVIEW").andExpect(status().isBadRequest());
+        read().andExpect(jsonPath("$.verifyMethods.length()").value(3))
+                .andExpect(jsonPath("$.verifyMethods[?(@ == 'PHOTO_REVIEW')]").isEmpty());
 
         verify("VERIFIED_AUTHENTIC", "IN_HAND_INSPECTION")
                 .andExpect(status().isCreated())
@@ -110,12 +120,15 @@ class ProvenanceFlowTest {
         identify(JP_PROMO.formatted("001/SV-P"));
         read().andExpect(jsonPath("$.authState").value("AWAITING_VERIFICATION"));
 
-        // A doubt sticks to the physical card, even once it's identified as a card with no risk category.
-        verify("SUSPECTED_COUNTERFEIT", "PHOTO_REVIEW").andExpect(jsonPath("$.authState").value("SUSPECTED_COUNTERFEIT"));
+        // Any method can raise a doubt. Like a verification, it was about the identity the card had then.
+        verify("SUSPECTED_COUNTERFEIT", "PHOTO_REVIEW").andExpect(jsonPath("$.authState").value("SUSPECTED_COUNTERFEIT"))
+                .andExpect(jsonPath("$.authFlagUnresolved").value(true));
         identify(COMMON);
         read().andExpect(jsonPath("$.authenticityRisk").value("NONE"))
-                .andExpect(jsonPath("$.authState").value("SUSPECTED_COUNTERFEIT"))
-                .andExpect(jsonPath("$.authFlagUnresolved").value(true));
+                .andExpect(jsonPath("$.authState").value("NOT_FLAGGED"))
+                .andExpect(jsonPath("$.authFlagUnresolved").value(false));
+        identify(JP_PROMO.formatted("001/SV-P"));
+        read().andExpect(jsonPath("$.authState").value("AWAITING_VERIFICATION"));
         verify("VERIFIED_AUTHENTIC", "GRADER_SLAB")
                 .andExpect(jsonPath("$.authState").value("VERIFIED_AUTHENTIC"))
                 .andExpect(jsonPath("$.verifications.length()").value(3))
@@ -137,6 +150,20 @@ class ProvenanceFlowTest {
     }
 
     @Test
+    void aRecentChaseCardCanBeVerifiedFromAPassingCloseUp() throws Exception {
+        identify(CHASE);
+        read().andExpect(jsonPath("$.authenticityRisk").value("RECENT_CHASE"))
+                .andExpect(jsonPath("$.authState").value("AWAITING_VERIFICATION"))
+                .andExpect(jsonPath("$.verifyMethods.length()").value(4));
+        verify("VERIFIED_AUTHENTIC", "PHOTO_REVIEW").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("close-up")));
+
+        api.uploadPhoto(orgId, cardId, "DETAIL", TestImages.goodBack(), collector).andExpect(jsonPath("$.status").value("PASSED"));
+        verify("VERIFIED_AUTHENTIC", "PHOTO_REVIEW").andExpect(status().isCreated())
+                .andExpect(jsonPath("$.authState").value("VERIFIED_AUTHENTIC"));
+    }
+
+    @Test
     void custodyIsVerifiedOnlyWhileItsLatestRecordWasChecked() throws Exception {
         String today = LocalDate.now(ZoneOffset.UTC).toString();
         custody("OWNER", "Sam", "Home safe", today, null)
@@ -149,7 +176,8 @@ class ProvenanceFlowTest {
                 .andExpect(jsonPath("$.custodyState").value("VERIFIED"))
                 .andExpect(jsonPath("$.custodyVerified").value(true))
                 .andExpect(jsonPath("$.custody.verificationMethod").value("VAULT_STATEMENT"))
-                .andExpect(jsonPath("$.custody.verifiedBy").isNotEmpty());
+                .andExpect(jsonPath("$.custody.verifiedBy").isNotEmpty())
+                .andExpect(jsonPath("$.custodyVerifiedUntil").isNotEmpty());
         assertThat(provenance.status(UUID.fromString(cardId)).custodyVerified()).isTrue();
 
         // Sent to a grader: a new holder nobody has checked yet.
@@ -162,21 +190,50 @@ class ProvenanceFlowTest {
 
         custody("OWNER", "Sam", "Home", LocalDate.now(ZoneOffset.UTC).plusDays(5).toString(), null).andExpect(status().isBadRequest());
         custody("OWNER", " ", "Home", today, null).andExpect(status().isBadRequest());
-        api.postJson(adminBase() + "/custody-records", custodyJson("OWNER", "Sam", "Home", today, "IN_PERSON"), collector)
+
+        // Members record custody, but only an admin can record it as checked.
+        api.postJson(memberBase() + "/custody-records", custodyJson("OWNER", "Sam", "Home", today, "IN_PERSON"), collector)
                 .andExpect(status().isForbidden());
+        api.postJson(memberBase() + "/custody-records", custodyJson("OWNER", "Sam", "Home safe", today, null), collector)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.custodyState").value("UNVERIFIED"))
+                .andExpect(jsonPath("$.custody.holderName").value("Sam"));
 
         // Members read it; outsiders and other orgs' paths get nothing.
         api.get("/api/orgs/" + orgId + "/cards/" + cardId + "/provenance", collector)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.custody.holderName").value("PSA"));
+                .andExpect(jsonPath("$.custody.holderName").value("Sam"));
         api.get("/api/orgs/" + orgId + "/cards/" + cardId + "/provenance", api.user("auth0|provenance-outsider", List.of()))
                 .andExpect(status().isNotFound());
         String otherOrg = api.collectorOrg("Other " + UUID.randomUUID(), "auth0|provenance-other-" + UUID.randomUUID());
-        api.postJson("/api/admin/orgs/" + otherOrg + "/cards/" + cardId + "/custody-records",
+        api.postJson("/api/orgs/" + otherOrg + "/cards/" + cardId + "/custody-records",
                 custodyJson("OWNER", "Sam", "Home", today, null), api.admin()).andExpect(status().isNotFound());
 
         assertThatThrownBy(() -> jdbc.update("update custody_record set verified = true where card_item_id = ?",
                 UUID.fromString(cardId))).hasMessageContaining("append-only");
+    }
+
+    @Test
+    void aCustodyCheckLapsesAfterNinetyDays() throws Exception {
+        String today = LocalDate.now(ZoneOffset.UTC).toString();
+        custody("VAULT", "Card Vault Co", "Unit 4", today, "VAULT_STATEMENT").andExpect(jsonPath("$.custodyState").value("VERIFIED"));
+        // The same check made 91 days ago instead. The API stamps rows with the current time, and rows
+        // can't be updated, so the old one is written directly in its place.
+        UUID card = UUID.fromString(cardId);
+        UUID admin = jdbc.queryForObject("select verified_by from custody_record where card_item_id = ?", UUID.class, card);
+        jdbc.update("delete from custody_record where card_item_id = ?", card);
+        jdbc.update("""
+                insert into custody_record (id, org_id, card_item_id, holder_type, holder_name, location, held_since, verified,
+                    verification_method, verified_by, recorded_by, created_at)
+                values (?, ?, ?, 'VAULT', 'Card Vault Co', 'Unit 4', ?, true, 'VAULT_STATEMENT', ?, ?, now() - interval '91 days')""",
+                UUID.randomUUID(), UUID.fromString(orgId), card, LocalDate.now(ZoneOffset.UTC).minusDays(100), admin, admin);
+
+        read().andExpect(jsonPath("$.custodyState").value("LAPSED"))
+                .andExpect(jsonPath("$.custodyVerified").value(false))
+                .andExpect(jsonPath("$.custodyVerifiedUntil").isEmpty());
+        Provenance.Status status = provenance.status(UUID.fromString(cardId));
+        assertThat(status.custodyVerified()).isFalse();
+        assertThat(status.custodyState()).isEqualTo(Provenance.CustodyState.LAPSED);
     }
 
     @Test
@@ -185,6 +242,10 @@ class ProvenanceFlowTest {
         Map<UUID, Provenance.Status> status = provenance.status(List.of(unknown));
         assertThat(status.get(unknown).authFlagUnresolved()).isTrue();
         assertThat(status.get(unknown).custodyVerified()).isFalse();
+    }
+
+    private String memberBase() {
+        return "/api/orgs/" + orgId + "/cards/" + cardId;
     }
 
     private String adminBase() {
@@ -205,7 +266,7 @@ class ProvenanceFlowTest {
     }
 
     private ResultActions custody(String holderType, String holder, String location, String since, String method) throws Exception {
-        return api.postJson(adminBase() + "/custody-records", custodyJson(holderType, holder, location, since, method), api.admin());
+        return api.postJson(memberBase() + "/custody-records", custodyJson(holderType, holder, location, since, method), api.admin());
     }
 
     private static String custodyJson(String holderType, String holder, String location, String since, String method) {

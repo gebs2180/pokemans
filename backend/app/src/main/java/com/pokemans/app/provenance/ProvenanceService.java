@@ -40,20 +40,31 @@ class ProvenanceService {
     @Transactional
     AuthenticityVerification verify(UUID orgId, UUID cardId, Provenance.Finding finding, Provenance.AuthMethod method, String note) {
         cardItems.requireAccessible(orgId, cardId);
-        if (finding == Provenance.Finding.VERIFIED_AUTHENTIC && method == Provenance.AuthMethod.PHOTO_REVIEW) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Photos can raise a doubt but can't verify a card: inspect it in hand, or use a slab or an authentication service");
-        }
         Catalog.IdentifiedCard identity = catalog.current(cardId).orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
                 "Confirm the card's identity first: a verification is made against it"));
+        if (finding == Provenance.Finding.VERIFIED_AUTHENTIC && method == Provenance.AuthMethod.PHOTO_REVIEW) {
+            if (!Provenance.canVerify(identity.authenticityRisk(), method)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A high-risk card (vintage holo, 1st Edition or Japanese "
+                        + "promo) can't be verified from photos: inspect it in hand, or use a slab or an authentication service");
+            }
+            if (cardItems.passedPhotos(cardId).stream().noneMatch(p -> p.side().equals("DETAIL"))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Verifying from photos needs a passing close-up photo of the card");
+            }
+        }
         return verifications.save(new AuthenticityVerification(orgId, cardId, identity.catalogCardId(), finding, method,
                 blankToNull(note), currentUser.id()));
     }
 
-    /** Records who holds the card. The card must belong to the org. */
+    /**
+     * Records who holds the card. Members of the card's org may record custody; only an admin can
+     * record it as checked.
+     */
     @Transactional
     CustodyRecord recordCustody(UUID orgId, UUID cardId, CustodyEntry entry) {
         cardItems.requireAccessible(orgId, cardId);
+        if (entry.verificationMethod() != null && !currentUser.isAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only an admin can record custody as checked");
+        }
         // A day's grace for the reviewer's time zone being ahead of UTC.
         if (entry.heldSince().isAfter(LocalDate.now(ZoneOffset.UTC).plusDays(1))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Custody can't start in the future");

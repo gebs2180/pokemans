@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { apiPath, uploadToStorage, useApi, type CardView, type Grader, type OutcomeView, type PhotoView, type Side, type UploadSlot } from '../api'
 import { useLoad } from '../useLoad'
 import { useOrg } from '../useOrg'
+import { ProvenancePanel } from './ProvenancePanel'
 
 const SIDE_LABEL: Record<Side, string> = { FRONT: 'Front', BACK: 'Back', DETAIL: 'Close-up' }
 
@@ -87,6 +88,8 @@ export function CardPage() {
         )
       })}
       {org?.type === 'CONTRIBUTOR' && !card.lot && <GradedResult orgId={orgId} cardId={cardId} ready={card.captureComplete} />}
+      {/* Who holds the card: needed before it can back an advance. We check it; members record it. */}
+      {org && org.type !== 'CONTRIBUTOR' && <ProvenancePanel orgId={orgId} cardId={cardId} admin={false} />}
     </>
   )
 }

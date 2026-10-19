@@ -87,6 +87,8 @@ class CrossOrgAccessTest {
                 postJson(p + "/cards/" + cardB + "/outcomes", "{\"grader\":\"PSA\",\"certNumber\":\"" + System.nanoTime() + "\",\"grade\":9}"),
                 get(p + "/cards/" + cardB + "/identification"),
                 get(p + "/cards/" + cardB + "/provenance"),
+                postJson(p + "/cards/" + cardB + "/custody-records",
+                        "{\"holderType\":\"OWNER\",\"holderName\":\"x\",\"location\":\"x\",\"heldSince\":\"2026-01-01\"}"),
                 get(p + "/consent"));
     }
 
@@ -128,8 +130,6 @@ class CrossOrgAccessTest {
                 post("/api/admin/orgs/" + orgB + "/cards/" + cardB + "/readings"),
                 postJson("/api/admin/orgs/" + orgB + "/cards/" + cardB + "/authenticity-verifications",
                         "{\"status\":\"VERIFIED_AUTHENTIC\",\"method\":\"IN_HAND_INSPECTION\"}"),
-                postJson("/api/admin/orgs/" + orgB + "/cards/" + cardB + "/custody-records",
-                        "{\"holderType\":\"OWNER\",\"holderName\":\"x\",\"location\":\"x\",\"heldSince\":\"2026-01-01\",\"verificationMethod\":\"IN_PERSON\"}"),
                 get("/api/admin/catalog-cards/" + catalogCard + "/prices"),
                 postJson("/api/admin/catalog-cards/" + catalogCard + "/comps", "{}"),
                 post("/api/admin/catalog-cards/" + catalogCard + "/prices/refresh"));

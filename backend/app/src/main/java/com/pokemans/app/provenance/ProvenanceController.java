@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -20,8 +21,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Authenticity findings and custody per card. Recording either is admin work; members of the
- * card's org can read both.
+ * Authenticity findings and custody per card. Findings are admin work. Members of the card's org
+ * can read both and record custody, but only an admin can record custody as checked.
  */
 @RestController
 class ProvenanceController {
@@ -49,14 +50,17 @@ class ProvenanceController {
     }
 
     /**
-     * @param authenticityRisk the current identity's risk category, or null if not identified
-     * @param verifications    findings, newest first
+     * @param authenticityRisk     the current identity's risk category, or null if not identified
+     * @param verifyMethods        the methods that can verify this card as genuine; any method can record a doubt
+     * @param verifications        findings, newest first
+     * @param custodyVerifiedUntil when the current custody check lapses, or null if custody isn't verified
      * @param custody          current custody, or null if none is recorded
      * @param custodyHistory   custody records, current first
      */
     record ProvenanceView(UUID cardId, boolean authFlagUnresolved, Provenance.AuthState authState,
-                          AuthenticityRisk authenticityRisk, List<VerificationView> verifications, boolean custodyVerified,
-                          Provenance.CustodyState custodyState, CustodyView custody, List<CustodyView> custodyHistory) {
+                          AuthenticityRisk authenticityRisk, List<Provenance.AuthMethod> verifyMethods,
+                          List<VerificationView> verifications, boolean custodyVerified, Provenance.CustodyState custodyState,
+                          Instant custodyVerifiedUntil, CustodyView custody, List<CustodyView> custodyHistory) {
     }
 
     private final ProvenanceService service;
@@ -78,7 +82,8 @@ class ProvenanceController {
         return view(cardId);
     }
 
-    @PostMapping("/api/admin/orgs/{orgId}/cards/{cardId}/custody-records")
+    /** Members record who holds the card; only an admin can record custody as checked. */
+    @PostMapping("/api/orgs/{orgId}/cards/{cardId}/custody-records")
     @ResponseStatus(HttpStatus.CREATED)
     ProvenanceView recordCustody(@PathVariable UUID orgId, @PathVariable UUID cardId, @Valid @RequestBody CustodyRequest r) {
         service.recordCustody(orgId, cardId, new ProvenanceService.CustodyEntry(r.holderType(), r.holderName(), r.location(),
@@ -104,7 +109,10 @@ class ProvenanceController {
                         c.isVerified(), c.getVerificationMethod(), c.getVerifiedBy(), c.getNote(), c.getRecordedBy(),
                         c.getCreatedAt()))
                 .toList();
-        return new ProvenanceView(cardId, status.authFlagUnresolved(), status.authState(), status.authenticityRisk(), findings,
-                status.custodyVerified(), status.custodyState(), custody.isEmpty() ? null : custody.getFirst(), custody);
+        List<Provenance.AuthMethod> verifyMethods = identity == null ? List.of() : Arrays.stream(Provenance.AuthMethod.values())
+                .filter(m -> Provenance.canVerify(identity.authenticityRisk(), m)).toList();
+        return new ProvenanceView(cardId, status.authFlagUnresolved(), status.authState(), status.authenticityRisk(), verifyMethods,
+                findings, status.custodyVerified(), status.custodyState(), status.custodyVerifiedUntil(),
+                custody.isEmpty() ? null : custody.getFirst(), custody);
     }
 }
