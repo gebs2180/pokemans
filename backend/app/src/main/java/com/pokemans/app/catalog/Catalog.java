@@ -1,5 +1,6 @@
 package com.pokemans.app.catalog;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -15,11 +16,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class Catalog {
 
-    /** A physical card's current identity. */
+    /**
+     * A physical card's current identity.
+     *
+     * @param identifiedSince when the card was first confirmed as this catalog card, counting from the
+     *                        last time it was confirmed as a different one: findings made before then
+     *                        were about another identity
+     */
     public record IdentifiedCard(UUID cardItemId, UUID catalogCardId, String language, String setName, String seriesName,
                                  LocalDate setReleaseDate, String number, String name, String rarity, Edition edition,
                                  Variant variant, String stamp, boolean promo, AuthenticityRisk authenticityRisk,
-                                 String imageUrl) {
+                                 String imageUrl, Instant identifiedSince) {
     }
 
     /** A canonical card identity, for modules that work per catalog card (pricing). */
@@ -46,14 +53,27 @@ public class Catalog {
         if (cardItemIds.isEmpty()) {
             return Map.of();
         }
-        var latest = identifications.findCurrent(cardItemIds);
-        Map<UUID, CatalogCard> cards = catalogCards.findAllById(latest.stream().map(CardIdentification::getCatalogCardId).toList())
+        // Confirmed identifications, newest first per card: the first is current, and the run of rows
+        // with the same catalog card behind it says since when.
+        Map<UUID, List<CardIdentification>> confirmed = identifications
+                .findByCardItemIdInAndStatusOrderByCreatedAtDesc(cardItemIds, CardIdentification.Status.CONFIRMED).stream()
+                .collect(Collectors.groupingBy(CardIdentification::getCardItemId));
+        Map<UUID, CatalogCard> cards = catalogCards.findAllById(confirmed.values().stream()
+                        .map(list -> list.getFirst().getCatalogCardId()).distinct().toList())
                 .stream().collect(Collectors.toMap(CatalogCard::getId, Function.identity()));
-        return latest.stream().collect(Collectors.toMap(CardIdentification::getCardItemId, i -> {
-            CatalogCard c = cards.get(i.getCatalogCardId());
-            return new IdentifiedCard(i.getCardItemId(), c.getId(), c.getLanguage(), c.getSetName(), c.getSeriesName(),
+        return confirmed.values().stream().collect(Collectors.toMap(list -> list.getFirst().getCardItemId(), list -> {
+            CardIdentification current = list.getFirst();
+            Instant since = current.getCreatedAt();
+            for (CardIdentification earlier : list) {
+                if (!earlier.getCatalogCardId().equals(current.getCatalogCardId())) {
+                    break;
+                }
+                since = earlier.getCreatedAt();
+            }
+            CatalogCard c = cards.get(current.getCatalogCardId());
+            return new IdentifiedCard(current.getCardItemId(), c.getId(), c.getLanguage(), c.getSetName(), c.getSeriesName(),
                     c.getSetReleaseDate(), c.getNumber(), c.getName(), c.getRarity(), c.getEdition(), c.getVariant(),
-                    c.getStamp(), c.isPromo(), c.getAuthenticityRisk(), c.getImageUrl());
+                    c.getStamp(), c.isPromo(), c.getAuthenticityRisk(), c.getImageUrl(), since);
         }));
     }
 

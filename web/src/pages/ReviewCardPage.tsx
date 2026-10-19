@@ -17,6 +17,7 @@ import {
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { PricesPanel } from './PricesPanel'
+import { ProvenancePanel } from './ProvenancePanel'
 
 const EDITIONS: Edition[] = ['UNLIMITED', 'FIRST_EDITION', 'SHADOWLESS']
 const VARIANTS: Variant[] = ['NORMAL', 'HOLO', 'REVERSE_HOLO']
@@ -73,6 +74,12 @@ export function ReviewCardPage() {
           <p className="muted">Confirm the card's identity first: comps and prices attach to the catalog card.</p>
         </section>
       )}
+      {/* Keyed on the identity: re-identifying can unresolve the authenticity flag. */}
+      <ProvenancePanel
+        key={data.identification ? `${data.identification.catalogCardId}@${data.identification.identifiedSince}` : 'none'}
+        orgId={orgId}
+        cardId={cardId}
+      />
       <Predictions data={data} base={base} onChange={reload} />
       <AssessmentPanel key={current?.id ?? 'none'} data={data} current={current} base={base} onChange={reload} />
     </>

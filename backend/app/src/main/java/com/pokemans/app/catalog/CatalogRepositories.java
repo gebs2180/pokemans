@@ -17,12 +17,8 @@ interface CardIdentificationRepository extends JpaRepository<CardIdentification,
 
     List<CardIdentification> findByCardItemIdOrderByCreatedAtDesc(UUID cardItemId);
 
-    /** Latest confirmed identification per card, for the given cards. */
-    @Query(nativeQuery = true, value = """
-            select distinct on (card_item_id) * from card_identification
-            where card_item_id in (:cardItemIds) and status = 'CONFIRMED'
-            order by card_item_id, created_at desc""")
-    List<CardIdentification> findCurrent(Collection<UUID> cardItemIds);
+    List<CardIdentification> findByCardItemIdInAndStatusOrderByCreatedAtDesc(Collection<UUID> cardItemIds,
+                                                                            CardIdentification.Status status);
 
     List<CardIdentification> findByReadingIdOrderByConfidenceDesc(UUID readingId);
 
