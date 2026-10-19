@@ -193,6 +193,8 @@ export type IdentifiedCard = {
   promo: boolean
   authenticityRisk: AuthenticityRisk
   imageUrl: string | null
+  /** When the card was first confirmed as this catalog card since it was last something else. */
+  identifiedSince: string
 }
 
 export type ReviewPhoto = { id: string; side: Side; url: string; cropUrl: string | null; capturedAt: string | null }
@@ -391,3 +393,73 @@ export type PriceTable = {
 }
 
 export type PricesView = { catalogCardId: string; comps: CompView[]; tables: PriceTable[]; skipped: string[] }
+
+// Provenance: authenticity findings and custody
+
+export type Finding = 'VERIFIED_AUTHENTIC' | 'SUSPECTED_COUNTERFEIT' | 'COUNTERFEIT'
+export type AuthMethod = 'IN_HAND_INSPECTION' | 'GRADER_SLAB' | 'THIRD_PARTY_AUTHENTICATION' | 'PHOTO_REVIEW'
+export type AuthState =
+  | 'NOT_FLAGGED'
+  | 'VERIFIED_AUTHENTIC'
+  | 'NOT_IDENTIFIED'
+  | 'AWAITING_VERIFICATION'
+  | 'SUSPECTED_COUNTERFEIT'
+  | 'COUNTERFEIT'
+export type HolderType = 'OWNER' | 'PARTNER' | 'VAULT' | 'GRADER' | 'LENDER' | 'OTHER'
+export type CustodyMethod = 'IN_PERSON' | 'VAULT_STATEMENT' | 'GRADER_RECEIPT' | 'VIDEO_CALL'
+export type CustodyState = 'NOT_RECORDED' | 'UNVERIFIED' | 'VERIFIED' | 'LAPSED'
+
+export type VerificationView = {
+  id: string
+  status: Finding
+  method: AuthMethod
+  note: string | null
+  catalogCardId: string
+  /** False once the card has been re-identified as something else. */
+  forCurrentIdentity: boolean
+  /** The card's photos the finding was based on. */
+  photoIds: string[]
+  verifiedBy: string
+  createdAt: string
+}
+
+export type CustodyView = {
+  id: string
+  holderType: HolderType
+  holderName: string
+  location: string
+  heldSince: string
+  verified: boolean
+  verificationMethod: CustodyMethod | null
+  verifiedBy: string | null
+  note: string | null
+  recordedBy: string
+  createdAt: string
+}
+
+export type ProvenanceView = {
+  cardId: string
+  authFlagUnresolved: boolean
+  authState: AuthState
+  authenticityRisk: AuthenticityRisk | null
+  /** Methods that can verify this card as genuine (photo review only below high risk); any method can record a doubt. */
+  verifyMethods: AuthMethod[]
+  verifications: VerificationView[]
+  custodyVerified: boolean
+  custodyState: CustodyState
+  /** When the current custody check lapses; null unless custody is verified. */
+  custodyVerifiedUntil: string | null
+  custody: CustodyView | null
+  custodyHistory: CustodyView[]
+}
+
+export type VerifyRequest = { status: Finding; method: AuthMethod; note: string | null; photoIds: string[] }
+
+export type CustodyRequest = {
+  holderType: HolderType
+  holderName: string
+  location: string
+  heldSince: string
+  verificationMethod: CustodyMethod | null
+  note: string | null
+}

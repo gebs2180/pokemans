@@ -98,7 +98,8 @@ The methodology's worked example (FMV $411 → RV $481 → QSV $314 → stressed
 | Module | Owns |
 |---|---|
 | `identity` | Orgs, users, roles, invites, data-sharing agreements and training consent |
-| `intake` | Collections, submission batches, card items, photos, photo quality checks, custody records, authenticity flags |
+| `intake` | Collections, submission batches, card items, photos, photo quality checks |
+| `provenance` | Authenticity verifications and custody records per card item (built 2026-10-18; it needs both `intake` and `catalog`, so it isn't part of `intake`) |
 | `catalog` | Catalog cards and variants, identification (provider suggestion + reviewer confirm) |
 | `condition` | Provider predictions (append-only), assessed distributions (versioned), reviewer adjustments, review queue |
 | `pricing` | Comp ingestion, per-grade price snapshots, step-down ratio tables, volatility and liquidity stats |
@@ -110,7 +111,7 @@ The methodology's worked example (FMV $411 → RV $481 → QSV $314 → stressed
 Modules talk through published interfaces and application events (e.g. `PhotosAccepted`, `CardIdentified`, `AssessmentFinalized`, `GradeReturned`), not each other's repositories.
 
 **Built so far (M3 skeleton, 2026-10-16):** `identity`, `storage`, `intake`, `catalog`, `condition`, `outcomes` and `pricing`.
-- **Published APIs:** each module exposes a small public API: `intake.CardItems` (cards, passing photos, the `CaptureCompleted` event), `catalog.Catalog` (current identity per card, and the identified catalog cards), `identity.Consents` and `pricing.Prices` (a card's latest snapshot set).
+- **Published APIs:** each module exposes a small public API: `intake.CardItems` (cards, passing photos, the `CaptureCompleted` event), `catalog.Catalog` (current identity per card, and the identified catalog cards), `identity.Consents` and `pricing.Prices` (a card's latest snapshot set). `provenance.Provenance` gives each card's two eligibility gates: `authFlagUnresolved` with its reason, and `custodyVerified`.
 - **Review queue:** it lives in `condition`, not `admin`.
 - **Contributor consent:** it lives in `identity` as a versioned terms text plus append-only acceptances that store the hash of the exact text.
 
@@ -269,7 +270,23 @@ docker-compose.yml
 **M2 status (2026-10-16): built.** The pieces still open are listed below. All are needed before the "done when" is met:
 - **Pre-grading providers:** the Ximilar and CardGrade.io adapters are built and tested against their published response shapes, but both are off. Each needs written confirmation of its terms and a key, and CardGrade.io also needs its training opt-out. Then run the controlled set through both.
 - **Identification:** automatic recognition is built and off by default. A `CardReader` port (Claude vision, `ClaudeCardReader`) reads name, number, set size, language, finish and the copyright year from the front crop. `SuggestionMatcher` ranks TCGdex candidates, mostly on number plus set size. Up to three are stored as `SUGGESTED` identifications with a confidence, and the reviewer confirms one. Readings are queued and retried like provider predictions (`card_reading`, V7). CardGrade.io's and Ximilar's identification outputs could be added as further readers. Front crops of partners' cards go to Anthropic's API; partner data-sharing terms should say so.
-- **Authenticity flags:** authenticity-risk categories are computed and shown. The flag lifecycle (verify, zero value until verified) and custody records are still to build, before M4 eligibility.
+- **Authenticity flags and custody (built 2026-10-18, V12):** the `provenance` module. Both tables are append-only, and the latest row counts. The review page has a panel for both. The capture page lets partners and collectors record custody.
+  - **Findings:** an admin records VERIFIED_AUTHENTIC, SUSPECTED_COUNTERFEIT or COUNTERFEIT, with the method (in-hand inspection, grader slab, third-party authentication, photo review), a note, and the card's photos it was based on (any number, `authenticity_verification_photo`). A photo review has to name its photos, and all of them must be the card's passing photos. Each finding is stored against the catalog card the card was identified as at the time.
+  - **Lifecycle:** a card is unresolved, so it has zero collateral value, in three cases:
+    - it isn't identified;
+    - it is in a risk category with no verification;
+    - its latest finding is a doubt.
+
+    A finding, whether a verification or a doubt, counts only for the identity it was made against, from when the card got that identity. Re-identifying the card as a different catalog card, even briefly, starts again from the new identity's risk category (Zach, 2026-10-18).
+  - **Risk tiers (decided 2026-10-18):**
+    - **High risk:** vintage holos and 1st Editions, and Japanese promos. They are the most faked and the hardest to judge from photos, so only an in-hand inspection, a grader's slab or a third-party authentication verifies them.
+    - **Recent chase cards:** lower risk. A photo review can verify them too, if the photos it names include a passing close-up (DETAIL).
+    - **Every card gets both gates (Zach, 2026-10-18):** this covers every card at or above the $25 minimum and unidentified cards, which count as unresolved. Bulk lots aren't really supported.
+    - **Any risk:** every method can record a doubt.
+  - **Custody:** holder type and name, location, held since, and whether it was checked (in person, vault statement, grader receipt, video call) and by whom.
+    - **Who records it:** members of the card's org record custody, always unverified. Only an admin records a check.
+    - **When it counts:** custody is verified only while the latest record was checked within the last 90 days (`pokemans.provenance.custody-check-valid-for`). After that it is LAPSED and gets no advance until checked again. A move to a new holder needs a new check.
+    - **No record:** a card with no custody record has no verified custody.
 - **Cert checks:** they are manual. An automated PSA cert lookup waits on a review of its API terms.
 - **Contributor terms:** the text in `Consents` is a plain-language draft for Zach to review, not reviewed legal wording.
 - **System distribution parameters:** spread, confidence penalties and the holo shift are starting values in `pokemans.condition`. Each assessment stores the values it was built with, so they can be tuned against returned grades in M5.
