@@ -13,8 +13,9 @@ import org.junit.jupiter.api.Test;
  * A hypothetical raw vintage holo: FMV $411, RV $481, QSV $314, stressed FMV $181, FLV $107,
  * advance $64 at α = 60%. The doc rounds to whole dollars; so does this test.
  *
- * <p>Net prices are taken from the doc's grade table as given (grades 4 and 3 derived by the 0.78
- * step-down). The pricer's own derivation is covered in {@link GradePricerTest}.
+ * <p>Net prices are taken from the doc's grade table as given: only grades 5 to 10 have sales, so
+ * grades 4 down to 1 are derived by the 0.78 step-down. The pricer's own derivation is covered in
+ * {@link GradePricerTest}.
  */
 class WorkedExampleGoldenTest {
 
@@ -48,9 +49,9 @@ class WorkedExampleGoldenTest {
         prices.put(Grade.G5, GradePrice.given(Grade.G5, d("170"), GradePrice.Method.OBSERVED, sales));
         prices.put(Grade.G4, GradePrice.given(Grade.G4, d("133"), GradePrice.Method.STEP_DOWN, 0));
         prices.put(Grade.G3, GradePrice.given(Grade.G3, d("104"), GradePrice.Method.STEP_DOWN, 0));
-        prices.put(Grade.G2, GradePrice.given(Grade.G2, d("85"), GradePrice.Method.OBSERVED, sales));
-        // Not in the doc's table; carries no probability centrally or under stress.
-        prices.put(Grade.G1, GradePrice.given(Grade.G1, d("66"), GradePrice.Method.STEP_DOWN, 0));
+        prices.put(Grade.G2, GradePrice.given(Grade.G2, d("81"), GradePrice.Method.STEP_DOWN, 0));
+        // Carries no probability centrally or under stress.
+        prices.put(Grade.G1, GradePrice.given(Grade.G1, d("63"), GradePrice.Method.STEP_DOWN, 0));
         prices.put(Grade.U, GradePrice.given(Grade.U, d("60"), GradePrice.Method.OBSERVED, sales));
         return new GradePriceTable(prices, new Trace());
     }
@@ -73,7 +74,7 @@ class WorkedExampleGoldenTest {
     @Test
     void theStressNeverGainsFromAGradeOnePremium() {
         // A PSA 1 premium (PSA 1 collectors) above grades 2-4: the stress shifts a grade 3 card into grade 1,
-        // which must not raise its value. Stressed prices are capped at the grade above, so grade 1 counts at 85.
+        // which must not raise its value. Stressed prices are capped at the grade above, so grade 1 counts at 81.
         Map<Grade, GradePrice> prices = new EnumMap<>(examplePrices().all().stream()
                 .collect(java.util.stream.Collectors.toMap(GradePrice::grade, p -> p)));
         prices.put(Grade.G1, GradePrice.given(Grade.G1, d("500"), GradePrice.Method.OBSERVED, 12));
@@ -83,7 +84,7 @@ class WorkedExampleGoldenTest {
                 GradeDistribution.of(p), new GradePriceTable(prices, new Trace()), d("0.08"), d("10"), 1, Confidence.A));
 
         assertThat(value.fmv()).isEqualByComparingTo("104.00");
-        assertThat(value.stressedFmv()).isEqualByComparingTo("85.00");
+        assertThat(value.stressedFmv()).isEqualByComparingTo("81.00");
     }
 
     @Test
@@ -125,8 +126,8 @@ class WorkedExampleGoldenTest {
         assertThat(v.fmv()).isEqualByComparingTo("410.95");
         assertThat(v.rv()).isEqualByComparingTo("480.81");
         assertThat(v.qsv()).isEqualByComparingTo("314.38");
-        assertThat(v.stressedFmv()).isEqualByComparingTo("181.39");
-        assertThat(v.flv()).isEqualByComparingTo("107.36");
+        assertThat(v.stressedFmv()).isEqualByComparingTo("181.19");
+        assertThat(v.flv()).isEqualByComparingTo("107.25");
         assertThat(v.liquidityTier()).isEqualTo(ParameterSet.LiquidityTier.MID);
         assertThat(v.searchPremium()).isEqualByComparingTo("0.05");
         assertThat(v.speedDiscount()).isEqualByComparingTo("0.10");
