@@ -28,6 +28,33 @@ public final class GradePriceTable {
         this.trace = trace;
     }
 
+    /**
+     * A table from gross snapshot prices (pricing stores them gross), netted of {@code cost} the way
+     * {@link GradePricer} nets: each gradable grade at its {@link GradingCost#netPrice}, U unchanged
+     * because it is already a raw sale price. Snapshots carry no raw-condition prices, so there is no
+     * raw-sale override here.
+     */
+    public static GradePriceTable netOf(Collection<GradePrice> grossPrices, GradingCost cost) {
+        Trace trace = new Trace();
+        EnumMap<Grade, GradePrice> netted = new EnumMap<>(Grade.class);
+        for (GradePrice p : grossPrices) {
+            BigDecimal net = p.grade().isUngradable() ? p.gross() : cost.netPrice(p.gross());
+            if (!p.grade().isUngradable()) {
+                trace.add("net[" + p.grade() + "]", "net of grading cost", net, "gross " + p.gross() + " - fixed " + cost.fixed()
+                        + " - time-to-cash " + Money.cents(cost.waitingCost(p.gross())));
+            }
+            netted.put(p.grade(), p.withNet(net));
+        }
+        return new GradePriceTable(netted, trace);
+    }
+
+    /** The same prices with every net set to its gross: a graded card, or the grade-first lift's raw FLV. */
+    public GradePriceTable atGross() {
+        EnumMap<Grade, GradePrice> gross = new EnumMap<>(Grade.class);
+        prices.forEach((grade, p) -> gross.put(grade, p.withNet(p.gross())));
+        return new GradePriceTable(gross, trace);
+    }
+
     public GradePrice get(Grade grade) {
         return prices.get(grade);
     }

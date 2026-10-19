@@ -15,12 +15,12 @@ import java.util.function.Function;
 /**
  * Step 5: eligibility, concentration caps, correlation haircut and the collateral base.
  *
- * <p>Concentration caps are measured against the final base (Zach, 2026-10-18): every eligible card
- * is capped at one level, the highest at which no card is above 20% of the capped total and the top
- * five are at most 50% of it. That can only hold with enough cards (fewer than 5 can't each be 20%
- * or less), so below {@code capsMinCards} eligible cards the caps aren't applied and the trace says
- * so. The correlation haircut then applies to the capped values; it only lowers the base slightly,
- * so a capped card can sit a little above 20% of the very final figure.
+ * <p>Concentration caps are measured against the eligible FLV before caps, at every collection size
+ * (Zach, 2026-10-19): every eligible card is capped at one level, the highest at which no card is
+ * above 20% of the eligible FLV and the top five are at most 50% of it. There is no minimum card
+ * count, so no cliff where one more card switches the caps on; a small pledge is held back by its
+ * concentration instead: one card counts at most 20% of its FLV, and five or fewer at most 50% of
+ * theirs. The correlation haircut then applies to the capped values.
  *
  * <p>α is the lender's choice: the result suggests a range and computes an advance only for an α the
  * caller supplies.
@@ -101,22 +101,17 @@ public final class PortfolioEvaluator {
         BigDecimal eligibleFlv = sum(value.values());
         trace.add("eligible_flv", "sum of eligible FLV", eligibleFlv, eligible.size() + " cards");
 
-        // Concentration caps, against the final base: one cap level for every card, the highest at which no
-        // card is above 20% of the capped base and the top five are at most 50% of it.
-        if (eligible.size() < params.capsMinCards()) {
-            trace.add("concentration_caps", "not applied: fewer than " + params.capsMinCards() + " eligible cards",
-                    eligibleFlv, eligible.size() + " cards; the pledge is concentrated, which the lender should weigh");
-        } else {
-            BigDecimal level = capLevel(value.values());
-            for (Map.Entry<String, BigDecimal> e : value.entrySet()) {
-                if (e.getValue().compareTo(level) > 0) {
-                    trace.add("capped[" + e.getKey() + "]", "concentration cap level", level, "FLV " + e.getValue());
-                    e.setValue(level);
-                }
+        // Concentration caps, against the eligible FLV before caps: one cap level for every card, the highest at
+        // which no card is above 20% of it and the top five are at most 50% of it.
+        BigDecimal level = capLevel(value.values(), eligibleFlv);
+        for (Map.Entry<String, BigDecimal> e : value.entrySet()) {
+            if (e.getValue().compareTo(level) > 0) {
+                trace.add("capped[" + e.getKey() + "]", "concentration cap level", level, "FLV " + e.getValue());
+                e.setValue(level);
             }
-            trace.add("concentration_caps", "single card at most " + params.singleCardCap() + " and top five at most "
-                    + params.topFiveCap() + " of the capped base", level, "cap level per card");
         }
+        trace.add("concentration_caps", "single card at most " + params.singleCardCap() + " and top five at most "
+                + params.topFiveCap() + " of the eligible FLV " + eligibleFlv, level, "cap level per card");
 
         // Correlation haircut by set and by character, shares measured on the capped base.
         BigDecimal capped = sum(value.values());
@@ -199,20 +194,23 @@ public final class PortfolioEvaluator {
 
     /**
      * The highest per-card cap level, in cents, at which capping every card at it keeps each card at most
-     * the single-card share and the top five at most the top-five share of the capped total. Both checks
-     * hold up to some level and fail above it, so a binary search finds it. Needs at least 10 cards for
-     * the default shares (5 for the single-card cap alone), or only a zero level fits.
+     * the single-card share and the top five at most the top-five share of {@code eligibleFlv}, the total
+     * before caps. Lowering the level only lowers the top five, so a binary search finds it.
      */
-    private BigDecimal capLevel(java.util.Collection<BigDecimal> flvs) {
+    private BigDecimal capLevel(java.util.Collection<BigDecimal> flvs, BigDecimal eligibleFlv) {
         List<BigDecimal> sorted = flvs.stream().sorted(Comparator.reverseOrder()).toList();
+        if (sorted.isEmpty()) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+        BigDecimal topFiveLimit = eligibleFlv.multiply(params.topFiveCap(), Money.MC);
         long lo = 0;
-        long hi = sorted.isEmpty() ? 0 : sorted.getFirst().movePointRight(2).setScale(0, RoundingMode.DOWN).longValueExact();
-        if (fits(sorted, BigDecimal.valueOf(hi, 2))) {
+        long hi = cents(Money.min(sorted.getFirst(), eligibleFlv.multiply(params.singleCardCap(), Money.MC)));
+        if (topFive(sorted, BigDecimal.valueOf(hi, 2)).compareTo(topFiveLimit) <= 0) {
             return BigDecimal.valueOf(hi, 2);
         }
         while (hi - lo > 1) {
             long mid = lo + (hi - lo) / 2;
-            if (fits(sorted, BigDecimal.valueOf(mid, 2))) {
+            if (topFive(sorted, BigDecimal.valueOf(mid, 2)).compareTo(topFiveLimit) <= 0) {
                 lo = mid;
             } else {
                 hi = mid;
@@ -221,23 +219,16 @@ public final class PortfolioEvaluator {
         return BigDecimal.valueOf(lo, 2);
     }
 
-    private boolean fits(List<BigDecimal> sortedDesc, BigDecimal level) {
+    private static BigDecimal topFive(List<BigDecimal> sortedDesc, BigDecimal level) {
         BigDecimal total = BigDecimal.ZERO;
-        BigDecimal topFive = BigDecimal.ZERO;
-        for (int i = 0; i < sortedDesc.size(); i++) {
-            BigDecimal capped = sortedDesc.get(i).min(level);
-            total = total.add(capped);
-            if (i < 5) {
-                topFive = topFive.add(capped);
-            }
+        for (int i = 0; i < Math.min(5, sortedDesc.size()); i++) {
+            total = total.add(sortedDesc.get(i).min(level));
         }
-        BigDecimal largest = sortedDesc.isEmpty() ? BigDecimal.ZERO : sortedDesc.getFirst().min(level);
-        return largest.compareTo(total.multiply(params.singleCardCap(), Money.MC)) <= 0
-                && topFive.compareTo(total.multiply(params.topFiveCap(), Money.MC)) <= 0;
+        return total;
     }
 
-    private static BigDecimal centsDown(BigDecimal amount) {
-        return amount.setScale(2, RoundingMode.DOWN);
+    private static long cents(BigDecimal amount) {
+        return amount.movePointRight(2).setScale(0, RoundingMode.DOWN).longValueExact();
     }
 
     private static BigDecimal sum(Iterable<BigDecimal> values) {

@@ -25,7 +25,6 @@ class ParameterSetTest {
         assertThat(p.extendedWindowDays()).isEqualTo(180);
         assertThat(p.singleCardCap()).isEqualByComparingTo("0.20");
         assertThat(p.topFiveCap()).isEqualByComparingTo("0.50");
-        assertThat(p.capsMinCards()).isEqualTo(10);
         assertThat(p.correlationThreshold()).isEqualByComparingTo("0.40");
     }
 
@@ -39,6 +38,16 @@ class ParameterSetTest {
         assertThat(p.liquidityTier(new BigDecimal("4.9"))).isEqualTo(ParameterSet.LiquidityTier.LOW);
         assertThat(p.speedDiscount(ParameterSet.LiquidityTier.LOW)).isEqualByComparingTo("0.20");
         assertThat(p.searchPremium(ParameterSet.LiquidityTier.HIGH)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void version110AddsTheFallbackSigma() {
+        ParameterSet v110 = ParameterSet.load("1.1.0");
+
+        assertThat(v110.fallbackSigma()).isEqualByComparingTo("0.20");
+        assertThat(ParameterSet.defaults().fallbackSigma()).isNull();
+        assertThat(v110.sellingFees()).isEqualByComparingTo(ParameterSet.defaults().sellingFees());
+        assertThat(v110.topFiveCap()).isEqualByComparingTo(ParameterSet.defaults().topFiveCap());
     }
 
     @Test

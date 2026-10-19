@@ -57,59 +57,58 @@ class PortfolioEvaluatorTest {
     }
 
     @Test
-    void capsAreMeasuredAgainstTheFinalBase() {
-        // 2,500 beside ten 100s. Capping every card at 200 gives a base of 1,200: the big card is 16.7% of it
-        // and the top five (200 + 4 x 100) exactly half. Measured before capping it would have kept 700 (41%).
+    void capsAreMeasuredAgainstTheEligibleFlvBeforeCaps() {
+        // 2,500 beside ten 100s: 3,500 eligible, so no card above 700 and the top five at most 1,750.
+        // The big card is capped at 700 (the top five are then 1,100). It is still 41% of the capped 1,700
+        // in its own set and character, so both 10% haircuts apply: 700 x 0.9 x 0.9 = 567.
         List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(10, "100", "small"));
         cards.add(card("big", "2500", "big", false));
 
         PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
 
-        assertThat(contribution(result, "big")).isEqualByComparingTo("200.00");
+        assertThat(result.trace().stepsFor("capped[big]").getFirst().value()).isEqualTo("700.00");
+        assertThat(contribution(result, "big")).isEqualByComparingTo("567.00");
         assertThat(contribution(result, "small-0")).isEqualByComparingTo("100");
-        assertThat(result.collateralBase()).isEqualByComparingTo("1200.00");
+        assertThat(result.collateralBase()).isEqualByComparingTo("1567.00");
     }
 
     @Test
-    void theTopFiveCapCanBindBeforeTheSingleCardCap() {
-        // Nine 50s and a 550: the single-card cap alone would allow 112.50, but then the top five are
-        // 112.50 + 200 of 562.50, over half. Only 50 keeps them at half: every card at 50, base 500.
+    void theSingleCardCapBinds() {
+        // Nine 50s and a 550: 1,000 eligible, so the big card is capped at 200; the top five are then 400.
         List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(9, "50", "small"));
         cards.add(card("big", "550", "big", false));
 
         PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
 
-        assertThat(contribution(result, "big")).isEqualByComparingTo("50.00");
-        assertThat(result.collateralBase()).isEqualByComparingTo("500.00");
+        assertThat(contribution(result, "big")).isEqualByComparingTo("200.00");
+        assertThat(result.collateralBase()).isEqualByComparingTo("650.00");
     }
 
     @Test
-    void capsTheTopFiveAtHalfOfTheFinalBase() {
-        // Five 180s and ten 10s: at a cap of 20 the five are 100 of a 200 base.
+    void theTopFiveCapCanBindBeforeTheSingleCardCap() {
+        // Five 180s and ten 10s: 1,000 eligible. The single-card cap allows 200, but the top five may only
+        // be 500, so every card is capped at 100.
         List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(5, "180", "top"));
         cards.addAll(cards(10, "10", "tail"));
 
         PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
 
-        assertThat(contribution(result, "top-0")).isEqualByComparingTo("20.00");
+        assertThat(contribution(result, "top-0")).isEqualByComparingTo("100.00");
         assertThat(contribution(result, "tail-0")).isEqualByComparingTo("10");
-        assertThat(result.collateralBase()).isEqualByComparingTo("200.00");
+        assertThat(result.collateralBase()).isEqualByComparingTo("600.00");
     }
 
     @Test
-    void fewerThanTenCardsAreNotCapped() {
-        // The caps can't hold for a small pledge (one card can never be 20% of its own base), so they are
-        // left off and the trace says so. The worked example's single card keeps its full FLV.
-        List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(8, "50", "small"));
-        cards.add(card("big", "550", "big", false));
+    void smallPledgesAreCappedToo() {
+        // No minimum card count (Zach, 2026-10-19). One card counts at most 20% of its FLV, then it is the
+        // whole base in its set and character, so both haircuts apply: 500 x 0.2 x 0.81 = 81.
+        PortfolioEvaluator.Result one = evaluator.evaluate(List.of(card("only", "500", "only", false)), Optional.empty());
+        assertThat(one.collateralBase()).isEqualByComparingTo("81.00");
 
-        PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
-
-        // Uncapped; it is still 58% of the base in its own set and character, so both 10% haircuts apply.
-        assertThat(contribution(result, "big")).isEqualByComparingTo("445.50");
-        assertThat(contribution(result, "small-0")).isEqualByComparingTo("50");
-        assertThat(result.collateralBase()).isEqualByComparingTo("845.50");
-        assertThat(result.trace().stepsFor("concentration_caps").getFirst().rule()).contains("fewer than 10");
+        // Three 100s: 20% would allow 60 each, but the top five (all three) may only be 150, so 50 each.
+        PortfolioEvaluator.Result three = evaluator.evaluate(cards(3, "100", "few"), Optional.empty());
+        assertThat(three.collateralBase()).isEqualByComparingTo("150.00");
+        assertThat(three.trace().stepsFor("concentration_caps").getFirst().value()).isEqualTo("50.00");
     }
 
     @Test
@@ -170,8 +169,8 @@ class PortfolioEvaluatorTest {
             topFive = topFive.add(contribution(result, "top-" + i));
         }
         assertThat(contribution(result, "top-a").scale()).isLessThanOrEqualTo(2);
-        assertThat(topFive).isLessThanOrEqualTo(result.collateralBase().multiply(d("0.5")));
-        assertThat(contribution(result, "top-a")).isLessThanOrEqualTo(result.collateralBase().multiply(d("0.2")));
+        assertThat(topFive).isLessThanOrEqualTo(result.eligibleFlv().multiply(d("0.5")));
+        assertThat(contribution(result, "top-a")).isLessThanOrEqualTo(result.eligibleFlv().multiply(d("0.2")));
         assertThat(result.trace().stepsFor("concentration_caps")).hasSize(1);
     }
 
@@ -192,17 +191,17 @@ class PortfolioEvaluatorTest {
 
     @Test
     void tiedCardsAreCappedAlike() {
-        // Six equal cards and five small ones: one level caps all six the same, 10 each, so the top five are
-        // 50 of a 100 base whichever five they are.
+        // Six equal cards and five small ones, 640 eligible: one level caps all six the same, 64 each, so the
+        // top five are 320, half of 640, whichever five they are.
         List<PortfolioEvaluator.Card> cards = new ArrayList<>(cards(6, "100", "tie"));
         cards.addAll(cards(5, "8", "tail"));
 
         PortfolioEvaluator.Result result = evaluator.evaluate(cards, Optional.empty());
 
         for (int i = 0; i < 6; i++) {
-            assertThat(contribution(result, "tie-" + i)).isEqualByComparingTo("10.00");
+            assertThat(contribution(result, "tie-" + i)).isEqualByComparingTo("64.00");
         }
         assertThat(contribution(result, "tail-0")).isEqualByComparingTo("8");
-        assertThat(result.collateralBase()).isEqualByComparingTo("100.00");
+        assertThat(result.collateralBase()).isEqualByComparingTo("424.00");
     }
 }

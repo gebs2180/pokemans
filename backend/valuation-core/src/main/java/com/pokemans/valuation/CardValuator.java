@@ -2,6 +2,7 @@ package com.pokemans.valuation;
 
 import java.math.BigDecimal;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -30,6 +31,10 @@ public final class CardValuator {
      * @param salesPerMonth     market sales of this card per month
      * @param copiesHeld        copies in the collection that would need to sell
      * @param photoConfidence   confidence from photo quality
+     * @param penalties         further confidence drops applied to the base confidence before the stress
+     *                          is chosen, each with its reason (a stale price table, a fallback σ)
+     * @param knownGrade        true for a graded card whose grade is known: its distribution is certain
+     *                          and gets no condition stress shift
      */
     public record Input(
             String cardId,
@@ -38,8 +43,18 @@ public final class CardValuator {
             BigDecimal monthlyVolatility,
             BigDecimal salesPerMonth,
             int copiesHeld,
-            Confidence photoConfidence) {
+            Confidence photoConfidence,
+            List<ConfidencePenalty> penalties,
+            boolean knownGrade) {
+
+        /** A raw card with no confidence penalties. */
+        public Input(String cardId, GradeDistribution distribution, GradePriceTable prices, BigDecimal monthlyVolatility,
+                     BigDecimal salesPerMonth, int copiesHeld, Confidence photoConfidence) {
+            this(cardId, distribution, prices, monthlyVolatility, salesPerMonth, copiesHeld, photoConfidence, List.of(), false);
+        }
+
         public Input {
+            penalties = List.copyOf(Objects.requireNonNull(penalties, "penalties (pass an empty list, not null)"));
             Objects.requireNonNull(cardId, "cardId");
             Objects.requireNonNull(distribution, "distribution");
             Objects.requireNonNull(prices, "prices");
@@ -82,12 +97,13 @@ public final class CardValuator {
                 .multiply(BigDecimal.ONE.subtract(d), Money.MC);
         trace.add("QSV", "FMV x (1 - f) x (1 - d)", Money.cents(qsv), "f " + f + ", d " + d + " (" + tier + " liquidity)");
 
-        int shift = stressShift(confidence);
+        int shift = in.knownGrade() ? 0 : stressShift(confidence);
         GradeDistribution stressed = in.distribution().shiftDown(shift);
         Map<Grade, BigDecimal> stressedPrices = neverUp(in.prices());
         BigDecimal stressedFmv = expectedValue(stressed, stressedPrices);
-        trace.add("FMV_stressed", "distribution shifted " + shift + " grades down, floor 1, U held; each grade priced"
-                        + " at most the grade above", Money.cents(stressedFmv), describe(stressed, stressedPrices));
+        trace.add("FMV_stressed", in.knownGrade()
+                        ? "known grade: no condition stress; each grade priced at most the grade above"
+                        : "distribution shifted " + shift + " grades down, floor 1, U held; each grade priced at most the grade above", Money.cents(stressedFmv), describe(stressed, stressedPrices));
 
         BigDecimal shock = volatilityShock(in.monthlyVolatility());
         trace.add("volatility_shock", "1 - k x sigma x sqrt(t)", shock,
@@ -205,8 +221,15 @@ public final class CardValuator {
         Confidence base = in.photoConfidence().worse(fromComps);
         trace.add("confidence_base", "worse of photo and comps", base,
                 "photo " + in.photoConfidence() + ", comps " + fromComps + " (weighted sales " + Money.cents(weightedComps) + ")");
+        for (ConfidencePenalty penalty : in.penalties()) {
+            if (penalty.levels() == 0) {
+                continue;
+            }
+            base = Staleness.drop(base, penalty.levels());
+            trace.add("confidence_penalty", penalty.reason() + ", drop " + penalty.levels(), base, "");
+        }
 
-        GradeDistribution stressed = in.distribution().shiftDown(stressShift(base));
+        GradeDistribution stressed = in.distribution().shiftDown(in.knownGrade() ? 0 : stressShift(base));
         StringBuilder derived = new StringBuilder();
         for (Grade grade : Grade.values()) {
             boolean inPlay = in.distribution().p(grade).signum() > 0 || stressed.p(grade).signum() > 0;

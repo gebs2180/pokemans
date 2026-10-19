@@ -9,6 +9,8 @@ interface GradeOutcomeRepository extends JpaRepository<GradeOutcome, UUID> {
 
     List<GradeOutcome> findByCardItemIdOrderByCreatedAtDesc(UUID cardItemId);
 
+    List<GradeOutcome> findByCardItemIdInOrderByCreatedAtDesc(Collection<UUID> cardItemIds);
+
     List<GradeOutcome> findAllByOrderByCreatedAtAsc();
 
     boolean existsByGraderAndCertNumber(Grader grader, String certNumber);

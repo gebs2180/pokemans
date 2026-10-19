@@ -294,18 +294,12 @@ class ValuationPropertiesTest {
         assertThat(result.collateralBase()).isLessThanOrEqualTo(eligible);
         List<BigDecimal> contributions = result.cards().stream().map(PortfolioEvaluator.Contribution::contribution)
                 .sorted(Comparator.reverseOrder()).toList();
-        long eligibleCards = result.cards().stream().filter(PortfolioEvaluator.Contribution::eligible).count();
-        if (eligibleCards >= params.capsMinCards()) {
-            // Caps hold against the capped base; the correlation haircut after them takes at most 19% more off
-            // (two 10% slices), so against the final base allow that much.
-            BigDecimal haircutRoom = BigDecimal.ONE.subtract(params.correlationHaircut()).pow(2);
-            BigDecimal preHaircut = result.collateralBase().divide(haircutRoom, Money.MC);
-            for (BigDecimal contribution : contributions) {
-                assertThat(contribution).isLessThanOrEqualTo(preHaircut.multiply(params.singleCardCap()).add(cent));
-            }
-            BigDecimal topFive = contributions.stream().limit(5).reduce(BigDecimal.ZERO, BigDecimal::add);
-            assertThat(topFive).isLessThanOrEqualTo(preHaircut.multiply(params.topFiveCap()).add(cent));
+        // Caps hold against the eligible FLV before caps, at every size; the correlation haircut only lowers them.
+        for (BigDecimal contribution : contributions) {
+            assertThat(contribution).isLessThanOrEqualTo(eligible.multiply(params.singleCardCap()).add(cent));
         }
+        BigDecimal topFive = contributions.stream().limit(5).reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertThat(topFive).isLessThanOrEqualTo(eligible.multiply(params.topFiveCap()).add(cent));
         for (PortfolioEvaluator.Contribution c : result.cards()) {
             if (!c.eligible()) {
                 assertThat(c.contribution()).isEqualByComparingTo("0");

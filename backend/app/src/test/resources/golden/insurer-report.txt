@@ -1,0 +1,146 @@
+Raw collection valuation Page 1 of 7
+Replacement value report
+Collection: Zach's binder
+Valued as of 2026-10-18, issued 2026-10-18 16:30 UTC
+Parameter set 1.1.0, raw cards valued on PSA price tables
+Grading cost: fee $25.00, shipping $5.00, insurance $2.00 per card, time-to-cash 2% of the graded price
+Run 00000000-0000-4000-8000-000000009000, report 00000000-0000-4000-8000-00000000abcd, template 1
+Inputs SHA-256 fixture
+TOTAL REPLACEMENT VALUE
+$5,631.92
+What it would cost to buy each card again: FMV plus buyer costs and a 
+search premium.
+CARDS COVERED
+13 of 16
+Cards not covered are listed at the end with the reason.
+Replacement value (RV) uses the card's central condition distribution, unstressed. Photos are the capture-time originals' card crops, with capture and 
+upload times and the SHA-256 of each stored original, as pre-loss evidence of each card's existence and condition.
+Charizard: $237.86
+Base Set #4, EN, holo (Charizard #1)
+Condition: raw, median 6
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Raw collection valuation Page 2 of 7
+Blastoise: $288.10
+Base Set #2, EN, holo (Blastoise #2)
+Condition: raw, median 8
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Venusaur: $123.81
+Base Set #15, EN, holo (Venusaur #3)
+Condition: raw, median 6
+authenticity not yet verified (AWAITING_VERIFICATION)
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Raw collection valuation Page 3 of 7
+Umbreon VMAX: $1,113.57
+Evolving Skies #215, EN, holo (Umbreon VMAX #4)
+Condition: raw, median 9
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Rayquaza VMAX: $538.86
+Evolving Skies #218, EN, holo (Rayquaza VMAX #5)
+Condition: raw, median 9
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Raw collection valuation Page 4 of 7
+Espeon VMAX: $423.92
+Evolving Skies #270, EN, holo (Espeon VMAX #6)
+Condition: raw, median 9
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Glaceon VMAX: $391.08
+Evolving Skies #209, EN, holo (Glaceon VMAX #7)
+Condition: raw, median 9
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Raw collection valuation Page 5 of 7
+Leafeon VMAX: $358.24
+Evolving Skies #205, EN, holo (Leafeon VMAX #8)
+Condition: raw, median 9
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Sylveon VMAX: $341.82
+Evolving Skies #212, EN, holo (Sylveon VMAX #9)
+Condition: raw, median 9
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Raw collection valuation Page 6 of 7
+Gengar VMAX: $325.40
+Evolving Skies #271, EN, holo (Gengar VMAX #10)
+Condition: raw, median 9
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Charizard VMAX: $374.66
+Evolving Skies #20, EN, holo (Charizard VMAX #11)
+Condition: raw, median 9
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Raw collection valuation Page 7 of 7
+Mew ex: $131.80
+Pokemon 151 #151, EN, holo (Mew ex #12)
+Condition: raw, median 9
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Lugia: $982.80
+Neo Genesis #9, EN, holo (Lugia slab)
+Condition: PSA 9 (cert 81234567)
+Front, captured 2026-10-12 18:04 UTC, uploaded 2026-10-12 18:05 UTC
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaa
+Back, captured 2026-10-12 18:06 UTC, uploaded 2026-10-12 18:07 UTC
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+bbb
+Not covered
+Card Reason
+Mewtwo (Mewtwo #14) authenticity doubted (COUNTERFEIT): not insured
+Binder page, mixed commons (Binder page, mixed commons) not covered: not identified
+Bulk lot (Bulk lot) not covered: photographed lot: lots aren't valued

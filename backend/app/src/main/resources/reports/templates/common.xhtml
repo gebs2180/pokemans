@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <style th:fragment="style">
+    @page {
+      size: letter;
+      margin: 18mm 16mm 20mm 16mm;
+      @bottom-left { content: "Raw collection valuation"; font-family: 'Noto Sans'; font-size: 7pt; color: #666; }
+      @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: 'Noto Sans'; font-size: 7pt; color: #666; }
+    }
+    body { font-family: 'Noto Sans'; font-size: 8.5pt; color: #1a1a1a; line-height: 1.35; }
+    h1 { font-size: 17pt; margin: 0 0 2mm 0; }
+    h2 { font-size: 11pt; margin: 7mm 0 2mm 0; border-bottom: 0.6pt solid #999; padding-bottom: 1mm; }
+    h3 { font-size: 9pt; margin: 4mm 0 1mm 0; }
+    .meta { color: #555; font-size: 7.5pt; }
+    .tiles { width: 100%; border-collapse: separate; border-spacing: 2mm 0; margin: 4mm -2mm; }
+    .tiles td { border: 0.6pt solid #bbb; padding: 2.5mm; vertical-align: top; width: 25%; }
+    .tile-label { color: #555; font-size: 7pt; text-transform: uppercase; }
+    .tile-value { font-size: 13pt; font-weight: 700; }
+    table.grid { width: 100%; border-collapse: collapse; margin-top: 1mm; }
+    table.grid th { text-align: left; font-size: 7pt; color: #444; border-bottom: 0.6pt solid #777; padding: 1mm 1.2mm; }
+    table.grid td { border-bottom: 0.3pt solid #ddd; padding: 1mm 1.2mm; vertical-align: top; }
+    table.grid tr { page-break-inside: avoid; }
+    .num { text-align: right; white-space: nowrap; }
+    .small { font-size: 7pt; color: #555; }
+    .note { background: #f3f3f3; padding: 2mm; margin: 2mm 0; }
+    .hash { font-family: monospace; font-size: 6.5pt; word-wrap: break-word; }
+  </style>
+</head>
+<body>
+  <div th:fragment="provenance" class="meta">
+    <span th:text="${'Collection: ' + m.collection}">Collection</span><br/>
+    <span th:text="${'Valued as of ' + m.asOf + ', issued ' + m.issuedAt}">dates</span><br/>
+    <span th:text="${'Parameter set ' + m.parameterSet + ', raw cards valued on ' + m.gradingCompany + ' price tables'}">params</span><br/>
+    <span th:text="${'Grading cost: ' + m.gradingCost}">cost</span><br/>
+    <span th:text="${'Run ' + m.runId + ', report ' + m.reportId + ', template ' + m.templateVersion}">ids</span><br/>
+    <span class="hash" th:text="${'Inputs SHA-256 ' + m.inputsSha256}">hash</span>
+  </div>
+</body>
+</html>

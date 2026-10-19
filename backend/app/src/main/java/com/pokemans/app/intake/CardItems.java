@@ -25,7 +25,11 @@ public class CardItems {
      * @param cropKey   the card crop next to it, or null
      */
     public record PhotoRef(UUID id, UUID cardItemId, String side, String storageKey, String contentType, String cropKey,
-                           Instant capturedAt, Instant uploadedAt) {
+                           Instant capturedAt, Instant uploadedAt, String sha256) {
+    }
+
+    /** A collection as other modules see it. */
+    public record CollectionRef(UUID id, UUID orgId, String name) {
     }
 
     /** Published when a card's required photos have all passed (front and back, or the front of a lot). */
@@ -35,11 +39,27 @@ public class CardItems {
     private final IntakeService intake;
     private final CardItemRepository cards;
     private final PhotoRepository photos;
+    private final CardCollectionRepository collections;
 
-    CardItems(IntakeService intake, CardItemRepository cards, PhotoRepository photos) {
+    CardItems(IntakeService intake, CardItemRepository cards, PhotoRepository photos, CardCollectionRepository collections) {
         this.intake = intake;
         this.cards = cards;
         this.photos = photos;
+        this.collections = collections;
+    }
+
+    /** The org's collection, else 404. No membership check: the caller has done it (or is admin). */
+    @Transactional(readOnly = true)
+    public CollectionRef requireCollection(UUID orgId, UUID collectionId) {
+        return collections.findByIdAndOrgId(collectionId, orgId)
+                .map(c -> new CollectionRef(c.getId(), c.getOrgId(), c.getName()))
+                .orElseThrow(() -> IntakeService.notFound("Collection"));
+    }
+
+    /** The collection's cards, oldest first. No access check. */
+    @Transactional(readOnly = true)
+    public List<CardItemRef> inCollection(UUID collectionId) {
+        return cards.findByCollectionIdOrderByCreatedAtAsc(collectionId).stream().map(CardItems::ref).toList();
     }
 
     /** The card if the caller may see its org, else 404. */
@@ -60,7 +80,7 @@ public class CardItems {
         return photos.findByCardItemIdOrderByCreatedAtAsc(cardId).stream()
                 .filter(p -> p.getStatus() == Photo.Status.PASSED)
                 .map(p -> new PhotoRef(p.getId(), p.getCardItemId(), p.getSide().name(), p.getStorageKey(), p.getContentType(),
-                        p.getCropKey(), p.getCapturedAt(), p.getUploadedAt()))
+                        p.getCropKey(), p.getCapturedAt(), p.getUploadedAt(), p.getSha256()))
                 .toList();
     }
 

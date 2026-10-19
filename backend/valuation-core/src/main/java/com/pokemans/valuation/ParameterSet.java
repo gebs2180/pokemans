@@ -52,14 +52,15 @@ public record ParameterSet(
         BigDecimal minFmv,
         BigDecimal singleCardCap,
         BigDecimal topFiveCap,
-        int capsMinCards,
         BigDecimal correlationThreshold,
         BigDecimal correlationHaircut,
         BigDecimal suggestedAlphaLow,
         BigDecimal suggestedAlphaHigh,
         // Step 6: grade-first
         BigDecimal gradeFirstMinLift,
-        int gradeFirstTopN) {
+        int gradeFirstTopN,
+        // Valuation runs: σ for a card with too few monthly price changes (null in sets before 1.1.0)
+        BigDecimal fallbackSigma) {
 
     public static final String DEFAULT_VERSION = "1.0.0";
 
@@ -124,13 +125,13 @@ public record ParameterSet(
                 decimal(p, "portfolio.minFmv"),
                 decimal(p, "portfolio.singleCardCap"),
                 decimal(p, "portfolio.topFiveCap"),
-                integer(p, "portfolio.capsMinCards"),
                 decimal(p, "portfolio.correlationThreshold"),
                 decimal(p, "portfolio.correlationHaircut"),
                 decimal(p, "portfolio.suggestedAlphaLow"),
                 decimal(p, "portfolio.suggestedAlphaHigh"),
                 decimal(p, "gradeFirst.minLift"),
-                integer(p, "gradeFirst.topN"));
+                integer(p, "gradeFirst.topN"),
+                optionalDecimal(p, "values.fallbackSigma"));
     }
 
     /** Liquidity tier for a card's monthly sales count. */
@@ -172,6 +173,11 @@ public record ParameterSet(
 
     private static BigDecimal decimal(Properties p, String key) {
         return new BigDecimal(required(p, key));
+    }
+
+    private static BigDecimal optionalDecimal(Properties p, String key) {
+        String value = p.getProperty(key);
+        return value == null || value.isBlank() ? null : new BigDecimal(value.trim());
     }
 
     private static int integer(Properties p, String key) {

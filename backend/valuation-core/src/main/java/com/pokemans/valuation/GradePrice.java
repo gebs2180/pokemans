@@ -63,6 +63,12 @@ public record GradePrice(
                 || method == Method.CARRIED_DOWN;
     }
 
+    /** The same price with a different net (and no raw override). */
+    public GradePrice withNet(BigDecimal newNet) {
+        return new GradePrice(grade, gross, newNet, method, salesUsed, compIds, false, windowDays, salesInWindow, basis,
+                confidence, stepDownRatio);
+    }
+
     /** A price given directly (e.g. by the reviewer or a test), with the net already computed. */
     public static GradePrice given(Grade grade, BigDecimal net, Method method, int salesUsed) {
         return new GradePrice(grade, net, net, method, salesUsed, List.of(), false, 0, salesUsed, List.of(), null, null);

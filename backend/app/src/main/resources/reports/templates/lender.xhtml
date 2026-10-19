@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title th:text="${m.title + ': ' + m.collection}">Collateral report</title>
+  <style th:replace="~{common :: style}"></style>
+</head>
+<body>
+  <h1 th:text="${m.title}">Collateral report</h1>
+  <div th:replace="~{common :: provenance}"></div>
+
+  <table class="tiles">
+    <tr>
+      <td><div class="tile-label">Collateral base</div><div class="tile-value" th:text="${m.collateralBase}">$0</div>
+        <div class="small" th:text="${'Sum of eligible forced-liquidation values (FLV) after caps and haircuts'}">x</div></td>
+      <td><div class="tile-label">Suggested advance</div><div class="tile-value" th:text="${m.advanceRange}">$0</div>
+        <div class="small" th:text="${'At alpha ' + m.alphaRange + ' of the base. The lender sets alpha.'}">x</div></td>
+      <td><div class="tile-label">Eligible cards</div><div class="tile-value" th:text="${m.eligibleCount + ' of ' + m.cardCount}">0</div>
+        <div class="small" th:text="${m.valuedCount + ' valued; eligible FLV before caps ' + m.eligibleFlv}">x</div></td>
+      <td><div class="tile-label">Raw / graded</div><div class="tile-value" th:text="${m.rawShare + ' / ' + m.gradedShare}">0</div>
+        <div class="small" th:text="${'Share of the base. Confidence: ' + m.confidenceMix}">x</div></td>
+    </tr>
+  </table>
+  <div class="note" th:if="${m.lenderAlpha != null}" th:text="${'At an alpha of ' + m.lenderAlpha + ', set by the lender, the advance is ' + m.lenderAdvance + '.'}">alpha</div>
+
+  <h2>Caps and haircuts</h2>
+  <p th:text="${m.capsNote}">caps</p>
+  <p th:if="${#lists.isEmpty(m.adjustments)}">No card was capped and no set or character slice was above 40% of the base.</p>
+  <ul th:unless="${#lists.isEmpty(m.adjustments)}">
+    <li th:each="a : ${m.adjustments}" th:text="${a}">adjustment</li>
+  </ul>
+
+  <h2>Cards</h2>
+  <table class="grid">
+    <tr><th>Card</th><th>Condition</th><th>Conf.</th><th class="num">FMV</th><th class="num">QSV</th><th class="num">FLV</th>
+      <th class="num">In base</th><th>Status</th></tr>
+    <tr th:each="c : ${m.cards}">
+      <td><b th:text="${c.name}">name</b><br/><span class="small" th:text="${c.identity + ' (' + c.label + ')'}">id</span></td>
+      <td th:text="${c.condition}">cond</td>
+      <td th:text="${c.confidence}">A</td>
+      <td class="num" th:text="${c.fmv}">0</td>
+      <td class="num" th:text="${c.qsv}">0</td>
+      <td class="num" th:text="${c.flv}">0</td>
+      <td class="num" th:text="${c.contribution}">0</td>
+      <td th:text="${c.status}">status</td>
+    </tr>
+  </table>
+
+  <h2>Exclusions</h2>
+  <p th:if="${#lists.isEmpty(m.exclusions)}">None: every card in the collection is in the base.</p>
+  <table class="grid" th:unless="${#lists.isEmpty(m.exclusions)}">
+    <tr><th>Card</th><th>Why it is not in the base</th></tr>
+    <tr th:each="e : ${m.exclusions}"><td th:text="${e.name}">name</td><td th:text="${e.reasons}">reasons</td></tr>
+  </table>
+
+  <h2>Grade first</h2>
+  <p>Raw cards worth grading before borrowing: lift = (FLV graded - FLV raw - C) / C, where C is the grading fee, shipping,
+    insurance and the cost of waiting. Recommended above 1.0, top 20.</p>
+  <p th:if="${#lists.isEmpty(m.gradeFirst)}">No raw card has a lift above 1.0.</p>
+  <table class="grid" th:unless="${#lists.isEmpty(m.gradeFirst)}">
+    <tr><th>#</th><th>Card</th><th>Expected grade</th><th class="num">Cost C</th><th class="num">FLV raw</th>
+      <th class="num">FLV graded</th><th class="num">Lift</th></tr>
+    <tr th:each="g : ${m.gradeFirst}">
+      <td th:text="${g.rank}">1</td>
+      <td><b th:text="${g.name}">name</b><br/><span class="small" th:text="${g.identity}">id</span></td>
+      <td th:text="${g.expectedGrade}">9</td>
+      <td class="num" th:text="${g.cost}">0</td>
+      <td class="num" th:text="${g.flvRaw}">0</td>
+      <td class="num" th:text="${g.flvGraded}">0</td>
+      <td class="num" th:text="${g.lift}">0</td>
+    </tr>
+  </table>
+
+  <h2>Method</h2>
+  <p>Each raw card's condition is a probability distribution over Ungradable and grades 1 to 10, from its photos.
+    Each grade is priced from sold comps of that exact grade (never asking prices), net of grading costs.
+    FMV is the probability-weighted price. QSV is a 30-day sale after fees and a speed discount. FLV is a 60-day
+    forced sale: the distribution shifted two grades down (three at confidence C), after fees, a volatility
+    shock (2 sigma over two months) and a market-depth discount. FLV is never above QSV.
+    Cards at confidence D, with an unresolved authenticity flag, without verified custody, or under $25 FMV are
+    excluded. Thin data lowers both value and confidence; nothing is interpolated upward.</p>
+
+  <h2>Traceability</h2>
+  <p class="small">The grades each card's values rest on: probability (p), gross and net price, how the price was set,
+    and the sold comps behind it. Grades below the lowest likely grade are shown where the stress reaches them.</p>
+  <div th:each="t : ${m.traceability}">
+    <h3 th:text="${t.name + ' (' + t.label + ')'}">card</h3>
+    <div class="small" th:text="${t.table}">table</div>
+    <div class="small" th:text="${t.market}">market</div>
+    <table class="grid">
+      <tr><th>Grade</th><th class="num">p</th><th class="num">Gross</th><th class="num">Net</th><th>Method</th>
+        <th class="num">Sales</th><th class="num">Window</th></tr>
+      <tr th:each="r : ${t.rows}">
+        <td th:text="${r.grade}">9</td><td class="num" th:text="${r.p}">0</td><td class="num" th:text="${r.gross}">0</td>
+        <td class="num" th:text="${r.net}">0</td><td th:text="${r.method}">m</td><td class="num" th:text="${r.sales}">0</td>
+        <td class="num" th:text="${r.window}">90d</td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>

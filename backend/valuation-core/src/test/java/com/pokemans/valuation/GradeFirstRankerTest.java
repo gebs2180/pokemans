@@ -29,7 +29,7 @@ class GradeFirstRankerTest {
         CardValuator.Input input = new CardValuator.Input(id,
                 GradeDistribution.of(Map.of(Grade.G10, new BigDecimal("0.6"), Grade.G9, new BigDecimal("0.4"))),
                 prices(topGradePrice), new BigDecimal("0.05"), new BigDecimal("30"), 1, Confidence.A);
-        return new GradeFirstRanker.Candidate(input, valuator.value(input), cost);
+        return new GradeFirstRanker.Candidate(input, cost);
     }
 
     @Test
@@ -59,18 +59,35 @@ class GradeFirstRankerTest {
     @Test
     void liftOfExactlyOneIsNotRecommended() {
         GradeFirstRanker.Candidate probe = candidate("edge", "1000");
-        BigDecimal flvGraded = ranker.score(List.of(probe)).getFirst().flvGraded();
-        // FLV_raw chosen so that FLV_graded - FLV_raw - C = C exactly: lift 1.0.
-        BigDecimal flvRaw = flvGraded.subtract(new BigDecimal("64"));
-        CardValuation raw = probe.rawValuation();
-        CardValuation atEdge = new CardValuation(raw.cardId(), raw.fmv(), raw.rv(), raw.qsv(), raw.stressedFmv(), flvRaw,
-                raw.confidence(), raw.stressShift(), raw.liquidityTier(), raw.searchPremium(), raw.speedDiscount(),
-                raw.volatilityShock(), raw.depthDiscount(), raw.trace());
+        GradeFirstRanker.Recommendation first = ranker.score(List.of(probe)).getFirst();
+        // A fee chosen so that FLV_graded - FLV_raw - C = C exactly: lift 1.0. FLV_graded and FLV_raw don't
+        // depend on C here (no time-to-cash), so halving the gap gives the fee.
+        BigDecimal gap = first.flvGraded().subtract(first.flvRaw());
+        GradingCost atEdge = new GradingCost(gap.divide(new BigDecimal("2")), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
-        GradeFirstRanker.Recommendation r = ranker.score(List.of(new GradeFirstRanker.Candidate(probe.input(), atEdge, cost))).getFirst();
+        GradeFirstRanker.Recommendation r = ranker.score(List.of(new GradeFirstRanker.Candidate(probe.input(), atEdge))).getFirst();
 
         assertThat(r.lift()).isEqualByComparingTo("1");
         assertThat(r.recommended()).isFalse();
+    }
+
+    @Test
+    void gradingCostCountsOnceEvenWhenTheRawFlvIsBuiltFromNetPrices() {
+        // The collateral FLV nets grading cost from every grade; the lift compares FLV at gross prices, so C
+        // only enters once (Zach, 2026-10-18).
+        GradingCost real = new GradingCost(new BigDecimal("25"), new BigDecimal("5"), new BigDecimal("2"), new BigDecimal("0.02"));
+        GradeFirstRanker.Candidate gross = candidate("gem", "1000");
+        GradePriceTable netted = GradePriceTable.netOf(gross.input().prices().all(), real);
+        CardValuator.Input in = gross.input();
+        CardValuator.Input nettedInput = new CardValuator.Input(in.cardId(), in.distribution(), netted, in.monthlyVolatility(),
+                in.salesPerMonth(), in.copiesHeld(), in.photoConfidence());
+
+        GradeFirstRanker.Recommendation fromNet = ranker.score(List.of(new GradeFirstRanker.Candidate(nettedInput, real))).getFirst();
+        GradeFirstRanker.Recommendation fromGross = ranker.score(List.of(new GradeFirstRanker.Candidate(in, real))).getFirst();
+
+        assertThat(fromNet.flvRaw()).isEqualByComparingTo(fromGross.flvRaw());
+        assertThat(fromNet.lift()).isEqualByComparingTo(fromGross.lift());
+        assertThat(fromNet.flvRaw()).isGreaterThan(valuator.value(nettedInput).flv());
     }
 
     @Test
@@ -93,7 +110,7 @@ class GradeFirstRankerTest {
         GradingCost free = new GradingCost(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
         GradeFirstRanker.Candidate c = candidate("free", "1000");
 
-        GradeFirstRanker.Recommendation r = ranker.score(List.of(new GradeFirstRanker.Candidate(c.input(), c.rawValuation(), free))).getFirst();
+        GradeFirstRanker.Recommendation r = ranker.score(List.of(new GradeFirstRanker.Candidate(c.input(), free))).getFirst();
 
         assertThat(r.lift()).isEqualByComparingTo("0");
         assertThat(r.recommended()).isFalse();

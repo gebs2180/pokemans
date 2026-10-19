@@ -145,4 +145,17 @@ class CatalogCard {
     String getImageUrl() {
         return imageUrl;
     }
+
+    /**
+     * National Pokedex numbers of the Pokemon on the card, as the provider gave them (TCGdex's
+     * {@code dexId}: one for most cards, several for a tag team). Empty for manual entries, trainers
+     * and energy.
+     */
+    java.util.List<Integer> getDexIds() {
+        Object ids = providerPayload == null ? null : providerPayload.get("dexId");
+        if (!(ids instanceof java.util.List<?> list)) {
+            return java.util.List.of();
+        }
+        return list.stream().filter(Number.class::isInstance).map(n -> ((Number) n).intValue()).toList();
+    }
 }

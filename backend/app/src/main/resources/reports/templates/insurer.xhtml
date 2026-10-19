@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title th:text="${m.title + ': ' + m.collection}">Replacement value report</title>
+  <style th:replace="~{common :: style}"></style>
+  <style>
+    .card { page-break-inside: avoid; border-bottom: 0.6pt solid #999; padding: 3mm 0; }
+    .photos td { vertical-align: top; padding-right: 4mm; width: 50%; }
+    .photos img { width: 40mm; }
+  </style>
+</head>
+<body>
+  <h1 th:text="${m.title}">Replacement value report</h1>
+  <div th:replace="~{common :: provenance}"></div>
+
+  <table class="tiles">
+    <tr>
+      <td><div class="tile-label">Total replacement value</div><div class="tile-value" th:text="${m.totalRv}">$0</div>
+        <div class="small">What it would cost to buy each card again: FMV plus buyer costs and a search premium.</div></td>
+      <td><div class="tile-label">Cards covered</div><div class="tile-value" th:text="${#lists.size(m.cards) + ' of ' + m.cardCount}">0</div>
+        <div class="small">Cards not covered are listed at the end with the reason.</div></td>
+    </tr>
+  </table>
+  <p class="small">Replacement value (RV) uses the card's central condition distribution, unstressed. Photos are the
+    capture-time originals' card crops, with capture and upload times and the SHA-256 of each stored original, as
+    pre-loss evidence of each card's existence and condition.</p>
+
+  <div class="card" th:each="c : ${m.cards}">
+    <h3 th:text="${c.name + ': ' + c.rv}">name</h3>
+    <div class="small" th:text="${c.identity + ' (' + c.label + ')'}">id</div>
+    <div class="small" th:text="${'Condition: ' + c.condition}">cond</div>
+    <div class="note" th:if="${c.note != null}" th:text="${c.note}">note</div>
+    <table class="photos">
+      <tr>
+        <td th:each="p : ${c.photos}">
+          <img th:src="${p.src}" alt="photo"/>
+          <div class="small" th:text="${p.side + ', captured ' + p.captured + ', uploaded ' + p.uploaded}">side</div>
+          <div class="hash" th:text="${p.sha256}">hash</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <h2>Not covered</h2>
+  <p th:if="${#lists.isEmpty(m.notCovered)}">Every card in the collection is covered.</p>
+  <table class="grid" th:unless="${#lists.isEmpty(m.notCovered)}">
+    <tr><th>Card</th><th>Reason</th></tr>
+    <tr th:each="n : ${m.notCovered}"><td th:text="${n.name + ' (' + n.label + ')'}">name</td><td th:text="${n.reason}">reason</td></tr>
+  </table>
+</body>
+</html>
