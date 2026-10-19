@@ -15,6 +15,9 @@ const ReviewCardPage = lazy(() => import('./pages/ReviewCardPage').then((m) => (
 const ValuationPage = lazy(() => import('./pages/ValuationPage').then((m) => ({ default: m.ValuationPage })))
 const ValuationRunPage = lazy(() => import('./pages/ValuationRunPage').then((m) => ({ default: m.ValuationRunPage })))
 
+/** Lender and insurer screens are paused unless the build turns them on. */
+export const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
+
 function App() {
   const { isLoading, isAuthenticated, user, error, loginWithRedirect, logout } = useAuth0()
   const location = useLocation()
@@ -54,8 +57,8 @@ function App() {
               <Route path="/admin/review" element={<ReviewQueuePage />} />
               <Route path="/admin/outcomes" element={<AdminOutcomesPage />} />
               <Route path="/admin/review/:orgId/:cardId" element={<ReviewCardPage />} />
-              <Route path="/admin/valuation/:orgId/:collectionId" element={<ValuationPage />} />
-              <Route path="/admin/valuation-runs/:runId" element={<ValuationRunPage />} />
+              {COLLATERAL && <Route path="/admin/valuation/:orgId/:collectionId" element={<ValuationPage />} />}
+              {COLLATERAL && <Route path="/admin/valuation-runs/:runId" element={<ValuationRunPage />} />}
               <Route path="/invite/:token" element={<InvitePage />} />
               <Route path="/orgs/:orgId" element={<OrgPage />} />
               <Route path="/orgs/:orgId/:kind/:containerId" element={<ContainerPage />} />

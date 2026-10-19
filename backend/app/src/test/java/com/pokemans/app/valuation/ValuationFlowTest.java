@@ -40,7 +40,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * A collection valued end to end through the API: identities, assessments, comps, provenance, then a
  * run, its replay from stored inputs, and both reports.
  */
-@SpringBootTest(properties = "pokemans.condition.worker.enabled=false")
+@SpringBootTest(properties = {"pokemans.condition.worker.enabled=false", "pokemans.collateral.enabled=true"})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 @Testcontainers(disabledWithoutDocker = true)

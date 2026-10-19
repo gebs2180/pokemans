@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,8 +19,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Admin-only (by path): start valuation runs and read them back, with every input and trace. */
+/**
+ * Admin-only (by path): start valuation runs and read them back, with every input and trace. Off unless
+ * {@code pokemans.collateral.enabled}: the lender and insurer side is paused (Zach, 2026-10-19).
+ */
 @RestController
+@ConditionalOnBooleanProperty("pokemans.collateral.enabled")
 class ValuationController {
 
     /** Per card, the grading cost of the day. */

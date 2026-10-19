@@ -4,6 +4,9 @@ import { apiPath, useApi, type ContainerDetail, type Me, type ReportView } from 
 import { useLoad } from '../useLoad'
 import { ReportsList } from './ReportsPanel'
 
+/** Lender and insurer reports are paused unless the build turns them on. */
+const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
+
 /** A batch or collection: its cards and their capture status. */
 export function ContainerPage() {
   const { orgId = '', kind = '', containerId = '' } = useParams()
@@ -93,7 +96,7 @@ export function ContainerPage() {
         ))}
       </ul>
 
-      {kind === 'collections' && <CollectionReports orgId={orgId} collectionId={containerId} />}
+      {COLLATERAL && kind === 'collections' && <CollectionReports orgId={orgId} collectionId={containerId} />}
     </>
   )
 }

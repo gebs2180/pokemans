@@ -13,6 +13,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,9 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Report PDFs. The admin issues them from a valuation run; members of the collection's org can list
  * and download the issued ones. A download is a short-lived signed link, returned as JSON rather than
- * a redirect so the browser opens it without the API token.
+ * a redirect so the browser opens it without the API token. Off unless {@code pokemans.collateral.enabled}:
+ * the lender and insurer side is paused (Zach, 2026-10-19).
  */
 @RestController
+@ConditionalOnBooleanProperty("pokemans.collateral.enabled")
 class ReportController {
 
     private static final OrgType[] COLLECTION_ORGS = {OrgType.COLLECTOR, OrgType.CONTRIBUTOR};

@@ -315,7 +315,7 @@ Posts are only read by hand to find people to ask. They are never stored.
 - **Manual comp entry (2026-10-17):** the pilot route. `PricingController` under `/api/admin/catalog-cards/{id}`: `POST comps`, `GET prices`, `POST prices/refresh`. The review page shows the panel once the card is identified.
 - **Not built yet:** a licensed adapter, excluding a mistaken comp, the comps browser, and stored step-down ratio tables. Snapshots are gross: grading costs are netted in the valuation run (M4). Details and open questions are in [m3-progress.md](m3-progress.md).
 
-**M4 status (2026-10-18): built, on fixture and hand-entered data.** Details and what's left are in [m4-progress.md](m4-progress.md).
+**M4 status (2026-10-18): built, on fixture and hand-entered data. Paused 2026-10-19:** the lender and insurer APIs and screens are off unless `pokemans.collateral.enabled` / `VITE_COLLATERAL_ENABLED` is set, while Zach's outside interest is cleared with his employer. Work moves to instant offers. Details and what's left are in [m4-progress.md](m4-progress.md).
 - **Modules:**
   - `valuation` snapshots a collection's inputs into a run, values it with `valuation-core`, and stores the inputs, results and trace (V13, append-only). Its published API is `Valuations`.
   - `reporting` renders lender and insurer PDFs from a stored run. Thymeleaf fills XHTML templates and OpenHTMLtoPDF lays them out, in the JVM, with bundled Noto Sans fonts. The PDFs are stored once under `reports/` in the private photo bucket, with their SHA-256.

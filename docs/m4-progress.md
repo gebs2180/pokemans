@@ -2,6 +2,8 @@
 
 Status 2026-10-18 · branch `claude/beautiful-rhodes-f0e445`.
 
+**Paused 2026-10-19.** The lender and insurer side is on hold until Zach's outside interest is cleared with his employer. The valuation-run and report APIs are only registered with `pokemans.collateral.enabled=true` (`COLLATERAL_ENABLED`), and the screens only show with `VITE_COLLATERAL_ENABLED=true`. Both are off by default; `CollateralSwitchedOffTest` checks it. The valuation engine stays in, because instant offers build on it.
+
 **Checks.** These pass locally with Docker running:
 - `cd backend; .\gradlew.bat build`, which runs valuation-core, the app's Testcontainers suites and the JaCoCo gate.
 - In `web/`: `npm run lint`, `npm test` and `npm run build`.

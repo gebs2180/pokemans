@@ -28,7 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * or by naming org A with B's ids, gets a 403 or 404 and changes nothing. Non-admins can't reach
  * any admin route, and nobody gets in without a token.
  */
-@SpringBootTest(properties = "pokemans.condition.worker.enabled=false")
+@SpringBootTest(properties = {"pokemans.condition.worker.enabled=false", "pokemans.collateral.enabled=true"})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 @Testcontainers(disabledWithoutDocker = true)
