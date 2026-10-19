@@ -31,15 +31,14 @@ class ConsentController {
 
     @GetMapping("/api/orgs/{orgId}/consent")
     ConsentStatus status(@PathVariable UUID orgId) {
-        access.require(orgId, OrgType.CONTRIBUTOR);
-        Consents.Terms terms = consents.contributorTerms();
+        Consents.Terms terms = Consents.termsFor(access.require(orgId, OrgType.CONTRIBUTOR, OrgType.BUYER).getType()).orElseThrow();
         return new ConsentStatus(terms.version(), terms.text(), consents.acceptedAt(orgId).orElse(null));
     }
 
     @PostMapping("/api/orgs/{orgId}/consent")
     ConsentStatus accept(@PathVariable UUID orgId, @Valid @RequestBody AcceptRequest request) {
         Instant accepted = consents.accept(orgId, request.version());
-        Consents.Terms terms = consents.contributorTerms();
+        Consents.Terms terms = Consents.termsFor(access.require(orgId, OrgType.CONTRIBUTOR, OrgType.BUYER).getType()).orElseThrow();
         return new ConsentStatus(terms.version(), terms.text(), accepted);
     }
 }

@@ -87,6 +87,12 @@ pokemans:
       enabled: ${PRICING_INGESTION_ENABLED:false}
       cron: "0 30 6 * * *"
       lookback: 400d
+  offers:
+    # Instant offers (Zach, 2026-10-19): each grade's quick-sale value less the buyer's margin. An offer
+    # stands for a week; a posted offer waits two weeks for a buyer.
+    buyer-margin: 0.10
+    offer-valid-for: 7d
+    listing-open-for: 14d
   collateral:
     # Lender and insurer collateral reports (valuation runs and report PDFs). Paused while Zach's outside
     # interest is cleared with his employer (2026-10-19): the APIs aren't registered unless this is on.

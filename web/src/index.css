@@ -338,3 +338,11 @@ details summary {
 .scroll {
   overflow-x: auto;
 }
+
+/* Card photos on instant-offer listings. */
+.thumb {
+  width: 6rem;
+  height: auto;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border);
+}

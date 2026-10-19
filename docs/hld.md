@@ -106,6 +106,7 @@ The methodology's worked example (FMV $411 → RV $481 → QSV $314 → stressed
 | `valuation` | Valuation runs: snapshot inputs → `valuation-core` → stored results and trace |
 | `reporting` | HTML templates, PDF rendering (OpenHTMLtoPDF), report storage and hashing |
 | `outcomes` | Grader submissions, returned grades (manual + CSV import), linking outcomes to predictions |
+| `offers` | Instant offers on raw cards, listings posted to buyer orgs, first-come acceptance, buyers' inspection records |
 | `admin` | Parameter set versions, review queues, comp overrides, user and org management |
 
 Modules talk through published interfaces and application events (e.g. `PhotosAccepted`, `CardIdentified`, `AssessmentFinalized`, `GradeReturned`), not each other's repositories.
@@ -331,6 +332,13 @@ Posts are only read by hand to find people to ask. They are never stored.
   - the insurer report covers every priced card, with doubted ones at $0;
   - only the admin issues reports and org members download them.
 - **UI:** the collection page lists issued reports for members. Admins get a valuation page (start a run with the grading cost, list runs) and a run page (figures, per-card trace, exclusions, grade-first, report issuing).
+
+**Instant offers (2026-10-19): built on fixture data.** While the lender and insurer side is paused, the same valuation engine prices instant offers for collectors selling raw cards to buyer orgs (shops, dealers). It adds:
+- a `BUYER` org type with versioned buyer terms;
+- the `offers` module (`card_offer`, `sale_listing`, `listing_event`, V14, append-only);
+- `OfferLadder` in valuation-core.
+
+Details in [offers.md](offers.md).
 
 ## 11. Risks and open decisions
 

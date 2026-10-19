@@ -5,6 +5,7 @@ import { CardPage } from './pages/CardPage'
 import { ContainerPage } from './pages/ContainerPage'
 import { HomePage } from './pages/HomePage'
 import { InvitePage } from './pages/InvitePage'
+import { DealsPage, MarketPage } from './pages/MarketPage'
 import { OrgPage } from './pages/OrgPage'
 
 // Admin and review screens are only for us, so partners' phones don't download them.
@@ -63,6 +64,8 @@ function App() {
               <Route path="/orgs/:orgId" element={<OrgPage />} />
               <Route path="/orgs/:orgId/:kind/:containerId" element={<ContainerPage />} />
               <Route path="/orgs/:orgId/cards/:cardId" element={<CardPage />} />
+              <Route path="/orgs/:orgId/market" element={<MarketPage />} />
+              <Route path="/orgs/:orgId/deals" element={<DealsPage />} />
               <Route path="*" element={<p>Page not found.</p>} />
             </Routes>
           </Suspense>

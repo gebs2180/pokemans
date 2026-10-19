@@ -96,6 +96,14 @@ class CrossOrgAccessTest {
                 postJson(p + "/cards/" + cardB + "/custody-records",
                         "{\"holderType\":\"OWNER\",\"holderName\":\"x\",\"location\":\"x\",\"heldSince\":\"2026-01-01\"}"),
                 get(p + "/consent"),
+                get(p + "/cards/" + cardB + "/sale"),
+                post(p + "/cards/" + cardB + "/offers"),
+                postJson(p + "/cards/" + cardB + "/listings", "{\"offerId\":\"" + UUID.randomUUID() + "\"}"),
+                post(p + "/listings/" + UUID.randomUUID() + "/withdraw"),
+                get(p + "/market"),
+                post(p + "/market/" + UUID.randomUUID() + "/accept"),
+                get(p + "/deals"),
+                postJson(p + "/deals/" + UUID.randomUUID() + "/inspection", "{\"inspectedGrade\":9,\"authentic\":true,\"pricePaid\":1}"),
                 get(p + "/collections/" + collectionB + "/reports"),
                 get(p + "/reports/" + reportB + "/download"));
     }

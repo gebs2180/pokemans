@@ -5,7 +5,7 @@ import java.util.Optional;
 
 /** Application roles (HLD §7). Spring authorities are {@code ROLE_<name>}. */
 public enum Role {
-    ADMIN, PARTNER, COLLECTOR, CONTRIBUTOR;
+    ADMIN, PARTNER, COLLECTOR, CONTRIBUTOR, BUYER;
 
     public String authority() {
         return "ROLE_" + name();

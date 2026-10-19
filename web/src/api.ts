@@ -1,9 +1,9 @@
 import { useAuth0 } from '@auth0/auth0-react'
 import { useCallback } from 'react'
 
-export type OrgType = 'PARTNER' | 'COLLECTOR' | 'CONTRIBUTOR'
+export type OrgType = 'PARTNER' | 'COLLECTOR' | 'CONTRIBUTOR' | 'BUYER'
 
-export const ORG_TYPE_LABEL: Record<OrgType, string> = { PARTNER: 'Partner', COLLECTOR: 'Collector', CONTRIBUTOR: 'Contributor' }
+export const ORG_TYPE_LABEL: Record<OrgType, string> = { PARTNER: 'Partner', COLLECTOR: 'Collector', CONTRIBUTOR: 'Contributor', BUYER: 'Buyer' }
 export type Side = 'FRONT' | 'BACK' | 'DETAIL'
 export type PhotoStatus = 'AWAITING_UPLOAD' | 'PASSED' | 'RETAKE'
 
@@ -565,4 +565,87 @@ export function money(amount: number | null | undefined) {
 
 export function percent(share: number) {
   return `${Math.round(share * 1000) / 10}%`
+}
+
+// Instant offers (2026-10-19)
+
+/** One rung of an offer: the price if the card inspects at this grade, and how likely that is. */
+export type Rung = { grade: string; probability: number; price: number }
+
+export type Offer = {
+  id: string
+  expectedOffer: number
+  fmv: number
+  confidence: Confidence
+  graded: boolean
+  subjectToAuthentication: boolean
+  ladder: Rung[]
+  createdAt: string
+  expiresAt: string
+  expired: boolean
+}
+
+export type ListingStatus = 'OPEN' | 'ACCEPTED' | 'WITHDRAWN' | 'EXPIRED'
+export type Party = { orgName: string | null; email: string | null }
+export type DeclinedReason = 'NOT_GENUINE' | 'NOT_THE_LISTED_CARD' | 'DOES_NOT_MATCH_PHOTOS'
+
+export type Inspection = {
+  inspectedGrade: number
+  authentic: boolean
+  pricePaid: number | null
+  ladderPrice: number
+  declinedReason: DeclinedReason | null
+  note: string | null
+  recordedAt: string
+}
+
+export type Listing = {
+  id: string
+  offerId: string
+  status: ListingStatus
+  listedAt: string
+  expiresAt: string
+  closedAt: string | null
+  buyer: Party | null
+  inspection: Inspection | null
+}
+
+export type Sale = { offer: Offer | null; listing: Listing | null }
+
+export type OfferCard = {
+  name: string
+  setName: string
+  number: string
+  language: string
+  edition: string
+  variant: string
+  label: string
+  distribution: Record<string, number>
+  gradedAs: string | null
+}
+
+export type PhotoLink = { side: Side; url: string }
+
+export type MarketItem = { listingId: string; card: OfferCard; offer: Offer; photos: PhotoLink[]; listedAt: string; expiresAt: string }
+
+export type Deal = {
+  listingId: string
+  card: OfferCard
+  offer: Offer
+  photos: PhotoLink[]
+  seller: Party
+  acceptedAt: string
+  inspection: Inspection | null
+}
+
+/**
+ * The rungs worth showing: every grade the card might come back as, then the best price for anything
+ * lower, which caps every grade below it.
+ */
+export function likelyRungs(ladder: Rung[]): { likely: Rung[]; lower: Rung | null } {
+  const gradable = ladder.filter((r) => r.grade !== 'U')
+  const likely = gradable.filter((r) => r.probability > 0)
+  const lowest = likely.length ? Number(likely[likely.length - 1].grade) : 11
+  const lower = gradable.find((r) => Number(r.grade) < lowest) ?? null
+  return { likely, lower }
 }
