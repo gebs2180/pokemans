@@ -122,7 +122,7 @@ public final class GradePricer {
                         confidence.get(grade), null));
                 continue;
             }
-            BigDecimal netGraded = Money.max(BigDecimal.ZERO, Money.cents(input.gradingCost().net(g)));
+            BigDecimal netGraded = input.gradingCost().netPrice(g);
             BigDecimal raw = input.rawConditionPrices().get(grade);
             boolean rawWins = raw != null && raw.compareTo(netGraded) > 0;
             BigDecimal net = rawWins ? raw : netGraded;

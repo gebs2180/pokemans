@@ -463,3 +463,106 @@ export type CustodyRequest = {
   verificationMethod: CustodyMethod | null
   note: string | null
 }
+
+// Valuation runs and reports (M4)
+
+export type GradingCost = { fee: number; shipping: number; insurance: number; timeToCashRate: number }
+
+export type ValuationDefaults = { parameterSet: string; gradingCompany: string; gradingCost: GradingCost }
+
+/** A run's portfolio figures. Alpha is a suggested range only: the lender sets it. */
+export type RunSummary = {
+  id: string
+  orgId: string
+  collectionId: string
+  collectionName: string
+  asOf: string
+  parameterSetVersion: string
+  gradingCompany: string
+  gradingCost: GradingCost
+  inputsSha256: string
+  cardCount: number
+  valuedCount: number
+  eligibleCount: number
+  eligibleFlv: number
+  collateralBase: number
+  rawShare: number
+  gradedShare: number
+  alphaLow: number
+  alphaHigh: number
+  advanceLow: number
+  advanceHigh: number
+  capsApplied: boolean
+  capsMinCards: number
+  totalRv: number
+  note: string | null
+  createdAt: string
+}
+
+export type TraceStep = { subject: string; rule: string; value: string; detail: string }
+
+export type CardInputs = {
+  cardItemId: string
+  label: string
+  lot: boolean
+  quantity: number
+  identity: { catalogCardId: string; name: string; setName: string; number: string; language: string } | null
+  assessment: { assessmentId: string; version: number; distribution: Record<string, number>; photoConfidence: Confidence } | null
+  graded: { outcomeId: string; gradingCompany: string; grade: number; valuedGrade: string; certNumber: string } | null
+  prices: { snapshotSetId: string; gradingCompany: string; asOf: string; daysOld: number; staleLevels: number; sigma: number | null } | null
+  copiesHeld: number
+  provenance: { authFlagUnresolved: boolean; authState: string; custodyVerified: boolean; custodyState: string }
+  unvaluedReason: string | null
+}
+
+export type CardLine = {
+  cardItemId: string
+  position: number
+  status: 'VALUED' | 'UNVALUED'
+  unvaluedReason: string | null
+  graded: boolean
+  inputs: CardInputs
+  fmv: number | null
+  rv: number | null
+  qsv: number | null
+  stressedFmv: number | null
+  flv: number | null
+  confidence: Confidence | null
+  eligible: boolean
+  exclusionReasons: string[]
+  contribution: number
+  insuredRv: number
+  insurerNote: string | null
+  flvGraded: number | null
+  flvRawForLift: number | null
+  gradingCost: number | null
+  lift: number | null
+  gradeFirstRank: number | null
+  trace: TraceStep[]
+}
+
+export type RunDetail = { run: RunSummary; cards: CardLine[]; portfolioTrace: TraceStep[]; confidenceMix: Record<string, number> }
+
+export type ReportType = 'LENDER' | 'INSURER'
+
+export type ReportView = {
+  id: string
+  runId: string
+  collectionId: string
+  type: ReportType
+  lenderAlpha: number | null
+  templateVersion: string
+  sha256: string
+  sizeBytes: number
+  issuedAt: string
+}
+
+export type DownloadLink = { url: string }
+
+export function money(amount: number | null | undefined) {
+  return amount == null ? '–' : amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+}
+
+export function percent(share: number) {
+  return `${Math.round(share * 1000) / 10}%`
+}

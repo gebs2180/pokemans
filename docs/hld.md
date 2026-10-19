@@ -110,7 +110,7 @@ The methodology's worked example (FMV $411 → RV $481 → QSV $314 → stressed
 
 Modules talk through published interfaces and application events (e.g. `PhotosAccepted`, `CardIdentified`, `AssessmentFinalized`, `GradeReturned`), not each other's repositories.
 
-**Built so far (M3 skeleton, 2026-10-16):** `identity`, `storage`, `intake`, `catalog`, `condition`, `outcomes` and `pricing`.
+**Built so far (M3 skeleton, 2026-10-16; M4 2026-10-18):** `identity`, `storage`, `intake`, `catalog`, `condition`, `outcomes`, `pricing`, `provenance`, `valuation` and `reporting`.
 - **Published APIs:** each module exposes a small public API: `intake.CardItems` (cards, passing photos, the `CaptureCompleted` event), `catalog.Catalog` (current identity per card, and the identified catalog cards), `identity.Consents` and `pricing.Prices` (a card's latest snapshot set). `provenance.Provenance` gives each card's two eligibility gates: `authFlagUnresolved` with its reason, and `custodyVerified`.
 - **Review queue:** it lives in `condition`, not `admin`.
 - **Contributor consent:** it lives in `identity` as a versioned terms text plus append-only acceptances that store the hash of the exact text.
@@ -314,6 +314,22 @@ Posts are only read by hand to find people to ask. They are never stored.
   - **Append-only tables** (`sold_comp`, `price_snapshot`, `price_stats`) refuse updates with a database trigger. Deletes stay possible for licence purges.
 - **Manual comp entry (2026-10-17):** the pilot route. `PricingController` under `/api/admin/catalog-cards/{id}`: `POST comps`, `GET prices`, `POST prices/refresh`. The review page shows the panel once the card is identified.
 - **Not built yet:** a licensed adapter, excluding a mistaken comp, the comps browser, and stored step-down ratio tables. Snapshots are gross: grading costs are netted in the valuation run (M4). Details and open questions are in [m3-progress.md](m3-progress.md).
+
+**M4 status (2026-10-18): built, on fixture and hand-entered data.** Details and what's left are in [m4-progress.md](m4-progress.md).
+- **Modules:**
+  - `valuation` snapshots a collection's inputs into a run, values it with `valuation-core`, and stores the inputs, results and trace (V13, append-only). Its published API is `Valuations`.
+  - `reporting` renders lender and insurer PDFs from a stored run. Thymeleaf fills XHTML templates and OpenHTMLtoPDF lays them out, in the JVM, with bundled Noto Sans fonts. The PDFs are stored once under `reports/` in the private photo bucket, with their SHA-256.
+  - New published APIs feed them: `condition.Assessments` (current assessment), `outcomes.Outcomes` (verified returned grades) and `CardItems.requireCollection` / `inCollection`.
+- **Reproducible:** each card's stored inputs (identity, assessment version and distribution, the gross price table, σ, sales rate, copies, provenance states, photos) plus the run's parameter-set body and grading cost are enough to value it again. `GET /api/admin/valuation-runs/{id}/replay` does that and lists any difference. The inputs are hashed onto the run.
+- **Decisions (Zach, 2026-10-18):**
+  - raw cards on PSA tables only;
+  - grading cost per run ($25 / $5 / $2 / 2% by default);
+  - fallback σ 20% with one confidence level off (parameter set 1.1.0);
+  - grade-first lift counts C once;
+  - verified slabs valued as graded;
+  - the insurer report covers every priced card, with doubted ones at $0;
+  - only the admin issues reports and org members download them.
+- **UI:** the collection page lists issued reports for members. Admins get a valuation page (start a run with the grading cost, list runs) and a run page (figures, per-card trace, exclusions, grade-first, report issuing).
 
 ## 11. Risks and open decisions
 

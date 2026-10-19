@@ -87,6 +87,17 @@ pokemans:
       enabled: ${PRICING_INGESTION_ENABLED:false}
       cron: "0 30 6 * * *"
       lookback: 400d
+  valuation:
+    # Valuation runs use 1.1.0: 1.0.0 plus the fallback sigma for cards with too few price changes.
+    parameter-set: 1.1.0
+    # Raw cards are valued on PSA's table only, with no fallback to another grader (Zach, 2026-10-18).
+    grading-company: PSA
+    # Starting values per card (Zach, 2026-10-18); the admin can override them on each run.
+    grading-cost:
+      fee: 25
+      shipping: 5
+      insurance: 2
+      time-to-cash-rate: 0.02
   provenance:
     # A custody check (vault statement, in-person visit, ...) counts this long, then lapses and the
     # card gets no advance until it is checked again.

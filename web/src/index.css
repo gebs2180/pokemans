@@ -318,3 +318,23 @@ details summary {
 .suggestion .noimg {
   width: 100%;
 }
+
+/* Valuation run summary: a row of figures that wraps on narrow screens. */
+.tiles {
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.tiles > .panel {
+  flex: 1 1 10rem;
+  margin: 0;
+}
+
+.tiles strong {
+  font-size: 1.2rem;
+}
+
+/* Wide tables scroll inside their own box instead of the page. */
+.scroll {
+  overflow-x: auto;
+}

@@ -42,6 +42,16 @@ class ParameterSetTest {
     }
 
     @Test
+    void version110AddsTheFallbackSigma() {
+        ParameterSet v110 = ParameterSet.load("1.1.0");
+
+        assertThat(v110.fallbackSigma()).isEqualByComparingTo("0.20");
+        assertThat(ParameterSet.defaults().fallbackSigma()).isNull();
+        assertThat(v110.sellingFees()).isEqualByComparingTo(ParameterSet.defaults().sellingFees());
+        assertThat(v110.capsMinCards()).isEqualTo(ParameterSet.defaults().capsMinCards());
+    }
+
+    @Test
     void unknownVersionFails() {
         assertThatThrownBy(() -> ParameterSet.load("9.9.9")).isInstanceOf(IllegalArgumentException.class);
     }

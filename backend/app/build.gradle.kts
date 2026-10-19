@@ -18,6 +18,10 @@ dependencies {
     implementation("software.amazon.awssdk:s3")
     implementation("com.drewnoakes:metadata-extractor:2.21.0")
     implementation("org.openpnp:opencv:4.9.0-0")
+    // Report PDFs, rendered in the JVM: Thymeleaf (Apache-2.0) fills XHTML templates and OpenHTMLtoPDF
+    // (LGPL-2.1, used unmodified as a library; PDFBox underneath is Apache-2.0) lays them out.
+    implementation("org.thymeleaf:thymeleaf")
+    implementation("io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.85")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
@@ -35,6 +39,8 @@ dependencies {
 // OpenCV loads its bundled native library through JNI, which Java 24+ warns about unless allowed.
 tasks.withType<Test>().configureEach {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
+    // ./gradlew test -Dgolden.update=true rewrites the golden report files (GoldenReportTest).
+    systemProperty("golden.update", System.getProperty("golden.update") ?: "false")
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {

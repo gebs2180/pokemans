@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
-import { apiPath, useApi, type ContainerDetail } from '../api'
+import { apiPath, useApi, type ContainerDetail, type Me, type ReportView } from '../api'
 import { useLoad } from '../useLoad'
+import { ReportsList } from './ReportsPanel'
 
 /** A batch or collection: its cards and their capture status. */
 export function ContainerPage() {
@@ -91,6 +92,30 @@ export function ContainerPage() {
           </li>
         ))}
       </ul>
+
+      {kind === 'collections' && <CollectionReports orgId={orgId} collectionId={containerId} />}
     </>
+  )
+}
+
+/** Reports issued for the collection, and for the admin the way to value it. */
+export function CollectionReports({ orgId, collectionId }: { orgId: string; collectionId: string }) {
+  const api = useApi()
+  const { data: me } = useLoad(() => api<Me>('GET', '/api/me'), [api])
+  const { data: reports, error } = useLoad(
+    () => api<ReportView[]>('GET', apiPath`/api/orgs/${orgId}/collections/${collectionId}/reports`),
+    [api, orgId, collectionId],
+  )
+  return (
+    <section>
+      <h2>Reports</h2>
+      {me?.roles.includes('ADMIN') && (
+        <p>
+          <Link to={`/admin/valuation/${orgId}/${collectionId}`}>Admin: valuation runs and report issuing</Link>
+        </p>
+      )}
+      {error && <p className="error" role="alert">{error}</p>}
+      {reports && <ReportsList reports={reports} downloadPath={(id) => apiPath`/api/orgs/${orgId}/reports/${id}/download`} />}
+    </section>
   )
 }

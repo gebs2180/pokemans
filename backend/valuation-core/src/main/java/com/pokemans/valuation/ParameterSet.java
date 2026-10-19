@@ -59,7 +59,9 @@ public record ParameterSet(
         BigDecimal suggestedAlphaHigh,
         // Step 6: grade-first
         BigDecimal gradeFirstMinLift,
-        int gradeFirstTopN) {
+        int gradeFirstTopN,
+        // Valuation runs: σ for a card with too few monthly price changes (null in sets before 1.1.0)
+        BigDecimal fallbackSigma) {
 
     public static final String DEFAULT_VERSION = "1.0.0";
 
@@ -130,7 +132,8 @@ public record ParameterSet(
                 decimal(p, "portfolio.suggestedAlphaLow"),
                 decimal(p, "portfolio.suggestedAlphaHigh"),
                 decimal(p, "gradeFirst.minLift"),
-                integer(p, "gradeFirst.topN"));
+                integer(p, "gradeFirst.topN"),
+                optionalDecimal(p, "values.fallbackSigma"));
     }
 
     /** Liquidity tier for a card's monthly sales count. */
@@ -172,6 +175,11 @@ public record ParameterSet(
 
     private static BigDecimal decimal(Properties p, String key) {
         return new BigDecimal(required(p, key));
+    }
+
+    private static BigDecimal optionalDecimal(Properties p, String key) {
+        String value = p.getProperty(key);
+        return value == null || value.isBlank() ? null : new BigDecimal(value.trim());
     }
 
     private static int integer(Properties p, String key) {

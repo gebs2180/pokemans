@@ -47,6 +47,8 @@ class CrossOrgAccessTest {
     private String collectionB;
     private String cardB;
     private String photoB;
+    private String runB;
+    private String reportB;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -64,6 +66,10 @@ class CrossOrgAccessTest {
                 "{\"label\":\"B card\",\"lot\":false,\"quantity\":1}", userB).andExpect(status().isCreated()), "$.id");
         photoB = TestApi.read(api.postJson("/api/orgs/" + orgB + "/cards/" + cardB + "/photos",
                 "{\"side\":\"FRONT\",\"contentType\":\"image/png\",\"sizeBytes\":100}", userB).andExpect(status().isCreated()), "$.photoId");
+        runB = TestApi.read(api.postJson("/api/admin/orgs/" + orgB + "/collections/" + collectionB + "/valuation-runs", "{}", api.admin())
+                .andExpect(status().isCreated()), "$.id");
+        reportB = TestApi.read(api.postJson("/api/admin/valuation-runs/" + runB + "/reports", "{\"type\":\"LENDER\"}", api.admin())
+                .andExpect(status().isCreated()), "$.id");
     }
 
     private static MockHttpServletRequestBuilder postJson(String url, String json) {
@@ -89,7 +95,9 @@ class CrossOrgAccessTest {
                 get(p + "/cards/" + cardB + "/provenance"),
                 postJson(p + "/cards/" + cardB + "/custody-records",
                         "{\"holderType\":\"OWNER\",\"holderName\":\"x\",\"location\":\"x\",\"heldSince\":\"2026-01-01\"}"),
-                get(p + "/consent"));
+                get(p + "/consent"),
+                get(p + "/collections/" + collectionB + "/reports"),
+                get(p + "/reports/" + reportB + "/download"));
     }
 
     @Test
@@ -105,7 +113,7 @@ class CrossOrgAccessTest {
         // Routes that name one of B's resources; A's own lists (collections, batches, consent) are A's to see.
         for (MockHttpServletRequestBuilder request : orgRoutes(orgA)) {
             String what = describe(request);
-            if (!what.contains(collectionB) && !what.contains(cardB) && !what.contains(photoB)) {
+            if (!what.contains(collectionB) && !what.contains(cardB) && !what.contains(photoB) && !what.contains(reportB)) {
                 continue;
             }
             assertThat(perform(request, userA)).as(what).isIn(403, 404);
@@ -132,7 +140,15 @@ class CrossOrgAccessTest {
                         "{\"status\":\"VERIFIED_AUTHENTIC\",\"method\":\"IN_HAND_INSPECTION\"}"),
                 get("/api/admin/catalog-cards/" + catalogCard + "/prices"),
                 postJson("/api/admin/catalog-cards/" + catalogCard + "/comps", "{}"),
-                post("/api/admin/catalog-cards/" + catalogCard + "/prices/refresh"));
+                post("/api/admin/catalog-cards/" + catalogCard + "/prices/refresh"),
+                get("/api/admin/valuation/defaults"),
+                postJson("/api/admin/orgs/" + orgB + "/collections/" + collectionB + "/valuation-runs", "{}"),
+                get("/api/admin/orgs/" + orgB + "/collections/" + collectionB + "/valuation-runs"),
+                get("/api/admin/valuation-runs/" + runB),
+                get("/api/admin/valuation-runs/" + runB + "/replay"),
+                get("/api/admin/valuation-runs/" + runB + "/reports"),
+                postJson("/api/admin/valuation-runs/" + runB + "/reports", "{\"type\":\"LENDER\"}"),
+                get("/api/admin/reports/" + reportB + "/download"));
         for (MockHttpServletRequestBuilder request : admin) {
             assertThat(perform(request, userA)).as(describe(request)).isEqualTo(403);
             // A token that claims ADMIN without an MFA login isn't admin either.

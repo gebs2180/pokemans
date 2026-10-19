@@ -157,4 +157,67 @@ class CardValuatorTest {
         assertThatThrownBy(() -> new CardValuator.Input("card", GradeDistribution.certain(Grade.G10), null, d("0"), d("1"), 1, Confidence.A))
                 .isInstanceOf(NullPointerException.class).hasMessageContaining("prices");
     }
+
+    @Test
+    void penaltiesDropConfidenceBeforeTheStressIsChosen() {
+        CardValuator.Input plain = input(prices("100"), Confidence.A, "0.05", "30", 1);
+        CardValuator.Input stale = new CardValuator.Input("card", plain.distribution(), plain.prices(), plain.monthlyVolatility(),
+                plain.salesPerMonth(), 1, Confidence.A,
+                List.of(new ConfidencePenalty("price table 40 days old", 2), new ConfidencePenalty("nothing", 0)), false);
+
+        CardValuation a = valuator.value(plain);
+        CardValuation c = valuator.value(stale);
+
+        assertThat(a.confidence()).isEqualTo(Confidence.A);
+        assertThat(a.stressShift()).isEqualTo(2);
+        assertThat(c.confidence()).isEqualTo(Confidence.C);
+        assertThat(c.stressShift()).isEqualTo(3);
+        assertThat(c.trace().stepsFor("confidence_penalty")).hasSize(1);
+    }
+
+    @Test
+    void aKnownGradeGetsNoConditionStress() {
+        Map<Grade, GradePrice> ladder = new EnumMap<>(Grade.class);
+        for (Grade grade : Grade.values()) {
+            String price = grade.isUngradable() ? "0" : Integer.toString(10 * grade.ordinal());
+            ladder.put(grade, GradePrice.given(grade, d(price), GradePrice.Method.OBSERVED, 20));
+        }
+        GradePriceTable table = new GradePriceTable(ladder, new Trace());
+        CardValuator.Input graded = new CardValuator.Input("slab", GradeDistribution.certain(Grade.G8), table, d("0.05"), d("30"), 1,
+                Confidence.A, List.of(), true);
+
+        CardValuation v = valuator.value(graded);
+
+        assertThat(v.stressShift()).isZero();
+        assertThat(v.stressedFmv()).isEqualByComparingTo(v.fmv());
+    }
+
+    @Test
+    void penaltiesCantRaiseConfidence() {
+        assertThatThrownBy(() -> new ConfidencePenalty("up", -1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new CardValuator.Input("card", GradeDistribution.certain(Grade.G10), prices("1"), d("0"), d("1"), 1,
+                Confidence.A, null, false)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void nettingASnapshotMatchesThePricer() {
+        GradingCost cost = new GradingCost(d("25"), d("5"), d("2"), d("0.02"));
+        GradePriceTable gross = prices("100");
+
+        GradePriceTable net = GradePriceTable.netOf(gross.all(), cost);
+
+        // 100 - 32 - 2 = 66; U is already a raw sale price.
+        assertThat(net.net(Grade.G9)).isEqualByComparingTo("66.00");
+        assertThat(net.gross(Grade.G9)).isEqualByComparingTo("100");
+        assertThat(net.net(Grade.U)).isEqualByComparingTo("100");
+        assertThat(GradePriceTable.netOf(prices("20").all(), cost).net(Grade.G9)).isEqualByComparingTo("0");
+        assertThat(net.atGross().net(Grade.G9)).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void gradingCostRefusesNonsense() {
+        assertThatThrownBy(() -> new GradingCost(d("-1"), d("0"), d("0"), d("0"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GradingCost(d("0"), d("0"), d("0"), d("1"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GradingCost(d("0"), d("0"), d("0"), d("-0.1"))).isInstanceOf(IllegalArgumentException.class);
+    }
 }
