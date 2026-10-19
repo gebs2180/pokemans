@@ -77,10 +77,9 @@ final class ReportModel {
         m.put("confidenceMix", String.join(", ", detail.confidenceMix().entrySet().stream()
                 .map(e -> e.getKey() + ": " + e.getValue()).toList()));
         m.put("capsApplied", run.capsApplied());
-        m.put("capsNote", run.capsApplied()
-                ? "Each card is capped at one level so that no card is more than 20% of the final base and the top five are at most 50%."
-                : "Concentration caps not applied: " + run.eligibleCount() + " eligible cards, fewer than the " + run.capsMinCards()
-                + " needed for the caps to hold. The pledge is concentrated, which the lender should weigh.");
+        m.put("capsNote", "Every card is capped at one level so that no card is more than 20% of the eligible FLV before caps ("
+                + money(run.eligibleFlv()) + ") and the top five are at most 50% of it, whatever the number of cards."
+                + (run.capsApplied() ? "" : " No card needed capping."));
         m.put("adjustments", adjustments(detail.portfolioTrace(), names));
 
         List<Map<String, Object>> cards = new ArrayList<>();

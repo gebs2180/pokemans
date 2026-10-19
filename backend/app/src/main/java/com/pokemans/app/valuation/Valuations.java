@@ -21,12 +21,16 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class Valuations {
 
-    /** A run's portfolio figures. α is a suggested range only: the lender sets it. */
+    /**
+     * A run's portfolio figures. α is a suggested range only: the lender sets it.
+     *
+     * @param capsApplied true when the concentration caps lowered at least one card
+     */
     public record RunSummary(UUID id, UUID orgId, UUID collectionId, String collectionName, LocalDate asOf, String parameterSetVersion,
                              String gradingCompany, GradingCost gradingCost, String inputsSha256, int cardCount, int valuedCount,
                              int eligibleCount, BigDecimal eligibleFlv, BigDecimal collateralBase, BigDecimal rawShare,
                              BigDecimal gradedShare, BigDecimal alphaLow, BigDecimal alphaHigh, BigDecimal advanceLow,
-                             BigDecimal advanceHigh, boolean capsApplied, int capsMinCards, BigDecimal totalRv, String note,
+                             BigDecimal advanceHigh, boolean capsApplied, BigDecimal totalRv, String note,
                              Instant createdAt) {
     }
 
@@ -88,13 +92,11 @@ public class Valuations {
     }
 
     static RunSummary summary(ValuationRun r) {
-        com.pokemans.valuation.ParameterSet params = ValuationService.JSON.readValue(r.getParameterSet(),
-                com.pokemans.valuation.ParameterSet.class);
         return new RunSummary(r.getId(), r.getOrgId(), r.getCollectionId(), r.getCollectionName(), r.getAsOf(), r.getParameterSetVersion(),
                 r.getGradingCompany(), ValuationService.JSON.readValue(r.getGradingCost(), GradingCost.class), r.getInputsSha256(),
                 r.getCardCount(), r.getValuedCount(), r.getEligibleCount(), r.getEligibleFlv(), r.getCollateralBase(), r.getRawShare(),
                 r.getGradedShare(), r.getAlphaLow(), r.getAlphaHigh(), r.getAdvanceLow(), r.getAdvanceHigh(), r.isCapsApplied(),
-                params.capsMinCards(), r.getTotalRv(), r.getNote(), r.getCreatedAt());
+                r.getTotalRv(), r.getNote(), r.getCreatedAt());
     }
 
     private static CardLine line(CardValuationRecord l) {

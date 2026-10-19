@@ -492,8 +492,8 @@ export type RunSummary = {
   alphaHigh: number
   advanceLow: number
   advanceHigh: number
+  /** True when the concentration caps lowered at least one card. */
   capsApplied: boolean
-  capsMinCards: number
   totalRv: number
   note: string | null
   createdAt: string

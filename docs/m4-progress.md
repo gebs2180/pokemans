@@ -15,7 +15,8 @@ Status 2026-10-18 · branch `claude/beautiful-rhodes-f0e445`.
 - **Known grade.** A `knownGrade` flag means no condition stress shift.
 - **Netting.** `GradePriceTable.netOf(gross, cost)` nets a gross snapshot the way the pricer does, and `atGross()` undoes it. `GradingCost.netPrice` is shared with `GradePricer`, and `GradingCost` refuses negative costs.
 - **Grade-first.** `GradeFirstRanker` computes FLV_raw for the lift from gross prices, so C counts once. `Candidate` no longer takes a raw valuation.
-- **Parameter set 1.1.0.** It is 1.0.0 plus `values.fallbackSigma=0.20`. 1.0.0 is untouched, and pricing still uses it.
+- **Parameter set 1.1.0.** It is 1.0.0 plus `values.fallbackSigma=0.20`, without `portfolio.capsMinCards` (caps apply at every size since 2026-10-19). The 1.0.0 file is untouched; its `capsMinCards` key is now ignored. Pricing still uses 1.0.0.
+- **Caps against the eligible FLV** (Zach, 2026-10-19): `PortfolioEvaluator` caps every card at one level, the highest at which no card is above 20% and the top five are at most 50% of the eligible FLV before caps, at every collection size.
 
 **app, new `valuation` module:**
 - **`ValuationService.run`** gathers each card of a collection:
@@ -91,7 +92,7 @@ Status 2026-10-18 · branch `claude/beautiful-rhodes-f0e445`.
 
 ## For Zach to decide
 
-1. **Caps squeeze small pledges hard.** Measured against the final base, "top five ≤ 50%" means the five smallest eligible cards must add up to the five largest. With 10 to about 15 eligible cards, the cap level falls to roughly the smallest cards' FLV.
+1. ~~**Caps squeeze small pledges hard.**~~ **Decided 2026-10-19:** caps are now measured against the eligible FLV before caps, at every size, with no 10-card minimum (`PortfolioEvaluator`, parameter set 1.1.0 drops `capsMinCards`). The golden fixture's base goes from $589 to $1,133.65 (cap level $223.64; $1,227.65 before the correlation haircut). A single card counts at most 20% of its FLV and five or fewer cards at most 50%. The original note follows. Measured against the final base, "top five ≤ 50%" means the five smallest eligible cards must add up to the five largest. With 10 to about 15 eligible cards, the cap level falls to roughly the smallest cards' FLV.
    - **The golden fixture:** ten eligible cards with FLV from $64 to $519 give an eligible FLV of $1,608. Every card is capped at $64.01, which is the smallest card's FLV, so the base is $589.
    - **Is this what you want?** Alternatives would be to measure the caps against the uncapped base, to apply only the 20% single-card cap below some count, or to raise `portfolio.capsMinCards`.
 2. ~~**Graded cards get no condition stress.**~~ Confirmed by Zach, 2026-10-19: a graded card is priced at its grade, whatever its condition. The volatility shock, the depth discount and FLV ≤ QSV still apply.

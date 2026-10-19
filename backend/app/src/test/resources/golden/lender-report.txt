@@ -7,13 +7,13 @@ Grading cost: fee $25.00, shipping $5.00, insurance $2.00 per card, time-to-cash
 Run 00000000-0000-4000-8000-000000009000, report 00000000-0000-4000-8000-00000000abcd, template 1
 Inputs SHA-256 fixture
 COLLATERAL BASE
-$588.90
+$1,133.65
 Sum of eligible forced-
 liquidation values (FLV) after 
 caps and haircuts
 SUGGESTED ADVANCE
-$294.45 to 
-$412.23
+$566.82 to 
+$793.56
 At alpha 50% to 70% of the 
 base. The lender sets alpha.
 ELIGIBLE CARDS
@@ -21,22 +21,16 @@ ELIGIBLE CARDS
 14 valued; eligible FLV before 
 caps $1,608.36
 RAW / GRADED
-89.1% / 10.9%
+80.3% / 19.7%
 Share of the base. Confidence: 
 A: 1, B: 9, D: 4
-At an alpha of 60%, set by the lender, the advance is $353.34.
+At an alpha of 60%, set by the lender, the advance is $680.19.
 Caps and haircuts
-Each card is capped at one level so that no card is more than 20% of the final base and the top five are at most 50%.
-Capped Umbreon VMAX (Umbreon VMAX #4) at $64.01 (FLV $309.27)
-Capped Rayquaza VMAX (Rayquaza VMAX #5) at $64.01 (FLV $144.13)
-Capped Espeon VMAX (Espeon VMAX #6) at $64.01 (FLV $111.10)
-Capped Glaceon VMAX (Glaceon VMAX #7) at $64.01 (FLV $101.66)
-Capped Leafeon VMAX (Leafeon VMAX #8) at $64.01 (FLV $92.23)
-Capped Sylveon VMAX (Sylveon VMAX #9) at $64.01 (FLV $87.50)
-Capped Gengar VMAX (Gengar VMAX #10) at $64.01 (FLV $82.79)
-Capped Charizard VMAX (Charizard VMAX #11) at $64.01 (FLV $96.94)
-Capped Lugia (Lugia slab) at $64.01 (FLV $518.73)
-Correlation haircut on set EN:Evolving Skies: slice above 0.40 of base, 0.10 off, share 0.8000, $51.21 off
+Every card is capped at one level so that no card is more than 20% of the eligible FLV before caps ($1,608.36) and the top five 
+are at most 50% of it, whatever the number of cards.
+Capped Umbreon VMAX (Umbreon VMAX #4) at $223.64 (FLV $309.27)
+Capped Lugia (Lugia slab) at $223.64 (FLV $518.73)
+Correlation haircut on set EN:Evolving Skies: slice above 0.40 of base, 0.10 off, share 0.7657, $94.00 off
 Cards
 Card Condition Conf. FMV QSV FLV In base Status
 Charizard
@@ -50,35 +44,35 @@ Base Set #15, EN, holo (Venusaur #3)
 raw, median 6 D $105.82 $80.95 $9.25 $0.00 excluded
 Umbreon VMAX
 Evolving Skies #215, EN, holo (Umbreon VMAX #4)
-raw, median 9 B $994.26 $802.86 $309.27 $57.61 eligible
+raw, median 9 B $994.26 $802.86 $309.27 $201.28 eligible
 Rayquaza VMAX
 Evolving Skies #218, EN, holo (Rayquaza VMAX #5)
-raw, median 9 B $481.13 $388.51 $144.13 $57.61 eligible
+raw, median 9 B $481.13 $388.51 $144.13 $129.72 eligible
 Espeon VMAX
 Evolving Skies #270, EN, holo (Espeon VMAX #6)
-raw, median 9 B $378.50 $305.64 $111.10 $57.61 eligible
+raw, median 9 B $378.50 $305.64 $111.10 $99.99 eligible
 Glaceon VMAX
 Evolving Skies #209, EN, holo (Glaceon VMAX #7)
-raw, median 9 B $349.18 $281.96 $101.66 $57.61 eligible
-Raw collection valuation Page 2 of 6
+raw, median 9 B $349.18 $281.96 $101.66 $91.49 eligible
 Leafeon VMAX
 Evolving Skies #205, EN, holo (Leafeon VMAX #8)
-raw, median 9 B $319.86 $258.29 $92.23 $57.61 eligible
+raw, median 9 B $319.86 $258.29 $92.23 $83.01 eligible
 Sylveon VMAX
 Evolving Skies #212, EN, holo (Sylveon VMAX #9)
-raw, median 9 B $305.20 $246.45 $87.50 $57.61 eligible
+raw, median 9 B $305.20 $246.45 $87.50 $78.75 eligible
 Gengar VMAX
 Evolving Skies #271, EN, holo (Gengar VMAX #10)
-raw, median 9 B $290.54 $234.61 $82.79 $57.61 eligible
+raw, median 9 B $290.54 $234.61 $82.79 $74.51 eligible
+Raw collection valuation Page 2 of 6
 Charizard VMAX
 Evolving Skies #20, EN, holo (Charizard VMAX #11)
-raw, median 9 B $334.52 $270.12 $96.94 $57.61 eligible
+raw, median 9 B $334.52 $270.12 $96.94 $87.25 eligible
 Mew ex
 Pokemon 151 #151, EN, holo (Mew ex #12)
 raw, median 9 D $112.65 $86.18 $5.42 $0.00 excluded
 Lugia
 Neo Genesis #9, EN, holo (Lugia slab)
-PSA 9 (cert 81234567) A $840.00 $642.60 $518.73 $64.01 eligible
+PSA 9 (cert 81234567) A $840.00 $642.60 $518.73 $223.64 eligible
 Mewtwo
 Base Set #10, EN, holo (Mewtwo #14)
 raw, median 5 D $28.00 $21.42 $0.00 $0.00 excluded
@@ -115,7 +109,6 @@ Evolving Skies #205, EN, holo
 7 Sylveon VMAX
 Evolving Skies #212, EN, holo
 9 $38.88 $110.74 $226.00 1.96
-Raw collection valuation Page 3 of 6
 8 Gengar VMAX
 Evolving Skies #271, EN, holo
 9 $38.58 $105.92 $216.17 1.86
@@ -125,6 +118,7 @@ Base Set #4, EN, holo
 10 Blastoise
 Base Set #2, EN, holo
 8 $37.68 $85.36 $174.20 1.36
+Raw collection valuation Page 3 of 6
 Method
 Each raw card's condition is a probability distribution over Ungradable and grades 1 to 10, from its photos. Each grade is 
 priced from sold comps of that exact grade (never asking prices), net of grading costs. FMV is the probability-weighted price. 
@@ -159,13 +153,13 @@ Venusaur (Venusaur #3)
 PSA table as of 2026-10-17 (1 days old), snapshot 00000000-0000-4000-8000-000000000803
 sigma 7%, 9 sales/month, 1 copy held
 Grade p Gross Net Method Sales Window
-Raw collection valuation Page 4 of 6
 3 0 $41.18 $8.36 STEP_DOWN 0 -
 4 0 $58.82 $25.64 STEP_DOWN 0 -
 5 0 $84.04 $50.36 STEP_DOWN 0 -
 6 0.6 $120.05 $85.65 STEP_DOWN 0 -
 7 0.4 $171.50 $136.07 OBSERVED 12 90d
 Umbreon VMAX (Umbreon VMAX #4)
+Raw collection valuation Page 4 of 6
 PSA table as of 2026-10-17 (1 days old), snapshot 00000000-0000-4000-8000-000000000804
 sigma 5%, 30 sales/month, 1 copy held
 Grade p Gross Net Method Sales Window
@@ -200,7 +194,6 @@ PSA table as of 2026-10-17 (1 days old), snapshot 00000000-0000-4000-8000-000000
 sigma 5%, 30 sales/month, 1 copy held
 Grade p Gross Net Method Sales Window
 5 0 $87.40 $53.65 STEP_DOWN 0 -
-Raw collection valuation Page 5 of 6
 6 0 $124.85 $90.35 STEP_DOWN 0 -
 7 0 $178.36 $142.79 OBSERVED 25 90d
 8 0.2 $254.80 $217.70 OBSERVED 25 90d
@@ -208,6 +201,7 @@ Raw collection valuation Page 5 of 6
 10 0.3 $520.00 $477.60 OBSERVED 25 90d
 Leafeon VMAX (Leafeon VMAX #8)
 PSA table as of 2026-10-17 (1 days old), snapshot 00000000-0000-4000-8000-000000000808
+Raw collection valuation Page 5 of 6
 sigma 5%, 30 sales/month, 1 copy held
 Grade p Gross Net Method Sales Window
 5 0 $80.67 $47.06 STEP_DOWN 0 -
@@ -241,7 +235,6 @@ PSA table as of 2026-10-17 (1 days old), snapshot 00000000-0000-4000-8000-000000
 sigma 5%, 30 sales/month, 1 copy held
 Grade p Gross Net Method Sales Window
 5 0 $84.04 $50.36 STEP_DOWN 0 -
-Raw collection valuation Page 6 of 6
 6 0 $120.05 $85.65 STEP_DOWN 0 -
 7 0 $171.50 $136.07 OBSERVED 25 90d
 8 0.2 $245.00 $208.10 OBSERVED 25 90d
@@ -250,6 +243,7 @@ Raw collection valuation Page 6 of 6
 Mew ex (Mew ex #12)
 PSA table as of 2026-09-08 (40 days old), snapshot 00000000-0000-4000-8000-000000000812
 sigma not measured (fallback used), 6 sales/month, 1 copy held
+Raw collection valuation Page 6 of 6
 Grade p Gross Net Method Sales Window
 6 0 $43.22 $10.36 STEP_DOWN 0 -
 7 0 $61.74 $28.51 OBSERVED 3 90d

@@ -72,7 +72,7 @@ const detail: RunDetail = {
     advanceLow: 50,
     advanceHigh: 70,
     capsApplied: false,
-    capsMinCards: 10,
+    
     totalRv: 940,
     note: null,
     createdAt: '2026-10-18T15:00:00Z',
@@ -114,7 +114,7 @@ describe('ValuationRunPage', () => {
     expect(await screen.findByText('Valuation of Pledge binder')).toBeInTheDocument()
     expect(screen.getByText('$50.00 – $70.00')).toBeInTheDocument()
     expect(screen.getByText(/the lender sets alpha/)).toBeInTheDocument()
-    expect(screen.getByText(/Caps not applied: 1 eligible cards, fewer than the 10/)).toBeInTheDocument()
+    expect(screen.getByText(/No card needed capping/)).toBeInTheDocument()
     expect(
       screen.getByText('excluded: unresolved authenticity flag (awaiting verification); custody not verified (lapsed)'),
     ).toBeInTheDocument()

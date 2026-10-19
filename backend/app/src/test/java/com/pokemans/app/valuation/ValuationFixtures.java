@@ -87,7 +87,7 @@ public final class ValuationFixtures {
                 params.version(), "PSA", COST, "fixture", cards.size(), (int) lines.stream().filter(l -> l.fmv() != null).count(),
                 result.eligibleCount(), p.eligibleFlv(), p.collateralBase(), p.rawShare().setScale(6, RoundingMode.HALF_EVEN),
                 p.gradedShare().setScale(6, RoundingMode.HALF_EVEN), params.suggestedAlphaLow(), params.suggestedAlphaHigh(),
-                p.suggestedAdvanceLow(), p.suggestedAdvanceHigh(), result.capsApplied(), params.capsMinCards(), result.totalRv(), null,
+                p.suggestedAdvanceLow(), p.suggestedAdvanceHigh(), result.capsApplied(), result.totalRv(), null,
                 CREATED);
         return new Valuations.RunDetail(run, lines, p.trace().steps(), mix);
     }

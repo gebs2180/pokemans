@@ -57,8 +57,8 @@ export function ValuationRunPage() {
       <h2>Caps and haircuts</h2>
       <p>
         {run.capsApplied
-          ? `Every card capped at ${caps ? money(Number(caps.value)) : '–'}: no card above 20% of the final base, top five at most 50%.`
-          : `Caps not applied: ${run.eligibleCount} eligible cards, fewer than the ${run.capsMinCards} the caps need.`}
+          ? `Every card capped at ${caps ? money(Number(caps.value)) : '–'}: no card above 20% of the eligible FLV before caps, top five at most 50% of it.`
+          : 'No card needed capping: none is above 20% of the eligible FLV before caps, and the top five are within 50% of it.'}
       </p>
       {adjustments.length > 0 && (
         <ul className="list small">

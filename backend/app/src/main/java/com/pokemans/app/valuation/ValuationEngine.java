@@ -41,6 +41,7 @@ final class ValuationEngine {
                       List<Trace.Step> trace) {
     }
 
+    /** @param capsApplied true when the concentration caps lowered at least one card */
     record Result(List<CardResult> cards, PortfolioEvaluator.Result portfolio, BigDecimal totalRv, boolean capsApplied,
                   int eligibleCount) {
     }
@@ -119,7 +120,8 @@ final class ValuationEngine {
             results.add(new CardResult(card, v, contributions.get(id), insured, note, gf, rank.get(id), trace.steps()));
         }
         int eligible = (int) portfolio.cards().stream().filter(PortfolioEvaluator.Contribution::eligible).count();
-        return new Result(results, portfolio, totalRv, eligible >= params.capsMinCards(), eligible);
+        boolean capped = portfolio.trace().steps().stream().anyMatch(s -> s.subject().startsWith("capped["));
+        return new Result(results, portfolio, totalRv, capped, eligible);
     }
 
     /** Gross snapshot prices: raw cards are netted of grading cost; graded cards are already graded. */

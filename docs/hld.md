@@ -325,6 +325,7 @@ Posts are only read by hand to find people to ask. They are never stored.
   - raw cards on PSA tables only;
   - grading cost per run ($25 / $5 / $2 / 2% by default);
   - fallback σ 20% with one confidence level off (parameter set 1.1.0);
+  - concentration caps measured against the eligible FLV before caps, at every collection size (2026-10-19);
   - grade-first lift counts C once;
   - verified slabs valued as graded;
   - the insurer report covers every priced card, with doubted ones at $0;
