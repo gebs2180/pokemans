@@ -135,6 +135,10 @@ class CardReading {
         return attempts;
     }
 
+    Instant getNextAttemptAt() {
+        return nextAttemptAt;
+    }
+
     String getLastError() {
         return lastError;
     }

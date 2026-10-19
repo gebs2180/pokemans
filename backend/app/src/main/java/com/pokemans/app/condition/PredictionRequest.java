@@ -130,6 +130,10 @@ class PredictionRequest {
         return attempts;
     }
 
+    Instant getNextAttemptAt() {
+        return nextAttemptAt;
+    }
+
     String getLastError() {
         return lastError;
     }

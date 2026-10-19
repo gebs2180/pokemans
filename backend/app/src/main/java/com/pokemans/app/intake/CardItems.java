@@ -90,6 +90,15 @@ public class CardItems {
         return cards.findCaptureComplete().stream().map(CardItems::ref).toList();
     }
 
+    /**
+     * Cards whose capture completed (as far as photo check times tell) in {@code [since, before)},
+     * oldest first. For sweeps that catch a lost {@link CaptureCompleted}. No access check.
+     */
+    @Transactional(readOnly = true)
+    public List<CardItemRef> captureCompletedBetween(Instant since, Instant before) {
+        return cards.findCaptureCompletedBetween(since, before).stream().map(CardItems::ref).toList();
+    }
+
     private static CardItemRef ref(CardItem c) {
         return new CardItemRef(c.getId(), c.getOrgId(), c.getLabel(), c.isLot(), c.getQuantity(), c.getCreatedAt());
     }

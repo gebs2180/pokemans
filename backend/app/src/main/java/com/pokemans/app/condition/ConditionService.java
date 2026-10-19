@@ -7,6 +7,7 @@ import com.pokemans.app.identity.CurrentUser;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.valuation.Confidence;
 import com.pokemans.valuation.GradeDistribution;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -16,6 +17,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -27,6 +31,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 class ConditionService {
 
+    private static final Logger log = LoggerFactory.getLogger(ConditionService.class);
+    /** Advisory lock key for {@link #sweepMissedCaptures}. */
+    private static final long SWEEP_LOCK = 0x706f6b65_636f6e64L;
+
+    private final ConditionProperties properties;
     private final List<String> enabledProviders;
     private final PredictionRequestRepository requests;
     private final ProviderPredictionRepository predictions;
@@ -39,6 +48,7 @@ class ConditionService {
     ConditionService(List<PreGradeProvider> providers, PredictionRequestRepository requests, ProviderPredictionRepository predictions,
                      ConditionAssessmentRepository assessments, CardItems cardItems, Catalog catalog, CurrentUser currentUser,
                      ConditionProperties properties) {
+        this.properties = properties;
         this.enabledProviders = providers.stream().map(PreGradeProvider::name).sorted().toList();
         this.requests = requests;
         this.predictions = predictions;
@@ -86,13 +96,43 @@ class ConditionService {
         List<String> open = requests.findByCardItemIdOrderByCreatedAtDesc(card.id()).stream()
                 .filter(PredictionRequest::isOpen).map(PredictionRequest::getProvider).toList();
         List<PredictionRequest> created = new ArrayList<>();
-        for (String provider : enabledProviders) {
-            if (!open.contains(provider)) {
-                created.add(requests.save(new PredictionRequest(card.orgId(), card.id(), provider,
-                        List.of(front.get().id(), back.get().id()), requestedBy)));
+        try {
+            for (String provider : enabledProviders) {
+                if (!open.contains(provider)) {
+                    created.add(requests.saveAndFlush(new PredictionRequest(card.orgId(), card.id(), provider,
+                            List.of(front.get().id(), back.get().id()), requestedBy)));
+                }
             }
+        } catch (DataIntegrityViolationException e) {
+            // Another instance or click queued the same provider meanwhile (prediction_request_open_idx).
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A prediction request for this card is already open");
         }
         return created;
+    }
+
+    /**
+     * Catches completed captures whose {@link CardItems.CaptureCompleted} was lost (a crash between
+     * the photo check committing and the listener running): queues predictions for single cards whose
+     * capture completed in the sweep window and that have never had a request. Cards younger than the
+     * minimum age are left to the listener. One sweep at a time across instances.
+     *
+     * @return how many cards were queued
+     */
+    @Transactional
+    int sweepMissedCaptures(Instant now) {
+        if (enabledProviders.isEmpty() || !requests.tryTransactionLock(SWEEP_LOCK)) {
+            return 0;
+        }
+        ConditionProperties.Worker worker = properties.worker();
+        int queued = 0;
+        for (CardItems.CardItemRef card : cardItems.captureCompletedBetween(now.minus(worker.sweepWindow()), now.minus(worker.sweepMinAge()))) {
+            if (!card.lot() && !requests.existsByCardItemId(card.id())) {
+                log.warn("Card {} completed capture but has no prediction requests; queuing them now", card.id());
+                enqueue(card, null);
+                queued++;
+            }
+        }
+        return queued;
     }
 
     /**

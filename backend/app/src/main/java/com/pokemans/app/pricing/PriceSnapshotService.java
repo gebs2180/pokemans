@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -89,11 +90,15 @@ class PriceSnapshotService {
         cardIds.addAll(comps.findCatalogCardIdsSoldBetween(from, asOf));
         List<Catalog.CardSummary> cards = catalog.cards(cardIds);
 
+        // Every comp in the window in one query, rather than one query per card.
+        Map<UUID, List<SoldComp>> soldByCard = comps.findBySoldOnBetween(from, asOf).stream()
+                .collect(Collectors.groupingBy(SoldComp::getCatalogCardId));
+
         // Pass 1: observed prices per card and company, grouped by era and company, build the ratio tables.
         Map<UUID, CardComps> compsByCard = new HashMap<>();
         Map<String, List<Map<Grade, BigDecimal>>> observedByEra = new HashMap<>();
         for (Catalog.CardSummary card : cards) {
-            CardComps cc = load(card.catalogCardId(), from, asOf);
+            CardComps cc = load(soldByCard.getOrDefault(card.catalogCardId(), List.of()));
             compsByCard.put(card.catalogCardId(), cc);
             cc.graded().forEach((company, graded) -> {
                 Map<Grade, BigDecimal> observed = pricer.observedPrices(asOf, graded);
@@ -166,8 +171,8 @@ class PriceSnapshotService {
                              List<SoldComp> all) {
     }
 
-    private CardComps load(UUID catalogCardId, LocalDate from, LocalDate asOf) {
-        List<SoldComp> all = comps.findByCatalogCardIdAndSoldOnBetween(catalogCardId, from, asOf).stream()
+    private CardComps load(List<SoldComp> sold) {
+        List<SoldComp> all = sold.stream()
                 .filter(c -> properties.currency().equals(c.getCurrency()))
                 .toList();
         Map<PriceSource.GradingCompany, Map<Grade, List<Comp>>> graded = new EnumMap<>(PriceSource.GradingCompany.class);

@@ -72,6 +72,18 @@ class SoldComp {
         return source;
     }
 
+    String getExternalSaleId() {
+        return externalSaleId;
+    }
+
+    Instant getRetrievedAt() {
+        return retrievedAt;
+    }
+
+    UUID getIngestRunId() {
+        return ingestRunId;
+    }
+
     UUID getCatalogCardId() {
         return catalogCardId;
     }
