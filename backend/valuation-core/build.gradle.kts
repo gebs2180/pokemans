@@ -9,7 +9,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:3.27.4")
     // Property-based tests; runs as its own engine on the JUnit platform.
-    testImplementation("net.jqwik:jqwik:1.9.3")
+    testImplementation("net.jqwik:jqwik:1.10.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
