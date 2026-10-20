@@ -22,20 +22,20 @@ const record: TrackRecord = {
   asOf: '2026-10-19T20:00:00Z',
   overall: acceptance('All', { listings: 7, open: 1, accepted: 4, withdrawn: 1, expired: 1, closed: 6, acceptanceRate: 0.6667, medianHoursToAccept: 3.5 }),
   byPriceBand: [acceptance('Under $50'), acceptance('$100 to $250', { listings: 7, accepted: 4, closed: 6, acceptanceRate: 0.6667 })],
-  grades: {
-    source: 'BUYER_INSPECTION',
-    inspected: 3,
-    excluded: 1,
-    withinOne: 1,
-    withinOneShare: 0.3333,
-    withinOneTarget: 0.8,
-    belowStressed: 1,
-    belowStressedShare: 0.3333,
-    belowStressedTarget: 0.05,
-    meanDifference: -2.17,
+  deliveries: {
+    taken: 4,
+    labels: 4,
+    inTransit: 1,
+    received: 2,
+    returned: 1,
+    returnRate: 0.3333,
+    returnedBy: { DOES_NOT_MATCH_PHOTOS: 1 },
+    earlierModel: 0,
+    medianHoursToArrival: 72,
   },
-  prices: { source: 'BUYER_INSPECTION', compared: 2, declined: 2, belowLadder: 1, atLadder: 1, aboveLadder: 0, medianRatio: 0.75, totalPaid: 150, totalLadder: 200 },
-  caveats: ['Sellers choose which offers to post.', 'Inspected grades are self-reported by the buyer.'],
+  prices: { compared: 2, belowOffer: 1, atOffer: 1, aboveOffer: 0, medianRatio: 0.75, totalPaid: 150, totalOffered: 200 },
+  shipping: { labels: 4, postage: 20.4, insurance: 6, meanPerLabel: 6.6 },
+  caveats: ['Sellers choose which offers to post.', 'Arrivals are recorded by the buyer.'],
 }
 
 describe('OfferTrackRecordPage', () => {
@@ -56,12 +56,12 @@ describe('OfferTrackRecordPage', () => {
     // A band with nothing closed says so instead of showing 0%.
     expect(within(screen.getByRole('row', { name: /^Under \$50/ })).getByText('– (none yet)')).toBeInTheDocument()
 
-    const within1 = screen.getByRole('row', { name: /Within ±1/ })
-    expect(within(within1).getByText('33.3%')).toBeInTheDocument()
-    expect(within(within1).getByText('target ≥ 80%')).toBeInTheDocument()
-    expect(screen.getByText(/1 left out/)).toBeInTheDocument()
-    expect(screen.getByText('-2.17 grades')).toBeInTheDocument()
+    const returned = screen.getByRole('row', { name: /^Returned/ })
+    expect(within(returned).getByText('33.3%')).toBeInTheDocument()
+    expect(within(returned).getByText(/doesn't match its photos: 1/)).toBeInTheDocument()
+    expect(screen.getByText('3 days')).toBeInTheDocument()
     expect(screen.getByText('1 / 1 / 0')).toBeInTheDocument()
     expect(screen.getByText('$150.00 against $200.00')).toBeInTheDocument()
+    expect(screen.getByText(/4 labels: \$20.40 postage and \$6.00 insurance, \$6.60 a card/)).toBeInTheDocument()
   })
 })

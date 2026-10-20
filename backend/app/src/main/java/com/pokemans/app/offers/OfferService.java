@@ -24,8 +24,9 @@ import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Prices instant offers (Zach, 2026-10-19): the card valued as of now, then a price for each grade it
- * could inspect at ({@link OfferLadder}). Stored with every input and the trace. No access checks:
+ * Prices instant offers (Zach, 2026-10-19): the card valued as of now, then one firm price, the
+ * expected value of what a buyer could pay at each grade ({@link OfferLadder}). Stored with every
+ * input, the per-grade ladder behind the price, and the trace. No access checks:
  * the controllers have done them.
  */
 @Service
@@ -82,7 +83,7 @@ class OfferService {
         return offers.save(new CardOffer(orgId, cardItemId, in.identity().catalogCardId(),
                 in.assessment() == null ? null : in.assessment().assessmentId(), in.prices().snapshotSetId(), in.graded() != null,
                 JSON.writeValueAsString(in), value.params().version(), properties.buyerMargin(), JSON.writeValueAsString(ladder),
-                offer.expected(), v.fmv(), v.confidence().name(), in.provenance().authFlagUnresolved(), trace, currentUser.id(), now,
+                offer.price(), v.fmv(), v.confidence().name(), in.provenance().authFlagUnresolved(), trace, currentUser.id(), now,
                 now.plus(properties.offerValidFor())));
     }
 
@@ -101,12 +102,6 @@ class OfferService {
 
     static CardInputs inputs(CardOffer offer) {
         return JSON.readValue(offer.getInputs(), CardInputs.class);
-    }
-
-    /** The ladder price for a grade found on inspection; half grades fold down. */
-    static BigDecimal priceAt(List<Rung> ladder, BigDecimal grade) {
-        Grade g = Grade.of(grade.setScale(0, java.math.RoundingMode.FLOOR).intValueExact());
-        return ladder.stream().filter(r -> r.grade() == g).map(Rung::price).findFirst().orElse(BigDecimal.ZERO);
     }
 
     private static ResponseStatusException refused(String reason) {

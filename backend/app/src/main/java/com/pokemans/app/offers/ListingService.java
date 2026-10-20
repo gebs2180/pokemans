@@ -23,8 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Posting offers to buyers and what happens next: the first buyer to accept takes the card, the
- * seller may withdraw until then, and the buyer records the inspection. No access checks: the
+ * Posting firm offers to buyers and what happens next: the first buyer to accept takes the card at
+ * the offer price, the seller may withdraw until then, a prepaid label follows, and on arrival the
+ * buyer records that the card came as shown and was paid for, or returns it. No access checks: the
  * controllers have done them.
  */
 @Service
@@ -35,22 +36,39 @@ class ListingService {
     record RungView(String grade, BigDecimal probability, BigDecimal price) {
     }
 
-    /** @param expired true once the offer is past its validity: price it again before posting */
-    record OfferView(UUID id, BigDecimal expectedOffer, BigDecimal fmv, String confidence, boolean graded,
-                     boolean subjectToAuthentication, List<RungView> ladder, Instant createdAt, Instant expiresAt, boolean expired) {
+    /**
+     * @param price   the firm price
+     * @param ladder  how it was reached: what a buyer could pay at each grade, and how likely each is
+     * @param expired true once the offer is past its validity: price it again before posting
+     */
+    record OfferView(UUID id, BigDecimal price, BigDecimal fmv, String confidence, boolean graded, boolean subjectToAuthentication,
+                     List<RungView> ladder, Instant createdAt, Instant expiresAt, boolean expired) {
     }
 
     record Party(String orgName, String email) {
     }
 
-    /** @param ladderPrice what the offer said for the grade found (half grades fold down) */
-    record InspectionView(BigDecimal inspectedGrade, boolean authentic, BigDecimal pricePaid, BigDecimal ladderPrice,
-                          String declinedReason, String note, Instant recordedAt) {
+    /** @param labelUrl the printable label; shown to the seller, who ships the card */
+    record LabelView(String carrier, String service, String trackingCode, String labelUrl, BigDecimal insuredValue, Instant boughtAt) {
     }
 
-    /** @param buyer who took it, once accepted (shown to the seller) */
+    /**
+     * What happened once the card arrived.
+     *
+     * @param type           RECEIVED (as shown, paid), RETURNED (with the reason), or INSPECTED (a grade
+     *                       recorded under the per-grade offers that came before)
+     * @param inspectedGrade only for INSPECTED
+     */
+    record OutcomeView(String type, BigDecimal pricePaid, String returnedReason, BigDecimal inspectedGrade, String note,
+                       Instant recordedAt) {
+    }
+
+    /**
+     * @param buyer who took it, once accepted (shown to the seller)
+     * @param label the prepaid label, once bought; null while it follows
+     */
     record ListingView(UUID id, UUID offerId, Status status, Instant listedAt, Instant expiresAt, Instant closedAt, Party buyer,
-                       InspectionView inspection) {
+                       LabelView label, OutcomeView outcome) {
     }
 
     record SaleView(OfferView offer, ListingView listing) {
@@ -67,11 +85,7 @@ class ListingService {
     }
 
     record DealView(UUID listingId, CardView card, OfferView offer, List<PhotoLink> photos, Party seller, Instant acceptedAt,
-                    InspectionView inspection) {
-    }
-
-    record InspectionRequest(BigDecimal inspectedGrade, boolean authentic, BigDecimal pricePaid, ListingEvent.DeclinedReason declinedReason,
-                             String note) {
+                    LabelView label, OutcomeView outcome) {
     }
 
     private final CardOfferRepository offers;
@@ -79,18 +93,21 @@ class ListingService {
     private final ListingEventRepository events;
     private final OffersProperties properties;
     private final Directory directory;
+    private final Shipping shipping;
     private final BlobStore blobs;
     private final StorageProperties storage;
     private final CurrentUser currentUser;
     private final JdbcTemplate jdbc;
 
     ListingService(CardOfferRepository offers, SaleListingRepository listings, ListingEventRepository events, OffersProperties properties,
-                   Directory directory, BlobStore blobs, StorageProperties storage, CurrentUser currentUser, JdbcTemplate jdbc) {
+                   Directory directory, Shipping shipping, BlobStore blobs, StorageProperties storage, CurrentUser currentUser,
+                   JdbcTemplate jdbc) {
         this.offers = offers;
         this.listings = listings;
         this.events = events;
         this.properties = properties;
         this.directory = directory;
+        this.shipping = shipping;
         this.blobs = blobs;
         this.storage = storage;
         this.currentUser = currentUser;
@@ -104,10 +121,13 @@ class ListingService {
         Optional<SaleListing> listing = listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardItemId);
         Map<UUID, List<ListingEvent>> history = history(listing.stream().toList());
         return new SaleView(offer.map(ListingService::offerView).orElse(null),
-                listing.map(l -> listingView(l, history.getOrDefault(l.getId(), List.of()), true)).orElse(null));
+                listing.map(l -> listingView(l, history.getOrDefault(l.getId(), List.of()))).orElse(null));
     }
 
-    /** Posts the offer to every buyer. One open or accepted listing per card at a time. */
+    /**
+     * Posts the offer to every buyer. The seller needs an address on file, since the label is bought
+     * the moment a buyer accepts. One open or taken listing per card at a time.
+     */
     @Transactional
     SaleListing post(UUID orgId, UUID cardItemId, UUID offerId) {
         // Serialize posting per card, so two clicks can't open two listings.
@@ -117,6 +137,9 @@ class ListingService {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         if (!offer.getExpiresAt().isAfter(now)) {
             throw conflict("This offer has expired. Get a new one first.");
+        }
+        if (shipping.address(orgId).isEmpty()) {
+            throw conflict("Add the address you'll ship from first.");
         }
         Optional<SaleListing> latest = listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardItemId);
         if (latest.isPresent()) {
@@ -154,14 +177,42 @@ class ListingService {
         return items;
     }
 
-    /** First come, first served: the first buyer to accept takes the card, everyone after gets 409. */
+    /**
+     * First come, first served: the first buyer to accept takes the card at the offer price, everyone
+     * after gets 409. The buyer needs an address on file for the label.
+     *
+     * @return the listing taken, for the label purchase that follows the commit
+     */
     @Transactional
-    void accept(UUID buyerOrgId, UUID listingId) {
+    SaleListing accept(UUID buyerOrgId, UUID listingId) {
         SaleListing listing = listings.findById(listingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
         requireOpen(listing, Map.of(Status.ACCEPTED, "Another buyer took this card first.",
                 Status.WITHDRAWN, "The seller withdrew this card.", Status.EXPIRED, "This listing has expired."));
+        if (shipping.address(buyerOrgId).isEmpty()) {
+            throw conflict("Add the address cards should ship to first.");
+        }
         close(ListingEvent.accepted(listingId, buyerOrgId, currentUser.id()), "Another buyer took this card first.");
+        return listing;
+    }
+
+    /** Buys the label for a deal (again, if the first try failed). */
+    ShippingLabel buyLabel(SaleListing listing, UUID buyerOrgId) {
+        CardOffer offer = offers.findById(listing.getOfferId()).orElseThrow();
+        return shipping.buy(listing.getId(), listing.getOrgId(), buyerOrgId, offer.getPrice());
+    }
+
+    /** A deal of this buyer org, or 404. */
+    @Transactional(readOnly = true)
+    SaleListing requireDeal(UUID buyerOrgId, UUID listingId) {
+        SaleListing listing = listings.findById(listingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Deal not found"));
+        boolean ours = history(List.of(listing)).getOrDefault(listingId, List.of()).stream()
+                .anyMatch(e -> e.getType() == ListingEvent.Type.ACCEPTED && e.getActorOrgId().equals(buyerOrgId));
+        if (!ours) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Deal not found");
+        }
+        return listing;
     }
 
     @Transactional(readOnly = true)
@@ -176,36 +227,30 @@ class ListingService {
             ListingEvent acceptedEvent = h.stream().filter(e -> e.getType() == ListingEvent.Type.ACCEPTED).findFirst().orElseThrow();
             Directory.Contact seller = directory.contact(l.getOrgId(), l.getListedBy());
             deals.add(new DealView(l.getId(), card(in), offerView(offer), photos(in), new Party(seller.orgName(), seller.email()),
-                    acceptedEvent.getCreatedAt(), inspection(h, offer)));
+                    acceptedEvent.getCreatedAt(), label(l.getId()), outcome(h)));
         }
         return deals;
     }
 
-    /** The buyer's record of the card in hand, once per deal. */
+    /** The card arrived genuine and as shown, and the buyer paid. Once per deal. */
     @Transactional
-    void inspect(UUID buyerOrgId, UUID listingId, InspectionRequest request) {
-        SaleListing listing = listings.findById(listingId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
-        List<ListingEvent> h = history(List.of(listing)).getOrDefault(listingId, List.of());
-        boolean ours = h.stream().anyMatch(e -> e.getType() == ListingEvent.Type.ACCEPTED && e.getActorOrgId().equals(buyerOrgId));
-        if (!ours) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Deal not found");
-        }
-        boolean declined = request.declinedReason() != null;
-        if (declined && request.pricePaid() != null && request.pricePaid().signum() > 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A declined card has no price paid");
-        }
-        if (!declined && request.pricePaid() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Record the price paid, or why you declined");
-        }
-        if (!declined && !request.authentic()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A card that isn't genuine is declined as NOT_GENUINE");
-        }
+    void received(UUID buyerOrgId, UUID listingId, BigDecimal pricePaid, String note) {
+        requireDeal(buyerOrgId, listingId);
+        recordOutcome(ListingEvent.received(listingId, buyerOrgId, currentUser.id(), pricePaid, blankToNull(note)));
+    }
+
+    /** The card goes back: not genuine, not the listed card, or not matching its photos. Once per deal. */
+    @Transactional
+    void returned(UUID buyerOrgId, UUID listingId, ListingEvent.DeclinedReason reason, String note) {
+        requireDeal(buyerOrgId, listingId);
+        recordOutcome(ListingEvent.returned(listingId, buyerOrgId, currentUser.id(), reason, blankToNull(note)));
+    }
+
+    private void recordOutcome(ListingEvent event) {
         try {
-            events.saveAndFlush(ListingEvent.inspected(listingId, buyerOrgId, currentUser.id(), request.inspectedGrade(),
-                    request.authentic(), declined ? null : request.pricePaid(), request.declinedReason(), blankToNull(request.note())));
+            events.saveAndFlush(event);
         } catch (DataIntegrityViolationException e) {
-            throw conflict("The inspection for this card is already recorded.");
+            throw conflict("What happened to this card is already recorded.");
         }
     }
 
@@ -246,32 +291,41 @@ class ListingService {
         return listing.getExpiresAt().isAfter(now) ? Status.OPEN : Status.EXPIRED;
     }
 
-    private ListingView listingView(SaleListing l, List<ListingEvent> history, boolean showBuyer) {
+    private ListingView listingView(SaleListing l, List<ListingEvent> history) {
         Status status = status(l, history, Instant.now());
         ListingEvent closed = history.stream()
                 .filter(e -> e.getType() == ListingEvent.Type.ACCEPTED || e.getType() == ListingEvent.Type.WITHDRAWN).findFirst().orElse(null);
         Party buyer = null;
-        if (showBuyer && closed != null && closed.getType() == ListingEvent.Type.ACCEPTED) {
+        if (closed != null && closed.getType() == ListingEvent.Type.ACCEPTED) {
             Directory.Contact c = directory.contact(closed.getActorOrgId(), closed.getActorUserId());
             buyer = new Party(c.orgName(), c.email());
         }
-        CardOffer offer = offers.findById(l.getOfferId()).orElseThrow();
         return new ListingView(l.getId(), l.getOfferId(), status, l.getCreatedAt(), l.getExpiresAt(),
-                closed == null ? null : closed.getCreatedAt(), buyer, inspection(history, offer));
+                closed == null ? null : closed.getCreatedAt(), buyer, label(l.getId()), outcome(history));
     }
 
-    private static InspectionView inspection(List<ListingEvent> history, CardOffer offer) {
-        return history.stream().filter(e -> e.getType() == ListingEvent.Type.INSPECTED).findFirst()
-                .map(e -> new InspectionView(e.getInspectedGrade(), Boolean.TRUE.equals(e.getAuthentic()), e.getPricePaid(),
-                        OfferService.priceAt(OfferService.ladder(offer), e.getInspectedGrade()),
-                        e.getDeclinedReason() == null ? null : e.getDeclinedReason().name(), e.getNote(), e.getCreatedAt()))
+    private LabelView label(UUID listingId) {
+        return shipping.label(listingId)
+                .map(x -> new LabelView(x.getCarrier(), x.getService(), x.getTrackingCode(), x.getLabelUrl(), x.getInsuredValue(),
+                        x.getCreatedAt()))
+                .orElse(null);
+    }
+
+    private static OutcomeView outcome(List<ListingEvent> history) {
+        return history.stream()
+                .filter(e -> e.getType() == ListingEvent.Type.RECEIVED || e.getType() == ListingEvent.Type.RETURNED
+                        || e.getType() == ListingEvent.Type.INSPECTED)
+                .findFirst()
+                .map(e -> new OutcomeView(e.getType().name(), e.getPricePaid(),
+                        e.getDeclinedReason() == null ? null : e.getDeclinedReason().name(), e.getInspectedGrade(), e.getNote(),
+                        e.getCreatedAt()))
                 .orElse(null);
     }
 
     static OfferView offerView(CardOffer o) {
         List<RungView> ladder = OfferService.ladder(o).stream()
                 .map(r -> new RungView(r.grade().toString(), r.probability(), r.price())).toList();
-        return new OfferView(o.getId(), o.getExpectedOffer(), o.getFmv(), o.getConfidence(), o.isGraded(), o.isSubjectToAuthentication(),
+        return new OfferView(o.getId(), o.getPrice(), o.getFmv(), o.getConfidence(), o.isGraded(), o.isSubjectToAuthentication(),
                 ladder, o.getCreatedAt(), o.getExpiresAt(), !o.getExpiresAt().isAfter(Instant.now()));
     }
 

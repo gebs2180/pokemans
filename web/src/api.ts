@@ -567,14 +567,15 @@ export function percent(share: number) {
   return `${Math.round(share * 1000) / 10}%`
 }
 
-// Instant offers (2026-10-19)
+// Instant offers (2026-10-19): one firm price, a prepaid label on accept
 
-/** One rung of an offer: the price if the card inspects at this grade, and how likely that is. */
+/** What a buyer could pay for the card at one grade, and how likely the grade is: how the firm price was reached. */
 export type Rung = { grade: string; probability: number; price: number }
 
 export type Offer = {
   id: string
-  expectedOffer: number
+  /** The firm price. */
+  price: number
   fmv: number
   confidence: Confidence
   graded: boolean
@@ -589,12 +590,27 @@ export type ListingStatus = 'OPEN' | 'ACCEPTED' | 'WITHDRAWN' | 'EXPIRED'
 export type Party = { orgName: string | null; email: string | null }
 export type DeclinedReason = 'NOT_GENUINE' | 'NOT_THE_LISTED_CARD' | 'DOES_NOT_MATCH_PHOTOS'
 
-export type Inspection = {
-  inspectedGrade: number
-  authentic: boolean
+export const RETURN_REASON: Record<DeclinedReason, string> = {
+  NOT_GENUINE: 'not genuine',
+  NOT_THE_LISTED_CARD: 'not the listed card',
+  DOES_NOT_MATCH_PHOTOS: "doesn't match its photos",
+}
+
+export type ShippingLabel = {
+  carrier: string
+  service: string
+  trackingCode: string | null
+  labelUrl: string
+  insuredValue: number
+  boughtAt: string
+}
+
+/** What happened once the card arrived. INSPECTED is a grade recorded under the per-grade offers that came before. */
+export type Outcome = {
+  type: 'RECEIVED' | 'RETURNED' | 'INSPECTED'
   pricePaid: number | null
-  ladderPrice: number
-  declinedReason: DeclinedReason | null
+  returnedReason: DeclinedReason | null
+  inspectedGrade: number | null
   note: string | null
   recordedAt: string
 }
@@ -607,7 +623,8 @@ export type Listing = {
   expiresAt: string
   closedAt: string | null
   buyer: Party | null
-  inspection: Inspection | null
+  label: ShippingLabel | null
+  outcome: Outcome | null
 }
 
 export type Sale = { offer: Offer | null; listing: Listing | null }
@@ -635,7 +652,44 @@ export type Deal = {
   photos: PhotoLink[]
   seller: Party
   acceptedAt: string
-  inspection: Inspection | null
+  label: ShippingLabel | null
+  outcome: Outcome | null
+}
+
+/** @param labelPending why the label didn't come with the accept, or null */
+export type AcceptResult = { deals: Deal[]; labelPending: string | null }
+
+export type ShipAddress = {
+  name: string
+  company: string | null
+  street1: string
+  street2: string | null
+  city: string
+  state: string
+  zip: string
+  country: string
+  phone: string | null
+  recordedAt?: string
+}
+
+export type ChargeLine = {
+  listingId: string
+  boughtAt: string
+  carrier: string
+  service: string
+  trackingCode: string | null
+  postage: number
+  insurance: number
+}
+
+export type BuyerCharges = {
+  buyerOrgId: string
+  buyerName: string | null
+  labels: number
+  postage: number
+  insurance: number
+  total: number
+  lines: ChargeLine[]
 }
 
 /** Acceptance among listings in one price band (or all). Rates are null when nothing has closed. */
@@ -651,37 +705,37 @@ export type Acceptance = {
   medianHoursToAccept: number | null
 }
 
-export type GradeCheck = {
-  source: string
-  inspected: number
-  excluded: number
-  withinOne: number
-  withinOneShare: number | null
-  withinOneTarget: number
-  belowStressed: number
-  belowStressedShare: number | null
-  belowStressedTarget: number
-  meanDifference: number | null
+export type Deliveries = {
+  taken: number
+  labels: number
+  inTransit: number
+  received: number
+  returned: number
+  returnRate: number | null
+  returnedBy: Partial<Record<DeclinedReason, number>>
+  earlierModel: number
+  medianHoursToArrival: number | null
 }
 
 export type PriceCheck = {
-  source: string
   compared: number
-  declined: number
-  belowLadder: number
-  atLadder: number
-  aboveLadder: number
+  belowOffer: number
+  atOffer: number
+  aboveOffer: number
   medianRatio: number | null
   totalPaid: number
-  totalLadder: number
+  totalOffered: number
 }
+
+export type ShippingCost = { labels: number; postage: number; insurance: number; meanPerLabel: number | null }
 
 export type TrackRecord = {
   asOf: string
   overall: Acceptance
   byPriceBand: Acceptance[]
-  grades: GradeCheck
+  deliveries: Deliveries
   prices: PriceCheck
+  shipping: ShippingCost
   caveats: string[]
 }
 

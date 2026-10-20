@@ -42,21 +42,24 @@ public class Consents {
 
     private static final Terms CONTRIBUTOR_TERMS = new Terms(CONTRIBUTOR_TERMS_VERSION, CONTRIBUTOR_TERMS_TEXT, sha256(CONTRIBUTOR_TERMS_TEXT));
 
-    public static final String BUYER_TERMS_VERSION = "buyer-2026-10-19";
+    /** Firm offers (2026-10-19): one price, no grade settled on arrival. */
+    public static final String BUYER_TERMS_VERSION = "buyer-firm-2026-10-19";
 
     /** Draft for Zach to review: plain language, not reviewed legal wording. */
     static final String BUYER_TERMS_TEXT = """
             By accepting an instant offer here you agree that:
 
-            1. Accepting is a commitment to buy the card at the price the offer shows for the grade you find \
-            when you inspect it in hand, judged on the PSA scale.
-            2. You may decline after inspection only if the card isn't genuine, isn't the card listed, or \
-            doesn't match its photos. Say which, in your inspection record.
-            3. You record the grade you found, whether the card is genuine and what you paid, within 14 days \
-            of receiving it. We keep these records and use them to check and improve our offers.
-            4. You use the seller's contact details only for this sale.
-            5. We are not a party to the sale. We don't hold cards or money, and shipping, inspection and \
-            payment are between you and the seller. A posted card can be taken by another buyer first.
+            1. Accepting is a commitment to buy the card at the offer price. The price is fixed: it doesn't \
+            change with the grade you think the card is when it arrives.
+            2. You pay the seller the offer price within 7 days of the card arriving, if it is genuine, is \
+            the card listed and matches its photos. Otherwise you send it back, at your cost, and record why.
+            3. We buy an insured, prepaid shipping label for the card when you accept, from the seller to the \
+            address you gave us, and bill you for it (postage and insurance) each month.
+            4. You record in the app when the card arrives and what you paid, or why you returned it. We \
+            keep these records and use them to check and improve our offers.
+            5. You use the seller's contact details only for this sale.
+            6. We are not a party to the sale. We don't hold cards or money, and payment is between you and \
+            the seller. A posted card can be taken by another buyer first.
 
             Ask Zach if anything here is unclear.""";
 

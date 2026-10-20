@@ -24,6 +24,11 @@ public class Directory {
     }
 
     @Transactional(readOnly = true)
+    public String orgName(UUID orgId) {
+        return orgs.findById(orgId).map(Org::getName).orElse(null);
+    }
+
+    @Transactional(readOnly = true)
     public Contact contact(UUID orgId, UUID userId) {
         return new Contact(orgs.findById(orgId).map(Org::getName).orElse(null),
                 users.findById(userId).map(AppUser::getEmail).orElse(null));

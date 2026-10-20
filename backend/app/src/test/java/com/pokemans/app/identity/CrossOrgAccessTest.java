@@ -103,7 +103,11 @@ class CrossOrgAccessTest {
                 get(p + "/market"),
                 post(p + "/market/" + UUID.randomUUID() + "/accept"),
                 get(p + "/deals"),
-                postJson(p + "/deals/" + UUID.randomUUID() + "/inspection", "{\"inspectedGrade\":9,\"authentic\":true,\"pricePaid\":1}"),
+                post(p + "/deals/" + UUID.randomUUID() + "/label"),
+                postJson(p + "/deals/" + UUID.randomUUID() + "/received", "{\"pricePaid\":1}"),
+                postJson(p + "/deals/" + UUID.randomUUID() + "/returned", "{\"reason\":\"NOT_GENUINE\"}"),
+                get(p + "/ship-address"),
+                postJson(p + "/ship-address", "{\"name\":\"x\",\"street1\":\"x\",\"city\":\"x\",\"state\":\"IL\",\"zip\":\"62701\"}"),
                 get(p + "/collections/" + collectionB + "/reports"),
                 get(p + "/reports/" + reportB + "/download"));
     }
@@ -157,7 +161,9 @@ class CrossOrgAccessTest {
                 get("/api/admin/valuation-runs/" + runB + "/reports"),
                 postJson("/api/admin/valuation-runs/" + runB + "/reports", "{\"type\":\"LENDER\"}"),
                 get("/api/admin/reports/" + reportB + "/download"),
-                get("/api/admin/offers/track-record"));
+                get("/api/admin/offers/track-record"),
+                get("/api/admin/shipping/charges"),
+                post("/api/admin/deals/" + UUID.randomUUID() + "/label?buyerOrgId=" + UUID.randomUUID()));
         for (MockHttpServletRequestBuilder request : admin) {
             assertThat(perform(request, userA)).as(describe(request)).isEqualTo(403);
             // A token that claims ADMIN without an MFA login isn't admin either.

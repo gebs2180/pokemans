@@ -4,25 +4,23 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The instant-offer track record: what happened to the offers we posted, read from the same views
- * the analysis workspace uses (V15), so the admin page and the notebooks can't disagree. Every rate
- * comes with the counts behind it, and the caveats travel with the numbers.
+ * The instant-offer track record: what happened to the firm offers we posted, read from the same view
+ * the analysis workspace uses ({@code v_offer_outcomes}, V16), so the admin page and the notebooks
+ * can't disagree. Every rate comes with the counts behind it, and the caveats travel with the numbers.
  */
 @Service
 class TrackRecordService {
 
-    /** The methodology's condition targets (CLAUDE.md, validation targets). */
-    static final BigDecimal WITHIN_ONE_TARGET = new BigDecimal("0.80");
-    static final BigDecimal BELOW_STRESSED_TARGET = new BigDecimal("0.05");
-
-    /** Bands of the expected offer, in dollars: [min, max). */
+    /** Bands of the offer price, in dollars: [min, max). */
     private static final List<Band> BANDS = List.of(
             new Band("Under $50", null, new BigDecimal("50")),
             new Band("$50 to $100", new BigDecimal("50"), new BigDecimal("100")),
@@ -32,10 +30,9 @@ class TrackRecordService {
 
     static final List<String> CAVEATS = List.of(
             "Sellers choose which offers to post. They post the ones they like, so posted offers lean towards cards we priced generously, and the acceptance rate is about those, not all offers.",
-            "Inspected grades and prices paid are self-reported by the buyer, who grades the card they are paying for and so has a reason to grade low. They are kept as their own source (BUYER_INSPECTION), never pooled with graders' results.",
-            "A buyer who accepts but never records an inspection drops out of the grade and price numbers.",
+            "Arrivals and prices paid are recorded by the buyer. A buyer who never records an arrival drops out of the delivery and price numbers until they do.",
             "A card posted more than once counts once per listing. Withdrawn and expired listings both count as not accepted; open listings aren't counted yet.",
-            "Grades are compared unfolded, so a 7.5 against a predicted 9 is a miss. Cards declined as not genuine or not the listed card are left out of the grade numbers; cards declined as not matching their photos stay in.");
+            "Offers are firm, so no grade is judged on arrival: grade accuracy has to come from graders' results for sold cards, which aren't collected yet.");
 
     record Band(String label, BigDecimal min, BigDecimal max) {
         boolean contains(BigDecimal value) {
@@ -52,32 +49,37 @@ class TrackRecordService {
     }
 
     /**
-     * @param inspected      inspections compared (raw cards only)
-     * @param excluded       inspections left out: graded cards, and cards declined as not genuine or not the listed card
-     * @param meanDifference inspected minus predicted median, on average; negative = found worse than predicted
+     * What happened to the cards buyers took.
+     *
+     * @param inTransit      taken, with no arrival or return recorded yet
+     * @param returnRate     returned / (received + returned); null with none recorded
+     * @param returnedBy     returns per reason
+     * @param earlierModel   taken under the per-grade offers that came before firm prices; left out of the rest
+     * @param medianHoursToArrival label bought to arrival or return recorded
      */
-    record GradeCheck(String source, int inspected, int excluded, int withinOne, BigDecimal withinOneShare, BigDecimal withinOneTarget,
-                      int belowStressed, BigDecimal belowStressedShare, BigDecimal belowStressedTarget, BigDecimal meanDifference) {
+    record Deliveries(int taken, int labels, int inTransit, int received, int returned, BigDecimal returnRate, Map<String, Integer> returnedBy,
+                      int earlierModel, BigDecimal medianHoursToArrival) {
     }
 
     /**
-     * @param compared  inspections with a price paid and a ladder price above zero at the grade found
-     * @param declined  inspections where the buyer declined, so nothing was paid
-     * @param medianRatio price paid / ladder price, median
+     * Price paid against the firm price, for cards that arrived as shown.
+     *
+     * @param medianRatio price paid / offer price, median
      */
-    record PriceCheck(String source, int compared, int declined, int belowLadder, int atLadder, int aboveLadder, BigDecimal medianRatio,
-                      BigDecimal totalPaid, BigDecimal totalLadder) {
+    record PriceCheck(int compared, int belowOffer, int atOffer, int aboveOffer, BigDecimal medianRatio, BigDecimal totalPaid,
+                      BigDecimal totalOffered) {
     }
 
-    record TrackRecord(Instant asOf, Acceptance overall, List<Acceptance> byPriceBand, GradeCheck grades, PriceCheck prices,
-                       List<String> caveats) {
+    /** Postage and insurance bought for taken cards, billed to buyers. */
+    record ShippingCost(int labels, BigDecimal postage, BigDecimal insurance, BigDecimal meanPerLabel) {
     }
 
-    private record Row(String status, BigDecimal expectedOffer, BigDecimal hoursToAccept, boolean graded, String source,
-                       BigDecimal inspectedGrade, String declinedReason, BigDecimal pricePaid, BigDecimal ladderPrice) {
+    record TrackRecord(Instant asOf, Acceptance overall, List<Acceptance> byPriceBand, Deliveries deliveries, PriceCheck prices,
+                       ShippingCost shipping, List<String> caveats) {
     }
 
-    private record Calibration(BigDecimal difference, boolean withinOne, boolean belowStressed) {
+    private record Row(String status, BigDecimal price, BigDecimal hoursToAccept, boolean labelled, BigDecimal postage,
+                       BigDecimal insurance, String outcome, BigDecimal pricePaid, String returnedReason, BigDecimal hoursToOutcome) {
     }
 
     private final JdbcTemplate jdbc;
@@ -89,20 +91,17 @@ class TrackRecordService {
     @Transactional(readOnly = true)
     TrackRecord trackRecord() {
         List<Row> rows = jdbc.query("""
-                select status, expected_offer, hours_to_accept, graded, inspection_source, inspected_grade, declined_reason,
-                       price_paid, ladder_price_at_inspected
+                select status, price, hours_to_accept, label_at is not null, postage, insurance_cost, outcome, price_paid,
+                       returned_reason, hours_label_to_outcome
                 from v_offer_outcomes""",
-                (rs, i) -> new Row(rs.getString(1), rs.getBigDecimal(2), rs.getBigDecimal(3), rs.getBoolean(4), rs.getString(5),
-                        rs.getBigDecimal(6), rs.getString(7), rs.getBigDecimal(8), rs.getBigDecimal(9)));
-        List<Calibration> calibration = jdbc.query(
-                "select grade_difference, within_one, below_stressed from v_offer_grade_calibration where source = 'BUYER_INSPECTION'",
-                (rs, i) -> new Calibration(rs.getBigDecimal(1), rs.getBoolean(2), rs.getBoolean(3)));
-
+                (rs, i) -> new Row(rs.getString(1), rs.getBigDecimal(2), rs.getBigDecimal(3), rs.getBoolean(4), rs.getBigDecimal(5),
+                        rs.getBigDecimal(6), rs.getString(7), rs.getBigDecimal(8), rs.getString(9), rs.getBigDecimal(10)));
         List<Acceptance> bands = new ArrayList<>();
         for (Band band : BANDS) {
-            bands.add(acceptance(band.label(), rows, r -> band.contains(r.expectedOffer())));
+            bands.add(acceptance(band.label(), rows, r -> band.contains(r.price())));
         }
-        return new TrackRecord(Instant.now(), acceptance("All", rows, r -> true), bands, grades(rows, calibration), prices(rows), CAVEATS);
+        return new TrackRecord(Instant.now(), acceptance("All", rows, r -> true), bands, deliveries(rows), prices(rows), shipping(rows),
+                CAVEATS);
     }
 
     private static Acceptance acceptance(String label, List<Row> all, Predicate<Row> in) {
@@ -112,36 +111,35 @@ class TrackRecordService {
         int withdrawn = count(rows, "WITHDRAWN");
         int expired = count(rows, "EXPIRED");
         int closed = accepted + withdrawn + expired;
-        List<BigDecimal> hours = rows.stream().map(Row::hoursToAccept).filter(h -> h != null).toList();
-        BigDecimal medianHours = median(hours);
+        BigDecimal medianHours = median(rows.stream().map(Row::hoursToAccept).filter(h -> h != null).toList());
         return new Acceptance(label, rows.size(), open, accepted, withdrawn, expired, closed, share(accepted, closed),
                 medianHours == null ? null : medianHours.setScale(1, RoundingMode.HALF_UP));
     }
 
-    private static GradeCheck grades(List<Row> rows, List<Calibration> compared) {
-        long inspections = rows.stream().filter(r -> "BUYER_INSPECTION".equals(r.source())).count();
-        int n = compared.size();
-        int withinOne = (int) compared.stream().filter(Calibration::withinOne).count();
-        int below = (int) compared.stream().filter(Calibration::belowStressed).count();
-        BigDecimal mean = n == 0 ? null : compared.stream().map(Calibration::difference).reduce(BigDecimal.ZERO, BigDecimal::add)
-                .divide(BigDecimal.valueOf(n), 2, RoundingMode.HALF_UP);
-        return new GradeCheck("BUYER_INSPECTION", n, (int) inspections - n, withinOne, share(withinOne, n), WITHIN_ONE_TARGET, below,
-                share(below, n), BELOW_STRESSED_TARGET, mean);
+    private static Deliveries deliveries(List<Row> rows) {
+        List<Row> taken = rows.stream().filter(r -> "ACCEPTED".equals(r.status())).toList();
+        int earlier = (int) taken.stream().filter(r -> "INSPECTED".equals(r.outcome())).count();
+        List<Row> firm = taken.stream().filter(r -> !"INSPECTED".equals(r.outcome())).toList();
+        int received = (int) firm.stream().filter(r -> "RECEIVED".equals(r.outcome())).count();
+        int returned = (int) firm.stream().filter(r -> "RETURNED".equals(r.outcome())).count();
+        Map<String, Integer> byReason = new LinkedHashMap<>();
+        firm.stream().filter(r -> "RETURNED".equals(r.outcome())).forEach(r -> byReason.merge(r.returnedReason(), 1, Integer::sum));
+        BigDecimal hours = median(firm.stream().map(Row::hoursToOutcome).filter(h -> h != null).toList());
+        return new Deliveries(firm.size(), (int) firm.stream().filter(Row::labelled).count(), firm.size() - received - returned, received,
+                returned, share(returned, received + returned), byReason, earlier, hours == null ? null : hours.setScale(1, RoundingMode.HALF_UP));
     }
 
     private static PriceCheck prices(List<Row> rows) {
-        List<Row> inspected = rows.stream().filter(r -> "BUYER_INSPECTION".equals(r.source())).toList();
-        int declined = (int) inspected.stream().filter(r -> r.declinedReason() != null).count();
-        List<Row> paid = inspected.stream()
-                .filter(r -> r.pricePaid() != null && r.ladderPrice() != null && r.ladderPrice().signum() > 0).toList();
+        List<Row> paid = rows.stream()
+                .filter(r -> "RECEIVED".equals(r.outcome()) && r.pricePaid() != null && r.price() != null && r.price().signum() > 0).toList();
         int below = 0;
         int at = 0;
         int above = 0;
         BigDecimal totalPaid = BigDecimal.ZERO;
-        BigDecimal totalLadder = BigDecimal.ZERO;
+        BigDecimal totalOffered = BigDecimal.ZERO;
         List<BigDecimal> ratios = new ArrayList<>();
         for (Row r : paid) {
-            int c = r.pricePaid().compareTo(r.ladderPrice());
+            int c = r.pricePaid().compareTo(r.price());
             if (c < 0) {
                 below++;
             } else if (c == 0) {
@@ -150,12 +148,20 @@ class TrackRecordService {
                 above++;
             }
             totalPaid = totalPaid.add(r.pricePaid());
-            totalLadder = totalLadder.add(r.ladderPrice());
-            ratios.add(r.pricePaid().divide(r.ladderPrice(), 6, RoundingMode.HALF_UP));
+            totalOffered = totalOffered.add(r.price());
+            ratios.add(r.pricePaid().divide(r.price(), 6, RoundingMode.HALF_UP));
         }
         BigDecimal medianRatio = median(ratios);
-        return new PriceCheck("BUYER_INSPECTION", paid.size(), declined, below, at, above,
-                medianRatio == null ? null : medianRatio.setScale(4, RoundingMode.HALF_UP), totalPaid, totalLadder);
+        return new PriceCheck(paid.size(), below, at, above, medianRatio == null ? null : medianRatio.setScale(4, RoundingMode.HALF_UP),
+                totalPaid, totalOffered);
+    }
+
+    private static ShippingCost shipping(List<Row> rows) {
+        List<Row> labelled = rows.stream().filter(Row::labelled).toList();
+        BigDecimal postage = labelled.stream().map(Row::postage).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal insurance = labelled.stream().map(Row::insurance).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new ShippingCost(labelled.size(), postage, insurance, labelled.isEmpty() ? null
+                : postage.add(insurance).divide(BigDecimal.valueOf(labelled.size()), 2, RoundingMode.HALF_UP));
     }
 
     private static int count(List<Row> rows, String status) {

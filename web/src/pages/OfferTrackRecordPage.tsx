@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { money, percent, useApi, type Acceptance, type TrackRecord } from '../api'
+import { money, percent, RETURN_REASON, useApi, type Acceptance, type DeclinedReason, type TrackRecord } from '../api'
 import { useLoad } from '../useLoad'
 
 /** Below this many, a rate is shown but called out as too few to read anything into. */
@@ -35,23 +35,24 @@ function AcceptanceRow({ a }: { a: Acceptance }) {
   )
 }
 
+/** Admin: what happened to the firm offers we posted, with the counts and caveats behind every rate. */
 export function OfferTrackRecordPage() {
   const api = useApi()
   const { data, error } = useLoad(() => api<TrackRecord>('GET', '/api/admin/offers/track-record'), [api])
 
   if (error) return <p className="error" role="alert">{error}</p>
   if (!data) return <p>Loading…</p>
-  const { overall, grades, prices } = data
+  const { overall, deliveries, prices, shipping } = data
 
   return (
     <>
       <p>
-        <Link to="/admin">← Admin</Link>
+        <Link to="/admin">← Admin</Link> · <Link to="/admin/shipping">Postage to bill →</Link>
       </p>
       <h1>Offer track record</h1>
       <p className="muted">
         What happened to the instant offers we posted, as of {new Date(data.asOf).toLocaleString()}. The same numbers come from the
-        analysis views <code>v_offer_outcomes</code> and <code>v_offer_grade_calibration</code>.
+        analysis view <code>v_offer_outcomes</code>.
       </p>
 
       <section aria-label="Read these with care">
@@ -64,16 +65,16 @@ export function OfferTrackRecordPage() {
       </section>
 
       <h2>Acceptance</h2>
-      <p className="muted">Accepted out of listings that closed (accepted, withdrawn or expired), by expected offer.</p>
+      <p className="muted">Bought out of listings that closed (bought, withdrawn or expired), by offer price.</p>
       <div className="scroll">
         <table className="table">
           <thead>
             <tr>
-              <th>Expected offer</th>
+              <th>Offer</th>
               <th>Listings</th>
-              <th>Accepted</th>
-              <th>Median time to accept</th>
-              <th>Not accepted</th>
+              <th>Bought</th>
+              <th>Median time to buy</th>
+              <th>Not bought</th>
             </tr>
           </thead>
           <tbody>
@@ -85,68 +86,70 @@ export function OfferTrackRecordPage() {
         </table>
       </div>
 
-      <h2>Inspected grade against our prediction</h2>
-      <p className="muted">
-        Source: {grades.source} (the buyer's own grading). {grades.inspected} inspections of raw cards compared
-        {grades.excluded > 0 ? `, ${grades.excluded} left out (graded cards, or not genuine or not the listed card)` : ''}.
-      </p>
+      <h2>Deliveries</h2>
       <table className="table">
         <tbody>
           <tr>
-            <th>Within ±1 of the predicted median</th>
+            <th>Bought</th>
             <td>
-              <Rate share={grades.withinOneShare} count={grades.withinOne} of={grades.inspected} />
+              {deliveries.taken} · {deliveries.labels} labelled · {deliveries.inTransit} on the way
             </td>
-            <td className="muted">target ≥ {percent(grades.withinOneTarget)}</td>
           </tr>
           <tr>
-            <th>Below the stressed median</th>
+            <th>Returned</th>
             <td>
-              <Rate share={grades.belowStressedShare} count={grades.belowStressed} of={grades.inspected} />
+              <Rate share={deliveries.returnRate} count={deliveries.returned} of={deliveries.received + deliveries.returned} />
+              {Object.entries(deliveries.returnedBy).map(([reason, n]) => (
+                <span key={reason} className="muted">
+                  {' '}
+                  · {RETURN_REASON[reason as DeclinedReason] ?? reason}: {n}
+                </span>
+              ))}
             </td>
-            <td className="muted">target &lt; {percent(grades.belowStressedTarget)}</td>
           </tr>
           <tr>
-            <th>Average difference (inspected − predicted)</th>
-            <td>{grades.meanDifference == null ? '–' : `${grades.meanDifference > 0 ? '+' : ''}${grades.meanDifference} grades`}</td>
-            <td className="muted">negative: the buyer found it worse than we predicted</td>
+            <th>Median label to arrival</th>
+            <td>{deliveries.medianHoursToArrival == null ? '–' : `${Math.round(deliveries.medianHoursToArrival / 24)} days`}</td>
           </tr>
+          {deliveries.earlierModel > 0 && (
+            <tr>
+              <th>Under the earlier per-grade offers</th>
+              <td className="muted">{deliveries.earlierModel}, left out of the numbers above</td>
+            </tr>
+          )}
         </tbody>
       </table>
 
-      <h2>Price paid against our ladder</h2>
-      <p className="muted">
-        Source: {prices.source}. The ladder price is what the offer said for the grade the buyer found (half grades fold down).
-      </p>
+      <h2>Price paid against the offer</h2>
       <table className="table">
         <tbody>
           <tr>
-            <th>Compared</th>
+            <th>Below / at / above the offer</th>
             <td>
-              {prices.compared} paid · {prices.declined} declined, nothing paid
+              {prices.belowOffer} / {prices.atOffer} / {prices.aboveOffer} <span className="muted">of {prices.compared} that arrived as shown</span>
             </td>
           </tr>
           <tr>
-            <th>Median paid ÷ ladder</th>
+            <th>Median paid ÷ offer</th>
             <td>
               {prices.medianRatio == null ? '–' : percent(prices.medianRatio)}
               {prices.compared > 0 && prices.compared < FEW && <span className="muted"> (too few to read)</span>}
             </td>
           </tr>
           <tr>
-            <th>Below / at / above the ladder</th>
+            <th>Total paid against total offered</th>
             <td>
-              {prices.belowLadder} / {prices.atLadder} / {prices.aboveLadder}
-            </td>
-          </tr>
-          <tr>
-            <th>Total paid against total ladder</th>
-            <td>
-              {money(prices.totalPaid)} against {money(prices.totalLadder)}
+              {money(prices.totalPaid)} against {money(prices.totalOffered)}
             </td>
           </tr>
         </tbody>
       </table>
+
+      <h2>Shipping</h2>
+      <p>
+        {shipping.labels} labels: {money(shipping.postage)} postage and {money(shipping.insurance)} insurance
+        {shipping.meanPerLabel != null && `, ${money(shipping.meanPerLabel)} a card on average`}. Billed to buyers.
+      </p>
     </>
   )
 }

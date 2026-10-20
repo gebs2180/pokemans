@@ -1,8 +1,12 @@
 # Instant offers
 
-Status 2026-10-19 · branch `claude/instant-offers`. Built on fixture and hand-entered data; no buyer has used it yet.
+Status 2026-10-19 · firm prices on branch `claude/firm-offers`. Built on fixture and hand-entered data; no buyer has used it yet.
 
 The lender and insurer side is paused while Zach clears his outside interest with his employer (see [m4-progress.md](m4-progress.md)). Instant offers reuse the same valuation engine for a different customer: collectors selling raw cards, and shops and dealers buying them.
+
+**The pitch (Zach, 2026-10-19).** Posting a card is easy, the offer is instant and based on its expected grade, and when a buyer accepts the seller instantly gets a shipping label. Sellers skip pricing and the time an eBay listing takes; buyers get raw cards that may grade a 10 for well under what a 10 costs. There is no back-and-forth between buyer and seller, which is what keeps this from being an eBay competitor.
+
+**Competitors (researched 2026-10-17).** Card Buyers, TCG Suppliers, poko.cards and SellCCG already do photo-to-offer-to-label for raw cards. But each is a single shop that re-grades the card on arrival and re-offers. A firm price that holds on arrival, priced from a grade distribution, across a network of buyers, is the difference.
 
 ## How it works
 
@@ -11,25 +15,28 @@ The lender and insurer side is paused while Zach clears his outside interest wit
    - its PSA price table, net of the default grading cost;
    - its provenance.
 
-   The offer is a price for every grade the card could inspect at, best grade first.
-2. **Selling.** "Sell at this offer" posts it to every buyer org. Posting isn't a sale: the first buyer to accept takes the card, and the page says so. A listing nobody accepts expires.
-3. **The deal.** The buyer gets the seller's org name and email, and the seller gets the buyer's. Shipping, inspection and payment happen between them. We hold no cards or money (Zach doesn't rule out becoming the middleman later).
-4. **The inspection.** Once the card is in hand, the buyer records:
-   - the grade found (PSA scale, half steps, 0 for ungradable);
-   - whether it is genuine;
-   - the price paid, or why they declined. The only reasons allowed are: not genuine, not the listed card, or doesn't match its photos.
+   The offer is **one firm price**. "How we priced it" shows the per-grade ladder behind it.
+2. **Selling.** "Sell" posts the price to every buyer org. The seller needs a ship-from address on file first. Posting isn't a sale: the first buyer to accept buys the card at the price, and the page says so. A listing nobody accepts expires.
+3. **The label.** Accepting buys a prepaid, insured label at once, on our EasyPost account, from the seller's address to the buyer's. The seller prints it from the card page. If the purchase fails (no shipping account yet, or the carrier is down), the sale still stands: the buyer or the admin buys the label again.
+4. **On arrival.** The buyer records one of two things:
+   - the card arrived genuine and as shown, and what they paid the seller, by default the offer price;
+   - it goes back, for one of the reasons the buyer terms allow: not genuine, not the listed card, or doesn't match its photos.
 
-   The record shows the ladder price at that grade, so a dispute starts from the facts.
+   No grade is judged: condition within the photos is the buyer's risk.
+5. **Billing.** Postage and insurance are billed to buyers monthly, off-platform, from `/admin/shipping`. Payment for the card is between buyer and seller, due within 7 days of a card arriving as shown. We hold no cards and no money for cards (Zach doesn't rule out becoming the middleman later).
 
 ## Decisions (Zach, 2026-10-19)
 
-- **We compute the offer**; buyers don't set rules. First come, first served.
-- **Rung price:** `offer_g = P↓_g · (1 − f) · (1 − d) · (1 − m)`.
+- **One firm price, not a per-grade ladder settled on inspection.** A ladder needs someone to judge the grade on arrival, which brings back the back-and-forth.
+- **Price:** `price = Σ p_g · offer_g`, where `offer_g = P↓_g · (1 − f) · (1 − d) · (1 − m)`.
   - P↓ is the grade's net price (net of grading cost), capped at the grade above, so a PSA 1 premium never pays more for a worse card.
   - f = 15% fees; d = the speed discount for the card's liquidity (5/10/20%); m = a 10% buyer margin.
+  - The buyer keeps the upside of a 10 and carries the downside.
   - For a verified graded card the ladder is one rung, at gross prices.
-  - The expected offer, Σ p·offer, is shown for orientation only.
 - **Validity:** an offer stands for 7 days, and a posted listing for 14 (`pokemans.offers.*`).
+- **Payment:** the buyer pays the seller off-platform within 7 days of a card arriving as shown.
+- **Labels:** bought on our EasyPost account, insured for the offer price, and billed to buyers monthly (`pokemans.shipping.*`, off until `EASYPOST_ENABLED` and `EASYPOST_API_KEY` are set). The parcel is a bubble mailer with a toploader: 7×5×1 in, 3 oz.
+- **Mismatches:** the buyer returns the card and records why. There is no re-offer.
 - **No offer for:**
   - lots, unidentified or unassessed cards;
   - cards without a PSA table;
@@ -37,77 +44,86 @@ The lender and insurer side is paused while Zach clears his outside interest wit
   - confidence D;
   - FMV under $25.
 
-  Unverified high-risk cards (vintage holos, Japanese promos) do get an offer, marked "subject to the buyer authenticating the card in hand".
-- **Calibration:** the buyer's inspected grade is stored as its own source (BUYER_INSPECTION, in `listing_event`), kept apart from graders' results because a buyer has a reason to grade low.
+  Unverified high-risk cards (vintage holos, Japanese promos) get an offer, marked "subject to the buyer authenticating the card in hand".
 
 ## Built
 
-- **valuation-core:** `OfferLadder`, with tests (`OfferLadderTest`).
+- **valuation-core:** `OfferLadder` returns the firm price and the ladder behind it.
 - **Valuation:** `Valuations.current(cardItemId)` values one card as of now with the run engine, so offers and valuation runs can't drift apart.
 - **identity:**
   - a `BUYER` org type and role;
-  - buyer terms, a versioned text in `Consents`. It is a plain-language **draft for Zach**, not reviewed legal wording;
-  - `Directory` for contact details.
-- **`offers` module, V14 (all append-only):**
-  - `card_offer`: every input, the ladder and the trace;
-  - `sale_listing`;
-  - `listing_event`: ACCEPTED, WITHDRAWN, INSPECTED. A partial unique index lets a listing close only once, so two buyers racing, or a buyer and a seller withdrawing, can't both win. Posting is serialized per card with an advisory lock.
+  - buyer terms, versioned in `Consents` (`buyer-firm-2026-10-19`). The text is a plain-language **draft for Zach**, not reviewed legal wording;
+  - `Directory` for names and contact details.
+- **`offers` module (V14, V16; all append-only):**
+  - `card_offer`: every input, the firm price, the ladder and the trace.
+  - `sale_listing`.
+  - `listing_event`: ACCEPTED, WITHDRAWN, RECEIVED and RETURNED, plus INSPECTED from the per-grade offers that came before. Partial unique indexes let a listing close only once and record one outcome. Posting is serialized per card with an advisory lock.
+  - `ship_address`: one per org, the latest row current.
+  - `shipping_label`.
+  - The `ShippingProvider` port, with an EasyPost adapter that buys the cheapest USPS rate, insured for the offer.
 - **API:**
   - Seller:
     - `GET /api/orgs/{org}/cards/{card}/sale`
     - `POST .../offers`
     - `POST .../listings`
     - `POST /api/orgs/{org}/listings/{id}/withdraw`
+  - Both sides: `GET`/`POST /api/orgs/{org}/ship-address`.
   - Buyer (buyer org, terms accepted):
     - `GET /api/orgs/{org}/market`
-    - `POST .../market/{id}/accept`
+    - `POST .../market/{id}/accept`, which returns the deals and `labelPending` if the label didn't go through
     - `GET .../deals`
-    - `POST .../deals/{id}/inspection`
-  - The market never names the seller. Contact details appear only to the two parties once a buyer accepts.
+    - `POST .../deals/{id}/label` (retry)
+    - `POST .../deals/{id}/received`
+    - `POST .../deals/{id}/returned`
+  - Admin:
+    - `POST /api/admin/deals/{id}/label?buyerOrgId=`
+    - `GET /api/admin/shipping/charges?month=yyyy-MM`
+  - The market never names the seller. Contact details and the label appear only to the two parties once a buyer accepts.
 - **Web:**
-  - an "Instant offer" panel on the card page;
-  - a buyer org page behind the buyer terms;
-  - "Cards for sale", with a two-step accept;
-  - "Your deals", with the inspection form;
-  - BUYER in the admin's org form.
+  - the "Instant offer" panel on the card page: the price, how it was priced, the ship-from address, "Sell for $X", and the label to print;
+  - the buyer org page, behind the buyer terms, with its ship-to address;
+  - "Cards for sale", with a two-step "Buy";
+  - "Your deals": the label and tracking, retrying the label, and recording the arrival or return;
+  - admin "Postage to bill".
 - **Tests:**
-  - `OffersFlowTest` covers the race between two buyers, withdrawal and reposting, every refusal, the vintage-holo condition and append-only rows.
-  - `CrossOrgAccessTest` covers every new route.
-  - Vitest covers `OfferPanel`, `MarketPage`, `InspectionForm` and `likelyRungs`.
+  - `OffersFlowTest`: the race, the label bought at once and insured at the price, a label failure that doesn't undo the sale and a retry, a return, withdrawal, every refusal, the track record, and append-only rows.
+  - `EasyPostShippingProviderTest`, against EasyPost's published response shapes.
+  - `CrossOrgAccessTest` covers every route.
+  - Vitest covers the offer panel, market, arrival form, track record and `likelyRungs`.
 
 ## Track record
 
-The realized sales are the evidence for the later lender and insurer pitch: our estimates, backed by what buyers actually accepted and paid. Built 2026-10-19 on fixture data.
+The realized sales are the evidence for the later lender and insurer pitch: our estimates, backed by what buyers actually bought and paid.
 
-- **Views (V15), for the analysis workspace:**
-  - `v_offer_outcomes`: one row per listing. It holds the card's identity, the offer date, expected offer and FMV, and the status (open, accepted, withdrawn, expired) with time to accept. It also has the predicted median and the stressed median (the FLV stress shift, from the offer's trace), plus the inspected grade, its source, the declined reason, the price paid and the ladder price at the grade found.
-  - `v_offer_grade_calibration`: predicted against inspected grade for raw cards. Each row keeps its `source` (BUYER_INSPECTION for now); graders' results join later with their own source, never pooled.
-- **Admin page** "Offer track record" (`/admin/offers`, `GET /api/admin/offers/track-record`). It reads the same views and shows:
-  - acceptance rate and median time to accept, overall and by expected-offer band;
-  - the share of inspections within ±1 of the predicted median, and below the stressed median, against the 80% and 5% targets;
-  - price paid against the ladder price;
-  - the counts behind every rate (flagged "too few to read" under 30), and the caveats below.
+- **`v_offer_outcomes` (V16)** has one row per listing:
+  - the card's identity, the offer date, the price and FMV;
+  - the status (open, accepted, withdrawn, expired) and time to accept;
+  - the label (carrier, postage, insurance);
+  - the outcome (received with the price paid, or returned with the reason) and the time from label to outcome.
+
+  V16 drops the grade-calibration view: with firm prices, nobody judges a grade on arrival.
+- **Admin page** "Offer track record" (`/admin/offers`) shows:
+  - acceptance rate and median time to accept, overall and by price band;
+  - deliveries: return rate by reason and median label-to-arrival time;
+  - price paid against the offer;
+  - postage per card;
+  - the counts behind every rate (flagged "too few to read" under 30), and the caveats.
 - **Counting rules, chosen to understate:**
-  - The acceptance rate is accepted out of accepted + withdrawn + expired. Open listings wait (Zach, 2026-10-19).
+  - The acceptance rate is accepted out of accepted + withdrawn + expired; open listings wait.
   - A card posted twice counts twice.
-  - Grades are compared unfolded, so a 7.5 against a predicted 9 is a miss (Zach, 2026-10-19).
-  - The predicted median is the lower median (Zach, 2026-10-19).
-  - Cards declined as not genuine or not the listed card are left out of the grade numbers, since the prediction was about another card. Cards that don't match their photos stay in (Zach, 2026-10-19).
-- **Selection bias, shown on the page:**
+  - Deals taken under the earlier per-grade offers are counted apart.
+- **Caveats, shown on the page:**
   - Sellers only post offers they like.
-  - Buyers self-report grades and prices and have a reason to grade low.
-  - Buyers who never record an inspection drop out.
+  - Buyers record arrivals themselves, and those who never record one drop out.
+  - Grade accuracy has to come from graders' results for sold cards, which aren't collected yet.
 
 ## Open
 
-- **Track record:**
-  - No read-only Postgres role for the analysis workspace yet (hld §3.4).
-  - Neither the page nor the views break results down by buyer yet.
-  - No confidence intervals: counts only.
-
 - **Buyer terms wording:** review before inviting the first buyer.
-- **Notifications:** buyers aren't told when a card is posted; they check "Cards for sale". Email waits for the notifier (M6).
+- **EasyPost account:** create one, test with a test key (labels are fake), then set the production key. EasyPost's terms and insurance limits need a look for high-value cards.
+- **Invoices:** monthly postage bills are produced by hand from "Postage to bill". There is no invoicing or payment collection.
+- **Grade accuracy:** add a way for buyers to report a grader's result when they slab a card they bought, as calibration data from a grader.
+- **Notifications:** buyers aren't told when a card is posted, and sellers aren't emailed their label. Email waits for the notifier (M6).
 - **"Instant" depends on the review queue.** An offer needs an identified, assessed card, and identification and condition review are still done by hand.
-- **Buyers' honesty:** inspected grades and prices paid are self-reported. Compare them per buyer once there are enough, and with graders' results where a card is later graded.
 - **Outside interest:** a marketplace for shops and collectors isn't "primarily to the financial services industry", but the employer's general outside-interest disclosure may still apply. Raise it in the lawyer hour.
 - **Not checked in the running app:** logging in needs Zach's Auth0 MFA.

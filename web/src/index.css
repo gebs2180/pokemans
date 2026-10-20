@@ -346,3 +346,10 @@ details summary {
   border-radius: 0.4rem;
   border: 1px solid var(--border);
 }
+
+/* The firm offer on a card: the one number that matters. */
+.offer-price {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0.25rem 0;
+}

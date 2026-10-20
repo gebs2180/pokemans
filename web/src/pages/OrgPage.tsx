@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { apiPath, useApi, type ConsentStatus, type ContainerSummary } from '../api'
 import { useLoad } from '../useLoad'
 import { containerKind, useOrg } from '../useOrg'
+import { AddressPanel } from './AddressForm'
 
 export function OrgPage() {
   const { orgId = '' } = useParams()
@@ -15,12 +16,13 @@ export function OrgPage() {
         <h1>{org.name}</h1>
         <ul className="list">
           <li>
-            <Link to={`/orgs/${orgId}/market`}>Cards for sale</Link> <span className="muted">raw cards posted at our offer</span>
+            <Link to={`/orgs/${orgId}/market`}>Cards for sale</Link> <span className="muted">raw cards at one firm price each</span>
           </li>
           <li>
-            <Link to={`/orgs/${orgId}/deals`}>Your deals</Link> <span className="muted">cards you took, and inspections to record</span>
+            <Link to={`/orgs/${orgId}/deals`}>Your deals</Link> <span className="muted">cards you bought, labels, and arrivals to record</span>
           </li>
         </ul>
+        <AddressPanel orgId={orgId} title="Where cards ship to" />
       </ConsentGate>
     )
   }

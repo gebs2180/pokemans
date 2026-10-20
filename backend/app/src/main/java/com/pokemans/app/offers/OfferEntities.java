@@ -11,7 +11,7 @@ import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** Our offer on one card, valid until {@link #getExpiresAt()}. Append-only. */
+/** Our firm offer on one card, valid until {@link #getExpiresAt()}. Append-only. */
 @Entity
 @Table(name = "card_offer")
 class CardOffer {
@@ -30,7 +30,8 @@ class CardOffer {
     private BigDecimal buyerMargin;
     @JdbcTypeCode(SqlTypes.JSON)
     private String ladder;
-    private BigDecimal expectedOffer;
+    /** The firm price: Σ p × the buyer's price at each grade. */
+    private BigDecimal price;
     private BigDecimal fmv;
     private String confidence;
     private boolean subjectToAuthentication;
@@ -44,7 +45,7 @@ class CardOffer {
     }
 
     CardOffer(UUID orgId, UUID cardItemId, UUID catalogCardId, UUID assessmentId, UUID snapshotSetId, boolean graded, String inputs,
-              String parameterSet, BigDecimal buyerMargin, String ladder, BigDecimal expectedOffer, BigDecimal fmv, String confidence,
+              String parameterSet, BigDecimal buyerMargin, String ladder, BigDecimal price, BigDecimal fmv, String confidence,
               boolean subjectToAuthentication, String trace, UUID createdBy, Instant createdAt, Instant expiresAt) {
         this.id = UUID.randomUUID();
         this.orgId = orgId;
@@ -57,7 +58,7 @@ class CardOffer {
         this.parameterSet = parameterSet;
         this.buyerMargin = buyerMargin;
         this.ladder = ladder;
-        this.expectedOffer = expectedOffer;
+        this.price = price;
         this.fmv = fmv;
         this.confidence = confidence;
         this.subjectToAuthentication = subjectToAuthentication;
@@ -91,8 +92,8 @@ class CardOffer {
         return ladder;
     }
 
-    BigDecimal getExpectedOffer() {
-        return expectedOffer;
+    BigDecimal getPrice() {
+        return price;
     }
 
     BigDecimal getFmv() {
@@ -177,9 +178,13 @@ class SaleListing {
 @Table(name = "listing_event")
 class ListingEvent {
 
-    enum Type { ACCEPTED, WITHDRAWN, INSPECTED }
+    /**
+     * RECEIVED: arrived genuine and as shown, and the buyer paid. RETURNED: sent back for an allowed
+     * reason. INSPECTED: a grade recorded under the per-grade offers that came before firm prices.
+     */
+    enum Type { ACCEPTED, WITHDRAWN, INSPECTED, RECEIVED, RETURNED }
 
-    /** Why a buyer declined after inspection: the only reasons the buyer terms allow. */
+    /** Why a buyer returns a card: the only reasons the buyer terms allow. */
     enum DeclinedReason { NOT_GENUINE, NOT_THE_LISTED_CARD, DOES_NOT_MATCH_PHOTOS }
 
     @Id
@@ -217,13 +222,18 @@ class ListingEvent {
         return new ListingEvent(listingId, Type.WITHDRAWN, sellerOrgId, userId);
     }
 
-    static ListingEvent inspected(UUID listingId, UUID buyerOrgId, UUID userId, BigDecimal grade, boolean authentic,
-                                  BigDecimal pricePaid, DeclinedReason declinedReason, String note) {
-        ListingEvent e = new ListingEvent(listingId, Type.INSPECTED, buyerOrgId, userId);
-        e.inspectedGrade = grade;
-        e.authentic = authentic;
+    static ListingEvent received(UUID listingId, UUID buyerOrgId, UUID userId, BigDecimal pricePaid, String note) {
+        ListingEvent e = new ListingEvent(listingId, Type.RECEIVED, buyerOrgId, userId);
+        e.authentic = true;
         e.pricePaid = pricePaid;
-        e.declinedReason = declinedReason;
+        e.note = note;
+        return e;
+    }
+
+    static ListingEvent returned(UUID listingId, UUID buyerOrgId, UUID userId, DeclinedReason reason, String note) {
+        ListingEvent e = new ListingEvent(listingId, Type.RETURNED, buyerOrgId, userId);
+        e.authentic = reason != DeclinedReason.NOT_GENUINE;
+        e.declinedReason = reason;
         e.note = note;
         return e;
     }
