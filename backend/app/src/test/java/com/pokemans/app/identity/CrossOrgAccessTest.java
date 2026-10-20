@@ -156,7 +156,8 @@ class CrossOrgAccessTest {
                 get("/api/admin/valuation-runs/" + runB + "/replay"),
                 get("/api/admin/valuation-runs/" + runB + "/reports"),
                 postJson("/api/admin/valuation-runs/" + runB + "/reports", "{\"type\":\"LENDER\"}"),
-                get("/api/admin/reports/" + reportB + "/download"));
+                get("/api/admin/reports/" + reportB + "/download"),
+                get("/api/admin/offers/track-record"));
         for (MockHttpServletRequestBuilder request : admin) {
             assertThat(perform(request, userA)).as(describe(request)).isEqualTo(403);
             // A token that claims ADMIN without an MFA login isn't admin either.

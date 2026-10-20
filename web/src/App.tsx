@@ -11,6 +11,7 @@ import { OrgPage } from './pages/OrgPage'
 // Admin and review screens are only for us, so partners' phones don't download them.
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })))
 const AdminOutcomesPage = lazy(() => import('./pages/AdminOutcomesPage').then((m) => ({ default: m.AdminOutcomesPage })))
+const OfferTrackRecordPage = lazy(() => import('./pages/OfferTrackRecordPage').then((m) => ({ default: m.OfferTrackRecordPage })))
 const ReviewQueuePage = lazy(() => import('./pages/ReviewQueuePage').then((m) => ({ default: m.ReviewQueuePage })))
 const ReviewCardPage = lazy(() => import('./pages/ReviewCardPage').then((m) => ({ default: m.ReviewCardPage })))
 const ValuationPage = lazy(() => import('./pages/ValuationPage').then((m) => ({ default: m.ValuationPage })))
@@ -57,6 +58,7 @@ function App() {
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/review" element={<ReviewQueuePage />} />
               <Route path="/admin/outcomes" element={<AdminOutcomesPage />} />
+              <Route path="/admin/offers" element={<OfferTrackRecordPage />} />
               <Route path="/admin/review/:orgId/:cardId" element={<ReviewCardPage />} />
               {COLLATERAL && <Route path="/admin/valuation/:orgId/:collectionId" element={<ValuationPage />} />}
               {COLLATERAL && <Route path="/admin/valuation-runs/:runId" element={<ValuationRunPage />} />}

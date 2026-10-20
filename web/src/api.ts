@@ -638,6 +638,53 @@ export type Deal = {
   inspection: Inspection | null
 }
 
+/** Acceptance among listings in one price band (or all). Rates are null when nothing has closed. */
+export type Acceptance = {
+  band: string
+  listings: number
+  open: number
+  accepted: number
+  withdrawn: number
+  expired: number
+  closed: number
+  acceptanceRate: number | null
+  medianHoursToAccept: number | null
+}
+
+export type GradeCheck = {
+  source: string
+  inspected: number
+  excluded: number
+  withinOne: number
+  withinOneShare: number | null
+  withinOneTarget: number
+  belowStressed: number
+  belowStressedShare: number | null
+  belowStressedTarget: number
+  meanDifference: number | null
+}
+
+export type PriceCheck = {
+  source: string
+  compared: number
+  declined: number
+  belowLadder: number
+  atLadder: number
+  aboveLadder: number
+  medianRatio: number | null
+  totalPaid: number
+  totalLadder: number
+}
+
+export type TrackRecord = {
+  asOf: string
+  overall: Acceptance
+  byPriceBand: Acceptance[]
+  grades: GradeCheck
+  prices: PriceCheck
+  caveats: string[]
+}
+
 /**
  * The rungs worth showing: every grade the card might come back as, then the best price for anything
  * lower, which caps every grade below it.

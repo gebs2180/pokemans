@@ -185,6 +185,121 @@ class OffersFlowTest {
     }
 
     @Test
+    void theTrackRecordCountsWhatHappenedToEveryListing() throws Exception {
+        String trackRecord = "/api/admin/offers/track-record";
+        String before = api.get(trackRecord, api.admin()).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        JwtRequestPostProcessor buyer = buyer("Track Record Buyer");
+        String buyerOrg = lastBuyerOrg;
+
+        // Predicted median 9 for every card (half at 9, half at 10).
+        String spotOn = acceptedListing("Espeon", buyer, buyerOrg);
+        String low = acceptedListing("Vaporeon", buyer, buyerOrg);
+        String mismatch = acceptedListing("Jolteon", buyer, buyerOrg);
+        String wrongCard = acceptedListing("Flareon", buyer, buyerOrg);
+        double nine = ladderPrice(spotOn, "9");
+        double seven = ladderPrice(low, "7");
+        inspect(buyerOrg, spotOn, buyer, "{\"inspectedGrade\":9.5,\"authentic\":true,\"pricePaid\":" + nine + "}");
+        inspect(buyerOrg, low, buyer, "{\"inspectedGrade\":7,\"authentic\":true,\"pricePaid\":" + Math.floor(seven * 50) / 100 + "}");
+        inspect(buyerOrg, mismatch, buyer, "{\"inspectedGrade\":5,\"authentic\":true,\"declinedReason\":\"DOES_NOT_MATCH_PHOTOS\"}");
+        inspect(buyerOrg, wrongCard, buyer, "{\"inspectedGrade\":9,\"authentic\":true,\"declinedReason\":\"NOT_THE_LISTED_CARD\"}");
+
+        String withdrawnCard = pricedCard("Leafeon", 300);
+        String withdrawn = postedListing(withdrawnCard);
+        api.postJson("/api/orgs/" + orgId + "/listings/" + withdrawn + "/withdraw", "", seller).andExpect(status().isOk());
+        postedListing(pricedCard("Glaceon", 300)); // still open
+        // A listing that ran its 14 days with no taker: listings are append-only, so insert one already past.
+        String expiredCard = pricedCard("Sylveon", 300);
+        String expiredOffer = TestApi.read(api.postJson(offers(expiredCard), "", seller).andExpect(status().isCreated()), "$.id");
+        jdbc.update("""
+                insert into sale_listing (id, offer_id, org_id, card_item_id, listed_by, created_at, expires_at)
+                select gen_random_uuid(), id, org_id, card_item_id, created_by, now() - interval '15 days', now() - interval '1 day'
+                from card_offer where id = ?::uuid""", expiredOffer);
+
+        String after = api.get(trackRecord, api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.caveats[0]", containsString("Sellers choose which offers to post")))
+                .andExpect(jsonPath("$.grades.source").value("BUYER_INSPECTION"))
+                .andExpect(jsonPath("$.grades.withinOneTarget").value(0.8))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(delta(before, after, "$.overall.listings")).isEqualTo(7);
+        assertThat(delta(before, after, "$.overall.accepted")).isEqualTo(4);
+        assertThat(delta(before, after, "$.overall.withdrawn")).isEqualTo(1);
+        assertThat(delta(before, after, "$.overall.expired")).isEqualTo(1);
+        assertThat(delta(before, after, "$.overall.open")).isEqualTo(1);
+        // Open listings aren't decided yet, so they aren't in the rate.
+        int accepted = JsonPath.read(after, "$.overall.accepted");
+        int closed = JsonPath.read(after, "$.overall.closed");
+        assertThat(((Number) JsonPath.read(after, "$.overall.acceptanceRate")).doubleValue())
+                .isCloseTo((double) accepted / closed, org.assertj.core.data.Offset.offset(0.0001));
+        List<Integer> bandListings = JsonPath.read(after, "$.byPriceBand[*].listings");
+        assertThat(bandListings.stream().mapToInt(Integer::intValue).sum()).isEqualTo((Integer) JsonPath.read(after, "$.overall.listings"));
+
+        // 9.5 is within one of 9; 7 isn't, but isn't below the stressed median either; 5 is below it.
+        // The card that wasn't the listed one says nothing about our prediction.
+        assertThat(delta(before, after, "$.grades.inspected")).isEqualTo(3);
+        assertThat(delta(before, after, "$.grades.excluded")).isEqualTo(1);
+        assertThat(delta(before, after, "$.grades.withinOne")).isEqualTo(1);
+        assertThat(delta(before, after, "$.grades.belowStressed")).isEqualTo(1);
+        // Paid the ladder price once and half of it once; two declined and paid nothing.
+        assertThat(delta(before, after, "$.prices.compared")).isEqualTo(2);
+        assertThat(delta(before, after, "$.prices.atLadder")).isEqualTo(1);
+        assertThat(delta(before, after, "$.prices.belowLadder")).isEqualTo(1);
+        assertThat(delta(before, after, "$.prices.declined")).isEqualTo(2);
+
+        // The analysis view, row by row.
+        Map<String, Object> row = jdbc.queryForMap("select * from v_offer_outcomes where listing_id = ?::uuid", spotOn);
+        assertThat(row.get("status")).isEqualTo("ACCEPTED");
+        assertThat((String) row.get("card_name")).startsWith("Espeon");
+        assertThat(row.get("predicted_median")).isEqualTo(9);
+        assertThat(row.get("stressed_median")).isEqualTo(9 - (Integer) row.get("stress_shift"));
+        assertThat(row.get("inspection_source")).isEqualTo("BUYER_INSPECTION");
+        assertThat(((BigDecimal) row.get("ladder_price_at_inspected")).doubleValue()).isEqualTo(nine); // 9.5 folds to 9
+        assertThat(((BigDecimal) row.get("hours_to_accept")).signum()).isGreaterThanOrEqualTo(0);
+        assertThat(jdbc.queryForObject("select status from v_offer_outcomes where listing_id = ?::uuid", String.class, withdrawn))
+                .isEqualTo("WITHDRAWN");
+        assertThat(jdbc.queryForObject("select count(*) from v_offer_outcomes where card_item_id = ?::uuid and expired", Integer.class,
+                expiredCard)).isEqualTo(1);
+        Map<String, Object> missed = jdbc.queryForMap("select * from v_offer_grade_calibration where listing_id = ?::uuid", low);
+        assertThat(missed.get("source")).isEqualTo("BUYER_INSPECTION");
+        assertThat(missed.get("within_one")).isEqualTo(false);
+        assertThat(((BigDecimal) missed.get("grade_difference")).doubleValue()).isEqualTo(-2);
+        assertThat(jdbc.queryForObject("select count(*) from v_offer_grade_calibration where listing_id = ?::uuid", Integer.class, wrongCard))
+                .isZero();
+
+        // Only the admin sees it.
+        api.get(trackRecord, seller).andExpect(status().isForbidden());
+        api.get(trackRecord, buyer).andExpect(status().isForbidden());
+    }
+
+    private String acceptedListing(String name, JwtRequestPostProcessor buyer, String buyerOrg) throws Exception {
+        String listingId = postedListing(pricedCard(name, 300));
+        api.postJson("/api/orgs/" + buyerOrg + "/market/" + listingId + "/accept", "", buyer).andExpect(status().isOk());
+        return listingId;
+    }
+
+    /** Prices the card, posts the offer, and returns the listing id. */
+    private String postedListing(String card) throws Exception {
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        return TestApi.read(api.get(sale(card), seller), "$.listing.id");
+    }
+
+    private double ladderPrice(String listingId, String grade) {
+        return jdbc.queryForObject("""
+                select (r ->> 'price')::float8 from sale_listing l join card_offer o on o.id = l.offer_id,
+                     jsonb_array_elements(o.ladder) r
+                where l.id = ?::uuid and grade_number(r ->> 'grade') = ?::int""", Double.class, listingId, grade);
+    }
+
+    private void inspect(String buyerOrg, String listingId, JwtRequestPostProcessor buyer, String body) throws Exception {
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/inspection", body, buyer).andExpect(status().isCreated());
+    }
+
+    private static int delta(String before, String after, String path) {
+        return JsonPath.<Integer>read(after, path) - JsonPath.<Integer>read(before, path);
+    }
+
+    @Test
     void aListingIsOpenUntilClosedOrExpired() {
         Instant now = Instant.now();
         SaleListing open = new SaleListing(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), now, now.plusSeconds(60));
