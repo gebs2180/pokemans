@@ -88,11 +88,11 @@ The realized sales are the evidence for the later lender and insurer pitch: our 
   - price paid against the ladder price;
   - the counts behind every rate (flagged "too few to read" under 30), and the caveats below.
 - **Counting rules, chosen to understate:**
-  - The acceptance rate is accepted out of accepted + withdrawn + expired. Open listings wait.
+  - The acceptance rate is accepted out of accepted + withdrawn + expired. Open listings wait (Zach, 2026-10-19).
   - A card posted twice counts twice.
-  - Grades are compared unfolded, so a 7.5 against a predicted 9 is a miss.
-  - The predicted median is the lower median.
-  - Cards declined as not genuine or not the listed card are left out of the grade numbers, since the prediction was about another card. Cards that don't match their photos stay in.
+  - Grades are compared unfolded, so a 7.5 against a predicted 9 is a miss (Zach, 2026-10-19).
+  - The predicted median is the lower median (Zach, 2026-10-19).
+  - Cards declined as not genuine or not the listed card are left out of the grade numbers, since the prediction was about another card. Cards that don't match their photos stay in (Zach, 2026-10-19).
 - **Selection bias, shown on the page:**
   - Sellers only post offers they like.
   - Buyers self-report grades and prices and have a reason to grade low.
