@@ -12,7 +12,7 @@ with ranked as (
 )
 update prediction_request r
 set status      = 'FAILED',
-    last_error  = 'Closed by migration V13: a newer open request for this card and provider exists',
+    last_error  = 'Closed by migration V17: a newer open request for this card and provider exists',
     finished_at = now()
 from ranked
 where r.id = ranked.id

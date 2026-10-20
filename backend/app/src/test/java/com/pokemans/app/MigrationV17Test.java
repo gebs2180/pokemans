@@ -15,16 +15,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * V13 applies to a database that already has duplicate open prediction requests (as a local
+ * V17 applies to a database that already has duplicate open prediction requests (as a local
  * database could): the older duplicates are closed with a reason, then the unique index goes on.
- * Runs the migrations into a schema of its own, stopping at V11 to plant the duplicates.
+ * Runs the migrations into a schema of its own, stopping at V16 to plant the duplicates.
  */
 @SpringBootTest(properties = "pokemans.condition.worker.enabled=false")
 @Import(TestcontainersConfiguration.class)
 @Testcontainers(disabledWithoutDocker = true)
-class MigrationV13Test {
+class MigrationV17Test {
 
-    private static final String SCHEMA = "v13_upgrade";
+    private static final String SCHEMA = "v17_upgrade";
 
     @Autowired
     private DataSource dataSource;
@@ -40,7 +40,7 @@ class MigrationV13Test {
     @Test
     void closesOlderDuplicateOpenRequestsBeforeAddingTheIndex() {
         jdbc.execute("drop schema if exists " + SCHEMA + " cascade");
-        flyway("11").migrate();
+        flyway("16").migrate();
 
         UUID org = UUID.randomUUID();
         UUID user = UUID.randomUUID();
@@ -68,7 +68,7 @@ class MigrationV13Test {
         assertThat(status(done)).containsEntry("status", "DONE");
         for (UUID closed : List.of(oldest, older)) {
             assertThat(status(closed)).containsEntry("status", "FAILED");
-            assertThat((String) status(closed).get("last_error")).contains("V13").contains("newer open request");
+            assertThat((String) status(closed).get("last_error")).contains("V17").contains("newer open request");
             assertThat(status(closed).get("finished_at")).isNotNull();
         }
         assertThat(jdbc.queryForObject("select count(*) from pg_indexes where schemaname = ? and indexname = 'prediction_request_open_idx'",
