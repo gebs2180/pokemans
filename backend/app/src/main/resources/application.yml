@@ -88,11 +88,24 @@ pokemans:
       cron: "0 30 6 * * *"
       lookback: 400d
   offers:
-    # Instant offers (Zach, 2026-10-19): each grade's quick-sale value less the buyer's margin. An offer
-    # stands for a week; a posted offer waits two weeks for a buyer.
+    # Instant offers (Zach, 2026-10-19): one firm price, the expected value over the card's grades of the
+    # quick-sale value less the buyer's margin. An offer stands for a week; a posted offer waits two weeks.
     buyer-margin: 0.10
     offer-valid-for: 7d
     listing-open-for: 14d
+  shipping:
+    # Prepaid, insured labels for taken cards, bought on our account and billed to buyers monthly
+    # (Zach, 2026-10-19). Off until a key is set in the environment; a test key buys test labels.
+    easypost:
+      enabled: ${EASYPOST_ENABLED:false}
+      api-key: ${EASYPOST_API_KEY:}
+      carrier: USPS
+    # A single raw card in a toploader, in a bubble mailer: inches and ounces.
+    parcel:
+      length: 7
+      width: 5
+      height: 1
+      weight-oz: 3
   collateral:
     # Lender and insurer collateral reports (valuation runs and report PDFs). Paused while Zach's outside
     # interest is cleared with his employer (2026-10-19): the APIs aren't registered unless this is on.

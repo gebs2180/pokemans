@@ -40,7 +40,7 @@ class OfferLadderTest {
         assertThat(rung(offer, Grade.G8).price()).isEqualByComparingTo("206.55");
         assertThat(rung(offer, Grade.G9).probability()).isEqualByComparingTo("0.5");
         // 0.3 x 688.50 + 0.5 x 344.25 + 0.2 x 206.55 = 419.985, to the even cent
-        assertThat(offer.expected()).isEqualByComparingTo("419.98");
+        assertThat(offer.price()).isEqualByComparingTo("419.98");
         assertThat(offer.liquidityTier()).isEqualTo(ParameterSet.LiquidityTier.MID);
         assertThat(offer.rungs().getFirst().grade()).isEqualTo(Grade.G10);
     }

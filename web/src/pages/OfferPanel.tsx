@@ -1,18 +1,21 @@
 import { useState } from 'react'
-import { apiPath, likelyRungs, money, useApi, type Offer, type Sale } from '../api'
+import { apiPath, likelyRungs, money, RETURN_REASON, useApi, type Offer, type Sale, type ShipAddress } from '../api'
+import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
+import { AddressForm } from './AddressForm'
 
-/** The offer as a price per grade: what a buyer pays depends on the grade the card inspects at. */
-export function OfferLadder({ offer }: { offer: Offer }) {
+/** How the firm price was reached: what a buyer could pay at each grade the card might be, and how likely each is. */
+export function HowPriced({ offer }: { offer: Offer }) {
   const { likely, lower } = likelyRungs(offer.ladder)
   return (
-    <>
+    <details>
+      <summary className="muted small">How we priced it</summary>
       <table className="table">
         <thead>
           <tr>
-            <th>If it inspects at</th>
+            <th>If it's a</th>
             <th>Chance</th>
-            <th>Offer</th>
+            <th>Worth to a buyer</th>
           </tr>
         </thead>
         <tbody>
@@ -32,19 +35,21 @@ export function OfferLadder({ offer }: { offer: Offer }) {
           )}
         </tbody>
       </table>
-      <p className="muted small">
-        Likely about {money(offer.expectedOffer)}.
-        {offer.subjectToAuthentication && ' Subject to the buyer authenticating the card in hand.'}
-      </p>
-    </>
+      <p className="muted small">The offer is the chance-weighted total, and it doesn't change with the grade the card turns out to be.</p>
+    </details>
   )
 }
 
-/** A member's card: get our instant offer, post it to buyers, and see what happened. */
+/** A member's card: get our instant offer, sell at it, and follow the sale through to the buyer. */
 export function OfferPanel({ orgId, cardId }: { orgId: string; cardId: string }) {
   const api = useApi()
   const salePath = apiPath`/api/orgs/${orgId}/cards/${cardId}/sale`
   const { data: sale, error, reload } = useLoad(() => api<Sale>('GET', salePath), [api, salePath])
+  // Wrapped, so "no address on file" (an empty response) is told apart from "still loading".
+  const { data: shipFrom, reload: reloadAddress } = useLoad(
+    () => api<ShipAddress | null>('GET', apiPath`/api/orgs/${orgId}/ship-address`).then((address) => ({ address })),
+    [api, orgId],
+  )
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -66,13 +71,14 @@ export function OfferPanel({ orgId, cardId }: { orgId: string; cardId: string })
   const { offer, listing } = sale
   const live = listing && (listing.status === 'OPEN' || listing.status === 'ACCEPTED')
   const getOffer = () => act('POST', apiPath`/api/orgs/${orgId}/cards/${cardId}/offers`)
+  const labelHref = safeHref(listing?.label?.labelUrl)
 
   return (
     <section className="panel">
       <h2>Instant offer</h2>
       {!offer && (
         <>
-          <p className="muted">See what a buyer would pay for this card, at each grade it could come back as.</p>
+          <p className="muted">One firm price for this card, based on the grade it's likely to be. No listing, no haggling.</p>
           <button onClick={getOffer} disabled={busy}>
             Get an offer
           </button>
@@ -80,7 +86,9 @@ export function OfferPanel({ orgId, cardId }: { orgId: string; cardId: string })
       )}
       {offer && (
         <>
-          <OfferLadder offer={offer} />
+          <p className="offer-price">{money(offer.price)}</p>
+          {offer.subjectToAuthentication && <p className="muted small">Subject to the buyer authenticating the card in hand.</p>}
+          <HowPriced offer={offer} />
           {!live &&
             (offer.expired ? (
               <p>
@@ -92,12 +100,22 @@ export function OfferPanel({ orgId, cardId }: { orgId: string; cardId: string })
             ) : (
               <>
                 <p className="muted small">
-                  Good until {new Date(offer.expiresAt).toLocaleDateString()}. Selling posts it to our buyers: the first to accept
-                  takes the card, and it isn't sold until one does.
+                  Good until {new Date(offer.expiresAt).toLocaleDateString()}. Selling posts this price to our buyers: the first to
+                  accept buys the card at it, and we send you a prepaid, insured shipping label. It isn't sold until a buyer accepts.
                 </p>
-                <button onClick={() => act('POST', apiPath`/api/orgs/${orgId}/cards/${cardId}/listings`, { offerId: offer.id })} disabled={busy}>
-                  Sell at this offer
-                </button>
+                {shipFrom && shipFrom.address == null ? (
+                  <>
+                    <p>Where will you ship from?</p>
+                    <AddressForm orgId={orgId} onSaved={reloadAddress} />
+                  </>
+                ) : (
+                  <button
+                    onClick={() => act('POST', apiPath`/api/orgs/${orgId}/cards/${cardId}/listings`, { offerId: offer.id })}
+                    disabled={busy || !shipFrom}
+                  >
+                    Sell for {money(offer.price)}
+                  </button>
+                )}
               </>
             ))}
         </>
@@ -105,7 +123,7 @@ export function OfferPanel({ orgId, cardId }: { orgId: string; cardId: string })
 
       {listing?.status === 'OPEN' && (
         <p>
-          Posted to buyers until {new Date(listing.expiresAt).toLocaleDateString()}.{' '}
+          Waiting for a buyer, until {new Date(listing.expiresAt).toLocaleDateString()}.{' '}
           <button className="link" onClick={() => act('POST', apiPath`/api/orgs/${orgId}/listings/${listing.id}/withdraw`)} disabled={busy}>
             Withdraw
           </button>
@@ -114,16 +132,26 @@ export function OfferPanel({ orgId, cardId }: { orgId: string; cardId: string })
       {listing?.status === 'ACCEPTED' && (
         <div className="ok">
           <p>
-            Taken by {listing.buyer?.orgName ?? 'a buyer'}
-            {listing.buyer?.email && ` (${listing.buyer.email})`} on {new Date(listing.closedAt!).toLocaleDateString()}. Contact them
-            to arrange shipping; they pay the offer for the grade they find.
+            Sold to {listing.buyer?.orgName ?? 'a buyer'}
+            {listing.buyer?.email && ` (${listing.buyer.email})`} on {new Date(listing.closedAt!).toLocaleDateString()}. They pay
+            you {offer && money(offer.price)} once it arrives as shown.
           </p>
-          {listing.inspection && (
+          {listing.label && labelHref ? (
             <p>
-              {listing.inspection.declinedReason
-                ? `They declined: ${listing.inspection.declinedReason.replace(/_/g, ' ').toLowerCase()}.`
-                : `Inspected at PSA ${listing.inspection.inspectedGrade}; paid ${money(listing.inspection.pricePaid)} (offer at that grade ${money(listing.inspection.ladderPrice)}).`}
+              <a href={labelHref} target="_blank" rel="noreferrer">
+                Print your prepaid label
+              </a>{' '}
+              <span className="muted small">
+                {listing.label.carrier} {listing.label.service}
+                {listing.label.trackingCode && `, tracking ${listing.label.trackingCode}`}, insured for {money(listing.label.insuredValue)}
+              </span>
             </p>
+          ) : (
+            <p className="muted">Your prepaid label is on its way.</p>
+          )}
+          {listing.outcome?.type === 'RECEIVED' && <p>Arrived. They recorded paying {money(listing.outcome.pricePaid)}.</p>}
+          {listing.outcome?.type === 'RETURNED' && listing.outcome.returnedReason && (
+            <p>They're sending it back: {RETURN_REASON[listing.outcome.returnedReason]}.</p>
           )}
         </div>
       )}

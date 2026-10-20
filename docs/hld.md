@@ -339,7 +339,7 @@ Posts are only read by hand to find people to ask. They are never stored.
 - `OfferLadder` in valuation-core;
 - the offer track record: views `v_offer_outcomes` and `v_offer_grade_calibration` (V15) and an admin page, so realized sales can later back the lender and insurer pitch.
 
-Details in [offers.md](offers.md).
+Since 2026-10-19 the offer is one firm price. Accepting buys a prepaid, insured label (EasyPost, behind a `ShippingProvider` port), and the buyer records the arrival or a return (V16: `ship_address`, `shipping_label`). Details in [offers.md](offers.md).
 
 ## 11. Risks and open decisions
 

@@ -7,25 +7,28 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * An instant offer on a raw card: a price for each grade it could come back as on in-hand inspection
- * (Zach, 2026-10-19).
+ * An instant offer on a raw card: one firm price, the expected value over its condition distribution
+ * of what a buyer could pay for it at each grade (Zach, 2026-10-19). The buyer accepts it or doesn't;
+ * no grade is settled afterwards, so the buyer keeps the upside of a 10 and carries the downside.
  *
  * <pre>
  * offer_g = P↓_g · (1 − f) · (1 − d) · (1 − m)
+ * price   = Σ p_g · offer_g
  * </pre>
  *
  * P↓_g is the grade's net price (net of grading cost, as in FMV), capped at the grade above so a
  * grade 1 premium never pays more for a worse card; (1 − f)(1 − d) is the quick-sale haircut a buyer
- * faces reselling within 30 days; m is the buyer's margin. The expected offer is Σ p_g · offer_g over
- * the card's condition distribution, for display only: what is paid is the rung the card inspects at.
+ * faces reselling within 30 days; m is the buyer's margin. The rungs are kept to show how the price was
+ * reached.
  */
 public final class OfferLadder {
 
-    /** One rung: the price if the card inspects at {@code grade}, and how likely that is. */
+    /** One rung: what a buyer could pay for the card if it is {@code grade}, and how likely that is. */
     public record Rung(Grade grade, BigDecimal probability, BigDecimal price) {
     }
 
-    public record Offer(List<Rung> rungs, BigDecimal expected, ParameterSet.LiquidityTier liquidityTier, Trace trace) {
+    /** @param price the firm price: Σ p · rung price, in cents */
+    public record Offer(List<Rung> rungs, BigDecimal price, ParameterSet.LiquidityTier liquidityTier, Trace trace) {
     }
 
     private final ParameterSet params;
@@ -71,7 +74,7 @@ public final class OfferLadder {
             trace.add("offer[" + grade + "]", "net price at most the grade above, x factor", price, "net " + capped.get(grade));
         }
         expected = Money.cents(expected);
-        trace.add("expected_offer", "sum p x offer", expected, "display only: the rung the card inspects at is paid");
+        trace.add("firm_price", "sum p x offer at each grade", expected, "one price: no grade is settled after acceptance");
         return new Offer(List.copyOf(rungs), expected, tier, trace);
     }
 }
