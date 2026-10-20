@@ -75,7 +75,35 @@ The lender and insurer side is paused while Zach clears his outside interest wit
   - `CrossOrgAccessTest` covers every new route.
   - Vitest covers `OfferPanel`, `MarketPage`, `InspectionForm` and `likelyRungs`.
 
+## Track record
+
+The realized sales are the evidence for the later lender and insurer pitch: our estimates, backed by what buyers actually accepted and paid. Built 2026-10-19 on fixture data.
+
+- **Views (V15), for the analysis workspace:**
+  - `v_offer_outcomes`: one row per listing. It holds the card's identity, the offer date, expected offer and FMV, and the status (open, accepted, withdrawn, expired) with time to accept. It also has the predicted median and the stressed median (the FLV stress shift, from the offer's trace), plus the inspected grade, its source, the declined reason, the price paid and the ladder price at the grade found.
+  - `v_offer_grade_calibration`: predicted against inspected grade for raw cards. Each row keeps its `source` (BUYER_INSPECTION for now); graders' results join later with their own source, never pooled.
+- **Admin page** "Offer track record" (`/admin/offers`, `GET /api/admin/offers/track-record`). It reads the same views and shows:
+  - acceptance rate and median time to accept, overall and by expected-offer band;
+  - the share of inspections within ±1 of the predicted median, and below the stressed median, against the 80% and 5% targets;
+  - price paid against the ladder price;
+  - the counts behind every rate (flagged "too few to read" under 30), and the caveats below.
+- **Counting rules, chosen to understate:**
+  - The acceptance rate is accepted out of accepted + withdrawn + expired. Open listings wait (Zach, 2026-10-19).
+  - A card posted twice counts twice.
+  - Grades are compared unfolded, so a 7.5 against a predicted 9 is a miss (Zach, 2026-10-19).
+  - The predicted median is the lower median (Zach, 2026-10-19).
+  - Cards declined as not genuine or not the listed card are left out of the grade numbers, since the prediction was about another card. Cards that don't match their photos stay in (Zach, 2026-10-19).
+- **Selection bias, shown on the page:**
+  - Sellers only post offers they like.
+  - Buyers self-report grades and prices and have a reason to grade low.
+  - Buyers who never record an inspection drop out.
+
 ## Open
+
+- **Track record:**
+  - No read-only Postgres role for the analysis workspace yet (hld §3.4).
+  - Neither the page nor the views break results down by buyer yet.
+  - No confidence intervals: counts only.
 
 - **Buyer terms wording:** review before inviting the first buyer.
 - **Notifications:** buyers aren't told when a card is posted; they check "Cards for sale". Email waits for the notifier (M6).

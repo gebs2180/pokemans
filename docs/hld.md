@@ -128,7 +128,7 @@ Installable as a PWA. The upload API is client-agnostic so a future Expo capture
 
 ### 3.4 Analysis workspace
 
-`analysis/` (Python, pandas, scikit-learn, Jupyter) reads from a read-only Postgres role and stable SQL views (`v_prediction_outcomes`, `v_flv_followup_prices`, `v_provider_comparison`). Outputs: calibration curves, ±1-grade hit rate, below-stressed-median rate, the 2021–2023 liquidation replay, and the week 1–2 provider comparison.
+`analysis/` (Python, pandas, scikit-learn, Jupyter) reads from a read-only Postgres role and stable SQL views (`v_prediction_outcomes`, `v_flv_followup_prices`, `v_provider_comparison`; built so far: `v_offer_outcomes` and `v_offer_grade_calibration`, V15). Outputs: calibration curves, ±1-grade hit rate, below-stressed-median rate, the 2021–2023 liquidation replay, and the week 1–2 provider comparison.
 
 ## 4. Key flows
 
@@ -336,7 +336,8 @@ Posts are only read by hand to find people to ask. They are never stored.
 **Instant offers (2026-10-19): built on fixture data.** While the lender and insurer side is paused, the same valuation engine prices instant offers for collectors selling raw cards to buyer orgs (shops, dealers). It adds:
 - a `BUYER` org type with versioned buyer terms;
 - the `offers` module (`card_offer`, `sale_listing`, `listing_event`, V14, append-only);
-- `OfferLadder` in valuation-core.
+- `OfferLadder` in valuation-core;
+- the offer track record: views `v_offer_outcomes` and `v_offer_grade_calibration` (V15) and an admin page, so realized sales can later back the lender and insurer pitch.
 
 Details in [offers.md](offers.md).
 
