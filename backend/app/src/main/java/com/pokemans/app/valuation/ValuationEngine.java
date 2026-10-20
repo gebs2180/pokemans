@@ -124,6 +124,26 @@ final class ValuationEngine {
         return new Result(results, portfolio, totalRv, capped, eligible);
     }
 
+    /**
+     * One card on its own, outside any run: its price table (netted for a raw card) and valuation.
+     *
+     * @param card a card with no unvalued reason
+     */
+    Single valueOne(CardInputs card) {
+        if (card.unvaluedReason() != null) {
+            throw new IllegalArgumentException("Card can't be valued: " + card.unvaluedReason());
+        }
+        Trace trace = new Trace();
+        GradePriceTable table = table(card, trace);
+        CardValuator.Input in = input(card, table, trace);
+        CardValuation v = new CardValuator(params).value(in);
+        trace.addAll(v.trace());
+        return new Single(in, v, trace);
+    }
+
+    record Single(CardValuator.Input input, CardValuation valuation, Trace trace) {
+    }
+
     /** Gross snapshot prices: raw cards are netted of grading cost; graded cards are already graded. */
     private GradePriceTable table(CardInputs card, Trace trace) {
         EnumMap<Grade, GradePrice> gross = new EnumMap<>(Grade.class);

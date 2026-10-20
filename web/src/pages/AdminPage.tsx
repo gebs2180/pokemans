@@ -55,6 +55,7 @@ export function AdminPage() {
           <option value="PARTNER">Partner</option>
           <option value="COLLECTOR">Collector</option>
           <option value="CONTRIBUTOR">Contributor (shares graded cards)</option>
+          <option value="BUYER">Buyer (takes up instant offers)</option>
         </select>
         <button type="submit" disabled={creating}>
           Create

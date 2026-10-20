@@ -159,7 +159,16 @@ class ValuationService {
 
     /** Every card in the collection with what its valuation needs, or why it can't be valued. */
     private List<CardInputs> gather(UUID collectionId) {
-        List<CardItems.CardItemRef> items = cardItems.inCollection(collectionId);
+        return gather(cardItems.inCollection(collectionId));
+    }
+
+    /** One card's inputs as of now, on its own (one copy). */
+    @Transactional(readOnly = true)
+    CardInputs currentInputs(UUID cardItemId) {
+        return gather(List.of(cardItems.get(cardItemId))).getFirst();
+    }
+
+    private List<CardInputs> gather(List<CardItems.CardItemRef> items) {
         List<UUID> ids = items.stream().map(CardItems.CardItemRef::id).toList();
         Map<UUID, Catalog.IdentifiedCard> identities = catalog.current(ids);
         Map<UUID, Assessments.Current> current = assessments.current(ids);

@@ -1,6 +1,10 @@
 package com.pokemans.app.valuation;
 
+import com.pokemans.valuation.CardValuation;
+import com.pokemans.valuation.GradeDistribution;
+import com.pokemans.valuation.GradePriceTable;
 import com.pokemans.valuation.GradingCost;
+import com.pokemans.valuation.ParameterSet;
 import com.pokemans.valuation.Trace;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -60,12 +64,38 @@ public class Valuations {
         }
     }
 
+    /**
+     * A card valued as of now, on its own: what instant offers are priced from.
+     *
+     * @param valuation    FMV and the rest with confidence, or null when the card can't be valued (see
+     *                     {@code inputs.unvaluedReason()})
+     * @param distribution the condition distribution used (certain at its grade for a graded card), or null
+     * @param prices       the price table used, net of grading cost for a raw card, or null
+     */
+    public record CurrentValue(CardInputs inputs, ParameterSet params, CardValuation valuation, GradeDistribution distribution,
+                               GradePriceTable prices, List<Trace.Step> trace) {
+    }
+
     private final ValuationRunRepository runs;
     private final CardValuationRecordRepository lines;
+    private final ValuationService service;
 
-    Valuations(ValuationRunRepository runs, CardValuationRecordRepository lines) {
+    Valuations(ValuationRunRepository runs, CardValuationRecordRepository lines, ValuationService service) {
         this.runs = runs;
         this.lines = lines;
+        this.service = service;
+    }
+
+    /** The card valued now, with today's assessment, prices, provenance and the default grading cost. */
+    @Transactional(readOnly = true)
+    public CurrentValue current(UUID cardItemId) {
+        CardInputs inputs = service.currentInputs(cardItemId);
+        ParameterSet params = service.parameterSet();
+        if (inputs.unvaluedReason() != null) {
+            return new CurrentValue(inputs, params, null, null, null, List.of());
+        }
+        ValuationEngine.Single one = new ValuationEngine(params, service.defaultGradingCost()).valueOne(inputs);
+        return new CurrentValue(inputs, params, one.valuation(), one.input().distribution(), one.input().prices(), one.trace().steps());
     }
 
     @Transactional(readOnly = true)

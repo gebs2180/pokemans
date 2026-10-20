@@ -13,8 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Data-use terms for contributors, and who accepted which version. A new version of the text needs
- * a new version string: acceptances are tied to the exact text by its hash.
+ * Terms an org's members accept before taking part: data-use terms for contributors, and the terms
+ * buyers commit to when they take up an instant offer. Who accepted which version is kept. A new
+ * version of a text needs a new version string: acceptances are tied to the exact text by its hash.
  */
 @Service
 public class Consents {
@@ -41,6 +42,26 @@ public class Consents {
 
     private static final Terms CONTRIBUTOR_TERMS = new Terms(CONTRIBUTOR_TERMS_VERSION, CONTRIBUTOR_TERMS_TEXT, sha256(CONTRIBUTOR_TERMS_TEXT));
 
+    public static final String BUYER_TERMS_VERSION = "buyer-2026-10-19";
+
+    /** Draft for Zach to review: plain language, not reviewed legal wording. */
+    static final String BUYER_TERMS_TEXT = """
+            By accepting an instant offer here you agree that:
+
+            1. Accepting is a commitment to buy the card at the price the offer shows for the grade you find \
+            when you inspect it in hand, judged on the PSA scale.
+            2. You may decline after inspection only if the card isn't genuine, isn't the card listed, or \
+            doesn't match its photos. Say which, in your inspection record.
+            3. You record the grade you found, whether the card is genuine and what you paid, within 14 days \
+            of receiving it. We keep these records and use them to check and improve our offers.
+            4. You use the seller's contact details only for this sale.
+            5. We are not a party to the sale. We don't hold cards or money, and shipping, inspection and \
+            payment are between you and the seller. A posted card can be taken by another buyer first.
+
+            Ask Zach if anything here is unclear.""";
+
+    private static final Terms BUYER_TERMS = new Terms(BUYER_TERMS_VERSION, BUYER_TERMS_TEXT, sha256(BUYER_TERMS_TEXT));
+
     private final ConsentRecordRepository records;
     private final OrgAccess access;
     private final CurrentUser currentUser;
@@ -55,16 +76,26 @@ public class Consents {
         return CONTRIBUTOR_TERMS;
     }
 
-    /** When the current user accepted the current contributor terms for this org, if they did. */
+    /** The terms members of this kind of org accept, if it has any. */
+    public static Optional<Terms> termsFor(OrgType type) {
+        return switch (type) {
+            case CONTRIBUTOR -> Optional.of(CONTRIBUTOR_TERMS);
+            case BUYER -> Optional.of(BUYER_TERMS);
+            case PARTNER, COLLECTOR -> Optional.empty();
+        };
+    }
+
+    /** When the current user accepted the current terms for this org, if they did. */
     @Transactional(readOnly = true)
     public Optional<Instant> acceptedAt(UUID orgId) {
-        return records.findFirstByOrgIdAndUserIdAndTermsVersionOrderByAcceptedAtDesc(orgId, currentUser.id(), CONTRIBUTOR_TERMS_VERSION)
+        Optional<Terms> terms = termsFor(access.require(orgId, OrgType.values()).getType());
+        return terms.flatMap(t -> records.findFirstByOrgIdAndUserIdAndTermsVersionOrderByAcceptedAtDesc(orgId, currentUser.id(), t.version()))
                 .map(ConsentRecord::getAcceptedAt);
     }
 
     /**
-     * 403 unless the current user accepted the current contributor terms for this org. The admin is
-     * exempt: entering a contributor's data on their behalf happens after they agreed in writing.
+     * 403 unless the current user accepted the current terms for this org. The admin is exempt:
+     * acting on a member's behalf happens after they agreed in writing.
      */
     @Transactional(readOnly = true)
     public void requireAccepted(UUID orgId) {
@@ -76,11 +107,11 @@ public class Consents {
     /** Records acceptance of the version the user was shown; a stale version is refused. */
     @Transactional
     public Instant accept(UUID orgId, String version) {
-        access.require(orgId, OrgType.CONTRIBUTOR);
-        if (!CONTRIBUTOR_TERMS_VERSION.equals(version)) {
+        Terms terms = termsFor(access.require(orgId, OrgType.CONTRIBUTOR, OrgType.BUYER).getType()).orElseThrow();
+        if (!terms.version().equals(version)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "The terms have changed; reload and read them again");
         }
-        return records.save(new ConsentRecord(orgId, currentUser.id(), version, CONTRIBUTOR_TERMS.sha256())).getAcceptedAt();
+        return records.save(new ConsentRecord(orgId, currentUser.id(), version, terms.sha256())).getAcceptedAt();
     }
 
     private static String sha256(String text) {
