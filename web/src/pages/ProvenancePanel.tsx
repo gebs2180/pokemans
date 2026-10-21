@@ -20,6 +20,9 @@ const AUTH_METHODS: AuthMethod[] = ['IN_HAND_INSPECTION', 'GRADER_SLAB', 'THIRD_
 const HOLDER_TYPES: HolderType[] = ['OWNER', 'PARTNER', 'VAULT', 'GRADER', 'LENDER', 'OTHER']
 const CUSTODY_METHODS: CustodyMethod[] = ['IN_PERSON', 'VAULT_STATEMENT', 'GRADER_RECEIPT', 'VIDEO_CALL']
 
+/** Collateral (lender and insurer) features; off while that side is paused. */
+const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
+
 const AUTH_LABEL: Record<AuthState, { text: string; className: string }> = {
   NOT_FLAGGED: { text: 'Not in an authenticity-risk category.', className: 'ok' },
   VERIFIED_AUTHENTIC: { text: 'Verified authentic as its current identity.', className: 'ok' },
@@ -27,6 +30,19 @@ const AUTH_LABEL: Record<AuthState, { text: string; className: string }> = {
   AWAITING_VERIFICATION: { text: 'Flagged: zero collateral value until verified.', className: 'warn' },
   SUSPECTED_COUNTERFEIT: { text: 'Suspected counterfeit: zero collateral value.', className: 'error' },
   COUNTERFEIT: { text: 'Counterfeit: zero collateral value.', className: 'error' },
+}
+
+/** The same states in instant-offer terms, for when collateral is off. */
+const OFFER_AUTH_LABEL: Record<AuthState, { text: string; className: string }> = {
+  NOT_FLAGGED: { text: 'Not in an authenticity-risk category.', className: 'ok' },
+  VERIFIED_AUTHENTIC: { text: 'Verified authentic as its current identity.', className: 'ok' },
+  NOT_IDENTIFIED: { text: 'Not identified yet: no offer until it is.', className: 'warn' },
+  AWAITING_VERIFICATION: {
+    text: 'High-risk card, not yet verified: its offer is subject to the buyer authenticating it in hand.',
+    className: 'warn',
+  },
+  SUSPECTED_COUNTERFEIT: { text: 'Suspected counterfeit: no offer.', className: 'error' },
+  COUNTERFEIT: { text: 'Counterfeit: no offer.', className: 'error' },
 }
 
 const CUSTODY_LABEL: Record<CustodyState, { text: string; className: string }> = {
@@ -51,19 +67,22 @@ function today() {
 
 /**
  * A card's authenticity findings and custody, the two gates on collateral eligibility. Members see
- * both and record custody; only an admin records findings and checks custody.
+ * both and record custody; only an admin records findings and checks custody. With collateral off,
+ * custody is hidden (offers don't use it) and authenticity is worded in offer terms.
  */
 export function ProvenancePanel({
   orgId,
   cardId,
   admin,
   photos = [],
+  collateral = COLLATERAL,
 }: {
   orgId: string
   cardId: string
   admin: boolean
   /** The card's passing photos, for an admin to name as a finding's evidence. */
   photos?: ReviewPhoto[]
+  collateral?: boolean
 }) {
   const api = useApi()
   const { data, error, reload } = useLoad(
@@ -72,15 +91,16 @@ export function ProvenancePanel({
   )
   const adminBase = apiPath`/api/admin/orgs/${orgId}/cards/${cardId}`
   const memberBase = apiPath`/api/orgs/${orgId}/cards/${cardId}`
+  const authLabels = collateral ? AUTH_LABEL : OFFER_AUTH_LABEL
 
   return (
     <section className="panel">
-      <h2>Authenticity and custody</h2>
+      <h2>{collateral ? 'Authenticity and custody' : 'Authenticity'}</h2>
       {error && <p className="error" role="alert">{error}</p>}
       {data && (
         <>
-          <h3>Authenticity</h3>
-          <p className={AUTH_LABEL[data.authState].className}>{AUTH_LABEL[data.authState].text}</p>
+          {collateral && <h3>Authenticity</h3>}
+          <p className={authLabels[data.authState].className}>{authLabels[data.authState].text}</p>
           {data.verifications.length > 0 && (
             <ul className="list">
               {data.verifications.map((v) => (
@@ -100,6 +120,8 @@ export function ProvenancePanel({
               <VerificationForm base={adminBase} verifyMethods={data.verifyMethods} photos={photos} onSaved={reload} />
             ))}
 
+          {collateral && (
+            <>
           <h3>Custody</h3>
           <p className={CUSTODY_LABEL[data.custodyState].className}>
             {CUSTODY_LABEL[data.custodyState].text}
@@ -117,6 +139,8 @@ export function ProvenancePanel({
             </ul>
           )}
           <CustodyForm base={memberBase} canCheck={admin} onSaved={reload} />
+            </>
+          )}
         </>
       )}
     </section>

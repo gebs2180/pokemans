@@ -142,7 +142,7 @@ describe('ProvenancePanel', () => {
 
   it('says a flagged card has zero value and an old verification no longer counts', async () => {
     vi.stubGlobal('fetch', async () => respond(200, view))
-    render(<ProvenancePanel orgId="org1" cardId="card1" admin />)
+    render(<ProvenancePanel orgId="org1" cardId="card1" admin collateral />)
 
     expect(await screen.findByText('Flagged: zero collateral value until verified.')).toBeInTheDocument()
     expect(screen.getByText(/for an earlier identity/)).toBeInTheDocument()
@@ -152,10 +152,21 @@ describe('ProvenancePanel', () => {
 
   it('shows members the status and custody form, but no findings form', async () => {
     vi.stubGlobal('fetch', async () => respond(200, view))
-    render(<ProvenancePanel orgId="org1" cardId="card1" admin={false} />)
+    render(<ProvenancePanel orgId="org1" cardId="card1" admin={false} collateral />)
 
     expect(await screen.findByText('Flagged: zero collateral value until verified.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Record finding' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Record custody' })).toBeInTheDocument()
+  })
+
+  it('with collateral off, hides custody and words authenticity in offer terms', async () => {
+    vi.stubGlobal('fetch', async () => respond(200, view))
+    render(<ProvenancePanel orgId="org1" cardId="card1" admin={false} collateral={false} />)
+
+    expect(await screen.findByRole('heading', { name: 'Authenticity' })).toBeInTheDocument()
+    expect(screen.getByText(/subject to the buyer authenticating it in hand/)).toBeInTheDocument()
+    expect(screen.queryByText(/collateral|advance/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Custody' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Record custody' })).not.toBeInTheDocument()
   })
 })

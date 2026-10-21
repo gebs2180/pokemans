@@ -21,11 +21,14 @@ import { ProvenancePanel } from './ProvenancePanel'
 
 const EDITIONS: Edition[] = ['UNLIMITED', 'FIRST_EDITION', 'SHADOWLESS']
 const VARIANTS: Variant[] = ['NORMAL', 'HOLO', 'REVERSE_HOLO']
+/** Lender and insurer features are paused unless the build turns them on. */
+const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
+const RISK_EFFECT = COLLATERAL ? 'zero collateral until verified' : 'its offer is subject to authentication in hand'
 const RISK_LABEL = {
   NONE: null,
-  VINTAGE_HOLO: 'Vintage holo / 1st Edition: authenticity risk, zero collateral until verified',
-  JAPANESE_PROMO: 'Japanese promo: authenticity risk, zero collateral until verified',
-  RECENT_CHASE: 'Recent chase card: authenticity risk, zero collateral until verified',
+  VINTAGE_HOLO: `Vintage holo / 1st Edition: authenticity risk, ${RISK_EFFECT}`,
+  JAPANESE_PROMO: `Japanese promo: authenticity risk, ${RISK_EFFECT}`,
+  RECENT_CHASE: `Recent chase card: authenticity risk, ${RISK_EFFECT}`,
 } as const
 
 function message(err: unknown) {
