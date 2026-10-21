@@ -5,6 +5,7 @@ export type OrgType = 'PARTNER' | 'COLLECTOR' | 'CONTRIBUTOR' | 'BUYER'
 
 export const ORG_TYPE_LABEL: Record<OrgType, string> = { PARTNER: 'Partner', COLLECTOR: 'Collector', CONTRIBUTOR: 'Contributor', BUYER: 'Buyer' }
 export type Side = 'FRONT' | 'BACK' | 'DETAIL'
+export const SIDE_LABEL: Record<Side, string> = { FRONT: 'Front', BACK: 'Back', DETAIL: 'Close-up' }
 export type PhotoStatus = 'AWAITING_UPLOAD' | 'PASSED' | 'RETAKE'
 
 export type Membership = { orgId: string; orgName: string; orgType: OrgType; role: string }
@@ -37,6 +38,10 @@ export type PhotoView = {
   glareFraction: number | null
   capturedAt: string | null
   uploadedAt: string | null
+  /** The side's newest passing photo: the one buyers and reviewers see. */
+  current: boolean
+  /** A short-lived thumbnail link (the card crop if there is one); null in lists. */
+  url: string | null
 }
 
 export type CardView = {
@@ -47,7 +52,28 @@ export type CardView = {
   captureComplete: boolean
   missingSides: Side[]
   photos: PhotoView[]
+  /** Why the photos can't change any more (posted or sold), or null. */
+  photosFrozen: string | null
 }
+
+/** Where a seller's card is on the way to a sale. */
+export type CardStage = 'PHOTOS' | 'LOT' | 'IDENTIFYING' | 'ASSESSING' | 'PRICING' | 'NO_OFFER' | 'READY' | 'OFFERED' | 'LISTED' | 'SOLD'
+
+export const STAGE_LABEL: Record<CardStage, string> = {
+  PHOTOS: 'Needs photos',
+  LOT: 'Lot: no offers',
+  IDENTIFYING: 'Waiting for us to identify it',
+  ASSESSING: 'Waiting for condition review',
+  PRICING: 'Waiting for prices',
+  NO_OFFER: 'No offer yet',
+  READY: 'Ready for an offer',
+  OFFERED: 'Offer ready',
+  LISTED: 'Posted to buyers',
+  SOLD: 'Sold',
+}
+
+/** @param identity the card as we identified it, or null; @param canOffer asking for an offer can work now */
+export type CardStatus = { cardId: string; stage: CardStage; identity: string | null; nextStep: string; canOffer: boolean }
 
 export type UploadSlot = {
   photoId: string
@@ -156,9 +182,21 @@ export type QueueItem = {
   assessment: 'NONE' | 'SYSTEM' | 'REVIEWER'
   confidence: Confidence | null
   openRequests: number
+  /** Whose card it is. */
+  orgName: string | null
 }
 
-export type CatalogHit = { externalId: string; number: string; name: string; setId: string | null; imageUrl: string | null }
+export type CatalogHit = {
+  externalId: string
+  number: string
+  name: string
+  setId: string | null
+  imageUrl: string | null
+  /** e.g. "Base Set", when the catalog says */
+  setName: string | null
+  /** the size printed after the slash (102 in 4/102), when the catalog says */
+  setTotal: number | null
+}
 
 export type ProviderCard = {
   externalId: string
@@ -664,6 +702,30 @@ export type Deal = {
   outcome: Outcome | null
 }
 
+/** A deal whose label hasn't been bought, for the admin. */
+export type AwaitingLabel = {
+  listingId: string
+  buyerOrgId: string
+  buyer: Party
+  seller: Party
+  card: OfferCard
+  offer: Offer
+  photos: PhotoLink[]
+  acceptedAt: string
+}
+
+/** The admin's preview of a card's offer, stored nowhere. */
+export type OfferPreview = {
+  offered: boolean
+  refusal: string | null
+  price: number | null
+  fmv: number | null
+  confidence: Confidence | null
+  buyerMargin: number | null
+  /** The steps that set the confidence: parameters, σ fallback, base, penalties, derived grades. */
+  why: TraceStep[]
+}
+
 /** @param labelPending why the label didn't come with the accept, or null */
 export type AcceptResult = { deals: Deal[]; labelPending: string | null }
 
@@ -716,7 +778,10 @@ export type Acceptance = {
 export type Deliveries = {
   taken: number
   labels: number
+  /** Labelled, nothing recorded yet. */
   inTransit: number
+  /** Taken, no label bought yet, nothing recorded. */
+  awaitingLabel: number
   received: number
   returned: number
   returnRate: number | null

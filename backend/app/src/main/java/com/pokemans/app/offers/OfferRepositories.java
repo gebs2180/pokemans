@@ -33,6 +33,13 @@ interface SaleListingRepository extends JpaRepository<SaleListing, UUID> {
             and e.type = com.pokemans.app.offers.ListingEvent.Type.ACCEPTED and e.actorOrgId = :buyerOrgId
             order by e.createdAt desc""")
     List<SaleListing> findAcceptedBy(UUID buyerOrgId);
+
+    /** Every accepted listing, oldest accept first. */
+    @Query("""
+            select l from SaleListing l, ListingEvent e where e.listingId = l.id
+            and e.type = com.pokemans.app.offers.ListingEvent.Type.ACCEPTED
+            order by e.createdAt asc""")
+    List<SaleListing> findAllAccepted();
 }
 
 interface ListingEventRepository extends JpaRepository<ListingEvent, UUID> {

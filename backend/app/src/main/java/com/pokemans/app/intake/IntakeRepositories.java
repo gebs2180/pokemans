@@ -36,6 +36,9 @@ interface CardItemRepository extends JpaRepository<CardItem, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<CardItem> findLockedByIdAndOrgId(UUID id, UUID orgId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<CardItem> findLockedById(UUID id);
+
     long countByBatchId(UUID batchId);
 
     long countByCollectionId(UUID collectionId);

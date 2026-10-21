@@ -16,11 +16,15 @@ The lender and insurer side is paused while Zach clears his outside interest wit
    - its provenance.
 
    The offer is **one firm price**. "How we priced it" shows the per-grade ladder behind it.
-2. **Selling.** "Sell" posts the price to every buyer org. The seller needs a ship-from address on file first. Posting isn't a sale: the first buyer to accept buys the card at the price, and the page says so. A listing nobody accepts expires.
-3. **The label.** Accepting buys a prepaid, insured label at once, on our EasyPost account, from the seller's address to the buyer's. The seller prints it from the card page. If the purchase fails (no shipping account yet, or the carrier is down), the sale still stands: the buyer or the admin buys the label again.
-4. **On arrival.** The buyer records one of two things:
-   - the card arrived genuine and as shown, and what they paid the seller, by default the offer price;
-   - it goes back, for one of the reasons the buyer terms allow: not genuine, not the listed card, or doesn't match its photos.
+2. **Selling.** "Sell" posts the price to every buyer org, after one confirm step. The seller needs a ship-from address on file first. Posting isn't a sale: the first buyer to accept buys the card at the price, and the page says so. A listing nobody accepts expires.
+   - Buyers see the photos the offer was priced on: each side's current photo (front, back, close-up), labelled, never superseded attempts. An offer whose photos were retaken since can't be posted: the seller gets a new one.
+   - From posting on, the card's photos can't change (E2E audit, 2026-10-21): the API refuses uploads while it's posted, and for good once it's sold. Withdrawing frees them again.
+3. **The label.** Accepting buys a prepaid, insured label at once, on our EasyPost account, from the seller's address to the buyer's. The seller prints it from the card page. If the purchase fails (no shipping account yet, or the carrier is down), the sale still stands: the buyer retries from Your deals, or the admin from **Labels to buy** (`/admin/labels`). Meanwhile the seller is told not to ship until the label shows.
+4. **On arrival.** Once a label exists, the buyer records one of two things:
+   - the card arrived genuine and as shown, and what they paid the seller, by default the offer price; any other amount needs a note saying why;
+   - it goes back, for one of the reasons the buyer terms allow: not genuine, not the listed card, or doesn't match its photos. No reason is preselected.
+
+   Without a label nothing can have shipped, so the API refuses both. If a card shipped another way, the admin records it for the buyer from **Labels to buy**, with a note saying how; the note is kept as "Recorded by the admin: …".
 
    No grade is judged: condition within the photos is the buyer's risk.
 5. **Billing.** Postage and insurance are billed to buyers monthly, off-platform, from `/admin/shipping`. Payment for the card is between buyer and seller, due within 7 days of a card arriving as shown. We hold no cards and no money for cards (Zach doesn't rule out becoming the middleman later).
@@ -67,6 +71,7 @@ The lender and insurer side is paused while Zach clears his outside interest wit
     - `POST .../offers`
     - `POST .../listings`
     - `POST /api/orgs/{org}/listings/{id}/withdraw`
+    - `GET /api/orgs/{org}/cards/{card}/status` and `GET /api/orgs/{org}/collections/{collection}/status`: where each card is (photos, our identification, condition review, prices, offer, posted, sold), its identity once confirmed, and what happens next
   - Both sides: `GET`/`POST /api/orgs/{org}/ship-address`.
   - Buyer (buyer org, terms accepted):
     - `GET /api/orgs/{org}/market`
@@ -76,7 +81,10 @@ The lender and insurer side is paused while Zach clears his outside interest wit
     - `POST .../deals/{id}/received`
     - `POST .../deals/{id}/returned`
   - Admin:
+    - `GET /api/admin/cards/{card}/offer-preview`: the offer the seller would get now, or why none, with the trace steps that set its confidence. Stores nothing.
+    - `GET /api/admin/deals/awaiting-label`
     - `POST /api/admin/deals/{id}/label?buyerOrgId=`
+    - `POST /api/admin/deals/{id}/received?buyerOrgId=` and `.../returned?buyerOrgId=`: an arrival or return recorded by hand, note required
     - `GET /api/admin/shipping/charges?month=yyyy-MM`
   - The market never names the seller. Contact details and the label appear only to the two parties once a buyer accepts.
 - **Web:**

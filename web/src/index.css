@@ -38,7 +38,22 @@ body {
 
 .who {
   font-size: 0.9rem;
-  overflow-wrap: anywhere;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+/* A long email shortens on a phone instead of pushing Log out off the bar. */
+.who .email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.who button.link {
+  flex-shrink: 0;
 }
 
 button,
@@ -337,6 +352,24 @@ details summary {
 /* Wide tables scroll inside their own box instead of the page. */
 .scroll {
   overflow-x: auto;
+}
+
+/* Labelled photos on listings and deals: three fit across a phone. */
+.photo.compact {
+  width: 6rem;
+}
+
+/* Where a seller's card is on the way to a sale. */
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.status-line p {
+  margin: 0.25rem 0;
 }
 
 /* Card photos on instant-offer listings. */

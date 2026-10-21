@@ -16,6 +16,8 @@ cd web; npm.cmd run dev                  # http://localhost:5173
 
 The backend applies database migrations (Flyway) and creates the versioned `photos` bucket on startup. Every default in `application.yml` points at the compose services. Production overrides them with environment variables (`DB_URL`, `STORAGE_ENDPOINT`, …), with `STORAGE_AUTO_CREATE_BUCKETS=false`.
 
+To run a second stack beside this one (say, the API on 8092), start Vite with `$env:API_PROXY="http://localhost:8092"`; it proxies `/api` there instead of 8080.
+
 MinIO stopped publishing images to Docker Hub in 2025, so compose and the tests use Chainguard's free build (`cgr.dev/chainguard/minio:latest`, the only free tag).
 
 ## Try the M1 flow

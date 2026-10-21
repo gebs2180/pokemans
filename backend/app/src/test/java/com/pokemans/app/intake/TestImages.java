@@ -15,4 +15,9 @@ public final class TestImages {
     public static byte[] goodBack() {
         return QualityCheckerTest.png(QualityCheckerTest.withCard(QualityCheckerTest.background(1700, 2300), 950, 850, 1150, -3));
     }
+
+    /** More passing photos, each with different pixels: {@code n} from 0 to 4. */
+    public static byte[] goodRetake(int n) {
+        return QualityCheckerTest.png(QualityCheckerTest.withCard(QualityCheckerTest.background(1650, 2250), 920, 825, 1125, -2 + n));
+    }
 }

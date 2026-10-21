@@ -45,9 +45,9 @@ export default defineConfig({
     setupFiles: ['src/test/setup.ts'],
   },
   server: {
-    // The Spring Boot app serves the API on 8080 in local development.
+    // The Spring Boot app serves the API on 8080 in local development; API_PROXY points a second stack elsewhere.
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': process.env.API_PROXY ?? 'http://localhost:8080',
     },
   },
 })

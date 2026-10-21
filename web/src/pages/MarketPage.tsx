@@ -1,12 +1,25 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
-import { apiPath, money, parseMoney, RETURN_REASON, useApi, type AcceptResult, type Deal, type DeclinedReason, type MarketItem, type OfferCard } from '../api'
+import {
+  apiPath,
+  money,
+  parseMoney,
+  RETURN_REASON,
+  SIDE_LABEL,
+  useApi,
+  type AcceptResult,
+  type Deal,
+  type DeclinedReason,
+  type MarketItem,
+  type OfferCard,
+  type PhotoLink,
+} from '../api'
 import { MoneyInput } from '../inputs'
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { HowPriced } from './OfferPanel'
 
-function CardTitle({ card }: { card: OfferCard }) {
+export function CardTitle({ card }: { card: OfferCard }) {
   return (
     <>
       <h3>{card.name}</h3>
@@ -20,20 +33,25 @@ function CardTitle({ card }: { card: OfferCard }) {
   )
 }
 
-function Photos({ photos }: { photos: { side: string; url: string }[] }) {
+/** The photos the offer was priced on, one per side, labelled: what "matches its photos" is checked against. */
+export function Photos({ photos }: { photos: PhotoLink[] }) {
   return (
     <div className="photos">
       {photos.map((p) => {
         const href = safeHref(p.url)
         return href ? (
-          <a key={href} href={href} target="_blank" rel="noreferrer">
-            <img src={href} alt={p.side.toLowerCase()} className="thumb" />
+          <a key={href} href={href} target="_blank" rel="noreferrer" className="photo compact">
+            <img src={href} alt={`${SIDE_LABEL[p.side]} photo`} className="thumb" />
+            <span className="muted small">{SIDE_LABEL[p.side]}</span>
           </a>
         ) : null
       })}
     </div>
   )
 }
+
+/** "Add the address cards should ship to first." is the one refusal the buyer fixes elsewhere: link there. */
+const NO_ADDRESS = 'Add the address cards should ship to first.'
 
 /** Buyers: raw cards posted at one firm price. The first buyer to accept buys the card at it. */
 export function MarketPage() {
@@ -43,19 +61,22 @@ export function MarketPage() {
   const [confirming, setConfirming] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  // A refusal shows by the card it's about: on a phone the top of the list is off-screen.
+  const [failed, setFailed] = useState<{ listingId: string; message: string } | null>(null)
 
   async function accept(listingId: string) {
     setMessage(null)
+    setFailed(null)
     setBusy(true)
     try {
       const result = await api<AcceptResult>('POST', apiPath`/api/orgs/${orgId}/market/${listingId}/accept`)
       setMessage(
         result.labelPending
-          ? `Bought. The seller's label didn't go through yet (${result.labelPending}); try it again from your deals.`
-          : 'Bought: the seller has a prepaid label to you. It is in your deals.',
+          ? `Bought. The seller's label didn't go through yet (${result.labelPending.replace(/\.$/, '')}). Try it again from Your deals, or we'll buy it for you.`
+          : 'Bought: the seller has a prepaid label to you. It is in Your deals.',
       )
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : String(e))
+      setFailed({ listingId, message: e instanceof Error ? e.message : String(e) })
     } finally {
       setBusy(false)
       setConfirming(null)
@@ -99,6 +120,17 @@ export function MarketPage() {
           ) : (
             <button onClick={() => setConfirming(item.listingId)}>Buy</button>
           )}
+          {failed?.listingId === item.listingId && (
+            <p className="error" role="alert">
+              {failed.message}
+              {failed.message === NO_ADDRESS && (
+                <>
+                  {' '}
+                  <Link to={`/orgs/${orgId}`}>Add your address</Link>
+                </>
+              )}
+            </p>
+          )}
         </section>
       ))}
     </>
@@ -135,6 +167,7 @@ export function DealsPage() {
       {data?.map((deal) => (
         <section key={deal.listingId} className="panel">
           <CardTitle card={deal.card} />
+          <Photos photos={deal.photos} />
           <p>
             Bought for {money(deal.offer.price)} on {new Date(deal.acceptedAt).toLocaleDateString()} from {deal.seller.orgName ?? 'a seller'}
             {deal.seller.email && (
@@ -164,8 +197,10 @@ export function DealsPage() {
               {deal.outcome.type === 'RETURNED' && deal.outcome.returnedReason && `Returned: ${RETURN_REASON[deal.outcome.returnedReason]}.`}
               {deal.outcome.type === 'INSPECTED' && `Inspected at PSA ${deal.outcome.inspectedGrade}.`}
             </p>
+          ) : deal.label ? (
+            <ArrivalForm path={apiPath`/api/orgs/${orgId}/deals/${deal.listingId}`} price={deal.offer.price} onSaved={reload} />
           ) : (
-            <ArrivalForm orgId={orgId} deal={deal} onSaved={reload} />
+            <p className="muted small">Once the label is bought and the card ships, record here how it arrived.</p>
           )}
         </section>
       ))}
@@ -173,13 +208,31 @@ export function DealsPage() {
   )
 }
 
-/** Once the card is in hand: it came as shown and you paid, or it goes back for one of the allowed reasons. */
-export function ArrivalForm({ orgId, deal, onSaved }: { orgId: string; deal: Deal; onSaved: () => void }) {
+/**
+ * Once the card is in hand: it came as shown and you paid, or it goes back for one of the allowed reasons.
+ *
+ * @param path the deal's API path: the buyer's, or the admin's (which adds ?buyerOrgId and needs a note)
+ * @param price the firm price: paying anything else needs a reason
+ */
+export function ArrivalForm({
+  path,
+  price,
+  onSaved,
+  noteRequired = false,
+}: {
+  path: string
+  price: number
+  onSaved: () => void
+  noteRequired?: boolean
+}) {
   const api = useApi()
   const [returning, setReturning] = useState(false)
-  const [paid, setPaid] = useState(String(deal.offer.price))
-  const [reason, setReason] = useState<DeclinedReason>('DOES_NOT_MATCH_PHOTOS')
+  const [paid, setPaid] = useState(String(price))
+  // No default: the reason is data, and a preselected one would skew it.
+  const [reason, setReason] = useState<DeclinedReason | ''>('')
   const [note, setNote] = useState('')
+  const differs = !returning && parseMoney(paid) !== price
+  const needsNote = noteRequired || differs
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -188,10 +241,12 @@ export function ArrivalForm({ orgId, deal, onSaved }: { orgId: string; deal: Dea
     setError(null)
     setBusy(true)
     try {
+      const [base, query] = path.split('?')
+      const suffix = query ? `?${query}` : ''
       if (returning) {
-        await api('POST', apiPath`/api/orgs/${orgId}/deals/${deal.listingId}/returned`, { reason, note: note || null })
+        await api('POST', `${base}/returned${suffix}`, { reason, note: note || null })
       } else {
-        await api('POST', apiPath`/api/orgs/${orgId}/deals/${deal.listingId}/received`, { pricePaid: parseMoney(paid), note: note || null })
+        await api('POST', `${base}/received${suffix}`, { pricePaid: parseMoney(paid), note: note || null })
       }
       onSaved()
     } catch (err) {
@@ -214,7 +269,10 @@ export function ArrivalForm({ orgId, deal, onSaved }: { orgId: string; deal: Dea
       {returning ? (
         <label>
           Because it's{' '}
-          <select value={reason} onChange={(e) => setReason(e.target.value as DeclinedReason)} aria-label="Return reason">
+          <select value={reason} onChange={(e) => setReason(e.target.value as DeclinedReason)} aria-label="Return reason" required>
+            <option value="" disabled>
+              choose a reason
+            </option>
             {(Object.keys(RETURN_REASON) as DeclinedReason[]).map((r) => (
               <option key={r} value={r}>
                 {RETURN_REASON[r]}
@@ -228,7 +286,15 @@ export function ArrivalForm({ orgId, deal, onSaved }: { orgId: string; deal: Dea
           <MoneyInput value={paid} onChange={setPaid} min={0} className="narrow" aria-label="Price paid" required />
         </label>
       )}
-      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" aria-label="Note" maxLength={2000} />
+      {differs && <p className="muted small">That's not the {money(price)} offer: say why in the note.</p>}
+      <input
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder={noteRequired ? 'How the card shipped, or why this is recorded by hand' : differs ? 'Why you paid a different amount' : 'Note (optional)'}
+        aria-label="Note"
+        maxLength={2000}
+        required={needsNote}
+      />
       <button type="submit" disabled={busy}>
         Record
       </button>

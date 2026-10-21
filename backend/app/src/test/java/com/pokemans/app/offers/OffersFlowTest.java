@@ -11,6 +11,7 @@ import com.pokemans.app.TestApi;
 import com.pokemans.app.TestcontainersConfiguration;
 import com.pokemans.app.identity.Consents;
 import com.pokemans.app.identity.SecurityProperties;
+import com.pokemans.app.intake.TestImages;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -273,6 +274,188 @@ class OffersFlowTest {
         Map<String, Object> row = jdbc.queryForMap("select * from v_offer_outcomes where listing_id = ?::uuid", UUID.fromString(kept));
         assertThat(row.get("outcome")).isEqualTo("RECEIVED");
         assertThat(row.get("carrier")).isEqualTo("USPS");
+    }
+
+    @Test
+    void arrivalWaitsForTheLabelAndADifferentPriceNeedsAReason() throws Exception {
+        String listingId = postedCard("Sylveon", 300);
+        JwtRequestPostProcessor buyer = buyer("Early Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Early Buyer");
+        shipper.failing = true;
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk())
+                .andExpect(jsonPath("$.deals[0].photos").isArray());
+        double price = ((Number) JsonPath.read(api.get("/api/orgs/" + buyerOrg + "/deals", buyer).andReturn().getResponse()
+                .getContentAsString(), "$[0].offer.price")).doubleValue();
+
+        // Nothing can have shipped without a label, so nothing can have arrived or gone back.
+        String received = "/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received";
+        api.postJson(received, "{\"pricePaid\":" + price + "}", buyer).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("no label")));
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/returned", "{\"reason\":\"NOT_GENUINE\"}", buyer)
+                .andExpect(status().isConflict());
+
+        // The admin sees the deal waiting for its label and buys it once shipping works.
+        String waiting = api.get("/api/admin/deals/awaiting-label", api.admin()).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString();
+        assertThat(JsonPath.<List<String>>read(waiting, "$[?(@.listingId == '" + listingId + "')].buyer.orgName")).containsExactly("Early Buyer");
+        assertThat(JsonPath.<List<String>>read(waiting, "$[?(@.listingId == '" + listingId + "')].seller.orgName")).containsExactly(sellerName);
+        shipper.failing = false;
+        api.postJson("/api/admin/deals/" + listingId + "/label?buyerOrgId=" + buyerOrg, "", api.admin()).andExpect(status().isOk());
+        assertThat(api.get("/api/admin/deals/awaiting-label", api.admin()).andReturn().getResponse().getContentAsString())
+                .doesNotContain(listingId);
+
+        // Paying less than the firm price needs a reason.
+        api.postJson(received, "{\"pricePaid\":" + (price - 5) + "}", buyer).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("why the amount paid differs")));
+        api.postJson(received, "{\"pricePaid\":" + (price - 5) + ",\"note\":\"seller agreed a discount for a soft corner\"}", buyer)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].outcome.note").value("seller agreed a discount for a soft corner"));
+    }
+
+    @Test
+    void theAdminRecordsAnArrivalByHandWhenTheCardShippedWithoutOurLabel() throws Exception {
+        String before = api.get("/api/admin/offers/track-record", api.admin()).andReturn().getResponse().getContentAsString();
+        String listingId = postedCard("Leafeon", 300);
+        JwtRequestPostProcessor buyer = buyer("Offline Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Offline Buyer");
+        shipper.failing = true;
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
+        String during = api.get("/api/admin/offers/track-record", api.admin()).andReturn().getResponse().getContentAsString();
+        assertThat(delta(during, before, "$.deliveries.awaitingLabel")).isEqualTo(1);
+        assertThat(delta(during, before, "$.deliveries.inTransit")).isZero();
+
+        String byHand = "/api/admin/deals/" + listingId + "/received?buyerOrgId=" + buyerOrg;
+        api.postJson(byHand, "{\"pricePaid\":10}", api.admin()).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("how the card was shipped")));
+        api.postJson(byHand, "{\"pricePaid\":10,\"note\":\"shipped with the seller's own stamps\"}", buyer).andExpect(status().isForbidden());
+        api.postJson("/api/admin/deals/" + listingId + "/received?buyerOrgId=" + UUID.randomUUID(),
+                "{\"pricePaid\":10,\"note\":\"x\"}", api.admin()).andExpect(status().isNotFound());
+        api.postJson(byHand, "{\"pricePaid\":10,\"note\":\"shipped with the seller's own stamps\"}", api.admin()).andExpect(status().isCreated());
+        api.get("/api/orgs/" + buyerOrg + "/deals", buyer)
+                .andExpect(jsonPath("$[0].outcome.type").value("RECEIVED"))
+                .andExpect(jsonPath("$[0].outcome.note").value("Recorded by the admin: shipped with the seller's own stamps"));
+    }
+
+    @Test
+    void photosFreezeOnceTheCardIsPostedAndBuyersSeeOnlyTheCurrentOnes() throws Exception {
+        String card = card("Photographed Umbreon");
+        api.uploadPhoto(orgId, card, "FRONT", TestImages.goodBack(), seller).andExpect(jsonPath("$.status").value("PASSED")); // the back, by mistake
+        api.uploadPhoto(orgId, card, "BACK", TestImages.goodRetake(0), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, card, "FRONT", TestImages.goodFront(), seller).andExpect(jsonPath("$.status").value("PASSED")); // retaken
+        api.get("/api/orgs/" + orgId + "/cards/" + card, seller)
+                .andExpect(jsonPath("$.photos.length()").value(3))
+                .andExpect(jsonPath("$.photos[?(@.current == true)].side", org.hamcrest.Matchers.containsInAnyOrder("FRONT", "BACK")))
+                .andExpect(jsonPath("$.photos[0].url").isNotEmpty())
+                .andExpect(jsonPath("$.photosFrozen").isEmpty());
+        priceLadder(identify(card, "Umbreon " + UUID.randomUUID().toString().substring(0, 4), "2015-05-06", "NORMAL", "Rare"), 300);
+        assess(card);
+        // The reviewer sees the current front and back only, front first.
+        api.get("/api/admin/orgs/" + orgId + "/cards/" + card + "/condition", api.admin())
+                .andExpect(jsonPath("$.photos[*].side", org.hamcrest.Matchers.contains("FRONT", "BACK")));
+
+        // A photo taken after the offer means buyers would see photos it wasn't priced on.
+        String stale = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.uploadPhoto(orgId, card, "DETAIL", TestImages.goodRetake(1), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + stale + "\"}", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("photos changed")));
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
+
+        // Buyers see the current front, back and close-up, labelled and in that order: never the superseded front.
+        JwtRequestPostProcessor buyer = buyer("Photo Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Photo Buyer");
+        api.get("/api/orgs/" + buyerOrg + "/market", buyer)
+                .andExpect(jsonPath("$[?(@.listingId == '" + listingId + "')].photos[*].side",
+                        org.hamcrest.Matchers.contains("FRONT", "BACK", "DETAIL")));
+
+        // Posted: the photos stay as buyers see them.
+        String upload = "/api/orgs/" + orgId + "/cards/" + card + "/photos";
+        String slot = "{\"side\":\"FRONT\",\"contentType\":\"image/png\",\"sizeBytes\":100}";
+        api.postJson(upload, slot, seller).andExpect(status().isConflict()).andExpect(jsonPath("$.detail", containsString("posted to buyers")));
+        api.get("/api/orgs/" + orgId + "/cards/" + card, seller).andExpect(jsonPath("$.photosFrozen", containsString("posted")));
+
+        // Sold: for good.
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk())
+                .andExpect(jsonPath("$.deals[0].photos[*].side", org.hamcrest.Matchers.contains("FRONT", "BACK", "DETAIL")));
+        api.postJson(upload, slot, seller).andExpect(status().isConflict()).andExpect(jsonPath("$.detail", containsString("sold")));
+    }
+
+    @Test
+    void aWithdrawnCardCanBeRetakenAgain() throws Exception {
+        String card = card("Withdrawn Espeon");
+        api.uploadPhoto(orgId, card, "FRONT", TestImages.goodFront(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, card, "BACK", TestImages.goodBack(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        priceLadder(identify(card, "Espeon " + UUID.randomUUID().toString().substring(0, 4), "2015-05-06", "NORMAL", "Rare"), 300);
+        assess(card);
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
+        api.postJson("/api/orgs/" + orgId + "/listings/" + listingId + "/withdraw", "", seller).andExpect(status().isOk());
+
+        api.uploadPhoto(orgId, card, "DETAIL", TestImages.goodRetake(2), seller).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PASSED"));
+    }
+
+    @Test
+    void theAdminPreviewsTheOfferOrSeesWhyThereIsNone() throws Exception {
+        String priced = pricedCard("Flareon", 300);
+        String preview = api.get("/api/admin/cards/" + priced + "/offer-preview", api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.offered").value(true))
+                .andExpect(jsonPath("$.refusal").isEmpty())
+                .andExpect(jsonPath("$.why[?(@.subject == 'confidence_base')]").isNotEmpty())
+                .andExpect(jsonPath("$.why[?(@.subject == 'parameters')]").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        // Nothing is stored, and the preview is the price the seller then gets.
+        api.get(sale(priced), seller).andExpect(jsonPath("$.offer").isEmpty());
+        String offer = api.postJson(offers(priced), "", seller).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        assertThat(((Number) JsonPath.read(offer, "$.price")).doubleValue())
+                .isEqualTo(((Number) JsonPath.read(preview, "$.price")).doubleValue());
+        assertThat(JsonPath.<String>read(offer, "$.confidence")).isEqualTo(JsonPath.read(preview, "$.confidence"));
+
+        String unknown = card("Unknown");
+        api.get("/api/admin/cards/" + unknown + "/offer-preview", api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.offered").value(false))
+                .andExpect(jsonPath("$.refusal", containsString("identified")))
+                .andExpect(jsonPath("$.confidence").isEmpty());
+        api.get("/api/admin/cards/" + UUID.randomUUID() + "/offer-preview", api.admin()).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void theCardStatusSaysWhatHappensNext() throws Exception {
+        String card = card("Status Jolteon");
+        String status = "/api/orgs/" + orgId + "/cards/" + card + "/status";
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("PHOTOS")).andExpect(jsonPath("$.canOffer").value(false));
+        api.uploadPhoto(orgId, card, "FRONT", TestImages.goodFront(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, card, "BACK", TestImages.goodBack(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("IDENTIFYING"))
+                .andExpect(jsonPath("$.nextStep", containsString("by hand"))).andExpect(jsonPath("$.identity").isEmpty());
+        String name = "Jolteon " + UUID.randomUUID().toString().substring(0, 4);
+        String catalog = identify(card, name, "2015-05-06", "HOLO", "Rare");
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("ASSESSING"))
+                .andExpect(jsonPath("$.identity", containsString(name + " · Set 2015-05-06")))
+                .andExpect(jsonPath("$.identity", containsString("holo")));
+        assess(card);
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("PRICING"));
+        priceLadder(catalog, 300);
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("READY")).andExpect(jsonPath("$.canOffer").value(true));
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("OFFERED"));
+        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("LISTED"));
+
+        String lot = TestApi.read(api.postJson("/api/orgs/" + orgId + "/collections/" + collectionId + "/cards",
+                "{\"label\":\"Bulk\",\"lot\":true,\"quantity\":40}", seller), "$.id");
+        String all = api.get("/api/orgs/" + orgId + "/collections/" + collectionId + "/status", seller).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(all, "$[?(@.cardId == '" + card + "')].stage")).containsExactly("LISTED");
+        assertThat(JsonPath.<List<String>>read(all, "$[?(@.cardId == '" + lot + "')].stage")).containsExactly("LOT");
     }
 
     @Test

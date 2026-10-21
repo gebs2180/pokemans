@@ -60,6 +60,7 @@ class PhotoService {
         if (access.require(orgId, OrgType.values()).getType() == OrgType.CONTRIBUTOR) {
             consents.requireAccepted(orgId);
         }
+        requireNotFrozen(card);
         if (!ACCEPTED_TYPES.contains(contentType)) {
             throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Photos must be JPEG or PNG");
         }
@@ -85,6 +86,8 @@ class PhotoService {
         if (photo.getStatus() != Photo.Status.AWAITING_UPLOAD) {
             return IntakeViews.photo(photo);
         }
+        // Checked again under the card's lock: posting takes the same lock, so a photo can't slip in as a card goes up for sale.
+        requireNotFrozen(card);
         BlobStore.StoredObject stored = blobs.head(storage.photoBucket(), photo.getStorageKey())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Nothing uploaded for this photo yet"));
 
@@ -112,6 +115,13 @@ class PhotoService {
             events.publishEvent(new CardItems.CaptureCompleted(orgId, card.getId()));
         }
         return IntakeViews.photo(photo);
+    }
+
+    private void requireNotFrozen(CardItem card) {
+        String frozen = intake.frozenReason(card.getId());
+        if (frozen != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, frozen);
+        }
     }
 
     static String sha256(byte[] bytes) {
