@@ -630,9 +630,15 @@ export type Offer = {
   createdAt: string
   expiresAt: string
   expired: boolean
+  /** Set once we voided the offer: it can't be posted, the seller gets a new one. */
+  voided: Undo | null
 }
 
-export type ListingStatus = 'OPEN' | 'ACCEPTED' | 'WITHDRAWN' | 'EXPIRED'
+/** Something the admin undid (2026-10-21): a voided offer or listing, or a cancelled deal, and why. */
+export type Undo = { reason: string; at: string; byUserId?: string; by?: string | null }
+
+/** VOIDED: we took the listing down with its offer. CANCELLED: a buyer took it and we undid the deal. */
+export type ListingStatus = 'OPEN' | 'ACCEPTED' | 'WITHDRAWN' | 'EXPIRED' | 'VOIDED' | 'CANCELLED'
 export type Party = { orgName: string | null; email: string | null }
 export type DeclinedReason = 'NOT_GENUINE' | 'NOT_THE_LISTED_CARD' | 'DOES_NOT_MATCH_PHOTOS'
 
@@ -671,6 +677,8 @@ export type Listing = {
   buyer: Party | null
   label: ShippingLabel | null
   outcome: Outcome | null
+  /** Why we took it down (VOIDED) or cancelled the deal (CANCELLED). */
+  undone: Undo | null
 }
 
 export type Sale = { offer: Offer | null; listing: Listing | null }
@@ -700,6 +708,8 @@ export type Deal = {
   acceptedAt: string
   label: ShippingLabel | null
   outcome: Outcome | null
+  /** Set once we cancelled the deal: nothing more to record, and the label isn't used. */
+  cancelled: Undo | null
 }
 
 /** A deal whose label hasn't been bought, for the admin. */
@@ -750,6 +760,10 @@ export type ChargeLine = {
   trackingCode: string | null
   postage: number
   insurance: number
+  /** null, or the refund's state: "requested" until the provider answers, then its answer. */
+  refund: string | null
+  /** False once the deal was cancelled: its postage is ours, refunded or not. */
+  billed: boolean
 }
 
 export type BuyerCharges = {
@@ -773,6 +787,9 @@ export type Acceptance = {
   closed: number
   acceptanceRate: number | null
   medianHoursToAccept: number | null
+  /** Listings we took down and deals we cancelled: left out of the rate. */
+  voided: number
+  cancelled: number
 }
 
 export type Deliveries = {
@@ -810,6 +827,40 @@ export type TrackRecord = {
   prices: PriceCheck
   shipping: ShippingCost
   caveats: string[]
+}
+
+/** A label refund the admin asked for, and the provider's answer (null when it couldn't be asked). */
+export type LabelRefund = Undo & { providerStatus: string | null; providerError: string | null }
+
+/** An offer's latest listing, as the admin sees it. */
+export type AdminListing = {
+  id: string
+  status: ListingStatus
+  listedAt: string
+  closedAt: string | null
+  buyerOrgId: string | null
+  buyer: Party | null
+  label: ShippingLabel | null
+  labelRefund: LabelRefund | null
+  outcome: Outcome['type'] | null
+  undone: Undo | null
+}
+
+/** Admin: one offer with its latest listing, to void, cancel or refund (2026-10-21). */
+export type AdminOffer = {
+  offerId: string
+  orgId: string
+  sellerName: string | null
+  cardItemId: string
+  card: OfferCard
+  price: number
+  fmv: number
+  confidence: Confidence
+  createdAt: string
+  expiresAt: string
+  expired: boolean
+  voided: Undo | null
+  listing: AdminListing | null
 }
 
 /**

@@ -98,6 +98,9 @@ pokemans:
     # B 13%, C 17%). An offer stands for a week; a posted offer waits two weeks.
     offer-valid-for: 7d
     listing-open-for: 14d
+    # No offer above this firm price (Zach, 2026-10-21): limits a mistake's cost in the beta and keeps
+    # every label under EasyPost's $5,000 insurance cap.
+    max-price: 500
   shipping:
     # Prepaid, insured labels for taken cards, bought on our account and billed to buyers monthly
     # (Zach, 2026-10-19). Off until a key is set in the environment; a test key buys test labels.
@@ -136,3 +139,58 @@ management:
     web:
       exposure:
         include: health,info
+
+# Error reports. Off unless SENTRY_DSN is set (docs/hosting.md). ERROR log lines and unhandled exceptions are sent;
+# request bodies, headers, cookies and user IPs are not.
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:local}
+  send-default-pii: false
+  max-request-body-size: none
+  logging:
+    minimum-event-level: error
+    minimum-breadcrumb-level: info
+
+---
+# Production (docs/hosting.md): SPRING_PROFILES_ACTIVE=prod. Nothing here has a local default, so the app
+# refuses to start with a variable missing instead of quietly using the docker-compose credentials.
+# Required: DB_URL, DB_USERNAME, DB_PASSWORD, SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI,
+# SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES, STORAGE_ENDPOINT, STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY,
+# STORAGE_PHOTO_BUCKET. Optional: STORAGE_PUBLIC_ENDPOINT, STORAGE_REGION (default auto), SENTRY_DSN,
+# SENTRY_ENVIRONMENT, and the feature switches above (CARD_READER_ENABLED, EASYPOST_ENABLED, ...).
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
+          audiences: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES}
+
+server:
+  # Behind Caddy, which terminates HTTPS and sets X-Forwarded-*.
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+pokemans:
+  storage:
+    # Cloudflare R2: region "auto", path-style, and no aws-chunked uploads (R2 answers them with 403).
+    # R2 has no bucket versioning; the nightly backup copy (deploy/backup) stands in for it.
+    endpoint: ${STORAGE_ENDPOINT}
+    region: ${STORAGE_REGION:auto}
+    access-key: ${STORAGE_ACCESS_KEY}
+    secret-key: ${STORAGE_SECRET_KEY}
+    photo-bucket: ${STORAGE_PHOTO_BUCKET}
+    auto-create-buckets: false
+    chunked-encoding: false
+
+management:
+  endpoint:
+    health:
+      show-details: never

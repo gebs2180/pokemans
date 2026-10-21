@@ -11,6 +11,7 @@ import { OrgPage } from './pages/OrgPage'
 // Admin and review screens are only for us, so partners' phones don't download them.
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })))
 const AdminOutcomesPage = lazy(() => import('./pages/AdminOutcomesPage').then((m) => ({ default: m.AdminOutcomesPage })))
+const AdminOffersPage = lazy(() => import('./pages/AdminOffersPage').then((m) => ({ default: m.AdminOffersPage })))
 const OfferTrackRecordPage = lazy(() => import('./pages/OfferTrackRecordPage').then((m) => ({ default: m.OfferTrackRecordPage })))
 const AdminLabelsPage = lazy(() => import('./pages/AdminLabelsPage').then((m) => ({ default: m.AdminLabelsPage })))
 const ShippingChargesPage = lazy(() => import('./pages/ShippingChargesPage').then((m) => ({ default: m.ShippingChargesPage })))
@@ -66,6 +67,7 @@ function App() {
               <Route path="/admin/review" element={<ReviewQueuePage />} />
               <Route path="/admin/outcomes" element={<AdminOutcomesPage />} />
               <Route path="/admin/offers" element={<OfferTrackRecordPage />} />
+              <Route path="/admin/deals" element={<AdminOffersPage />} />
               <Route path="/admin/shipping" element={<ShippingChargesPage />} />
               <Route path="/admin/labels" element={<AdminLabelsPage />} />
               <Route path="/admin/review/:orgId/:cardId" element={<ReviewCardPage />} />

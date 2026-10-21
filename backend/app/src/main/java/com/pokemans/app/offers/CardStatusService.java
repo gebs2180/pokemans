@@ -33,9 +33,12 @@ class CardStatusService {
     private final SaleListingRepository listings;
     private final ListingEventRepository events;
     private final CardItems cardItems;
+    private final CardOfferVoidRepository voids;
 
-    CardStatusService(OfferService offers, SaleListingRepository listings, ListingEventRepository events, CardItems cardItems) {
+    CardStatusService(OfferService offers, SaleListingRepository listings, ListingEventRepository events, CardItems cardItems,
+                      CardOfferVoidRepository voids) {
         this.offers = offers;
+        this.voids = voids;
         this.listings = listings;
         this.events = events;
         this.cardItems = cardItems;
@@ -59,7 +62,8 @@ class CardStatusService {
         if (listed == ListingService.Status.OPEN) {
             return new CardStatus(cardId, Stage.LISTED, identity, "Posted to buyers: the first to accept buys it at the price.", false);
         }
-        Optional<CardOffer> latest = offers.latest(cardId).filter(o -> o.getExpiresAt().isAfter(Instant.now()));
+        Optional<CardOffer> latest = offers.latest(cardId).filter(o -> o.getExpiresAt().isAfter(Instant.now()))
+                .filter(o -> voids.findByOfferId(o.getId()).isEmpty());
         if (latest.isPresent()) {
             return new CardStatus(cardId, Stage.OFFERED, identity, "You have an offer: sell at it, or let it expire.", false);
         }

@@ -31,7 +31,7 @@ class TrackRecordService {
     static final List<String> CAVEATS = List.of(
             "Sellers choose which offers to post. They post the ones they like, so posted offers lean towards cards we priced generously, and the acceptance rate is about those, not all offers.",
             "Arrivals and prices paid are recorded by the buyer. A buyer who never records an arrival drops out of the delivery and price numbers until they do.",
-            "A card posted more than once counts once per listing. Withdrawn and expired listings both count as not accepted; open listings aren't counted yet.",
+            "A card posted more than once counts once per listing. Withdrawn and expired listings both count as not accepted; open listings aren't counted yet. Listings we voided and deals we cancelled are left out of every rate.",
             "Offers are firm, so no grade is judged on arrival: grade accuracy has to come from graders' results for sold cards, which aren't collected yet.");
 
     record Band(String label, BigDecimal min, BigDecimal max) {
@@ -44,8 +44,9 @@ class TrackRecordService {
      * @param acceptanceRate accepted / (accepted + withdrawn + expired); null with none closed
      * @param medianHoursToAccept null with none accepted
      */
+    /** @param voided listings we took down, and cancelled the deals we undid: left out of the rate */
     record Acceptance(String band, int listings, int open, int accepted, int withdrawn, int expired, int closed,
-                      BigDecimal acceptanceRate, BigDecimal medianHoursToAccept) {
+                      BigDecimal acceptanceRate, BigDecimal medianHoursToAccept, int voided, int cancelled) {
     }
 
     /**
@@ -112,9 +113,10 @@ class TrackRecordService {
         int withdrawn = count(rows, "WITHDRAWN");
         int expired = count(rows, "EXPIRED");
         int closed = accepted + withdrawn + expired;
-        BigDecimal medianHours = median(rows.stream().map(Row::hoursToAccept).filter(h -> h != null).toList());
+        BigDecimal medianHours = median(rows.stream().filter(r -> "ACCEPTED".equals(r.status())).map(Row::hoursToAccept)
+                .filter(h -> h != null).toList());
         return new Acceptance(label, rows.size(), open, accepted, withdrawn, expired, closed, share(accepted, closed),
-                medianHours == null ? null : medianHours.setScale(1, RoundingMode.HALF_UP));
+                medianHours == null ? null : medianHours.setScale(1, RoundingMode.HALF_UP), count(rows, "VOIDED"), count(rows, "CANCELLED"));
     }
 
     private static Deliveries deliveries(List<Row> rows) {

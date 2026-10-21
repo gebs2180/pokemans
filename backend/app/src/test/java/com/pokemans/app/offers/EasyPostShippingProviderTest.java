@@ -78,6 +78,22 @@ class EasyPostShippingProviderTest {
     }
 
     @Test
+    void asksForARefundAndReturnsItsStatus() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://ep.test/v2/shipments/shp_123/refund")).andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"id\":\"shp_123\",\"object\":\"Shipment\",\"refund_status\":\"submitted\"}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://ep.test/v2/shipments/shp_456/refund"))
+                .andRespond(withSuccess("{\"id\":\"shp_456\"}", MediaType.APPLICATION_JSON));
+        EasyPostShippingProvider easyPost = new EasyPostShippingProvider(CONFIG, builder);
+
+        assertThat(easyPost.refund("shp_123")).isEqualTo("submitted");
+        assertThatThrownBy(() -> easyPost.refund("shp_456")).hasMessageContaining("no refund status");
+        server.verify();
+    }
+
+    @Test
     void failsLoudlyWhenThereAreNoRatesOrTheApiRefuses() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

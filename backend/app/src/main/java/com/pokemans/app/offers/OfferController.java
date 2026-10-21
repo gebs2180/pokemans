@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -70,13 +71,20 @@ class OfferController {
     record AcceptResult(List<ListingService.DealView> deals, String labelPending) {
     }
 
-    /** One buyer's labels in a month: what to bill them, off-platform. */
+    /**
+     * One buyer's labels in a month: what to bill them, off-platform. A cancelled deal's label is listed
+     * but not billed: we undid the deal, so its postage is ours, refunded or not.
+     */
     record BuyerCharges(UUID buyerOrgId, String buyerName, int labels, BigDecimal postage, BigDecimal insurance, BigDecimal total,
                         List<ChargeLine> lines) {
     }
 
+    /**
+     * @param refund null, or the refund's state: "requested" until its provider answers, then the answer
+     * @param billed false once the deal was cancelled
+     */
     record ChargeLine(UUID listingId, Instant boughtAt, String carrier, String service, String trackingCode, BigDecimal postage,
-                      BigDecimal insurance) {
+                      BigDecimal insurance, String refund, boolean billed) {
     }
 
     private final OfferService offers;
@@ -145,7 +153,7 @@ class OfferController {
     @ResponseStatus(HttpStatus.CREATED)
     ListingService.OfferView price(@PathVariable UUID orgId, @PathVariable UUID cardId) {
         requireSellerCard(orgId, cardId);
-        return ListingService.offerView(offers.price(orgId, cardId));
+        return ListingService.offerView(offers.price(orgId, cardId), null);
     }
 
     /** Posts the offer to every buyer. Not a sale yet: a buyer has to take it. */
@@ -263,13 +271,21 @@ class OfferController {
         for (ShippingLabel l : shipping.labelsIn(m)) {
             byBuyer.computeIfAbsent(l.getBuyerOrgId(), k -> new ArrayList<>()).add(l);
         }
+        List<ShippingLabel> all = byBuyer.values().stream().flatMap(List::stream).toList();
+        Map<UUID, LabelRefund> refunds = shipping.refunds(all.stream().map(ShippingLabel::getId).toList());
+        Set<UUID> cancelled = listings.cancelledAmong(all.stream().map(ShippingLabel::getListingId).toList());
         List<BuyerCharges> charges = new ArrayList<>();
         byBuyer.forEach((buyer, ls) -> {
-            BigDecimal postage = ls.stream().map(ShippingLabel::getPostage).reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal insurance = ls.stream().map(ShippingLabel::getInsuranceCost).reduce(BigDecimal.ZERO, BigDecimal::add);
-            charges.add(new BuyerCharges(buyer, directory.orgName(buyer), ls.size(), postage, insurance,
-                    postage.add(insurance), ls.stream().map(l -> new ChargeLine(l.getListingId(), l.getCreatedAt(), l.getCarrier(),
-                    l.getService(), l.getTrackingCode(), l.getPostage(), l.getInsuranceCost())).toList()));
+            List<ChargeLine> lines = ls.stream().map(l -> {
+                LabelRefund r = refunds.get(l.getId());
+                String refund = r == null ? null : r.getProviderStatus() == null ? "requested" : r.getProviderStatus();
+                return new ChargeLine(l.getListingId(), l.getCreatedAt(), l.getCarrier(), l.getService(), l.getTrackingCode(),
+                        l.getPostage(), l.getInsuranceCost(), refund, !cancelled.contains(l.getListingId()));
+            }).toList();
+            List<ChargeLine> billed = lines.stream().filter(ChargeLine::billed).toList();
+            BigDecimal postage = billed.stream().map(ChargeLine::postage).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal insurance = billed.stream().map(ChargeLine::insurance).reduce(BigDecimal.ZERO, BigDecimal::add);
+            charges.add(new BuyerCharges(buyer, directory.orgName(buyer), billed.size(), postage, insurance, postage.add(insurance), lines));
         });
         return charges;
     }

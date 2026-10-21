@@ -178,7 +178,12 @@ export function DealsPage() {
             )}
             .
           </p>
-          {deal.label ? (
+          {deal.cancelled ? (
+            <p className="warn">
+              We cancelled this deal on {new Date(deal.cancelled.at).toLocaleDateString()}: {deal.cancelled.reason}. You don't pay for
+              it, and its label isn't billed to you.
+            </p>
+          ) : deal.label ? (
             <p className="muted small">
               {deal.label.carrier} {deal.label.service}
               {deal.label.trackingCode && `, tracking ${deal.label.trackingCode}`}, insured for {money(deal.label.insuredValue)}.
@@ -197,7 +202,7 @@ export function DealsPage() {
               {deal.outcome.type === 'RETURNED' && deal.outcome.returnedReason && `Returned: ${RETURN_REASON[deal.outcome.returnedReason]}.`}
               {deal.outcome.type === 'INSPECTED' && `Inspected at PSA ${deal.outcome.inspectedGrade}.`}
             </p>
-          ) : deal.label ? (
+          ) : deal.cancelled ? null : deal.label ? (
             <ArrivalForm path={apiPath`/api/orgs/${orgId}/deals/${deal.listingId}`} price={deal.offer.price} onSaved={reload} />
           ) : (
             <p className="muted small">Once the label is bought and the card ships, record here how it arrived.</p>

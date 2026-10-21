@@ -14,7 +14,7 @@ cd backend; $env:SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI="https://<
 cd web; npm.cmd run dev                  # http://localhost:5173
 ```
 
-The backend applies database migrations (Flyway) and creates the versioned `photos` bucket on startup. Every default in `application.yml` points at the compose services. Production overrides them with environment variables (`DB_URL`, `STORAGE_ENDPOINT`, …), with `STORAGE_AUTO_CREATE_BUCKETS=false`.
+The backend applies database migrations (Flyway) and creates the versioned `photos` bucket on startup. Every default in `application.yml` points at the compose services. Production uses the `prod` profile, which has no local defaults and reads everything from environment variables (`DB_URL`, `STORAGE_ENDPOINT`, …); see [hosting.md](hosting.md).
 
 To run a second stack beside this one (say, the API on 8092), start Vite with `$env:API_PROXY="http://localhost:8092"`; it proxies `/api` there instead of 8080.
 

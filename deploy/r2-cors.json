@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedOrigins": ["https://REPLACE-WITH-SITE-ADDRESS"],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["content-type", "if-none-match"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]

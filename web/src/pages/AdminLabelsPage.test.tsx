@@ -14,7 +14,7 @@ const deal: AwaitingLabel = {
   card: { name: 'Pikachu VMAX', setName: 'Vivid Voltage', number: '188', language: 'en', edition: 'UNLIMITED', variant: 'HOLO', label: 'x', distribution: {}, gradedAs: null },
   offer: {
     id: 'o1', price: 100.54, fmv: 160, confidence: 'B', buyerMargin: 0.13, graded: false, subjectToAuthentication: false, ladder: [],
-    createdAt: '2026-10-21T10:00:00Z', expiresAt: '2026-10-28T10:00:00Z', expired: false,
+    createdAt: '2026-10-21T10:00:00Z', expiresAt: '2026-10-28T10:00:00Z', expired: false, voided: null,
   },
   photos: [],
   acceptedAt: '2026-10-21T11:00:00Z',

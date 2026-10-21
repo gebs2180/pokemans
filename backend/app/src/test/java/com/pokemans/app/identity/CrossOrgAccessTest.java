@@ -170,7 +170,11 @@ class CrossOrgAccessTest {
                 get("/api/admin/cards/" + cardB + "/offer-preview"),
                 postJson("/api/admin/deals/" + UUID.randomUUID() + "/received?buyerOrgId=" + UUID.randomUUID(), "{\"pricePaid\":1,\"note\":\"x\"}"),
                 postJson("/api/admin/deals/" + UUID.randomUUID() + "/returned?buyerOrgId=" + UUID.randomUUID(),
-                        "{\"reason\":\"NOT_GENUINE\",\"note\":\"x\"}"));
+                        "{\"reason\":\"NOT_GENUINE\",\"note\":\"x\"}"),
+                get("/api/admin/offers"),
+                postJson("/api/admin/offers/" + UUID.randomUUID() + "/void", "{\"reason\":\"x\"}"),
+                postJson("/api/admin/deals/" + UUID.randomUUID() + "/cancel", "{\"reason\":\"x\"}"),
+                postJson("/api/admin/deals/" + UUID.randomUUID() + "/label/refund", "{\"reason\":\"x\"}"));
         for (MockHttpServletRequestBuilder request : admin) {
             assertThat(perform(request, userA)).as(describe(request)).isEqualTo(403);
             // A token that claims ADMIN without an MFA login isn't admin either.

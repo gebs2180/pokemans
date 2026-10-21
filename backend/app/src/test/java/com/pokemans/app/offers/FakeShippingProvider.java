@@ -7,13 +7,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 
-/** A shipping provider for tests: records what it was asked to buy, and fails while {@link #failing} is set. */
+/** A shipping provider for tests: records what it was asked to buy and refund, and fails while {@link #failing} is set. */
 class FakeShippingProvider implements ShippingProvider {
 
     record Bought(Address from, Address to, BigDecimal insuredValue, String reference) {
     }
 
     final List<Bought> bought = new CopyOnWriteArrayList<>();
+    final List<String> refunded = new CopyOnWriteArrayList<>();
     volatile boolean failing;
 
     @Override
@@ -30,6 +31,15 @@ class FakeShippingProvider implements ShippingProvider {
         String tracking = "9400" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         return new Label(name(), "shp_" + tracking, "USPS", "GroundAdvantage", tracking, "https://labels.example/" + tracking + ".pdf",
                 new BigDecimal("5.10"), insuredValue.multiply(new BigDecimal("0.01")).setScale(2, java.math.RoundingMode.HALF_UP));
+    }
+
+    @Override
+    public String refund(String shipmentId) {
+        if (failing) {
+            throw new IllegalStateException("carrier is down");
+        }
+        refunded.add(shipmentId);
+        return "submitted";
     }
 
     @TestConfiguration(proxyBeanMethods = false)

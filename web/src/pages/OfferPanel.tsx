@@ -117,7 +117,14 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
           {offer.subjectToAuthentication && <p className="muted small">Subject to the buyer authenticating the card in hand.</p>}
           <HowPriced offer={offer} />
           {!live &&
-            (offer.expired ? (
+            (offer.voided ? (
+              <>
+                <p>
+                  We withdrew this offer on {new Date(offer.voided.at).toLocaleDateString()}: {offer.voided.reason}.
+                </p>
+                {askButton('Get a new offer')}
+              </>
+            ) : offer.expired ? (
               <>
                 <p>This offer has expired; prices move.</p>
                 {askButton('Get a new offer')}
@@ -234,6 +241,13 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
             <p>They're sending it back: {RETURN_REASON[listing.outcome.returnedReason]}.</p>
           )}
         </div>
+      )}
+      {listing?.status === 'CANCELLED' && listing.offerId === offer?.id && (
+        <p className="warn">
+          We cancelled the sale{listing.buyer?.orgName && ` to ${listing.buyer.orgName}`}
+          {listing.undone && ` on ${new Date(listing.undone.at).toLocaleDateString()}: ${listing.undone.reason}`}. Don't ship the card, and
+          don't use its label.
+        </p>
       )}
       {listing && (listing.status === 'WITHDRAWN' || listing.status === 'EXPIRED') && (
         <p className="muted small">Your last posting was {listing.status.toLowerCase()}.</p>

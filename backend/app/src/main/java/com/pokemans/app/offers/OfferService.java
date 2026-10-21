@@ -97,8 +97,13 @@ class OfferService {
                     + " minimum for an offer.", null, null);
         }
         BigDecimal margin = value.params().offerMargin(v.confidence());
-        return new Quote(value, null, margin, new OfferLadder(value.params(), margin)
-                .offer(value.distribution(), value.prices(), in.prices().salesPerMonth()));
+        OfferLadder.Offer offer = new OfferLadder(value.params(), margin)
+                .offer(value.distribution(), value.prices(), in.prices().salesPerMonth());
+        if (offer.price().compareTo(properties.maxPrice()) > 0) {
+            return new Quote(value, "Instant offers go up to $" + properties.maxPrice().stripTrailingZeros().toPlainString()
+                    + " for now, and this card is worth more than that, so it gets no offer.", null, null);
+        }
+        return new Quote(value, null, margin, offer);
     }
 
     @Transactional(readOnly = true)

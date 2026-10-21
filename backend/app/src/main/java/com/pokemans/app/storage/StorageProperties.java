@@ -16,6 +16,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param downloadUrlTtl how long a presigned link for viewing a photo stays valid
  * @param maxUploadBytes largest photo accepted
  * @param autoCreateBuckets create the photo bucket (versioned) at startup if missing; local dev and tests only
+ * @param chunkedEncoding aws-chunked uploads from the app; Cloudflare R2 rejects them (403), so production turns this off
  */
 @ConfigurationProperties("pokemans.storage")
 public record StorageProperties(
@@ -29,7 +30,8 @@ public record StorageProperties(
         @DefaultValue("10m") Duration uploadUrlTtl,
         @DefaultValue("15m") Duration downloadUrlTtl,
         @DefaultValue("26214400") long maxUploadBytes,
-        @DefaultValue("false") boolean autoCreateBuckets) {
+        @DefaultValue("false") boolean autoCreateBuckets,
+        @DefaultValue("true") boolean chunkedEncoding) {
 
     /** Never prints the secret key. */
     @Override

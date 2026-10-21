@@ -230,12 +230,152 @@ class OffersFlowTest {
                 "{\"status\":\"COUNTERFEIT\",\"method\":\"IN_HAND_INSPECTION\"}", api.admin()).andExpect(status().isCreated());
         api.postJson(offers(fake), "", seller).andExpect(status().isConflict()).andExpect(jsonPath("$.detail", containsString("doubt")));
 
+        // Above the maximum firm price, no offer (Zach, 2026-10-21; pokemans.offers.max-price, $500 by default).
+        String grail = pricedCard("Grail", 3000);
+        api.postJson(offers(grail), "", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("go up to $500")));
+        assertThat(jdbc.queryForObject("select count(*) from card_offer where card_item_id = ?::uuid", Integer.class, grail)).isZero();
+
         // A vintage holo nobody has verified still gets an offer, subject to authentication in hand.
         String vintage = card("Base Set Charizard");
-        priceLadder(identify(vintage, "Charizard", "1999-01-09", "HOLO", "Rare Holo"), 900);
+        priceLadder(identify(vintage, "Charizard", "1999-01-09", "HOLO", "Rare Holo"), 400);
         assess(vintage);
         api.postJson(offers(vintage), "", seller).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.subjectToAuthentication").value(true));
+    }
+
+    @Test
+    void aVoidedOfferComesOffTheMarketAndCantBeSold() throws Exception {
+        String card = pricedCard("Flareon", 300);
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
+        JwtRequestPostProcessor buyer = buyer("Void Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Void Buyer");
+
+        String recent = api.get("/api/admin/offers", api.admin()).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(recent, "$[?(@.offerId == '" + offerId + "')].listing.status")).containsExactly("OPEN");
+
+        // Who, when and why: a reason is required.
+        String voidPath = "/api/admin/offers/" + offerId + "/void";
+        api.postJson(voidPath, "{\"reason\":\" \"}", api.admin()).andExpect(status().isBadRequest());
+        api.postJson(voidPath, "{\"reason\":\"wrong set\"}", seller).andExpect(status().isForbidden());
+        api.postJson(voidPath, "{\"reason\":\"wrong set\"}", api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.voided.reason").value("wrong set"))
+                .andExpect(jsonPath("$.voided.byUserId").isNotEmpty())
+                .andExpect(jsonPath("$.listing.status").value("VOIDED"))
+                .andExpect(jsonPath("$.listing.undone.reason").value("wrong set"));
+        api.postJson(voidPath, "{\"reason\":\"again\"}", api.admin()).andExpect(status().isConflict());
+
+        // Off the market, can't be taken, and the seller sees why.
+        String market = api.get("/api/orgs/" + buyerOrg + "/market", buyer).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<Object>>read(market, "$[?(@.listingId == '" + listingId + "')]")).isEmpty();
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("no longer for sale")));
+        api.get(sale(card), seller).andExpect(jsonPath("$.offer.voided.reason").value("wrong set"))
+                .andExpect(jsonPath("$.listing.status").value("VOIDED"));
+        api.postJson("/api/orgs/" + orgId + "/listings/" + listingId + "/withdraw", "", seller).andExpect(status().isConflict());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("withdrew this offer")));
+
+        // A new offer can be posted.
+        String fresh = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson(listings(card), "{\"offerId\":\"" + fresh + "\"}", seller).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.listing.status").value("OPEN"));
+
+        assertThatThrownBy(() -> jdbc.update("update card_offer_void set reason = 'x' where offer_id = ?::uuid", UUID.fromString(offerId)))
+                .hasMessageContaining("append-only");
+        Map<String, Object> row = jdbc.queryForMap("select status, voided, undo_reason from v_offer_outcomes where listing_id = ?::uuid",
+                UUID.fromString(listingId));
+        assertThat(row).containsEntry("status", "VOIDED").containsEntry("voided", true).containsEntry("undo_reason", "wrong set");
+    }
+
+    @Test
+    void aCancelledDealFreesTheCardAndItsLabelIsRefunded() throws Exception {
+        String card = pricedCard("Leafeon", 300);
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
+        JwtRequestPostProcessor buyer = buyer("Cancelled Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Cancelled Buyer");
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
+
+        // A taken offer is undone by cancelling the deal, and a live deal's label isn't refunded.
+        api.postJson("/api/admin/offers/" + offerId + "/void", "{\"reason\":\"x\"}", api.admin()).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("cancel the deal")));
+        String refund = "/api/admin/deals/" + listingId + "/label/refund";
+        api.postJson(refund, "{\"reason\":\"unused\"}", api.admin()).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("Cancel the deal first")));
+
+        String cancel = "/api/admin/deals/" + listingId + "/cancel";
+        api.postJson(cancel, "{}", api.admin()).andExpect(status().isBadRequest());
+        api.postJson(cancel, "{\"reason\":\"seller sold it elsewhere\"}", api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.listing.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.listing.undone.reason").value("seller sold it elsewhere"))
+                .andExpect(jsonPath("$.voided.reason").value("Deal cancelled: seller sold it elsewhere"));
+        api.postJson(cancel, "{\"reason\":\"again\"}", api.admin()).andExpect(status().isConflict());
+
+        // The buyer sees it cancelled and can't record anything more on it.
+        api.get("/api/orgs/" + buyerOrg + "/deals", buyer)
+                .andExpect(jsonPath("$[?(@.listingId == '" + listingId + "')].cancelled.reason").value("seller sold it elsewhere"));
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received", "{\"pricePaid\":1}", buyer)
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.detail", containsString("cancelled")));
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/label", "", buyer).andExpect(status().isConflict());
+
+        // The card is free for a new offer.
+        api.get(sale(card), seller).andExpect(jsonPath("$.listing.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.listing.undone.reason").value("seller sold it elsewhere"));
+        String fresh = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson(listings(card), "{\"offerId\":\"" + fresh + "\"}", seller).andExpect(status().isCreated());
+
+        // The label's refund: a provider that's down is recorded and can be asked again; one answer per label.
+        shipper.failing = true;
+        api.postJson(refund, "{\"reason\":\"unused\"}", api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.listing.labelRefund.providerStatus").isEmpty())
+                .andExpect(jsonPath("$.listing.labelRefund.providerError", containsString("carrier is down")));
+        shipper.failing = false;
+        api.postJson(refund, "{\"reason\":\"unused\"}", api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.listing.labelRefund.providerStatus").value("submitted"))
+                .andExpect(jsonPath("$.listing.labelRefund.reason").value("unused"));
+        api.postJson(refund, "{\"reason\":\"unused\"}", api.admin()).andExpect(status().isConflict());
+        String shipment = jdbc.queryForObject("select provider_shipment_id from shipping_label where listing_id = ?::uuid", String.class,
+                UUID.fromString(listingId));
+        assertThat(shipper.refunded).containsOnlyOnce(shipment);
+        assertThat(jdbc.queryForObject("select count(*) from label_refund where listing_id = ?::uuid", Integer.class,
+                UUID.fromString(listingId))).isEqualTo(2);
+
+        // Listed, but not billed to the buyer.
+        String charges = api.get("/api/admin/shipping/charges", api.admin()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<Object>>read(charges, "$[?(@.buyerOrgId == '" + buyerOrg + "')].labels")).containsExactly(0);
+        assertThat(JsonPath.<List<Object>>read(charges, "$[*].lines[?(@.listingId == '" + listingId + "')].refund"))
+                .containsExactly("submitted");
+
+        assertThatThrownBy(() -> jdbc.update("update label_refund set reason = 'x' where listing_id = ?::uuid", UUID.fromString(listingId)))
+                .hasMessageContaining("append-only");
+        assertThat(jdbc.queryForObject("select status from v_offer_outcomes where listing_id = ?::uuid", String.class,
+                UUID.fromString(listingId))).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void aDealCantBeCancelledOnceTheCardArrived() throws Exception {
+        String listingId = postedCard("Glaceon", 300);
+        JwtRequestPostProcessor buyer = buyer("Arrived Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Arrived Buyer");
+        String cancel = "/api/admin/deals/" + listingId + "/cancel";
+        api.postJson(cancel, "{\"reason\":\"x\"}", api.admin()).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("void the offer")));
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received", "{\"pricePaid\":10}", buyer)
+                .andExpect(status().isCreated());
+        api.postJson(cancel, "{\"reason\":\"x\"}", api.admin()).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("received")));
+        api.postJson("/api/admin/deals/" + UUID.randomUUID() + "/cancel", "{\"reason\":\"x\"}", api.admin())
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -466,8 +606,12 @@ class OffersFlowTest {
 
         assertThat(ListingService.status(open, List.of(), now)).isEqualTo(ListingService.Status.OPEN);
         assertThat(ListingService.status(old, List.of(), now)).isEqualTo(ListingService.Status.EXPIRED);
-        assertThat(ListingService.status(old, List.of(ListingEvent.accepted(old.getId(), UUID.randomUUID(), UUID.randomUUID())), now))
-                .isEqualTo(ListingService.Status.ACCEPTED);
+        ListingEvent taken = ListingEvent.accepted(old.getId(), UUID.randomUUID(), UUID.randomUUID());
+        assertThat(ListingService.status(old, List.of(taken), now)).isEqualTo(ListingService.Status.ACCEPTED);
+        assertThat(ListingService.status(old, List.of(taken, ListingEvent.cancelled(old.getId(), UUID.randomUUID(), "x")), now))
+                .isEqualTo(ListingService.Status.CANCELLED);
+        assertThat(ListingService.status(open, List.of(ListingEvent.voided(open.getId(), UUID.randomUUID(), "x")), now))
+                .isEqualTo(ListingService.Status.VOIDED);
     }
 
     /** How much a count in the track record grew; other tests share the database. */

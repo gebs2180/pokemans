@@ -28,6 +28,7 @@ const offer = (over: Partial<Offer> = {}): Offer => ({
   createdAt: '2026-10-19T10:00:00Z',
   expiresAt: '2099-10-26T10:00:00Z',
   expired: false,
+  voided: null,
   ...over,
 })
 
@@ -143,7 +144,7 @@ describe('OfferPanel', () => {
           offer: offer(),
           listing: {
             id: 'l1', offerId: 'offer1', status: 'OPEN', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2099-11-02T10:00:00Z',
-            closedAt: null, buyer: null, label: null, outcome: null,
+            closedAt: null, buyer: null, label: null, outcome: null, undone: null,
           },
         },
       ],
@@ -164,7 +165,7 @@ describe('OfferPanel', () => {
           offer: offer(),
           listing: {
             id: 'l1', offerId: 'offer1', status: 'ACCEPTED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
-            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null }, label: null, outcome: null,
+            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null }, label: null, outcome: null, undone: null,
           },
         },
       ],
@@ -186,6 +187,7 @@ describe('OfferPanel', () => {
             closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: 'shop@example.com' },
             label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' },
             outcome: null,
+            undone: null,
           },
         },
       ],
@@ -197,6 +199,38 @@ describe('OfferPanel', () => {
     expect(screen.getByRole('link', { name: 'Print your prepaid label' })).toHaveAttribute('href', 'https://labels.example/l1.pdf')
     expect(screen.getByText(/tracking 9400111, insured for \$419.98/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Sell for/ })).not.toBeInTheDocument()
+  })
+
+  it('says why we withdrew an offer, and offers a new one instead of selling', async () => {
+    stubApi([{ offer: offer({ voided: { reason: 'wrong set', at: '2026-10-21T10:00:00Z' } }), listing: null }], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText(/We withdrew this offer on .*: wrong set\./)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Get a new offer' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Sell for/ })).not.toBeInTheDocument()
+  })
+
+  it('tells the seller not to ship once we cancel the sale', async () => {
+    stubApi(
+      [
+        {
+          offer: offer({ voided: { reason: 'Deal cancelled: buyer closed', at: '2026-10-21T10:00:00Z' } }),
+          listing: {
+            id: 'l1', offerId: 'offer1', status: 'CANCELLED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
+            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null },
+            label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' },
+            outcome: null,
+            undone: { reason: 'buyer closed', at: '2026-10-21T10:00:00Z' },
+          },
+        },
+      ],
+      address,
+    )
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText(/We cancelled the sale to Card Shop on .*: buyer closed\. Don't ship the card/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Print your prepaid label' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Get a new offer' })).toBeInTheDocument()
   })
 })
 
@@ -292,6 +326,7 @@ describe('ArrivalForm', () => {
     acceptedAt: '2026-10-20T10:00:00Z',
     label: null,
     outcome: null,
+    cancelled: null,
   }
 
   it('records the price paid, prefilled with the offer', async () => {
@@ -366,6 +401,7 @@ describe('DealsPage', () => {
     acceptedAt: '2026-10-20T10:00:00Z',
     label: null,
     outcome: null,
+    cancelled: null,
   }
 
   function renderDeals(deals: Deal[]) {
@@ -391,5 +427,33 @@ describe('DealsPage', () => {
       { ...deal, label: { carrier: 'USPS', service: 'Ground', trackingCode: '94', labelUrl: 'https://l', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' } },
     ])
     expect(await screen.findByRole('button', { name: 'Record' })).toBeInTheDocument()
+  })
+})
+
+describe('DealsPage', () => {
+  it('shows a cancelled deal with nothing left to record', async () => {
+    const cancelled: Deal = {
+      listingId: 'l1',
+      card: { name: 'Leafeon', setName: 's', number: '1', language: 'en', edition: 'UNLIMITED', variant: 'NORMAL', label: 'x', distribution: {}, gradedAs: null },
+      offer: offer(),
+      photos: [],
+      seller: { orgName: 'Sam', email: null },
+      acceptedAt: '2026-10-20T10:00:00Z',
+      label: null,
+      outcome: null,
+      cancelled: { reason: 'seller sold it elsewhere', at: '2026-10-21T10:00:00Z' },
+    }
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(respond(200, [cancelled]))))
+    render(
+      <MemoryRouter initialEntries={['/orgs/b1/deals']}>
+        <Routes>
+          <Route path="/orgs/:orgId/deals" element={<DealsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText(/We cancelled this deal on .*: seller sold it elsewhere\. You don't pay for it/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try the label again' })).not.toBeInTheDocument()
   })
 })
