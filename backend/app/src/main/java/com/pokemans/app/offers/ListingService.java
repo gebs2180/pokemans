@@ -41,8 +41,9 @@ class ListingService {
      * @param ladder  how it was reached: what a buyer could pay at each grade, and how likely each is
      * @param expired true once the offer is past its validity: price it again before posting
      */
-    record OfferView(UUID id, BigDecimal price, BigDecimal fmv, String confidence, boolean graded, boolean subjectToAuthentication,
-                     List<RungView> ladder, Instant createdAt, Instant expiresAt, boolean expired) {
+    /** @param buyerMargin the margin left to the buyer, set by the confidence */
+    record OfferView(UUID id, BigDecimal price, BigDecimal fmv, String confidence, BigDecimal buyerMargin, boolean graded,
+                     boolean subjectToAuthentication, List<RungView> ladder, Instant createdAt, Instant expiresAt, boolean expired) {
     }
 
     record Party(String orgName, String email) {
@@ -325,8 +326,8 @@ class ListingService {
     static OfferView offerView(CardOffer o) {
         List<RungView> ladder = OfferService.ladder(o).stream()
                 .map(r -> new RungView(r.grade().toString(), r.probability(), r.price())).toList();
-        return new OfferView(o.getId(), o.getPrice(), o.getFmv(), o.getConfidence(), o.isGraded(), o.isSubjectToAuthentication(),
-                ladder, o.getCreatedAt(), o.getExpiresAt(), !o.getExpiresAt().isAfter(Instant.now()));
+        return new OfferView(o.getId(), o.getPrice(), o.getFmv(), o.getConfidence(), o.getBuyerMargin(), o.isGraded(),
+                o.isSubjectToAuthentication(), ladder, o.getCreatedAt(), o.getExpiresAt(), !o.getExpiresAt().isAfter(Instant.now()));
     }
 
     private static CardView card(CardInputs in) {

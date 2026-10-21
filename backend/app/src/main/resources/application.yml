@@ -94,8 +94,8 @@ pokemans:
       lookback: 400d
   offers:
     # Instant offers (Zach, 2026-10-19): one firm price, the expected value over the card's grades of the
-    # quick-sale value less the buyer's margin. An offer stands for a week; a posted offer waits two weeks.
-    buyer-margin: 0.10
+    # quick-sale value less the buyer's margin, which the parameter set sets by confidence (1.2.0: A 10%,
+    # B 13%, C 17%). An offer stands for a week; a posted offer waits two weeks.
     offer-valid-for: 7d
     listing-open-for: 14d
   shipping:
@@ -116,8 +116,8 @@ pokemans:
     # interest is cleared with his employer (2026-10-19): the APIs aren't registered unless this is on.
     enabled: ${COLLATERAL_ENABLED:false}
   valuation:
-    # Valuation runs use 1.1.0: 1.0.0 plus the fallback sigma for cards with too few price changes.
-    parameter-set: 1.1.0
+    # Valuations and offers use 1.2.0: 1.1.0 (1.0.0 plus the fallback sigma) plus the offer margin by confidence.
+    parameter-set: 1.2.0
     # Raw cards are valued on PSA's table only, with no fallback to another grader (Zach, 2026-10-18).
     grading-company: PSA
     # Starting values per card (Zach, 2026-10-18); the admin can override them on each run.

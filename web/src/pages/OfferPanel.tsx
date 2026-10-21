@@ -36,6 +36,10 @@ export function HowPriced({ offer }: { offer: Offer }) {
         </tbody>
       </table>
       <p className="muted small">The offer is the chance-weighted total, and it doesn't change with the grade the card turns out to be.</p>
+      <p className="muted small">
+        Each grade's worth leaves the buyer a {Math.round(offer.buyerMargin * 100)}% margin, set by how sure we are of the card's
+        condition (confidence {offer.confidence}): the less certain, the more room the buyer gets for the risk.
+      </p>
     </details>
   )
 }

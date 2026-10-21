@@ -75,14 +75,15 @@ class OfferService {
             throw refused("Its value is under the $" + value.params().minFmv().stripTrailingZeros().toPlainString()
                     + " minimum for an offer.");
         }
-        OfferLadder.Offer offer = new OfferLadder(value.params(), properties.buyerMargin())
+        BigDecimal margin = value.params().offerMargin(v.confidence());
+        OfferLadder.Offer offer = new OfferLadder(value.params(), margin)
                 .offer(value.distribution(), value.prices(), in.prices().salesPerMonth());
         List<Rung> ladder = offer.rungs().stream().map(r -> new Rung(r.grade(), r.probability(), r.price())).toList();
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         String trace = JSON.writeValueAsString(java.util.stream.Stream.concat(value.trace().stream(), offer.trace().steps().stream()).toList());
         return offers.save(new CardOffer(orgId, cardItemId, in.identity().catalogCardId(),
                 in.assessment() == null ? null : in.assessment().assessmentId(), in.prices().snapshotSetId(), in.graded() != null,
-                JSON.writeValueAsString(in), value.params().version(), properties.buyerMargin(), JSON.writeValueAsString(ladder),
+                JSON.writeValueAsString(in), value.params().version(), margin, JSON.writeValueAsString(ladder),
                 offer.price(), v.fmv(), v.confidence().name(), in.provenance().authFlagUnresolved(), trace, currentUser.id(), now,
                 now.plus(properties.offerValidFor())));
     }
