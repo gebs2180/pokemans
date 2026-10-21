@@ -46,7 +46,7 @@ function App() {
 
       {!isLoading && !isAuthenticated && (
         <main>
-          <p>Raw collection collateral reports.</p>
+          <p>{COLLATERAL ? 'Raw collection collateral reports.' : 'Instant offers on raw cards.'}</p>
           <button onClick={() => loginWithRedirect({ appState: { returnTo: location.pathname + location.search } })}>Log in</button>
         </main>
       )}

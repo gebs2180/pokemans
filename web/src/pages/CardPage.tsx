@@ -89,8 +89,8 @@ export function CardPage() {
         )
       })}
       {org?.type === 'CONTRIBUTOR' && !card.lot && <GradedResult orgId={orgId} cardId={cardId} ready={card.captureComplete} />}
-      {/* Who holds the card: needed before it can back an advance. We check it; members record it. */}
       {org && (org.type === 'COLLECTOR' || org.type === 'CONTRIBUTOR') && !card.lot && <OfferPanel orgId={orgId} cardId={cardId} />}
+      {/* Authenticity, and who holds the card (needed before it can back an advance; hidden while collateral is off). */}
       {org && org.type !== 'CONTRIBUTOR' && <ProvenancePanel orgId={orgId} cardId={cardId} admin={false} />}
     </>
   )
