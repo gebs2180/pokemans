@@ -16,7 +16,7 @@ import {
 } from '../api'
 import { DateInput } from '../inputs'
 import { safeHref } from '../safeHref'
-import { useLoad } from '../useLoad'
+import { useLoad, usePoll } from '../useLoad'
 import { PricesPanel } from './PricesPanel'
 import { ProvenancePanel } from './ProvenancePanel'
 
@@ -296,17 +296,24 @@ function Suggestions({
     [api, orgId, cardId],
   )
   const [err, setErr] = useState<string | null>(null)
+  const [readingNow, setReadingNow] = useState(false)
+  // A reading queued by an upload runs in the background: check every 2 s until it's done.
+  usePoll(data?.reading?.status === 'PENDING', reload)
 
   if (!data || !data.recognition) return null
   const reading = data.reading
 
+  /** Reads while the admin waits; a failed read comes back pending and is retried in the background. */
   async function readAgain() {
     setErr(null)
+    setReadingNow(true)
     try {
       await api('POST', `${base}/readings`)
       reload()
     } catch (e) {
       setErr(message(e))
+    } finally {
+      setReadingNow(false)
     }
   }
 
@@ -342,12 +349,7 @@ function Suggestions({
       {!reading && <p className="muted">Not read automatically yet.</p>}
       {reading?.status === 'PENDING' && (
         <>
-          <p className="muted">
-            Reading the card…{' '}
-            <button className="link" onClick={reload}>
-              Refresh
-            </button>
-          </p>
+          <p className="muted">Reading the card…</p>
           {reading.error && <p className="warn small">Last attempt failed, retrying: {reading.error}</p>}
         </>
       )}
@@ -381,8 +383,8 @@ function Suggestions({
           </div>
         )
       })}
-      <button className="link small" onClick={readAgain}>
-        Read the card again
+      <button className="link small" onClick={readAgain} disabled={readingNow}>
+        {readingNow ? 'Reading…' : 'Read the card again'}
       </button>
       {err && <p className="error" role="alert">{err}</p>}
     </div>
@@ -394,6 +396,8 @@ function Predictions({ data, base, onChange }: { data: CardCondition; base: stri
   const [err, setErr] = useState<string | null>(null)
   const open = data.requests.filter((r) => r.status === 'PENDING' || r.status === 'SUBMITTED')
   const failed = data.requests.filter((r) => r.status === 'FAILED')
+  // Providers answer in the background: check every 2 s while a request is open.
+  usePoll(open.length > 0, onChange)
 
   async function ask() {
     setErr(null)

@@ -46,6 +46,13 @@ interface CardReadingRepository extends JpaRepository<CardReading, UUID> {
             for update skip locked""")
     List<UUID> lockDue(Instant now, int limit);
 
+    /** Locks one pending reading if it is due and no other worker holds it; as {@link #lockDue}. */
+    @Query(nativeQuery = true, value = """
+            select id from card_reading
+            where id = :id and status = 'PENDING' and next_attempt_at <= :now
+            for update skip locked""")
+    Optional<UUID> lockDueById(UUID id, Instant now);
+
     /** Moves the next attempt to {@code until}: no other worker sees these as due until then. */
     @Modifying
     @Query("update CardReading r set r.nextAttemptAt = :until where r.id in :ids")

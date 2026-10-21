@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -44,10 +45,15 @@ class ConditionService {
     private final Catalog catalog;
     private final CurrentUser currentUser;
     private final DistributionBuilder builder;
+    private final ApplicationEventPublisher events;
+
+    /** Prediction requests were queued; once that commits, the worker sends them instead of waiting for its next poll. */
+    record PredictionsQueued(UUID cardItemId) {
+    }
 
     ConditionService(List<PreGradeProvider> providers, PredictionRequestRepository requests, ProviderPredictionRepository predictions,
                      ConditionAssessmentRepository assessments, CardItems cardItems, Catalog catalog, CurrentUser currentUser,
-                     ConditionProperties properties) {
+                     ConditionProperties properties, ApplicationEventPublisher events) {
         this.properties = properties;
         this.enabledProviders = providers.stream().map(PreGradeProvider::name).sorted().toList();
         this.requests = requests;
@@ -57,6 +63,7 @@ class ConditionService {
         this.catalog = catalog;
         this.currentUser = currentUser;
         this.builder = new DistributionBuilder(properties);
+        this.events = events;
     }
 
     List<String> enabledProviders() {
@@ -106,6 +113,9 @@ class ConditionService {
         } catch (DataIntegrityViolationException e) {
             // Another instance or click queued the same provider meanwhile (prediction_request_open_idx).
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A prediction request for this card is already open");
+        }
+        if (!created.isEmpty()) {
+            events.publishEvent(new PredictionsQueued(card.id()));
         }
         return created;
     }

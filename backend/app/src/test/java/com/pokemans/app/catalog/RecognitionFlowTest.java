@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,10 +37,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class RecognitionFlowTest {
 
-    /** Reads every card as Metagross δ 11/113; the first call fails, as an outage would. */
+    /** Reads every card as Metagross δ 11/113; the first call fails, as an outage would, and so does any call after {@link #failNext}. */
     static class FakeReader implements CardReader {
 
         final AtomicInteger calls = new AtomicInteger();
+        final AtomicBoolean failNext = new AtomicBoolean();
 
         @Override
         public String name() {
@@ -50,7 +52,7 @@ class RecognitionFlowTest {
         public Reading read(byte[] image, String contentType) {
             assertThat(contentType).isEqualTo("image/jpeg");
             assertThat(image).isNotEmpty();
-            if (calls.incrementAndGet() == 1) {
+            if (calls.incrementAndGet() == 1 || failNext.getAndSet(false)) {
                 throw new IllegalStateException("overloaded");
             }
             return new Reading("Metagross δ", "11", 113, "en", false, Variant.HOLO, 2005, null, null, "fake-1", Map.of("ok", true));
@@ -76,6 +78,9 @@ class RecognitionFlowTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private FakeReader reader;
 
     @MockitoBean
     private CatalogProvider provider;
@@ -135,10 +140,20 @@ class RecognitionFlowTest {
                         "select catalog_card_id::text from card_identification where card_item_id = ?::uuid and status = 'SUGGESTED' order by confidence desc limit 1",
                         String.class, cardId)));
 
-        // Reading again is admin-only.
-        api.postJson("/api/admin/orgs/" + orgId + "/cards/" + cardId + "/readings", "", collector).andExpect(status().isForbidden());
-        api.postJson("/api/admin/orgs/" + orgId + "/cards/" + cardId + "/readings", "", api.admin())
+        // Reading again is admin-only, and the admin waits for the answer.
+        String readAgain = "/api/admin/orgs/" + orgId + "/cards/" + cardId + "/readings";
+        api.postJson(readAgain, "", collector).andExpect(status().isForbidden());
+        api.postJson(readAgain, "", api.admin())
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.reading.status").value("DONE"))
+                .andExpect(jsonPath("$.suggestions.length()").value(2));
+
+        // If the reader fails meanwhile, the reading stays queued and the retry job finishes it.
+        reader.failNext.set(true);
+        api.postJson(readAgain, "", api.admin())
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.reading.status").value("PENDING"));
+        runReader();
+        api.get(identification, api.admin()).andExpect(jsonPath("$.reading.status").value("DONE"));
     }
 }

@@ -15,10 +15,14 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
@@ -51,11 +55,18 @@ class RecognitionService {
     private final CatalogProperties properties;
     private final CurrentUser currentUser;
     private final TransactionTemplate transactions;
+    private final ApplicationEventPublisher events;
+    private final TaskExecutor executor;
+
+    /** A reading was queued; once that commits, the worker starts on it instead of waiting for its next poll. */
+    record ReadingQueued(UUID readingId) {
+    }
 
     RecognitionService(Optional<CardReader> reader, Optional<CatalogProvider> provider, CardReadingRepository readings,
                        CardIdentificationRepository identifications, IdentificationService identification, CardItems cardItems,
                        BlobStore blobs, StorageProperties storage, CatalogProperties properties, CurrentUser currentUser,
-                       TransactionTemplate transactions) {
+                       TransactionTemplate transactions, ApplicationEventPublisher events,
+                       @Qualifier("applicationTaskExecutor") TaskExecutor executor) {
         this.reader = reader;
         this.provider = provider;
         this.readings = readings;
@@ -67,6 +78,8 @@ class RecognitionService {
         this.properties = properties;
         this.currentUser = currentUser;
         this.transactions = transactions;
+        this.events = events;
+        this.executor = executor;
     }
 
     boolean enabled() {
@@ -78,8 +91,48 @@ class RecognitionService {
     void onCaptureCompleted(CardItems.CaptureCompleted event) {
         CardItems.CardItemRef card = cardItems.get(event.cardItemId());
         if (reader.isPresent() && !card.lot()) {
-            queue(card, null);
+            events.publishEvent(new ReadingQueued(queue(card, null).getId()));
         }
+    }
+
+    /**
+     * Starts the worker in the background as soon as a queued reading commits, so the card is read
+     * in seconds rather than at the next poll. The poll stays as the fallback for retries and for a
+     * crash before this runs. Off wherever the background worker is (tests drive it directly).
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    void startQueued(ReadingQueued event) {
+        if (properties.reader().enabled() && properties.reader().workerEnabled()) {
+            executor.execute(() -> {
+                try {
+                    runOnce();
+                } catch (RuntimeException e) {
+                    log.warn("Reading card {} straight away failed; the scheduled worker will retry", event.readingId(), e);
+                }
+            });
+        }
+    }
+
+    /**
+     * Admin: reads the card now and returns the reading, done unless the reader failed. A failed call
+     * leaves it queued, and the scheduled worker retries it with the usual backoff. No transaction is
+     * held while the reader runs.
+     */
+    CardReading readNow(UUID orgId, UUID cardId) {
+        UUID id = transactions.execute(status -> requestReading(orgId, cardId).getId());
+        Instant now = Instant.now();
+        Instant until = now.plus(LEASE).truncatedTo(ChronoUnit.MICROS);
+        boolean claimed = Boolean.TRUE.equals(transactions.execute(status -> {
+            if (readings.lockDueById(id, now).isEmpty()) {
+                return false; // another worker got to it first
+            }
+            readings.lease(List.of(id), until);
+            return true;
+        }));
+        if (claimed) {
+            handle(id, until);
+        }
+        return transactions.execute(status -> readings.findById(id).orElseThrow());
     }
 
     /** Admin: read the card (again), from its latest passing front. */

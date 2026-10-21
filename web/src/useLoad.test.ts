@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import { useLoad } from './useLoad'
+import { describe, expect, it, vi } from 'vitest'
+import { useLoad, usePoll } from './useLoad'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -46,5 +46,21 @@ describe('useLoad', () => {
     act(() => result.current.reload())
     expect(result.current.error).toBeNull()
     await waitFor(() => expect(result.current.data).toBe('ok'))
+  })
+})
+
+describe('usePoll', () => {
+  it('reloads every interval while active, and stops when it is not', () => {
+    vi.useFakeTimers()
+    const reload = vi.fn()
+    const { rerender, unmount } = renderHook(({ active }) => usePoll(active, reload, 2000), { initialProps: { active: true } })
+
+    vi.advanceTimersByTime(6000)
+    expect(reload).toHaveBeenCalledTimes(3)
+    rerender({ active: false })
+    vi.advanceTimersByTime(6000)
+    expect(reload).toHaveBeenCalledTimes(3)
+    unmount()
+    vi.useRealTimers()
   })
 })

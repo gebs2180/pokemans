@@ -112,11 +112,14 @@ class CatalogController {
         return view(cardId);
     }
 
-    /** Reads the card (again) from its latest front photo; suggestions follow within a minute. */
+    /**
+     * Reads the card (again) from its latest front photo, while the admin waits: the answer carries
+     * the suggestions, or a pending reading if the reader failed and will be retried.
+     */
     @PostMapping("/api/admin/orgs/{orgId}/cards/{cardId}/readings")
     @ResponseStatus(HttpStatus.CREATED)
     CardIdentificationView read(@PathVariable UUID orgId, @PathVariable UUID cardId) {
-        recognition.requestReading(orgId, cardId);
+        recognition.readNow(orgId, cardId);
         return view(cardId);
     }
 
