@@ -14,6 +14,7 @@ import {
   type ProviderCard,
   type Variant,
 } from '../api'
+import { DateInput } from '../inputs'
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { PricesPanel } from './PricesPanel'
@@ -230,14 +231,7 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
                 {/* Required: the release date decides the vintage and recent-chase authenticity flags. */}
                 <label>
                   Set released{' '}
-                  <input
-                    type="date"
-                    value={released}
-                    max={todayLocal}
-                    onChange={(e) => setReleased(e.target.value)}
-                    aria-label="Set release date"
-                    required
-                  />
+                  <DateInput value={released} max={todayLocal} onChange={setReleased} aria-label="Set release date" required />
                 </label>
               </div>
             )}

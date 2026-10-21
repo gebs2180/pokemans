@@ -13,6 +13,7 @@ import {
   type ReviewPhoto,
   type VerifyRequest,
 } from '../api'
+import { DateInput } from '../inputs'
 import { useLoad } from '../useLoad'
 
 const FINDINGS: Finding[] = ['VERIFIED_AUTHENTIC', 'SUSPECTED_COUNTERFEIT', 'COUNTERFEIT']
@@ -308,7 +309,7 @@ export function CustodyForm({ base, canCheck, onSaved }: { base: string; canChec
         <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Where" aria-label="Location" required maxLength={500} />
         <label>
           Since{' '}
-          <input type="date" value={heldSince} max={today()} onChange={(e) => setHeldSince(e.target.value)} aria-label="Held since" required />
+          <DateInput value={heldSince} max={today()} onChange={setHeldSince} aria-label="Held since" required />
         </label>
       </div>
       <div className="row">

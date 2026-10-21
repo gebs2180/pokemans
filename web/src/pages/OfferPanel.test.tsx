@@ -190,7 +190,7 @@ describe('ArrivalForm', () => {
     const onSaved = vi.fn()
     render(<ArrivalForm orgId="b1" deal={deal} onSaved={onSaved} />)
 
-    expect(screen.getByLabelText('Price paid')).toHaveValue(419.98)
+    expect(screen.getByLabelText('Price paid')).toHaveValue('419.98')
     await user.click(screen.getByRole('button', { name: 'Record' }))
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
