@@ -1,5 +1,6 @@
 package com.pokemans.app.intake;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,6 +47,16 @@ interface CardItemRepository extends JpaRepository<CardItem, UUID> {
               and (c.is_lot or exists (select 1 from photo p where p.card_item_id = c.id and p.side = 'BACK' and p.status = 'PASSED'))
             order by c.created_at""")
     List<CardItem> findCaptureComplete();
+
+    /** Capture-complete cards whose newest passing photo was checked in {@code [since, before)}. */
+    @Query(nativeQuery = true, value = """
+            select c.* from card_item c
+            where exists (select 1 from photo p where p.card_item_id = c.id and p.side = 'FRONT' and p.status = 'PASSED')
+              and (c.is_lot or exists (select 1 from photo p where p.card_item_id = c.id and p.side = 'BACK' and p.status = 'PASSED'))
+              and (select max(p.checked_at) from photo p where p.card_item_id = c.id and p.status = 'PASSED') >= :since
+              and (select max(p.checked_at) from photo p where p.card_item_id = c.id and p.status = 'PASSED') < :before
+            order by c.created_at""")
+    List<CardItem> findCaptureCompletedBetween(Instant since, Instant before);
 }
 
 interface PhotoRepository extends JpaRepository<Photo, UUID> {

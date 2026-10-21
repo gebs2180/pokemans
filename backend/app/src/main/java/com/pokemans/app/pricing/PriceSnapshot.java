@@ -6,7 +6,10 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,11 +17,12 @@ import java.util.List;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.springframework.data.domain.Persistable;
 
 /** The price of one grade of one card as of a date, and how it was set. Append-only. */
 @Entity
 @Table(name = "price_snapshot")
-class PriceSnapshot {
+class PriceSnapshot implements Persistable<UUID> {
 
     @Id
     private UUID id;
@@ -46,7 +50,27 @@ class PriceSnapshot {
     private List<String> trace;
     private Instant createdAt;
 
+    /** New until saved or loaded: saving inserts straight away (and batches) instead of merging, which selects first. */
+    @Transient
+    private boolean isNew = true;
+
     protected PriceSnapshot() {
+    }
+
+    @PostLoad
+    @PostPersist
+    void markNotNew() {
+        isNew = false;
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
+    }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
     }
 
     PriceSnapshot(UUID snapshotSetId, UUID catalogCardId, LocalDate asOf, PriceSource.GradingCompany gradingCompany,

@@ -20,6 +20,8 @@ class FixturePriceSource implements PriceSource {
 
     private final Map<UUID, List<Sale>> sales = new ConcurrentHashMap<>();
     private int nextId;
+    /** Runs at the start of every fetch, e.g. to hold a refresh open while a test looks at it. */
+    private volatile Runnable onFetch = () -> { };
 
     @Override
     public String name() {
@@ -33,11 +35,17 @@ class FixturePriceSource implements PriceSource {
 
     @Override
     public List<Sale> soldSales(Catalog.CardSummary card, LocalDate from, LocalDate to) {
+        onFetch.run();
         return List.copyOf(sales.getOrDefault(card.catalogCardId(), List.of()));
     }
 
     void clear() {
         sales.clear();
+        onFetch = () -> { };
+    }
+
+    void onFetch(Runnable hook) {
+        onFetch = hook;
     }
 
     /** Adds a graded sale and returns it. */

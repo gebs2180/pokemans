@@ -99,17 +99,17 @@ class PricingController {
     }
 
     private final CompIngestionService ingestion;
-    private final PriceSnapshotService snapshots;
+    private final PricingRefresh refresh;
     private final SoldCompRepository comps;
     private final Prices prices;
     private final Catalog catalog;
     private final CurrentUser currentUser;
     private final PricingProperties properties;
 
-    PricingController(CompIngestionService ingestion, PriceSnapshotService snapshots, SoldCompRepository comps, Prices prices,
+    PricingController(CompIngestionService ingestion, PricingRefresh refresh, SoldCompRepository comps, Prices prices,
                       Catalog catalog, CurrentUser currentUser, PricingProperties properties) {
         this.ingestion = ingestion;
-        this.snapshots = snapshots;
+        this.refresh = refresh;
         this.comps = comps;
         this.prices = prices;
         this.catalog = catalog;
@@ -154,12 +154,13 @@ class PricingController {
 
     /**
      * Re-prices every card from the stored comps now, instead of waiting for the nightly job, and
-     * returns this card's prices. Step-down ratios come from all cards, so all are re-priced.
+     * returns this card's prices. Step-down ratios come from all cards, so all are re-priced. 409 while
+     * another refresh (the nightly job, or another click) is running.
      */
     @PostMapping("/prices/refresh")
     PricesView refresh(@PathVariable UUID catalogCardId) {
         requireCard(catalogCardId);
-        PriceSnapshotService.Result result = snapshots.snapshotAll(LocalDate.now(ZoneOffset.UTC));
+        PriceSnapshotService.Result result = refresh.snapshotOnly(LocalDate.now(ZoneOffset.UTC));
         return view(catalogCardId, result.skipped().getOrDefault(catalogCardId, List.of()));
     }
 

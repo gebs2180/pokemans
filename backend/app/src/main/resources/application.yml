@@ -10,6 +10,11 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate # Flyway owns the schema (src/main/resources/db/migration)
+    properties:
+      # Batch inserts (a refresh writes 11 snapshot rows per card and grader). Ids are assigned
+      # UUIDs, so nothing stops batching; append-only entities implement Persistable to skip merge.
+      hibernate.jdbc.batch_size: 50
+      hibernate.order_inserts: true
   mvc:
     problemdetails:
       enabled: true

@@ -5,6 +5,7 @@ import com.pokemans.app.storage.BlobStore;
 import com.pokemans.app.storage.StorageProperties;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,13 +19,35 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Works through due prediction requests: submits pending ones, polls submitted ones, stores every
- * answer, and rebuilds the card's system assessment once nothing is left open for it. Each request
- * is handled in its own transaction, so one failing provider doesn't hold up the others.
+ * answer, and rebuilds the card's system assessment once nothing is left open for it.
+ *
+ * <p>Safe with several instances running: due requests are claimed in a short transaction
+ * ({@code FOR UPDATE SKIP LOCKED}, then leased by moving their next attempt out), the provider is
+ * called with no transaction open, and the answer is written in another short transaction. A crashed
+ * worker's claims come back when the lease runs out. Each request is handled on its own, so one
+ * failing provider doesn't hold up the others.
  */
 @Component
 class PredictionWorker {
 
     private static final Logger log = LoggerFactory.getLogger(PredictionWorker.class);
+
+    /** What one provider call came back with, applied to the request afterwards. */
+    private sealed interface Outcome {
+    }
+
+    private record Submitted(String externalRequestId) implements Outcome {
+    }
+
+    private record Polled(PreGradeProvider.Poll poll, long latencyMs) implements Outcome {
+    }
+
+    private record CallFailed(String error) implements Outcome {
+    }
+
+    /** Requests leased to this worker until {@code until}; the lease doubles as the claim's token. */
+    private record Claim(List<UUID> ids, Instant until) {
+    }
 
     private final Map<String, PreGradeProvider> providers;
     private final PredictionRequestRepository requests;
@@ -50,52 +73,107 @@ class PredictionWorker {
         this.transactions = transactions;
     }
 
-    /** One pass over everything due now. Returns how many requests were looked at. */
+    /**
+     * One pass over everything due now, claimed a batch at a time. Returns how many requests were
+     * handled. The pass stops after twenty batches so it can't run on forever.
+     */
     int runOnce() {
-        List<UUID> due = requests.findDue(Instant.now()).stream().map(PredictionRequest::getId).toList();
-        for (UUID id : due) {
-            try {
-                PredictionRequest finished = transactions.execute(status -> handle(requests.findById(id).orElseThrow()));
-                if (finished != null) {
-                    // Its own transaction: a failed rebuild must not roll back the stored prediction.
-                    transactions.executeWithoutResult(status -> afterFinished(finished));
-                }
-            } catch (RuntimeException e) {
-                log.warn("Prediction request {} failed unexpectedly", id, e);
+        int handled = 0;
+        int limit = properties.worker().claimBatch() * 20;
+        while (handled < limit) {
+            Claim claim = claim();
+            if (claim.ids().isEmpty()) {
+                break;
+            }
+            for (UUID id : claim.ids()) {
+                handle(id, claim.until());
+                handled++;
             }
         }
-        return due.size();
+        return handled;
     }
 
-    /** Advances one request; returns it when it has just finished (so the assessment may need rebuilding), else null. */
-    private PredictionRequest handle(PredictionRequest request) {
-        if (!request.isOpen()) {
-            return null;
+    /** Locks a batch of due requests and leases them to this worker, in one short transaction. */
+    private Claim claim() {
+        Instant now = Instant.now();
+        // Postgres keeps microseconds: truncate so the lease reads back equal and can mark ownership.
+        Instant until = now.plus(properties.worker().lease()).truncatedTo(ChronoUnit.MICROS);
+        List<UUID> ids = transactions.execute(status -> {
+            List<UUID> due = requests.lockDue(now, properties.worker().claimBatch());
+            if (!due.isEmpty()) {
+                requests.lease(due, until);
+            }
+            return due;
+        });
+        return new Claim(ids, until);
+    }
+
+    private void handle(UUID id, Instant leasedUntil) {
+        try {
+            PredictionRequest request = requests.findById(id).orElseThrow();
+            if (!request.isOpen() || !leasedUntil.equals(request.getNextAttemptAt())) {
+                return;
+            }
+            Outcome outcome = call(request); // no transaction open: provider calls can take many seconds
+            PredictionRequest finished = transactions.execute(status -> apply(id, leasedUntil, outcome));
+            if (finished != null) {
+                // Its own transaction: a failed rebuild must not roll back the stored prediction.
+                transactions.executeWithoutResult(status -> afterFinished(finished));
+            }
+        } catch (RuntimeException e) {
+            log.warn("Prediction request {} failed unexpectedly", id, e);
         }
+    }
+
+    /** Calls the provider for one request. A failed call is an outcome too, not an exception. */
+    private Outcome call(PredictionRequest request) {
         PreGradeProvider provider = providers.get(request.getProvider());
         if (provider == null) {
-            request.callFailed("Provider " + request.getProvider() + " is not enabled", properties.worker().maxAttempts());
-            return request.isOpen() ? null : request;
+            return new CallFailed("Provider " + request.getProvider() + " is not enabled");
         }
         long started = System.nanoTime();
         try {
             if (request.getStatus() == PredictionRequest.Status.PENDING) {
-                request.submitted(provider.submit(photos(request), request.getId().toString()));
-                return null;
+                return new Submitted(provider.submit(photos(request), request.getId().toString()));
             }
-            switch (provider.poll(request.getExternalRequestId())) {
-                case PreGradeProvider.Pending pending -> request.stillPending(Duration.ofSeconds(10), properties.worker().maxPending());
-                case PreGradeProvider.Done done -> {
-                    predictions.save(ProviderPrediction.succeeded(request, done.reading(), withoutImages(done.raw()), elapsedMs(started)));
-                    request.done();
-                }
-                case PreGradeProvider.Failed failed -> {
-                    predictions.save(ProviderPrediction.rejected(request, failed.reason(), withoutImages(failed.raw()), elapsedMs(started)));
-                    request.rejected(failed.reason());
-                }
-            }
+            return new Polled(provider.poll(request.getExternalRequestId()), elapsedMs(started));
         } catch (RuntimeException e) {
-            request.callFailed(e.getClass().getSimpleName() + ": " + e.getMessage(), properties.worker().maxAttempts());
+            return new CallFailed(e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Writes what the provider said. Every answer is stored, even if this worker's lease ran out while
+     * the call was running; the request itself only moves on while it is still ours.
+     *
+     * @return the request when it has just finished (so the assessment may need rebuilding), else null
+     */
+    private PredictionRequest apply(UUID id, Instant leasedUntil, Outcome outcome) {
+        PredictionRequest request = requests.findById(id).orElseThrow();
+        if (outcome instanceof Polled(PreGradeProvider.Poll poll, long latencyMs)) {
+            switch (poll) {
+                case PreGradeProvider.Done done ->
+                        predictions.save(ProviderPrediction.succeeded(request, done.reading(), withoutImages(done.raw()), latencyMs));
+                case PreGradeProvider.Failed failed ->
+                        predictions.save(ProviderPrediction.rejected(request, failed.reason(), withoutImages(failed.raw()), latencyMs));
+                case PreGradeProvider.Pending pending -> {
+                }
+            }
+        }
+        if (!request.isOpen() || !leasedUntil.equals(request.getNextAttemptAt())) {
+            log.warn("Prediction request {} was claimed again while its provider call ran; {} not applied to it", id, outcome);
+            return null;
+        }
+        switch (outcome) {
+            case Submitted submitted -> request.submitted(submitted.externalRequestId());
+            case CallFailed failed -> request.callFailed(failed.error(), properties.worker().maxAttempts());
+            case Polled polled -> {
+                switch (polled.poll()) {
+                    case PreGradeProvider.Pending pending -> request.stillPending(Duration.ofSeconds(10), properties.worker().maxPending());
+                    case PreGradeProvider.Done done -> request.done();
+                    case PreGradeProvider.Failed failed -> request.rejected(failed.reason());
+                }
+            }
         }
         return request.isOpen() ? null : request;
     }

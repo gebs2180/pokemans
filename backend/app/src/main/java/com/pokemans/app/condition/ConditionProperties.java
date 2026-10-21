@@ -46,11 +46,22 @@ record ConditionProperties(
      * @param enabled      run the background job (off in tests, which drive it directly)
      * @param pollInterval how often due requests are submitted or polled
      * @param maxAttempts  give up on a request after this many failed calls
+     * @param maxPending   give up on a request still running at the provider after this long
+     * @param lease        how long a claimed request stays hidden from other workers; longer than a
+     *                     batch of provider calls takes, so a crashed worker's claims come back
+     * @param claimBatch   requests claimed at a time
+     * @param sweepWindow  how far back the sweep looks for completed captures that never got requests
+     * @param sweepMinAge  how long a capture must have been complete before the sweep queues it, so it
+     *                     doesn't race the capture-completed listener
      */
     record Worker(@DefaultValue("true") boolean enabled,
                   @DefaultValue("15s") Duration pollInterval,
                   @DefaultValue("8") int maxAttempts,
-                  @DefaultValue("24h") Duration maxPending) {
+                  @DefaultValue("24h") Duration maxPending,
+                  @DefaultValue("10m") Duration lease,
+                  @DefaultValue("10") int claimBatch,
+                  @DefaultValue("7d") Duration sweepWindow,
+                  @DefaultValue("2m") Duration sweepMinAge) {
     }
 
     /** Off until the account's terms are confirmed in writing and a key is set. */

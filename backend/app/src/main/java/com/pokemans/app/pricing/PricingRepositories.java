@@ -11,7 +11,7 @@ interface SoldCompRepository extends JpaRepository<SoldComp, UUID> {
 
     boolean existsBySourceAndExternalSaleId(String source, String externalSaleId);
 
-    List<SoldComp> findByCatalogCardIdAndSoldOnBetween(UUID catalogCardId, LocalDate from, LocalDate to);
+    List<SoldComp> findBySoldOnBetween(LocalDate from, LocalDate to);
 
     List<SoldComp> findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID catalogCardId);
 

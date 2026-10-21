@@ -1,5 +1,6 @@
 package com.pokemans.app.catalog;
 
+import java.time.Instant;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -23,6 +24,13 @@ class RecognitionScheduler {
     void run() {
         if (properties.reader().workerEnabled()) {
             recognition.runOnce();
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${pokemans.catalog.reader.sweep-interval:5m}", initialDelayString = "1m")
+    void sweep() {
+        if (properties.reader().workerEnabled()) {
+            recognition.sweepMissedCaptures(Instant.now());
         }
     }
 }

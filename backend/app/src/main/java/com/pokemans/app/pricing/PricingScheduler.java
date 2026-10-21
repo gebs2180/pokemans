@@ -2,6 +2,8 @@ package com.pokemans.app.pricing;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -13,6 +15,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 @ConditionalOnBooleanProperty("pokemans.pricing.ingestion.enabled")
 class PricingScheduler {
 
+    private static final Logger log = LoggerFactory.getLogger(PricingScheduler.class);
+
     private final PricingRefresh refresh;
 
     PricingScheduler(PricingRefresh refresh) {
@@ -21,6 +25,11 @@ class PricingScheduler {
 
     @Scheduled(cron = "${pokemans.pricing.ingestion.cron:0 30 6 * * *}", zone = "UTC")
     void run() {
-        refresh.runOnce(LocalDate.now(ZoneOffset.UTC));
+        try {
+            refresh.runOnce(LocalDate.now(ZoneOffset.UTC));
+        } catch (PricingLock.Busy e) {
+            // Another instance's nightly run, or an admin refresh, is already at it.
+            log.info("Nightly pricing refresh skipped: another refresh is running");
+        }
     }
 }
