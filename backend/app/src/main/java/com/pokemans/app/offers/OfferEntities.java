@@ -100,6 +100,10 @@ class CardOffer {
         return fmv;
     }
 
+    BigDecimal getBuyerMargin() {
+        return buyerMargin;
+    }
+
     String getConfidence() {
         return confidence;
     }

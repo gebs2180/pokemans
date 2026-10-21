@@ -60,7 +60,11 @@ public record ParameterSet(
         BigDecimal gradeFirstMinLift,
         int gradeFirstTopN,
         // Valuation runs: σ for a card with too few monthly price changes (null in sets before 1.1.0)
-        BigDecimal fallbackSigma) {
+        BigDecimal fallbackSigma,
+        // Instant offers: the buyer's margin by the card's confidence (null in sets before 1.2.0)
+        BigDecimal offerMarginA,
+        BigDecimal offerMarginB,
+        BigDecimal offerMarginC) {
 
     public static final String DEFAULT_VERSION = "1.0.0";
 
@@ -131,7 +135,10 @@ public record ParameterSet(
                 decimal(p, "portfolio.suggestedAlphaHigh"),
                 decimal(p, "gradeFirst.minLift"),
                 integer(p, "gradeFirst.topN"),
-                optionalDecimal(p, "values.fallbackSigma"));
+                optionalDecimal(p, "values.fallbackSigma"),
+                optionalDecimal(p, "offers.buyerMargin.A"),
+                optionalDecimal(p, "offers.buyerMargin.B"),
+                optionalDecimal(p, "offers.buyerMargin.C"));
     }
 
     /** Liquidity tier for a card's monthly sales count. */
@@ -159,6 +166,23 @@ public record ParameterSet(
             case MID -> speedDiscountMid;
             case LOW -> speedDiscountLow;
         };
+    }
+
+    /**
+     * The buyer's margin on an instant offer for a card valued at this confidence: the less certain
+     * its condition, the more the buyer keeps for carrying the risk (Zach, 2026-10-21). D gets no offer.
+     */
+    public BigDecimal offerMargin(Confidence confidence) {
+        BigDecimal margin = switch (confidence) {
+            case A -> offerMarginA;
+            case B -> offerMarginB;
+            case C -> offerMarginC;
+            case D -> throw new IllegalArgumentException("Confidence D gets no offer");
+        };
+        if (margin == null) {
+            throw new IllegalStateException("Parameter set " + version + " has no offer margins: offers need 1.2.0 or later");
+        }
+        return margin;
     }
 
     public enum LiquidityTier { HIGH, MID, LOW }

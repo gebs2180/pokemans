@@ -30,7 +30,7 @@ The lender and insurer side is paused while Zach clears his outside interest wit
 - **One firm price, not a per-grade ladder settled on inspection.** A ladder needs someone to judge the grade on arrival, which brings back the back-and-forth.
 - **Price:** `price = Σ p_g · offer_g`, where `offer_g = P↓_g · (1 − f) · (1 − d) · (1 − m)`.
   - P↓ is the grade's net price (net of grading cost), capped at the grade above, so a PSA 1 premium never pays more for a worse card.
-  - f = 15% fees; d = the speed discount for the card's liquidity (5/10/20%); m = a 10% buyer margin.
+  - f = 15% fees; d = the speed discount for the card's liquidity (5/10/20%); m = the buyer margin, by the card's confidence: 10% at A, 13% at B, 17% at C (Zach, 2026-10-21, parameter set 1.2.0). Before that, B and C cost a seller nothing until they tipped into D; a less certain condition is a bigger risk for the buyer under a firm price, so it now leaves the buyer more room. "How we priced it" says which margin applied and why.
   - The buyer keeps the upside of a 10 and carries the downside.
   - For a verified graded card the ladder is one rung, at gross prices.
 - **Validity:** an offer stands for 7 days, and a posted listing for 14 (`pokemans.offers.*`).

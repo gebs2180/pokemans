@@ -6,13 +6,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * @param parameterSet   the parameter set runs are valued with (1.1.0 adds the fallback σ)
+ * @param parameterSet   the parameter set runs and offers are valued with (1.1.0 adds the fallback σ, 1.2.0 the offer margins)
  * @param gradingCompany whose price table values a raw card's distribution: PSA only, no fallback (Zach, 2026-10-18)
  * @param gradingCost    the grading cost a run starts from; the admin can override it per run
  */
 @ConfigurationProperties("pokemans.valuation")
 record ValuationProperties(
-        @DefaultValue("1.1.0") String parameterSet,
+        @DefaultValue("1.2.0") String parameterSet,
         @DefaultValue("PSA") String gradingCompany,
         @DefaultValue GradingCostDefaults gradingCost) {
 

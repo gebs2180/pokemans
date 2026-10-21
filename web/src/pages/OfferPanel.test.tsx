@@ -21,6 +21,7 @@ const offer = (over: Partial<Offer> = {}): Offer => ({
   price: 419.98,
   fmv: 600,
   confidence: 'B',
+  buyerMargin: 0.13,
   graded: false,
   subjectToAuthentication: false,
   ladder: rungs,
@@ -68,6 +69,7 @@ describe('OfferPanel', () => {
     expect(await screen.findByText('$419.98')).toBeInTheDocument()
     expect(screen.getByText(/isn't sold until a buyer accepts/)).toBeInTheDocument()
     expect(screen.getByText('How we priced it')).toBeInTheDocument()
+    expect(screen.getByText(/leaves the buyer a 13% margin, set by how sure we are of the card's condition \(confidence B\)/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Sell for $419.98' }))
 
     await waitFor(() => expect(posts).toHaveLength(2))

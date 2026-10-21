@@ -51,6 +51,20 @@ class ParameterSetTest {
     }
 
     @Test
+    void version120AddsTheOfferMarginByConfidence() {
+        ParameterSet v120 = ParameterSet.load("1.2.0");
+
+        assertThat(v120.offerMargin(Confidence.A)).isEqualByComparingTo("0.10");
+        assertThat(v120.offerMargin(Confidence.B)).isEqualByComparingTo("0.13");
+        assertThat(v120.offerMargin(Confidence.C)).isEqualByComparingTo("0.17");
+        assertThatThrownBy(() -> v120.offerMargin(Confidence.D)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ParameterSet.load("1.1.0").offerMargin(Confidence.A)).isInstanceOf(IllegalStateException.class);
+        // Everything else is 1.1.0's.
+        assertThat(v120.fallbackSigma()).isEqualByComparingTo(ParameterSet.load("1.1.0").fallbackSigma());
+        assertThat(v120.stressShiftGradesConfidenceC()).isEqualTo(ParameterSet.load("1.1.0").stressShiftGradesConfidenceC());
+    }
+
+    @Test
     void unknownVersionFails() {
         assertThatThrownBy(() -> ParameterSet.load("9.9.9")).isInstanceOf(IllegalArgumentException.class);
     }

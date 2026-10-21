@@ -127,7 +127,7 @@ class ValuationFlowTest {
         String runs = "/api/admin/orgs/" + orgId + "/collections/" + collectionId + "/valuation-runs";
         api.postJson(runs, "{}", collector).andExpect(status().isForbidden());
         api.get("/api/admin/valuation/defaults", api.admin()).andExpect(status().isOk())
-                .andExpect(jsonPath("$.parameterSet").value("1.1.0"))
+                .andExpect(jsonPath("$.parameterSet").value("1.2.0"))
                 .andExpect(jsonPath("$.gradingCompany").value("PSA"))
                 .andExpect(jsonPath("$.gradingCost.fee").value(25));
         api.postJson(runs, "{\"gradingCost\":{\"fee\":-1,\"shipping\":5,\"insurance\":2,\"timeToCashRate\":0.02}}", api.admin())
