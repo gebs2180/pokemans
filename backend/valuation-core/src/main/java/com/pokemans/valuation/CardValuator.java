@@ -82,6 +82,7 @@ public final class CardValuator {
         trace.add("FMV", "sum p x net price", Money.cents(fmv), describe(in.distribution(), in.prices()));
 
         Confidence confidence = confidence(in, trace);
+        Confidence offerConfidence = offerConfidence(in, trace);
 
         ParameterSet.LiquidityTier tier = params.liquidityTier(in.salesPerMonth());
         BigDecimal s = params.searchPremium(tier);
@@ -123,7 +124,7 @@ public final class CardValuator {
                 "f " + f + (flv.compareTo(formula) < 0 ? "; formula gave " + Money.cents(formula) + ", capped at QSV" : ""));
 
         return new CardValuation(in.cardId(), Money.cents(fmv), Money.cents(rv), Money.cents(qsv),
-                Money.cents(stressedFmv), Money.cents(flv), confidence, shift, tier, s, d, shock, depth, trace);
+                Money.cents(stressedFmv), Money.cents(flv), confidence, shift, tier, s, d, shock, depth, trace, offerConfidence);
     }
 
     /** FLV for the same card once its grade is known: no condition stress, gross graded prices. */
@@ -201,23 +202,8 @@ public final class CardValuator {
      * already dropped, so checking the base's stress is enough.
      */
     private Confidence confidence(Input in, Trace trace) {
-        BigDecimal weightedComps = BigDecimal.ZERO;
-        for (Grade grade : Grade.values()) {
-            GradePrice price = in.prices().get(grade);
-            if (price.method() == GradePrice.Method.OBSERVED) {
-                weightedComps = weightedComps.add(in.distribution().p(grade).multiply(BigDecimal.valueOf(price.salesInWindow()), Money.MC));
-            }
-        }
-        Confidence fromComps;
-        if (weightedComps.compareTo(params.compsForA()) >= 0) {
-            fromComps = Confidence.A;
-        } else if (weightedComps.compareTo(params.compsForB()) >= 0) {
-            fromComps = Confidence.B;
-        } else if (weightedComps.compareTo(params.compsForC()) >= 0) {
-            fromComps = Confidence.C;
-        } else {
-            fromComps = Confidence.D;
-        }
+        BigDecimal weightedComps = weightedComps(in);
+        Confidence fromComps = fromComps(weightedComps);
         Confidence base = in.photoConfidence().worse(fromComps);
         trace.add("confidence_base", "worse of photo and comps", base,
                 "photo " + in.photoConfidence() + ", comps " + fromComps + " (weighted sales " + Money.cents(weightedComps) + ")");
@@ -244,6 +230,62 @@ public final class CardValuator {
         Confidence dropped = base.drop();
         trace.add("confidence", "derived price in play, drop one level", dropped, "derived grades " + derived);
         return dropped;
+    }
+
+    /**
+     * The confidence an instant offer is priced at (Zach, 2026-10-21). The offer uses the central
+     * distribution and net prices, never σ or the stressed distribution, so it starts from the same
+     * base (photo and comps) and takes the penalties that bear on prices (a stale table), but not a
+     * fallback σ, and it drops a level for a derived price only where the central distribution puts
+     * probability.
+     */
+    private Confidence offerConfidence(Input in, Trace trace) {
+        Confidence c = in.photoConfidence().worse(fromComps(weightedComps(in)));
+        for (ConfidencePenalty penalty : in.penalties()) {
+            if (penalty.levels() == 0 || penalty.flvOnly()) {
+                continue;
+            }
+            c = Staleness.drop(c, penalty.levels());
+            trace.add("offer_confidence_penalty", penalty.reason() + ", drop " + penalty.levels(), c, "");
+        }
+        StringBuilder derived = new StringBuilder();
+        for (Grade grade : Grade.values()) {
+            if (in.distribution().p(grade).signum() > 0 && in.prices().get(grade).derived()) {
+                derived.append(derived.isEmpty() ? "" : ", ").append(grade);
+            }
+        }
+        if (derived.isEmpty()) {
+            trace.add("offer_confidence", "base and price penalties; no derived price where the card is likely", c,
+                    "FLV-only penalties (fallback sigma, the stress) left out");
+            return c;
+        }
+        Confidence dropped = c.drop();
+        trace.add("offer_confidence", "derived price where the card is likely, drop one level", dropped,
+                "derived grades " + derived + "; FLV-only penalties (fallback sigma, the stress) left out");
+        return dropped;
+    }
+
+    /** Probability-weighted count of the observed sales behind the prices. */
+    private static BigDecimal weightedComps(Input in) {
+        BigDecimal weighted = BigDecimal.ZERO;
+        for (Grade grade : Grade.values()) {
+            GradePrice price = in.prices().get(grade);
+            if (price.method() == GradePrice.Method.OBSERVED) {
+                weighted = weighted.add(in.distribution().p(grade).multiply(BigDecimal.valueOf(price.salesInWindow()), Money.MC));
+            }
+        }
+        return weighted;
+    }
+
+    private Confidence fromComps(BigDecimal weightedComps) {
+        if (weightedComps.compareTo(params.compsForA()) >= 0) {
+            return Confidence.A;
+        } else if (weightedComps.compareTo(params.compsForB()) >= 0) {
+            return Confidence.B;
+        } else if (weightedComps.compareTo(params.compsForC()) >= 0) {
+            return Confidence.C;
+        }
+        return Confidence.D;
     }
 
     private static String describe(GradeDistribution distribution, GradePriceTable prices) {

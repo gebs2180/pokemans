@@ -370,7 +370,7 @@ class OffersFlowTest {
         api.postJson(cancel, "{\"reason\":\"x\"}", api.admin()).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail", containsString("void the offer")));
         api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
-        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received", "{\"pricePaid\":10}", buyer)
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received", "{\"pricePaid\":10,\"note\":\"agreed a lower price\"}", buyer)
                 .andExpect(status().isCreated());
         api.postJson(cancel, "{\"reason\":\"x\"}", api.admin()).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail", containsString("received")));
@@ -564,6 +564,37 @@ class OffersFlowTest {
                 .andExpect(jsonPath("$.refusal", containsString("identified")))
                 .andExpect(jsonPath("$.confidence").isEmpty());
         api.get("/api/admin/cards/" + UUID.randomUUID() + "/offer-preview", api.admin()).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void realisticHandEnteredCompsGetAnOffer() throws Exception {
+        // Audit finding 1: three fresh sales each at PSA 8, 9 and 10, as comps.csv has for Pikachu VMAX. Too few 30-day changes to
+        // measure sigma, and the stress reaches the derived 5 to 7. Both only bear on the FLV, so the offer
+        // is priced at the comps' own confidence, C (Zach, 2026-10-21).
+        String card = card("Realistic Pikachu");
+        String catalog = identify(card, "Pikachu VMAX " + UUID.randomUUID().toString().substring(0, 4), "2020-11-13", "HOLO", "Rare Rainbow");
+        Map<Integer, Integer> top = Map.of(10, 280, 9, 200, 8, 120);
+        for (Map.Entry<Integer, Integer> grade : top.entrySet()) {
+            for (int daysAgo : new int[] {1, 2, 3}) {
+                api.postJson("/api/admin/catalog-cards/" + catalog + "/comps", "{\"gradingCompany\":\"PSA\",\"grade\":" + grade.getKey()
+                        + ",\"price\":" + (grade.getValue() + daysAgo) + ",\"soldOn\":\"" + TODAY.minusDays(daysAgo)
+                        + "\",\"listingType\":\"AUCTION\",\"marketplace\":\"eBay\"}", api.admin()).andExpect(status().isCreated());
+            }
+        }
+        api.postJson("/api/admin/catalog-cards/" + catalog + "/prices/refresh", "", api.admin()).andExpect(status().isOk());
+        api.postJson("/api/admin/orgs/" + orgId + "/cards/" + card + "/assessments",
+                "{\"distribution\":{\"8\":0.3,\"9\":0.5,\"10\":0.2},\"confidence\":\"B\",\"reason\":\"reviewed\"}", api.admin())
+                .andExpect(status().isCreated());
+
+        api.get("/api/admin/cards/" + card + "/offer-preview", api.admin())
+                .andExpect(jsonPath("$.offered").value(true))
+                .andExpect(jsonPath("$.confidence").value("C"))
+                .andExpect(jsonPath("$.why[?(@.subject == 'offer_confidence')].detail", org.hamcrest.Matchers.contains(
+                        containsString("FLV-only penalties"))))
+                .andExpect(jsonPath("$.why[?(@.subject == 'sigma')]").isEmpty());
+        api.postJson(offers(card), "", seller).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.confidence").value("C"))
+                .andExpect(jsonPath("$.buyerMargin").value(0.17));
     }
 
     @Test

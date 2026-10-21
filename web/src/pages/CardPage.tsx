@@ -102,19 +102,35 @@ export function CardPage() {
             {latest && latest !== current && (
               <RetakeResult photo={latest} keeping={current !== null} />
             )}
-            {!card.photosFrozen && (
-              <label className="capture">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png"
-                  capture="environment"
-                  disabled={busy !== null}
-                  onChange={(e) => capture(side, e)}
-                  aria-label={`${latest ? 'Retake' : 'Take'} ${SIDE_LABEL[side].toLowerCase()} photo`}
-                />
-                {busy === side ? 'Uploading and checking…' : latest ? 'Retake' : `Take ${SIDE_LABEL[side].toLowerCase()} photo`}
-              </label>
-            )}
+            {!card.photosFrozen &&
+              (busy === side ? (
+                <p className="muted">Uploading and checking…</p>
+              ) : (
+                <div className="row">
+                  {/* The camera straight away, or a photo already taken (e.g. from a lightbox setup): Android opens only the camera with capture set. */}
+                  <label className="capture">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      capture="environment"
+                      disabled={busy !== null}
+                      onChange={(e) => capture(side, e)}
+                      aria-label={`${latest ? 'Retake' : 'Take'} ${SIDE_LABEL[side].toLowerCase()} photo`}
+                    />
+                    {latest ? 'Retake' : `Take ${SIDE_LABEL[side].toLowerCase()} photo`}
+                  </label>
+                  <label className="capture secondary">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      disabled={busy !== null}
+                      onChange={(e) => capture(side, e)}
+                      aria-label={`Choose a ${SIDE_LABEL[side].toLowerCase()} photo`}
+                    />
+                    Choose a photo
+                  </label>
+                </div>
+              ))}
             {attempts.length > 1 && <p className="muted small">{attempts.length} attempts, all kept; the one shown is used.</p>}
           </section>
         )

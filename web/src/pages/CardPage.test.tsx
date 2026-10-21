@@ -85,7 +85,9 @@ describe('CardPage', () => {
     expect(screen.getByRole('img', { name: 'Back photo you took' })).toBeInTheDocument()
     expect(screen.getByText(/Your last try needs a retake \(the photo above is still the one used\)/)).toBeInTheDocument()
     expect(screen.getByText('The blue Poké Ball side.')).toBeInTheDocument()
-    expect(screen.getByLabelText('Retake front photo')).toBeInTheDocument()
+    expect(screen.getByLabelText('Retake front photo')).toHaveAttribute('capture', 'environment')
+    // A photo already taken can be picked too: the library input has no capture, so Android offers the gallery.
+    expect(screen.getByLabelText('Choose a front photo')).not.toHaveAttribute('capture')
   })
 
   it('says what happens next, and who does it', async () => {

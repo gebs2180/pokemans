@@ -176,6 +176,39 @@ class CardValuatorTest {
     }
 
     @Test
+    void theOfferConfidenceSkipsPenaltiesThatOnlyBearOnTheFlv() {
+        // Likely a 9 or 10 (observed); the stress reaches 7 and 8, which are derived; σ is a fallback.
+        GradeDistribution likely = GradeDistribution.of(Map.of(Grade.G9, d("0.5"), Grade.G10, d("0.5")));
+        GradePriceTable table = prices("100", Grade.G7, Grade.G8);
+        CardValuator.Input in = new CardValuator.Input("card", likely, table, d("0.20"), d("30"), 1, Confidence.B,
+                List.of(new ConfidencePenalty("fallback sigma 0.20", 1, true)), false);
+
+        CardValuation v = valuator.value(in);
+
+        // The FLV takes both: B, fallback σ to C, derived grades in the stress to D.
+        assertThat(v.confidence()).isEqualTo(Confidence.D);
+        // The offer uses neither σ nor the stress: it stays at B.
+        assertThat(v.offerConfidence()).isEqualTo(Confidence.B);
+        assertThat(v.trace().stepsFor("offer_confidence_penalty")).isEmpty();
+        assertThat(v.trace().stepsFor("offer_confidence").getFirst().detail()).contains("FLV-only penalties");
+    }
+
+    @Test
+    void theOfferConfidenceStillTakesStaleTablesAndLikelyDerivedPrices() {
+        GradeDistribution likely = GradeDistribution.of(Map.of(Grade.G8, d("0.5"), Grade.G9, d("0.5")));
+        CardValuator.Input in = new CardValuator.Input("card", likely, prices("100", Grade.G8), d("0.05"), d("30"), 1, Confidence.A,
+                List.of(new ConfidencePenalty("price table 40 days old", 1), new ConfidencePenalty("fallback sigma 0.20", 1, true)), false);
+
+        CardValuation v = valuator.value(in);
+
+        // A, stale table to B, then the derived 8 the card may well be: C.
+        assertThat(v.offerConfidence()).isEqualTo(Confidence.C);
+        assertThat(v.trace().stepsFor("offer_confidence_penalty")).singleElement()
+                .satisfies(st -> assertThat(st.rule()).startsWith("price table 40 days old"));
+        assertThat(v.trace().stepsFor("offer_confidence").getFirst().detail()).contains("derived grades 8");
+    }
+
+    @Test
     void aKnownGradeGetsNoConditionStress() {
         Map<Grade, GradePrice> ladder = new EnumMap<>(Grade.class);
         for (Grade grade : Grade.values()) {

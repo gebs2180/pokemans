@@ -146,6 +146,12 @@ select {
   display: none;
 }
 
+/* The second way in: a photo already taken, from the library. */
+.capture.secondary {
+  background: none;
+  color: inherit;
+}
+
 .muted {
   color: var(--muted);
 }
