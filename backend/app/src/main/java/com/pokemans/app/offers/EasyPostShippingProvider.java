@@ -89,6 +89,17 @@ class EasyPostShippingProvider implements ShippingProvider {
                 string(label, "label_url"), new BigDecimal(string(selected, "rate")), insurance);
     }
 
+    /** <a href="https://docs.easypost.com/docs/shipments/refunds">Refunds</a>: EasyPost answers with the shipment and its refund status. */
+    @Override
+    public String refund(String shipmentId) {
+        Map<String, Object> shipment = http.post().uri("/shipments/{id}/refund", shipmentId).retrieve().body(OBJECT);
+        String status = string(shipment, "refund_status");
+        if (status == null) {
+            throw new IllegalStateException("EasyPost gave no refund status for " + shipmentId);
+        }
+        return status;
+    }
+
     /** The cheapest rate on the preferred carrier, or the cheapest of all if it offers none. */
     private Map<String, Object> cheapest(List<Map<String, Object>> rates) {
         Comparator<Map<String, Object>> byPrice = Comparator.comparing(r -> new BigDecimal(string(r, "rate")));

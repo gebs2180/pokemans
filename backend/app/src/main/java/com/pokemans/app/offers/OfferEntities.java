@@ -185,8 +185,10 @@ class ListingEvent {
     /**
      * RECEIVED: arrived genuine and as shown, and the buyer paid. RETURNED: sent back for an allowed
      * reason. INSPECTED: a grade recorded under the per-grade offers that came before firm prices.
+     * VOIDED: we took an open listing down, with its offer. CANCELLED: we undid a taken deal. Both are
+     * the admin's, with no actor org and the reason in the note (Zach, 2026-10-21).
      */
-    enum Type { ACCEPTED, WITHDRAWN, INSPECTED, RECEIVED, RETURNED }
+    enum Type { ACCEPTED, WITHDRAWN, INSPECTED, RECEIVED, RETURNED, VOIDED, CANCELLED }
 
     /** Why a buyer returns a card: the only reasons the buyer terms allow. */
     enum DeclinedReason { NOT_GENUINE, NOT_THE_LISTED_CARD, DOES_NOT_MATCH_PHOTOS }
@@ -242,6 +244,18 @@ class ListingEvent {
         return e;
     }
 
+    static ListingEvent voided(UUID listingId, UUID adminUserId, String reason) {
+        ListingEvent e = new ListingEvent(listingId, Type.VOIDED, null, adminUserId);
+        e.note = reason;
+        return e;
+    }
+
+    static ListingEvent cancelled(UUID listingId, UUID adminUserId, String reason) {
+        ListingEvent e = new ListingEvent(listingId, Type.CANCELLED, null, adminUserId);
+        e.note = reason;
+        return e;
+    }
+
     UUID getListingId() {
         return listingId;
     }
@@ -276,6 +290,106 @@ class ListingEvent {
 
     String getNote() {
         return note;
+    }
+
+    Instant getCreatedAt() {
+        return createdAt;
+    }
+}
+
+/** We voided an offer: it can't be posted again (Zach, 2026-10-21). Append-only. */
+@Entity
+@Table(name = "card_offer_void")
+class CardOfferVoid {
+
+    @Id
+    private UUID id;
+    private UUID offerId;
+    private String reason;
+    private UUID voidedBy;
+    private Instant createdAt;
+
+    protected CardOfferVoid() {
+    }
+
+    CardOfferVoid(UUID offerId, String reason, UUID voidedBy) {
+        this.id = UUID.randomUUID();
+        this.offerId = offerId;
+        this.reason = reason;
+        this.voidedBy = voidedBy;
+        this.createdAt = Instant.now();
+    }
+
+    UUID getOfferId() {
+        return offerId;
+    }
+
+    String getReason() {
+        return reason;
+    }
+
+    UUID getVoidedBy() {
+        return voidedBy;
+    }
+
+    Instant getCreatedAt() {
+        return createdAt;
+    }
+}
+
+/**
+ * A label marked to be refunded, and what its provider said when asked (Zach, 2026-10-21). A request
+ * the provider never answered can be made again. Append-only.
+ */
+@Entity
+@Table(name = "label_refund")
+class LabelRefund {
+
+    @Id
+    private UUID id;
+    private UUID labelId;
+    private UUID listingId;
+    private String reason;
+    private UUID requestedBy;
+    private String provider;
+    private String providerStatus;
+    private String providerError;
+    private Instant createdAt;
+
+    protected LabelRefund() {
+    }
+
+    LabelRefund(UUID labelId, UUID listingId, String reason, UUID requestedBy, String provider, String providerStatus,
+                String providerError) {
+        this.id = UUID.randomUUID();
+        this.labelId = labelId;
+        this.listingId = listingId;
+        this.reason = reason;
+        this.requestedBy = requestedBy;
+        this.provider = provider;
+        this.providerStatus = providerStatus;
+        this.providerError = providerError;
+        this.createdAt = Instant.now();
+    }
+
+    UUID getLabelId() {
+        return labelId;
+    }
+
+    String getReason() {
+        return reason;
+    }
+
+    UUID getRequestedBy() {
+        return requestedBy;
+    }
+
+    String getProviderStatus() {
+        return providerStatus;
+    }
+
+    String getProviderError() {
+        return providerError;
     }
 
     Instant getCreatedAt() {

@@ -42,9 +42,19 @@ The lender and insurer side is paused while Zach clears his outside interest wit
   - cards without a PSA table;
   - cards whose authenticity is doubted;
   - confidence D;
-  - FMV under $25.
+  - FMV under $25;
+  - a firm price above the maximum, $500 by default (`pokemans.offers.max-price`; Zach, 2026-10-21). It caps what one mistake can cost a buyer during the beta, and keeps every label under EasyPost's $5,000 insurance limit. The seller is told instant offers go up to $500 for now; no offer row is stored.
 
   Unverified high-risk cards (vintage holos, Japanese promos) get an offer, marked "subject to the buyer authenticating the card in hand".
+
+## Undo (Zach, 2026-10-21)
+
+Before the closed beta, the admin can take back a mistake (a wrong identification, a bad price, a deal that fell through). Nothing is edited: each undo is a new row with who, when and why, so the record shows the mistake and its correction.
+
+- **Void an offer.** The offer can't be posted again. If it's on the market, its listing comes down with it (a `VOIDED` listing event) and buyers can no longer take it. The seller sees "We withdrew this offer" with the reason, and gets a new one. An offer a buyer has already taken is undone by cancelling the deal instead.
+- **Cancel a deal.** Only before the buyer records an arrival or a return; the database lets a deal end once, so a cancel and an arrival can't both land. The deal's offer is voided too, so the card is free for a new offer at today's price. The buyer sees the deal cancelled with the reason and can record nothing more on it or retry its label; the seller is told not to ship. A cancelled deal's label isn't billed to the buyer: we undid the deal, so its postage is ours.
+- **Refund a label.** Only for a cancelled deal: a live deal's label is the one the seller ships with. The refund is asked of the provider that sold the label (EasyPost: `POST /shipments/{id}/refund`), and its answer is kept (`submitted`, `refunded`, `rejected`, `not_applicable`). If the provider couldn't be asked (none set up, or it failed), the request is still recorded with why, and the admin can ask again; once answered, a label isn't asked about again. EasyPost refunds unused USPS labels within its refund window; a used or late one is rejected.
+- **Track record.** A voided listing and a cancelled deal get statuses of their own in `v_offer_outcomes` (`VOIDED`, `CANCELLED`) and are left out of the acceptance and delivery numbers, which count them apart.
 
 ## Built
 
@@ -54,13 +64,15 @@ The lender and insurer side is paused while Zach clears his outside interest wit
   - a `BUYER` org type and role;
   - buyer terms, versioned in `Consents` (`buyer-firm-2026-10-19`). The text is a plain-language **draft for Zach**, not reviewed legal wording;
   - `Directory` for names and contact details.
-- **`offers` module (V14, V16; all append-only):**
+- **`offers` module (V14, V16, V18; all append-only):**
   - `card_offer`: every input, the firm price, the ladder and the trace.
   - `sale_listing`.
-  - `listing_event`: ACCEPTED, WITHDRAWN, RECEIVED and RETURNED, plus INSPECTED from the per-grade offers that came before. Partial unique indexes let a listing close only once and record one outcome. Posting is serialized per card with an advisory lock.
+  - `listing_event`: ACCEPTED, WITHDRAWN, RECEIVED and RETURNED, plus INSPECTED from the per-grade offers that came before, and the admin's VOIDED and CANCELLED (V18, no actor org, the reason in the note). Partial unique indexes let a listing close only once (taken, withdrawn or voided) and a deal end once (arrived, returned or cancelled). Posting, voiding and cancelling are serialized per card with an advisory lock.
+  - `card_offer_void` (V18): one per voided offer, with the reason and the admin.
+  - `label_refund` (V18): each refund request, with the reason, the admin and the provider's answer or why it couldn't be asked.
   - `ship_address`: one per org, the latest row current.
   - `shipping_label`.
-  - The `ShippingProvider` port, with an EasyPost adapter that buys the cheapest USPS rate, insured for the offer.
+  - The `ShippingProvider` port, with an EasyPost adapter that buys the cheapest USPS rate, insured for the offer, and asks for a label's refund.
 - **API:**
   - Seller:
     - `GET /api/orgs/{org}/cards/{card}/sale`
@@ -75,21 +87,24 @@ The lender and insurer side is paused while Zach clears his outside interest wit
     - `POST .../deals/{id}/label` (retry)
     - `POST .../deals/{id}/received`
     - `POST .../deals/{id}/returned`
-  - Admin:
+  - Admin (admin role after an MFA login):
     - `POST /api/admin/deals/{id}/label?buyerOrgId=`
-    - `GET /api/admin/shipping/charges?month=yyyy-MM`
+    - `GET /api/admin/shipping/charges?month=yyyy-MM`: cancelled deals' labels are listed with `billed: false` and their refund state
+    - `GET /api/admin/offers`: the newest 200 offers with their latest listing, label and any undo
+    - `POST /api/admin/offers/{id}/void`, `POST /api/admin/deals/{id}/cancel`, `POST /api/admin/deals/{id}/label/refund`, each with `{"reason": "..."}`
   - The market never names the seller. Contact details and the label appear only to the two parties once a buyer accepts.
 - **Web:**
   - the "Instant offer" panel on the card page: the price, how it was priced, the ship-from address, "Sell for $X", and the label to print;
   - the buyer org page, behind the buyer terms, with its ship-to address;
   - "Cards for sale", with a two-step "Buy";
   - "Your deals": the label and tracking, retrying the label, and recording the arrival or return;
-  - admin "Postage to bill".
+  - admin "Postage to bill";
+  - admin "Offers and deals" (`/admin/deals`): void, cancel and refund, each asking for a reason, and the voided, cancelled and refund states with who and when. The seller's offer panel and the buyer's deals show a voided offer or a cancelled deal with its reason.
 - **Tests:**
-  - `OffersFlowTest`: the race, the label bought at once and insured at the price, a label failure that doesn't undo the sale and a retry, a return, withdrawal, every refusal, the track record, and append-only rows.
+  - `OffersFlowTest`: the race, the label bought at once and insured at the price, a label failure that doesn't undo the sale and a retry, a return, withdrawal, every refusal including the maximum price, voiding, cancelling and refunding (with the fake provider failing and recovering), the track record, and append-only rows.
   - `EasyPostShippingProviderTest`, against EasyPost's published response shapes.
   - `CrossOrgAccessTest` covers every route.
-  - Vitest covers the offer panel, market, arrival form, track record and `likelyRungs`.
+  - Vitest covers the offer panel (including voided and cancelled), market, deals, arrival form, track record, the admin offers page and `likelyRungs`.
 
 ## Track record
 
@@ -120,7 +135,8 @@ The realized sales are the evidence for the later lender and insurer pitch: our 
 ## Open
 
 - **Buyer terms wording:** review before inviting the first buyer.
-- **EasyPost account:** create one, test with a test key (labels are fake), then set the production key. EasyPost's terms and insurance limits need a look for high-value cards.
+- **EasyPost account:** create one, test with a test key (labels are fake), then set the production key. EasyPost insures up to $5,000 a parcel; the $500 offer maximum keeps well under it, but its terms need a look before raising the maximum.
+- **Undo, open (2026-10-21):** the seller sees a voided offer's reason as the admin typed it, so write it for them; a cancelled deal after the card shipped needs the card back by hand; a refund's later status (EasyPost moves `submitted` to `refunded` or `rejected`) isn't fetched yet.
 - **Invoices:** monthly postage bills are produced by hand from "Postage to bill". There is no invoicing or payment collection.
 - **Grade accuracy:** add a way for buyers to report a grader's result when they slab a card they bought, as calibration data from a grader.
 - **Notifications:** buyers aren't told when a card is posted, and sellers aren't emailed their label. Email waits for the notifier (M6).
