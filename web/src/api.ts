@@ -563,6 +563,12 @@ export function money(amount: number | null | undefined) {
   return amount == null ? '–' : amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 }
 
+/** A dollar amount as typed, e.g. "1,234.50" or "$1234": NaN unless it is a plain number once "$" and commas are dropped. */
+export function parseMoney(text: string): number {
+  const plain = text.replace(/[$,\s]/g, '')
+  return /^\d+(\.\d{1,2})?$/.test(plain) ? Number(plain) : NaN
+}
+
 export function percent(share: number) {
   return `${Math.round(share * 1000) / 10}%`
 }

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import {
   apiPath,
+  parseMoney,
   useApi,
   type CompRequest,
   type CompView,
@@ -10,6 +11,7 @@ import {
   type PricesView,
   type RawCondition,
 } from '../api'
+import { DateInput, MoneyInput } from '../inputs'
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 
@@ -136,7 +138,7 @@ export function CompForm({ base, onAdded }: { base: string; onAdded: () => void 
       gradingCompany: kind === 'graded' ? company : null,
       grade: kind === 'graded' ? Number(grade) : null,
       rawCondition: kind === 'raw' ? raw : null,
-      price: Number(price),
+      price: parseMoney(price),
       soldOn,
       listingType,
       marketplace: marketplace.trim(),
@@ -195,17 +197,8 @@ export function CompForm({ base, onAdded }: { base: string; onAdded: () => void 
         )}
       </div>
       <div className="row">
-        <input
-          type="number"
-          min={0.01}
-          step={0.01}
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          placeholder="Sold price (USD)"
-          aria-label="Sold price (USD)"
-          required
-        />
-        <input type="date" value={soldOn} max={today()} onChange={(e) => setSoldOn(e.target.value)} aria-label="Sold on" required />
+        <MoneyInput value={price} onChange={setPrice} placeholder="Sold price (USD)" aria-label="Sold price (USD)" required />
+        <DateInput value={soldOn} max={today()} onChange={setSoldOn} aria-label="Sold on" required />
         <select value={listingType} onChange={(e) => setListingType(e.target.value as ListingType)} aria-label="Listing type">
           {LISTING_TYPES.map((t) => (
             <option key={t} value={t}>

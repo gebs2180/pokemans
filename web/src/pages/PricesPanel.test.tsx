@@ -37,6 +37,21 @@ describe('CompForm', () => {
     expect(add).toBeEnabled()
     expect(fetch).toHaveBeenCalledTimes(1)
   })
+
+  it('sends a price typed with commas as a number', async () => {
+    const user = userEvent.setup()
+    const fetch = vi.fn(async () => respond(201, { id: 'comp1' }))
+    vi.stubGlobal('fetch', fetch)
+    render(<CompForm base="/api/admin/catalog-cards/c1" onAdded={() => {}} />)
+
+    await user.type(screen.getByLabelText('Grade'), '10')
+    await user.type(screen.getByLabelText('Sold price (USD)'), '28,750.00')
+    await user.click(screen.getByRole('button', { name: 'Add sold comp' }))
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toMatchObject({ grade: 10, price: 28750 })
+  })
 })
 
 describe('PricesPanel', () => {

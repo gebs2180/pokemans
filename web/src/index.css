@@ -353,3 +353,84 @@ details summary {
   font-weight: 700;
   margin: 0.25rem 0;
 }
+
+.date-input {
+  position: relative;
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.date-input input {
+  width: 8.5rem;
+}
+
+.date-toggle {
+  padding: 0.45rem 0.55rem;
+  line-height: 0;
+}
+
+.calendar {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 10;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+}
+
+.calendar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.calendar-head button {
+  padding: 0.2rem 0.6rem;
+}
+
+.calendar table {
+  border-collapse: collapse;
+}
+
+.calendar th {
+  font-weight: normal;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 0.15rem;
+}
+
+.calendar td {
+  padding: 1px;
+}
+
+.calendar .day {
+  width: 2.1rem;
+  padding: 0.3rem 0;
+  border: 1px solid transparent;
+  background: none;
+  color: inherit;
+}
+
+.calendar .day:hover:not(:disabled) {
+  border-color: var(--border);
+}
+
+.calendar .day.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.calendar .day:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: default;
+}

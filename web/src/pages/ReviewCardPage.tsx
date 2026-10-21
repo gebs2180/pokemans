@@ -14,6 +14,7 @@ import {
   type ProviderCard,
   type Variant,
 } from '../api'
+import { DateInput } from '../inputs'
 import { safeHref } from '../safeHref'
 import { useLoad, usePoll } from '../useLoad'
 import { PricesPanel } from './PricesPanel'
@@ -21,11 +22,14 @@ import { ProvenancePanel } from './ProvenancePanel'
 
 const EDITIONS: Edition[] = ['UNLIMITED', 'FIRST_EDITION', 'SHADOWLESS']
 const VARIANTS: Variant[] = ['NORMAL', 'HOLO', 'REVERSE_HOLO']
+/** Lender and insurer features are paused unless the build turns them on. */
+const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
+const RISK_EFFECT = COLLATERAL ? 'zero collateral until verified' : 'its offer is subject to authentication in hand'
 const RISK_LABEL = {
   NONE: null,
-  VINTAGE_HOLO: 'Vintage holo / 1st Edition: authenticity risk, zero collateral until verified',
-  JAPANESE_PROMO: 'Japanese promo: authenticity risk, zero collateral until verified',
-  RECENT_CHASE: 'Recent chase card: authenticity risk, zero collateral until verified',
+  VINTAGE_HOLO: `Vintage holo / 1st Edition: authenticity risk, ${RISK_EFFECT}`,
+  JAPANESE_PROMO: `Japanese promo: authenticity risk, ${RISK_EFFECT}`,
+  RECENT_CHASE: `Recent chase card: authenticity risk, ${RISK_EFFECT}`,
 } as const
 
 function message(err: unknown) {
@@ -227,14 +231,7 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
                 {/* Required: the release date decides the vintage and recent-chase authenticity flags. */}
                 <label>
                   Set released{' '}
-                  <input
-                    type="date"
-                    value={released}
-                    max={todayLocal}
-                    onChange={(e) => setReleased(e.target.value)}
-                    aria-label="Set release date"
-                    required
-                  />
+                  <DateInput value={released} max={todayLocal} onChange={setReleased} aria-label="Set release date" required />
                 </label>
               </div>
             )}

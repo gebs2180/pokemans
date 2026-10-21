@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
-import { apiPath, money, RETURN_REASON, useApi, type AcceptResult, type Deal, type DeclinedReason, type MarketItem, type OfferCard } from '../api'
+import { apiPath, money, parseMoney, RETURN_REASON, useApi, type AcceptResult, type Deal, type DeclinedReason, type MarketItem, type OfferCard } from '../api'
+import { MoneyInput } from '../inputs'
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { HowPriced } from './OfferPanel'
@@ -190,7 +191,7 @@ export function ArrivalForm({ orgId, deal, onSaved }: { orgId: string; deal: Dea
       if (returning) {
         await api('POST', apiPath`/api/orgs/${orgId}/deals/${deal.listingId}/returned`, { reason, note: note || null })
       } else {
-        await api('POST', apiPath`/api/orgs/${orgId}/deals/${deal.listingId}/received`, { pricePaid: Number(paid), note: note || null })
+        await api('POST', apiPath`/api/orgs/${orgId}/deals/${deal.listingId}/received`, { pricePaid: parseMoney(paid), note: note || null })
       }
       onSaved()
     } catch (err) {
@@ -224,7 +225,7 @@ export function ArrivalForm({ orgId, deal, onSaved }: { orgId: string; deal: Dea
       ) : (
         <label>
           Paid ($){' '}
-          <input type="number" min={0} step={0.01} value={paid} onChange={(e) => setPaid(e.target.value)} className="narrow" aria-label="Price paid" required />
+          <MoneyInput value={paid} onChange={setPaid} min={0} className="narrow" aria-label="Price paid" required />
         </label>
       )}
       <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" aria-label="Note" maxLength={2000} />
