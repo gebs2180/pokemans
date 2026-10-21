@@ -28,6 +28,12 @@ public class Directory {
         return orgs.findById(orgId).map(Org::getName).orElse(null);
     }
 
+    /** A user's login email, or null. */
+    @Transactional(readOnly = true)
+    public String email(UUID userId) {
+        return users.findById(userId).map(AppUser::getEmail).orElse(null);
+    }
+
     @Transactional(readOnly = true)
     public Contact contact(UUID orgId, UUID userId) {
         return new Contact(orgs.findById(orgId).map(Org::getName).orElse(null),

@@ -33,4 +33,12 @@ interface ShippingProvider {
      * @param reference our listing id, printed on the label and kept by the provider
      */
     Label buy(Address from, Address to, Parcel parcel, BigDecimal insuredValue, String reference);
+
+    /**
+     * Asks for an unused label's postage back (Zach, 2026-10-21).
+     *
+     * @param shipmentId the provider's id for the label's shipment
+     * @return the provider's answer, e.g. EasyPost's submitted, refunded, rejected or not_applicable
+     */
+    String refund(String shipmentId);
 }

@@ -15,6 +15,8 @@ const acceptance = (band: string, over: Partial<Acceptance> = {}): Acceptance =>
   closed: 0,
   acceptanceRate: null,
   medianHoursToAccept: null,
+  voided: 0,
+  cancelled: 0,
   ...over,
 })
 

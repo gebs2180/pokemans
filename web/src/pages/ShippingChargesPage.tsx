@@ -23,7 +23,10 @@ export function ShippingChargesPage() {
         <Link to="/admin/offers">← Offer track record</Link>
       </p>
       <h1>Postage to bill</h1>
-      <p className="muted">Labels for bought cards are paid on our shipping account and invoiced to each buyer monthly (UTC months).</p>
+      <p className="muted">
+        Labels for bought cards are paid on our shipping account and invoiced to each buyer monthly (UTC months). A cancelled deal's label is
+        listed but not billed.
+      </p>
       <label>
         Month <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month" />
       </label>
@@ -35,13 +38,13 @@ export function ShippingChargesPage() {
             {b.buyerName ?? b.buyerOrgId}: {money(b.total)}
           </h2>
           <p className="muted small">
-            {b.labels} label{b.labels === 1 ? '' : 's'}: {money(b.postage)} postage, {money(b.insurance)} insurance
+            {b.labels} label{b.labels === 1 ? '' : 's'} billed: {money(b.postage)} postage, {money(b.insurance)} insurance
           </p>
           <div className="scroll">
             <table className="table">
               <tbody>
                 {b.lines.map((l) => (
-                  <tr key={l.listingId}>
+                  <tr key={l.listingId} className={l.billed ? undefined : 'muted'}>
                     <td>{new Date(l.boughtAt).toLocaleDateString()}</td>
                     <td>
                       {l.carrier} {l.service}
@@ -49,6 +52,10 @@ export function ShippingChargesPage() {
                     <td className="muted">{l.trackingCode}</td>
                     <td>{money(l.postage)}</td>
                     <td>{money(l.insurance)}</td>
+                    <td>
+                      {!l.billed && 'Not billed: deal cancelled'}
+                      {l.refund && `${l.billed ? '' : '; '}refund ${l.refund}`}
+                    </td>
                   </tr>
                 ))}
               </tbody>

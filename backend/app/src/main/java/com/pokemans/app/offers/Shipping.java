@@ -8,10 +8,14 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -29,14 +33,16 @@ class Shipping {
 
     private final ShipAddressRepository addresses;
     private final ShippingLabelRepository labels;
+    private final LabelRefundRepository refunds;
     private final Optional<ShippingProvider> provider;
     private final ShippingProperties properties;
     private final CurrentUser currentUser;
 
-    Shipping(ShipAddressRepository addresses, ShippingLabelRepository labels, Optional<ShippingProvider> provider,
-             ShippingProperties properties, CurrentUser currentUser) {
+    Shipping(ShipAddressRepository addresses, ShippingLabelRepository labels, LabelRefundRepository refunds,
+             Optional<ShippingProvider> provider, ShippingProperties properties, CurrentUser currentUser) {
         this.addresses = addresses;
         this.labels = labels;
+        this.refunds = refunds;
         this.provider = provider;
         this.properties = properties;
         this.currentUser = currentUser;
@@ -82,6 +88,50 @@ class Shipping {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Couldn't buy the shipping label: " + e.getMessage(), e);
         }
         return labels.save(new ShippingLabel(listingId, buyerOrgId, from.getId(), to.getId(), bought, insuredValue));
+    }
+
+    /**
+     * Asks the provider that sold the label for its postage back, and records the request with its
+     * answer, or why it couldn't be asked. Once answered, a label isn't asked about again.
+     */
+    @Transactional
+    LabelRefund refund(ShippingLabel label, String reason) {
+        List<LabelRefund> earlier = refunds.findByLabelIdInOrderByCreatedAtAsc(List.of(label.getId()));
+        Optional<LabelRefund> answered = earlier.stream().filter(r -> r.getProviderStatus() != null).findFirst();
+        if (answered.isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "A refund for this label was already asked for: " + answered.get().getProviderStatus() + ".");
+        }
+        String status = null;
+        String error = null;
+        Optional<ShippingProvider> seller = provider.filter(p -> p.name().equals(label.getProvider()));
+        if (seller.isEmpty()) {
+            error = "The label's provider (" + label.getProvider() + ") isn't set up here, so ask it for the refund by hand.";
+        } else if (label.getProviderShipmentId() == null) {
+            error = "The label has no shipment id to refund, so ask " + label.getProvider() + " by hand.";
+        } else {
+            try {
+                status = seller.get().refund(label.getProviderShipmentId());
+            } catch (RuntimeException e) {
+                error = "Couldn't ask for the refund: " + e.getMessage();
+            }
+        }
+        try {
+            return refunds.saveAndFlush(new LabelRefund(label.getId(), label.getListingId(), reason, currentUser.id(),
+                    seller.map(ShippingProvider::name).orElse(null), status, error));
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A refund for this label was just asked for.");
+        }
+    }
+
+    /** Refund requests for these labels, the latest for each. */
+    @Transactional(readOnly = true)
+    Map<UUID, LabelRefund> refunds(Collection<UUID> labelIds) {
+        Map<UUID, LabelRefund> latest = new HashMap<>();
+        if (!labelIds.isEmpty()) {
+            refunds.findByLabelIdInOrderByCreatedAtAsc(labelIds).forEach(r -> latest.put(r.getLabelId(), r));
+        }
+        return latest;
     }
 
     /** Labels bought in a month (UTC), oldest first: what each buyer is billed. */
@@ -190,8 +240,20 @@ class ShippingLabel {
         this.createdAt = Instant.now();
     }
 
+    UUID getId() {
+        return id;
+    }
+
     UUID getListingId() {
         return listingId;
+    }
+
+    String getProvider() {
+        return provider;
+    }
+
+    String getProviderShipmentId() {
+        return providerShipmentId;
     }
 
     UUID getBuyerOrgId() {

@@ -78,6 +78,10 @@ class OfferService {
         BigDecimal margin = value.params().offerMargin(v.confidence());
         OfferLadder.Offer offer = new OfferLadder(value.params(), margin)
                 .offer(value.distribution(), value.prices(), in.prices().salesPerMonth());
+        if (offer.price().compareTo(properties.maxPrice()) > 0) {
+            throw refused("Instant offers go up to $" + properties.maxPrice().stripTrailingZeros().toPlainString()
+                    + " for now, and this card is worth more than that, so it gets no offer.");
+        }
         List<Rung> ladder = offer.rungs().stream().map(r -> new Rung(r.grade(), r.probability(), r.price())).toList();
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         String trace = JSON.writeValueAsString(java.util.stream.Stream.concat(value.trace().stream(), offer.trace().steps().stream()).toList());
