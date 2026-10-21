@@ -1,0 +1,118 @@
+# Production stack for one small VPS (docs/hosting.md). Run from this folder:
+#   docker compose -f compose.prod.yml --env-file .env up -d --build
+# Every secret comes from .env (copy .env.example; never commit it). Only Caddy publishes ports.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 20m
+    max-file: "5"
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pokemans
+      POSTGRES_USER: pokemans
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pokemans -d pokemans"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    logging: *logging
+
+  backend:
+    build: ../backend
+    image: pokemans-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/pokemans
+      DB_USERNAME: pokemans
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: ${AUTH0_ISSUER_URI:?set AUTH0_ISSUER_URI in .env}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES: ${AUTH0_AUDIENCE:?set AUTH0_AUDIENCE in .env}
+      STORAGE_ENDPOINT: ${R2_ENDPOINT:?set R2_ENDPOINT in .env}
+      STORAGE_ACCESS_KEY: ${R2_APP_ACCESS_KEY_ID:?set R2_APP_ACCESS_KEY_ID in .env}
+      STORAGE_SECRET_KEY: ${R2_APP_SECRET_ACCESS_KEY:?set R2_APP_SECRET_ACCESS_KEY in .env}
+      STORAGE_PHOTO_BUCKET: ${R2_PHOTO_BUCKET:-pokemans-photos}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-beta}
+      # Optional features, off unless set in .env (see docs/local-dev.md for each).
+      CARD_READER_ENABLED: ${CARD_READER_ENABLED:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      EASYPOST_ENABLED: ${EASYPOST_ENABLED:-false}
+      EASYPOST_API_KEY: ${EASYPOST_API_KEY:-}
+    # A 4 GB VPS: the JVM takes 60% of this limit as heap.
+    mem_limit: 1536m
+    logging: *logging
+
+  caddy:
+    build:
+      context: ../web
+      args:
+        VITE_AUTH0_DOMAIN: ${AUTH0_DOMAIN:?set AUTH0_DOMAIN in .env}
+        VITE_AUTH0_CLIENT_ID: ${AUTH0_SPA_CLIENT_ID:?set AUTH0_SPA_CLIENT_ID in .env}
+        VITE_AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+        VITE_COLLATERAL_ENABLED: "false"
+    image: pokemans-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    logging: *logging
+
+  # Nightly Postgres dump and photo-bucket copy to the backup bucket (backup/backup.sh).
+  backup:
+    build: ./backup
+    image: pokemans-backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGDATABASE: pokemans
+      PGUSER: pokemans
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_AT: ${BACKUP_AT:-03:30}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+      PHOTO_BUCKET: ${R2_PHOTO_BUCKET:-pokemans-photos}
+      BACKUP_BUCKET: ${R2_BACKUP_BUCKET:-pokemans-backups}
+      HEALTHCHECK_URL: ${BACKUP_HEALTHCHECK_URL:-}
+      # rclone remotes: "photos" reads the photo bucket, "backups" writes the backup bucket (separate tokens).
+      RCLONE_CONFIG_PHOTOS_TYPE: s3
+      RCLONE_CONFIG_PHOTOS_PROVIDER: Cloudflare
+      RCLONE_CONFIG_PHOTOS_ENDPOINT: ${R2_ENDPOINT}
+      RCLONE_CONFIG_PHOTOS_ACCESS_KEY_ID: ${R2_BACKUP_READ_ACCESS_KEY_ID:?set R2_BACKUP_READ_ACCESS_KEY_ID in .env}
+      RCLONE_CONFIG_PHOTOS_SECRET_ACCESS_KEY: ${R2_BACKUP_READ_SECRET_ACCESS_KEY:?set R2_BACKUP_READ_SECRET_ACCESS_KEY in .env}
+      RCLONE_CONFIG_PHOTOS_NO_CHECK_BUCKET: "true"
+      RCLONE_CONFIG_BACKUPS_TYPE: s3
+      RCLONE_CONFIG_BACKUPS_PROVIDER: Cloudflare
+      RCLONE_CONFIG_BACKUPS_ENDPOINT: ${R2_ENDPOINT}
+      RCLONE_CONFIG_BACKUPS_ACCESS_KEY_ID: ${R2_BACKUP_WRITE_ACCESS_KEY_ID:?set R2_BACKUP_WRITE_ACCESS_KEY_ID in .env}
+      RCLONE_CONFIG_BACKUPS_SECRET_ACCESS_KEY: ${R2_BACKUP_WRITE_SECRET_ACCESS_KEY:?set R2_BACKUP_WRITE_SECRET_ACCESS_KEY in .env}
+      RCLONE_CONFIG_BACKUPS_NO_CHECK_BUCKET: "true"
+    logging: *logging
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
