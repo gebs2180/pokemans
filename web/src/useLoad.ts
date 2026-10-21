@@ -37,3 +37,12 @@ export function useLoad<T>(loader: () => Promise<T>, deps: unknown[]) {
   }, [])
   return { data, error, reload }
 }
+
+/** Calls {@code reload} every {@code ms} while {@code active}, e.g. while background work is pending. */
+export function usePoll(active: boolean, reload: () => void, ms = 2000) {
+  useEffect(() => {
+    if (!active) return
+    const timer = setInterval(reload, ms)
+    return () => clearInterval(timer)
+  }, [active, reload, ms])
+}

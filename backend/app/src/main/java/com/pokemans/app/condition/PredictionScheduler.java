@@ -20,7 +20,8 @@ class PredictionScheduler {
         this.condition = condition;
     }
 
-    @Scheduled(fixedDelayString = "${pokemans.condition.worker.poll-interval:15s}", initialDelayString = "10s")
+    @Scheduled(fixedDelayString = "${pokemans.condition.worker.poll-interval:15s}",
+            initialDelayString = "${pokemans.condition.worker.poll-interval:15s}")
     void run() {
         worker.runOnce();
     }

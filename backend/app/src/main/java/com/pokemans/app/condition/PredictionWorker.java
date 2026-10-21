@@ -14,7 +14,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -58,10 +62,12 @@ class PredictionWorker {
     private final StorageProperties storage;
     private final ConditionProperties properties;
     private final TransactionTemplate transactions;
+    private final TaskExecutor executor;
 
     PredictionWorker(List<PreGradeProvider> providers, PredictionRequestRepository requests, ProviderPredictionRepository predictions,
                      ConditionService condition, CardItems cardItems, BlobStore blobs, StorageProperties storage,
-                     ConditionProperties properties, TransactionTemplate transactions) {
+                     ConditionProperties properties, TransactionTemplate transactions,
+                     @Qualifier("applicationTaskExecutor") TaskExecutor executor) {
         this.providers = providers.stream().collect(Collectors.toMap(PreGradeProvider::name, Function.identity()));
         this.requests = requests;
         this.predictions = predictions;
@@ -71,6 +77,26 @@ class PredictionWorker {
         this.storage = storage;
         this.properties = properties;
         this.transactions = transactions;
+        this.executor = executor;
+    }
+
+    /**
+     * Sends newly queued requests in the background as soon as they commit, instead of at the next
+     * poll; the poll stays as the fallback, and keeps polling providers for answers. Off wherever the
+     * background worker is (tests drive it directly).
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    void startQueued(ConditionService.PredictionsQueued event) {
+        if (properties.worker().enabled()) {
+            executor.execute(() -> {
+                try {
+                    runOnce();
+                } catch (RuntimeException e) {
+                    log.warn("Sending prediction requests for card {} straight away failed; the scheduled worker will retry",
+                            event.cardItemId(), e);
+                }
+            });
+        }
     }
 
     /**

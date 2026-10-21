@@ -20,7 +20,7 @@ class RecognitionScheduler {
         this.properties = properties;
     }
 
-    @Scheduled(fixedDelayString = "${pokemans.catalog.reader.poll-interval:15s}", initialDelayString = "10s")
+    @Scheduled(fixedDelayString = "${pokemans.catalog.reader.poll-interval:15s}", initialDelayString = "${pokemans.catalog.reader.poll-interval:15s}")
     void run() {
         if (properties.reader().workerEnabled()) {
             recognition.runOnce();
