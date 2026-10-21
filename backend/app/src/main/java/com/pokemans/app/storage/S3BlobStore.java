@@ -41,7 +41,10 @@ class S3BlobStore implements BlobStore, AutoCloseable {
         AwsCredentialsProvider credentials = properties.accessKey() == null || properties.accessKey().isBlank()
                 ? DefaultCredentialsProvider.builder().build()
                 : StaticCredentialsProvider.create(AwsBasicCredentials.create(properties.accessKey(), properties.secretKey()));
-        S3Configuration s3 = S3Configuration.builder().pathStyleAccessEnabled(properties.pathStyle()).build();
+        S3Configuration s3 = S3Configuration.builder()
+                .pathStyleAccessEnabled(properties.pathStyle())
+                .chunkedEncodingEnabled(properties.chunkedEncoding())
+                .build();
         Region region = Region.of(properties.region());
 
         var clientBuilder = S3Client.builder().region(region).credentialsProvider(credentials).serviceConfiguration(s3);

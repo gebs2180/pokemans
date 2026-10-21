@@ -22,6 +22,9 @@ dependencies {
     // (LGPL-2.1, used unmodified as a library; PDFBox underneath is Apache-2.0) lays them out.
     implementation("org.thymeleaf:thymeleaf")
     implementation("io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.85")
+    // Error reports to Sentry (docs/hosting.md). Does nothing unless SENTRY_DSN is set.
+    implementation("io.sentry:sentry-spring-boot-4-starter:8.61.0")
+    implementation("io.sentry:sentry-logback:8.61.0")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 

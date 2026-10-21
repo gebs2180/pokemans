@@ -1,0 +1,43 @@
+# Caddy gets and renews the HTTPS certificate for SITE_ADDRESS (Let's Encrypt) on its own.
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		-Server
+	}
+
+	# The API. Only health is exposed from actuator.
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+	handle /actuator/health {
+		reverse_proxy backend:8080
+	}
+	handle /actuator/* {
+		respond 404
+	}
+
+	# The PWA. Hashed assets cache forever; the shell and service worker never, so a deploy shows up on reload.
+	handle {
+		root * /srv
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		@shell path / /index.html /sw.js /registerSW.js /manifest.webmanifest
+		header @shell Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
