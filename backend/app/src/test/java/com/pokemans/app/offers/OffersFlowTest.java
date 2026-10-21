@@ -127,6 +127,9 @@ class OffersFlowTest {
                 .andExpect(jsonPath("$.labelPending").isEmpty())
                 .andExpect(jsonPath("$.deals[0].seller.orgName").value(sellerName))
                 .andExpect(jsonPath("$.deals[0].label.trackingCode").isNotEmpty())
+                // The buyer never learns where the seller is: no printable label (it shows the seller's address), no city.
+                .andExpect(jsonPath("$.deals[0].label.labelUrl").isEmpty())
+                .andExpect(jsonPath("$.deals[0].seller.city").doesNotExist())
                 .andExpect(jsonPath("$.deals[0].label.insuredValue").value(price));
         FakeShippingProvider.Bought label = shipper.bought.stream().filter(b -> b.reference().equals(listingId)).findFirst().orElseThrow();
         assertThat(label.from().name()).isEqualTo("Sam");

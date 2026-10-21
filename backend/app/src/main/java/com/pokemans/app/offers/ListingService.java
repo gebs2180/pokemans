@@ -265,7 +265,7 @@ class ListingService {
             ListingEvent acceptedEvent = h.stream().filter(e -> e.getType() == ListingEvent.Type.ACCEPTED).findFirst().orElseThrow();
             Directory.Contact seller = directory.contact(l.getOrgId(), l.getListedBy());
             deals.add(new DealView(l.getId(), card(in), offerView(offer), photos(in), new Party(seller.orgName(), seller.email()),
-                    acceptedEvent.getCreatedAt(), label(l.getId()), outcome(h), undone(h, ListingEvent.Type.CANCELLED)));
+                    acceptedEvent.getCreatedAt(), forBuyer(label(l.getId())), outcome(h), undone(h, ListingEvent.Type.CANCELLED)));
         }
         return deals;
     }
@@ -426,6 +426,16 @@ class ListingService {
     private static UndoView undone(List<ListingEvent> history, ListingEvent.Type type) {
         return history.stream().filter(e -> e.getType() == type).findFirst()
                 .map(e -> new UndoView(e.getNote(), e.getCreatedAt())).orElse(null);
+    }
+
+    /**
+     * The label as the buyer sees it: carrier and tracking, but not the printable label, which shows the
+     * seller's address. Buyers never learn where a seller is, so they can't meet up and deal around us
+     * (Zach, 2026-10-21).
+     */
+    private static LabelView forBuyer(LabelView label) {
+        return label == null ? null
+                : new LabelView(label.carrier(), label.service(), label.trackingCode(), null, label.insuredValue(), label.boughtAt());
     }
 
     LabelView label(UUID listingId) {

@@ -102,7 +102,7 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
     - `GET /api/admin/shipping/charges?month=yyyy-MM`: cancelled deals' labels are listed with `billed: false` and their refund state
     - `GET /api/admin/offers`: the newest 200 offers with their latest listing, label and any undo
     - `POST /api/admin/offers/{id}/void`, `POST /api/admin/deals/{id}/cancel`, `POST /api/admin/deals/{id}/label/refund`, each with `{"reason": "..."}`
-  - The market never names the seller. Contact details and the label appear only to the two parties once a buyer accepts.
+  - The market never names the seller. Once a buyer accepts, each side sees the other's org name and email, and only the seller gets the printable label. The buyer never sees the seller's address or city, not even through the label, so the two can't meet up and deal around us (Zach, 2026-10-21). The parcel's return address still shows the seller's address on arrival; a return address of ours would close that.
 - **Web:**
   - the "Instant offer" panel on the card page: the price, how it was priced, the ship-from address, "Sell for $X", and the label to print;
   - the buyer org page, behind the buyer terms, with its ship-to address;

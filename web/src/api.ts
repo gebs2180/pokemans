@@ -652,7 +652,8 @@ export type ShippingLabel = {
   carrier: string
   service: string
   trackingCode: string | null
-  labelUrl: string
+  /** The printable label, for the seller only: it shows the seller's address, which buyers never see. */
+  labelUrl: string | null
   insuredValue: number
   boughtAt: string
 }
