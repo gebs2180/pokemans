@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { ApiError, apiPath, useApi } from './api'
+import { ApiError, apiPath, UNREACHABLE, UPLOAD_FAILED, uploadToStorage, useApi } from './api'
 import { auth0, respond } from './test/auth0'
 
 function api() {
@@ -74,5 +74,25 @@ describe('useApi', () => {
 describe('apiPath', () => {
   it('encodes every interpolated segment', () => {
     expect(apiPath`/api/invites/${'a/../b?c'}/accept`).toBe('/api/invites/a%2F..%2Fb%3Fc/accept')
+  })
+})
+
+describe('network failures', () => {
+  const offline = async () => {
+    throw new TypeError('Failed to fetch')
+  }
+
+  it('says the app could not be reached instead of "Failed to fetch"', async () => {
+    vi.stubGlobal('fetch', offline)
+    await expect(api()('GET', '/api/things')).rejects.toThrow(UNREACHABLE)
+  })
+
+  it('says the photo did not upload, and asks to try again', async () => {
+    vi.stubGlobal('fetch', offline)
+    const slot = { photoId: 'p1', url: 'http://storage/x', method: 'PUT', headers: {}, expiresAt: '' }
+    await expect(uploadToStorage(slot, new Blob(['x']))).rejects.toThrow(UPLOAD_FAILED)
+
+    vi.stubGlobal('fetch', async () => respond(403))
+    await expect(uploadToStorage(slot, new Blob(['x']))).rejects.toThrow("The photo didn't upload (storage answered 403). Please try again.")
   })
 })

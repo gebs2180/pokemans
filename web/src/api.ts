@@ -128,14 +128,18 @@ export function useApi() {
         }
         throw e
       })
-      const response = await fetch(path, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      })
+      const response = await reach(
+        () =>
+          fetch(path, {
+            method,
+            headers: {
+              Authorization: `Bearer ${token}`,
+              ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+            },
+            body: body === undefined ? undefined : JSON.stringify(body),
+          }),
+        UNREACHABLE,
+      )
       if (response.status === 401) {
         await relogin()
         throw new ApiError(401, 'Your session has ended. Redirecting to log in…')
@@ -157,11 +161,28 @@ export function useApi() {
   )
 }
 
+export const UNREACHABLE = "Couldn't reach pokemans. Check your connection and try again."
+export const UPLOAD_FAILED = "The photo didn't upload. Check your connection and try again."
+
+/**
+ * A fetch that never reached the server (offline, blocked, dropped) rejects with the browser's own
+ * TypeError, e.g. "Failed to fetch"; people see `message` instead.
+ */
+async function reach(request: () => Promise<Response>, message: string): Promise<Response> {
+  try {
+    return await request()
+  } catch (e) {
+    if (e instanceof TypeError) throw new Error(message, { cause: e })
+    throw e
+  }
+}
+
 /** PUTs a file straight to storage using a presigned upload slot. */
 export async function uploadToStorage(slot: UploadSlot, file: Blob): Promise<void> {
-  const response = await fetch(slot.url, { method: slot.method, headers: slot.headers, body: file })
+  const response = await reach(() => fetch(slot.url, { method: slot.method, headers: slot.headers, body: file }), UPLOAD_FAILED)
   if (!response.ok) {
-    throw new Error(`Upload to storage failed: ${response.status}`)
+    // An expired slot (403) or a storage hiccup: asking again gets a fresh slot.
+    throw new ApiError(response.status, `The photo didn't upload (storage answered ${response.status}). Please try again.`)
   }
 }
 
