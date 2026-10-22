@@ -57,7 +57,7 @@ class PhotoService {
     @Transactional
     UploadSlot requestUpload(UUID orgId, UUID cardId, Photo.Side side, String contentType, long sizeBytes) {
         CardItem card = intake.requireCard(orgId, cardId);
-        if (access.require(orgId, OrgType.values()).getType() == OrgType.CONTRIBUTOR) {
+        if (access.require(orgId, OrgType.values()).getType() != OrgType.PARTNER) {
             consents.requireAccepted(orgId);
         }
         requireNotFrozen(card);
@@ -76,7 +76,7 @@ class PhotoService {
     /** Idempotent: confirming a photo that was already checked returns the stored result. */
     @Transactional
     PhotoView confirm(UUID orgId, UUID photoId) {
-        if (access.require(orgId, OrgType.values()).getType() == OrgType.CONTRIBUTOR) {
+        if (access.require(orgId, OrgType.values()).getType() != OrgType.PARTNER) {
             consents.requireAccepted(orgId);
         }
         // Locks photo then card: a repeated confirm waits and sees the stored result, and confirms of the

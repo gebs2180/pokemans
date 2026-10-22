@@ -153,6 +153,7 @@ class OfferController {
     @ResponseStatus(HttpStatus.CREATED)
     ListingService.OfferView price(@PathVariable UUID orgId, @PathVariable UUID cardId) {
         requireSellerCard(orgId, cardId);
+        consents.requireAccepted(orgId);
         return ListingService.offerView(offers.price(orgId, cardId), null);
     }
 
@@ -161,6 +162,7 @@ class OfferController {
     @ResponseStatus(HttpStatus.CREATED)
     ListingService.SaleView post(@PathVariable UUID orgId, @PathVariable UUID cardId, @Valid @RequestBody PostRequest request) {
         requireSellerCard(orgId, cardId);
+        consents.requireAccepted(orgId);
         listings.post(orgId, cardId, request.offerId());
         return listings.sale(cardId);
     }

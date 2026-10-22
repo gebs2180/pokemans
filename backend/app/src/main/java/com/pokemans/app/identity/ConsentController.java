@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Contributor data-use terms: read them, see whether you accepted, accept. */
+/** An org's terms (seller, contributor or buyer): read them, see whether you accepted, accept. */
 @RestController
 class ConsentController {
 
@@ -31,14 +31,14 @@ class ConsentController {
 
     @GetMapping("/api/orgs/{orgId}/consent")
     ConsentStatus status(@PathVariable UUID orgId) {
-        Consents.Terms terms = Consents.termsFor(access.require(orgId, OrgType.CONTRIBUTOR, OrgType.BUYER).getType()).orElseThrow();
+        Consents.Terms terms = Consents.termsFor(access.require(orgId, Consents.TERMS_ORGS).getType()).orElseThrow();
         return new ConsentStatus(terms.version(), terms.text(), consents.acceptedAt(orgId).orElse(null));
     }
 
     @PostMapping("/api/orgs/{orgId}/consent")
     ConsentStatus accept(@PathVariable UUID orgId, @Valid @RequestBody AcceptRequest request) {
         Instant accepted = consents.accept(orgId, request.version());
-        Consents.Terms terms = Consents.termsFor(access.require(orgId, OrgType.CONTRIBUTOR, OrgType.BUYER).getType()).orElseThrow();
+        Consents.Terms terms = Consents.termsFor(access.require(orgId, Consents.TERMS_ORGS).getType()).orElseThrow();
         return new ConsentStatus(terms.version(), terms.text(), accepted);
     }
 }

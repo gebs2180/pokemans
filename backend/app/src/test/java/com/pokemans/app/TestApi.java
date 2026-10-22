@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.pokemans.app.identity.Consents;
 import com.pokemans.app.identity.RoleClaimConverter;
 import com.pokemans.app.identity.SecurityProperties;
 import java.net.URI;
@@ -59,6 +60,8 @@ public class TestApi {
                 .andExpect(status().isCreated()), "$.id");
         String token = read(postJson("/api/admin/orgs/" + orgId + "/invites", "{}", admin()), "$.token");
         mvc.perform(post("/api/invites/" + token + "/accept").with(user(memberSubject, List.of()))).andExpect(status().isOk());
+        postJson("/api/orgs/" + orgId + "/consent", "{\"version\":\"" + Consents.SELLER_TERMS_VERSION + "\"}", user(memberSubject, List.of()))
+                .andExpect(status().isOk());
         return orgId;
     }
 

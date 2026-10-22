@@ -27,10 +27,17 @@ export function OrgPage() {
     )
   }
   const containers = <Containers orgId={orgId} orgName={org.name} kind={containerKind(org.type)} />
+  if (org.type === 'COLLECTOR') {
+    return (
+      <ConsentGate orgId={orgId} title="Before you sell" intro="Please read what posting a card for sale commits you to." accepted="seller terms">
+        {containers}
+      </ConsentGate>
+    )
+  }
   return org.type === 'CONTRIBUTOR' ? <ConsentGate orgId={orgId}>{containers}</ConsentGate> : containers
 }
 
-/** Contributors and buyers read and accept their terms before taking part. */
+/** Collectors, contributors and buyers read and accept their terms before taking part. */
 function ConsentGate({
   orgId,
   children,
