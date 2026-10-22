@@ -16,11 +16,15 @@ The lender and insurer side is paused while Zach clears his outside interest wit
    - its provenance.
 
    The offer is **one firm price**. "How we priced it" shows the per-grade ladder behind it.
-2. **Selling.** "Sell" posts the price to every buyer org. The seller needs a ship-from address on file first. Posting isn't a sale: the first buyer to accept buys the card at the price, and the page says so. A listing nobody accepts expires.
-3. **The label.** Accepting buys a prepaid, insured label at once, on our EasyPost account, from the seller's address to the buyer's. The seller prints it from the card page. If the purchase fails (no shipping account yet, or the carrier is down), the sale still stands: the buyer or the admin buys the label again.
-4. **On arrival.** The buyer records one of two things:
-   - the card arrived genuine and as shown, and what they paid the seller, by default the offer price;
-   - it goes back, for one of the reasons the buyer terms allow: not genuine, not the listed card, or doesn't match its photos.
+2. **Selling.** "Sell" posts the price to every buyer org, after one confirm step. The seller needs a ship-from address on file first. Posting isn't a sale: the first buyer to accept buys the card at the price, and the page says so. A listing nobody accepts expires.
+   - Buyers see the photos the offer was priced on: each side's current photo (front, back, close-up), labelled, never superseded attempts. An offer whose photos were retaken since can't be posted: the seller gets a new one.
+   - From posting on, the card's photos can't change (E2E audit, 2026-10-21): the API refuses uploads while it's posted, and for good once it's sold. Withdrawing frees them again.
+3. **The label.** Accepting buys a prepaid, insured label at once, on our EasyPost account, from the seller's address to the buyer's. The seller prints it from the card page. If the purchase fails (no shipping account yet, or the carrier is down), the sale still stands: the buyer retries from Your deals, or the admin from **Labels to buy** (`/admin/labels`). Meanwhile the seller is told not to ship until the label shows.
+4. **On arrival.** Once a label exists, the buyer records one of two things:
+   - the card arrived genuine and as shown, and what they paid the seller, by default the offer price; any other amount needs a note saying why;
+   - it goes back, for one of the reasons the buyer terms allow: not genuine, not the listed card, or doesn't match its photos. No reason is preselected.
+
+   Without a label nothing can have shipped, so the API refuses both. If a card shipped another way, the admin records it for the buyer from **Labels to buy**, with a note saying how; the note is kept as "Recorded by the admin: …".
 
    No grade is judged: condition within the photos is the buyer's risk.
 5. **Billing.** Postage and insurance are billed to buyers monthly, off-platform, from `/admin/shipping`. Payment for the card is between buyer and seller, due within 7 days of a card arriving as shown. We hold no cards and no money for cards (Zach doesn't rule out becoming the middleman later).
@@ -31,6 +35,8 @@ The lender and insurer side is paused while Zach clears his outside interest wit
 - **Price:** `price = Σ p_g · offer_g`, where `offer_g = P↓_g · (1 − f) · (1 − d) · (1 − m)`.
   - P↓ is the grade's net price (net of grading cost), capped at the grade above, so a PSA 1 premium never pays more for a worse card.
   - f = 15% fees; d = the speed discount for the card's liquidity (5/10/20%); m = the buyer margin, by the card's confidence: 10% at A, 13% at B, 17% at C (Zach, 2026-10-21, parameter set 1.2.0). Before that, B and C cost a seller nothing until they tipped into D; a less certain condition is a bigger risk for the buyer under a firm price, so it now leaves the buyer more room. "How we priced it" says which margin applied and why.
+  - The confidence an offer is priced at is the card's own, without the penalties that only bear on FLV (Zach, 2026-10-21, after the E2E audit's finding 1). The offer uses the central distribution and net prices, never σ or the stressed distribution. So a fallback σ and derived prices that only the stress reaches don't lower it. The photo and comps base, a stale price table, and a derived price where the card is likely still do. FLV and valuation runs keep every penalty. The trace records it as `offer_confidence`, and the admin's offer preview shows it.
+  - Grades without their own sales are still priced by extrapolation for offers, as the methodology does (Zach, 2026-10-21, after finding 6, which showed a Base Charizard PSA 5 at about $3).
   - The buyer keeps the upside of a 10 and carries the downside.
   - For a verified graded card the ladder is one rung, at gross prices.
 - **Validity:** an offer stands for 7 days, and a posted listing for 14 (`pokemans.offers.*`).
@@ -79,6 +85,7 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
     - `POST .../offers`
     - `POST .../listings`
     - `POST /api/orgs/{org}/listings/{id}/withdraw`
+    - `GET /api/orgs/{org}/cards/{card}/status` and `GET /api/orgs/{org}/collections/{collection}/status`: where each card is (photos, our identification, condition review, prices, offer, posted, sold), its identity once confirmed, and what happens next
   - Both sides: `GET`/`POST /api/orgs/{org}/ship-address`.
   - Buyer (buyer org, terms accepted):
     - `GET /api/orgs/{org}/market`
@@ -88,11 +95,14 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
     - `POST .../deals/{id}/received`
     - `POST .../deals/{id}/returned`
   - Admin (admin role after an MFA login):
+    - `GET /api/admin/cards/{card}/offer-preview`: the offer the seller would get now, or why none, with the trace steps that set its confidence. Stores nothing.
+    - `GET /api/admin/deals/awaiting-label`
     - `POST /api/admin/deals/{id}/label?buyerOrgId=`
+    - `POST /api/admin/deals/{id}/received?buyerOrgId=` and `.../returned?buyerOrgId=`: an arrival or return recorded by hand, note required
     - `GET /api/admin/shipping/charges?month=yyyy-MM`: cancelled deals' labels are listed with `billed: false` and their refund state
     - `GET /api/admin/offers`: the newest 200 offers with their latest listing, label and any undo
     - `POST /api/admin/offers/{id}/void`, `POST /api/admin/deals/{id}/cancel`, `POST /api/admin/deals/{id}/label/refund`, each with `{"reason": "..."}`
-  - The market never names the seller. Contact details and the label appear only to the two parties once a buyer accepts.
+  - The market never names the seller. Once a buyer accepts, each side sees the other's org name and email, and only the seller gets the printable label. The buyer never sees the seller's address or city, not even through the label, so the two can't meet up and deal around us (Zach, 2026-10-21). The parcel's return address still shows the seller's address on arrival: kept for the beta (Zach, 2026-10-21).
 - **Web:**
   - the "Instant offer" panel on the card page: the price, how it was priced, the ship-from address, "Sell for $X", and the label to print;
   - the buyer org page, behind the buyer terms, with its ship-to address;

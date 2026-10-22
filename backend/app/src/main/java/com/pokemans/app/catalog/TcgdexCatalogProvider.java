@@ -4,6 +4,7 @@ import java.net.http.HttpClient;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -34,6 +35,7 @@ class TcgdexCatalogProvider implements CatalogProvider {
 
     private final RestClient http;
     private final Map<String, Map<String, Object>> sets = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, Map<String, Object>>> setLists = new ConcurrentHashMap<>();
 
     TcgdexCatalogProvider(CatalogProperties properties) {
         JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(
@@ -66,6 +68,8 @@ class TcgdexCatalogProvider implements CatalogProvider {
             return List.of();
         }
         String wantedNumber = normalizeNumber(number);
+        Integer wantedTotal = setTotal(number);
+        Map<String, Map<String, Object>> setList = setList(language);
         List<Hit> hits = new ArrayList<>();
         for (Map<String, Object> r : results) {
             String id = string(r, "id");
@@ -78,9 +82,48 @@ class TcgdexCatalogProvider implements CatalogProvider {
             if (!words.stream().skip(1).allMatch(haystack::contains)) {
                 continue;
             }
-            hits.add(new Hit(id, localId, cardName, setIdOf(id, localId), string(r, "image")));
+            String setId = setIdOf(id, localId);
+            Map<String, Object> set = setId == null ? Map.of() : setList.getOrDefault(setId, Map.of());
+            hits.add(new Hit(id, localId, cardName, setId, string(r, "image"), string(set, "name"), officialCount(set)));
+        }
+        if (wantedTotal != null) {
+            // "4/102" names Base Set, not Base Set 2 (4/130): sets of the printed size first, in TCGdex's order otherwise.
+            hits.sort(Comparator.comparing(h -> !wantedTotal.equals(h.setTotal())));
         }
         return hits;
+    }
+
+    /** The set size printed after the slash ("102" in "4/102"), or null when there's no slash. */
+    static Integer setTotal(String number) {
+        if (number == null || !number.contains("/")) {
+            return null;
+        }
+        String total = number.substring(number.indexOf('/') + 1).trim().replaceFirst("^0+(?=.)", "");
+        return total.matches("\\d{1,4}") ? Integer.valueOf(total) : null;
+    }
+
+    /** Every set in the language, by id, fetched once: names and sizes for search results. Empty if TCGdex won't say. */
+    private Map<String, Map<String, Object>> setList(String language) {
+        Map<String, Map<String, Object>> cached = setLists.get(language);
+        if (cached != null) {
+            return cached;
+        }
+        Map<String, Map<String, Object>> byId = new java.util.HashMap<>();
+        try {
+            List<Map<String, Object>> body = http.get().uri("/{lang}/sets", language).retrieve().body(LIST);
+            if (body != null) {
+                body.forEach(set -> {
+                    String id = string(set, "id");
+                    if (id != null) {
+                        byId.put(id, set);
+                    }
+                });
+            }
+        } catch (RuntimeException e) {
+            return Map.of(); // names are a help, not a need: try again next search
+        }
+        setLists.put(language, byId);
+        return byId;
     }
 
     /** "delta" and "δ" both mean the Delta Species symbol TCGdex puts in names. */

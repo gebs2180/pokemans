@@ -28,6 +28,7 @@ const record: TrackRecord = {
     taken: 4,
     labels: 4,
     inTransit: 1,
+    awaitingLabel: 0,
     received: 2,
     returned: 1,
     returnRate: 0.3333,

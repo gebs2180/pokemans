@@ -57,7 +57,9 @@ function QueueTable({ items }: { items: QueueItem[] }) {
           <tr key={i.cardId}>
             <td>
               <Link to={`/admin/review/${i.orgId}/${i.cardId}`}>{i.label}</Link>
-              <div className="muted small">{new Date(i.createdAt).toLocaleDateString()}</div>
+              <div className="muted small">
+                {i.orgName ?? 'Unknown org'} · {new Date(i.createdAt).toLocaleDateString()}
+              </div>
             </td>
             <td className={i.identified ? '' : 'warn'}>{i.identifiedAs ?? 'Not identified'}</td>
             <td className={i.assessment === 'REVIEWER' ? 'ok' : 'warn'}>

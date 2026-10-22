@@ -7,7 +7,8 @@ export function AdminPage() {
   const api = useApi()
   const { data: orgs, error, reload } = useLoad(() => api<Org[]>('GET', '/api/admin/orgs'), [api])
   const [name, setName] = useState('')
-  const [type, setType] = useState<OrgType>('PARTNER')
+  // The offers beta needs collector and buyer orgs; partner orgs are for the paused collateral side.
+  const [type, setType] = useState<OrgType>('COLLECTOR')
   const [invites, setInvites] = useState<Record<string, CreatedInvite>>({})
   const [actionError, setActionError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -48,14 +49,15 @@ export function AdminPage() {
       <p>
         <Link to="/admin/review">Review queue →</Link> · <Link to="/admin/outcomes">Graded results to check →</Link> ·{' '}
         <Link to="/admin/deals">Offers and deals →</Link> · <Link to="/admin/offers">Offer track record →</Link> ·{' '}
+        <Link to="/admin/labels">Labels to buy →</Link> ·{' '}
         <Link to="/admin/shipping">Postage to bill →</Link>
       </p>
       <h1>Orgs</h1>
       <form onSubmit={createOrg} className="row">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Org name" aria-label="Org name" required maxLength={200} />
         <select value={type} onChange={(e) => setType(e.target.value as OrgType)} aria-label="Org type">
+          <option value="COLLECTOR">Collector (sells cards)</option>
           <option value="PARTNER">Partner</option>
-          <option value="COLLECTOR">Collector</option>
           <option value="CONTRIBUTOR">Contributor (shares graded cards)</option>
           <option value="BUYER">Buyer (takes up instant offers)</option>
         </select>

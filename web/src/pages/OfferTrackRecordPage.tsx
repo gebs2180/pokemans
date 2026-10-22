@@ -92,7 +92,8 @@ export function OfferTrackRecordPage() {
           <tr>
             <th>Bought</th>
             <td>
-              {deliveries.taken} · {deliveries.labels} labelled · {deliveries.inTransit} on the way
+              {deliveries.taken} · {deliveries.labels} labelled · {deliveries.inTransit} on the way · {deliveries.awaitingLabel} waiting
+              for a label
             </td>
           </tr>
           <tr>

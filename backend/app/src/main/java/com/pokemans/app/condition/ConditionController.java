@@ -1,6 +1,7 @@
 package com.pokemans.app.condition;
 
 import com.pokemans.app.catalog.Catalog;
+import com.pokemans.app.identity.Directory;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.storage.BlobStore;
 import com.pokemans.app.storage.StorageProperties;
@@ -43,8 +44,9 @@ class ConditionController {
                          @NotBlank @Size(max = 2000) String reason) {
     }
 
+    /** @param orgName whose card it is, so the reviewer can tell collectors apart */
     record QueueItem(UUID cardId, UUID orgId, String label, Instant createdAt, boolean identified, String identifiedAs,
-                     String assessment, Confidence confidence, int openRequests) {
+                     String assessment, Confidence confidence, int openRequests, String orgName) {
     }
 
     record PhotoLink(UUID id, String side, URI url, URI cropUrl, Instant capturedAt) {
@@ -76,10 +78,11 @@ class ConditionController {
     private final Catalog catalog;
     private final BlobStore blobs;
     private final StorageProperties storage;
+    private final Directory directory;
 
     ConditionController(ConditionService condition, ConditionAssessmentRepository assessmentRepository,
                         PredictionRequestRepository requestRepository, CardItems cardItems, Catalog catalog, BlobStore blobs,
-                        StorageProperties storage) {
+                        StorageProperties storage, Directory directory) {
         this.condition = condition;
         this.assessmentRepository = assessmentRepository;
         this.requestRepository = requestRepository;
@@ -87,6 +90,7 @@ class ConditionController {
         this.catalog = catalog;
         this.blobs = blobs;
         this.storage = storage;
+        this.directory = directory;
     }
 
     /**
@@ -104,20 +108,22 @@ class ConditionController {
         Map<UUID, Long> open = ids.isEmpty() ? Map.of()
                 : requestRepository.findByCardItemIdIn(ids).stream().filter(PredictionRequest::isOpen)
                 .collect(Collectors.groupingBy(PredictionRequest::getCardItemId, Collectors.counting()));
+        Map<UUID, String> orgNames = new java.util.HashMap<>();
+        cards.forEach(c -> orgNames.computeIfAbsent(c.orgId(), directory::orgName));
         return cards.stream().map(c -> {
             Catalog.IdentifiedCard id = identities.get(c.id());
             ConditionAssessment a = current.get(c.id());
             return new QueueItem(c.id(), c.orgId(), c.label(), c.createdAt(), id != null,
                     id == null ? null : id.name() + " · " + id.setName() + " " + id.number(),
                     a == null ? "NONE" : a.getAuthorType().name(), a == null ? null : a.getConfidence(),
-                    open.getOrDefault(c.id(), 0L).intValue());
+                    open.getOrDefault(c.id(), 0L).intValue(), orgNames.get(c.orgId()));
         }).toList();
     }
 
     @GetMapping("/orgs/{orgId}/cards/{cardId}/condition")
     CardConditionView card(@PathVariable UUID orgId, @PathVariable UUID cardId) {
         CardItems.CardItemRef card = condition.requireCard(orgId, cardId);
-        List<PhotoLink> photos = cardItems.passedPhotos(cardId).stream()
+        List<PhotoLink> photos = cardItems.currentPhotos(cardId).stream()
                 .map(p -> new PhotoLink(p.id(), p.side(), blobs.presignDownload(storage.photoBucket(), p.storageKey()),
                         p.cropKey() == null ? null : blobs.presignDownload(storage.photoBucket(), p.cropKey()), p.capturedAt()))
                 .toList();

@@ -173,7 +173,8 @@ final class ValuationEngine {
         BigDecimal sigma = card.prices().sigma();
         if (sigma == null) {
             sigma = params.fallbackSigma();
-            penalties.add(new ConfidencePenalty("fallback sigma " + sigma, 1));
+            // σ only feeds the FLV's volatility shock, so an instant offer doesn't take this drop (Zach, 2026-10-21).
+            penalties.add(new ConfidencePenalty("fallback sigma " + sigma, 1, true));
             trace.add("sigma", "fallback: too few 30-day price changes to measure", sigma, card.prices().sigmaChanges() + " changes");
         }
         GradeDistribution distribution;

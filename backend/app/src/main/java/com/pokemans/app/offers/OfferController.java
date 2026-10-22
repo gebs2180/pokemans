@@ -60,7 +60,7 @@ class OfferController {
                        String country, String phone, Instant recordedAt) {
     }
 
-    /** @param pricePaid what the buyer paid the seller: the firm price, unless they agreed otherwise between them */
+    /** @param pricePaid what the buyer paid the seller: the firm price, unless they agreed otherwise between them (then say why in the note) */
     record ReceivedBody(@NotNull @DecimalMin("0") @Digits(integer = 10, fraction = 2) BigDecimal pricePaid, @Size(max = 2000) String note) {
     }
 
@@ -94,9 +94,10 @@ class OfferController {
     private final CardItems cardItems;
     private final Consents consents;
     private final Directory directory;
+    private final CardStatusService statuses;
 
     OfferController(OfferService offers, ListingService listings, Shipping shipping, OrgAccess access, CardItems cardItems,
-                    Consents consents, Directory directory) {
+                    Consents consents, Directory directory, CardStatusService statuses) {
         this.offers = offers;
         this.listings = listings;
         this.shipping = shipping;
@@ -104,6 +105,7 @@ class OfferController {
         this.cardItems = cardItems;
         this.consents = consents;
         this.directory = directory;
+        this.statuses = statuses;
     }
 
     // Addresses: where a seller ships from, or a buyer ships to.
@@ -129,6 +131,21 @@ class OfferController {
     ListingService.SaleView sale(@PathVariable UUID orgId, @PathVariable UUID cardId) {
         requireSellerCard(orgId, cardId);
         return listings.sale(cardId);
+    }
+
+    /** Where the card is on the way to a sale (photos, our review, offer, sold), and what happens next. */
+    @GetMapping("/api/orgs/{orgId}/cards/{cardId}/status")
+    CardStatusService.CardStatus status(@PathVariable UUID orgId, @PathVariable UUID cardId) {
+        requireSellerCard(orgId, cardId);
+        return statuses.status(cardId);
+    }
+
+    /** {@link #status} for each card in a collection, in the collection's order. */
+    @GetMapping("/api/orgs/{orgId}/collections/{collectionId}/status")
+    List<CardStatusService.CardStatus> collectionStatus(@PathVariable UUID orgId, @PathVariable UUID collectionId) {
+        access.require(orgId, SELLER_ORGS);
+        cardItems.requireCollection(orgId, collectionId);
+        return cardItems.inCollection(collectionId).stream().map(c -> statuses.status(c.id())).toList();
     }
 
     /** Prices the card now. 409 with the reason when it gets no offer. */
@@ -194,7 +211,7 @@ class OfferController {
     @ResponseStatus(HttpStatus.CREATED)
     List<ListingService.DealView> received(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody ReceivedBody body) {
         requireBuyer(orgId);
-        listings.received(orgId, listingId, body.pricePaid(), body.note());
+        listings.received(orgId, listingId, body.pricePaid(), body.note(), false);
         return listings.deals(orgId);
     }
 
@@ -202,11 +219,38 @@ class OfferController {
     @ResponseStatus(HttpStatus.CREATED)
     List<ListingService.DealView> returned(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody ReturnedBody body) {
         requireBuyer(orgId);
-        listings.returned(orgId, listingId, body.reason(), body.note());
+        listings.returned(orgId, listingId, body.reason(), body.note(), false);
         return listings.deals(orgId);
     }
 
     // Admin (by path)
+
+    /** Deals still waiting for their label, oldest first: retry the label, or record the arrival by hand. */
+    @GetMapping("/api/admin/deals/awaiting-label")
+    List<ListingService.AwaitingLabel> awaitingLabels() {
+        return listings.awaitingLabels();
+    }
+
+    /** What an offer on the card would be now, or why it gets none, with the steps that set its confidence. Stores nothing. */
+    @GetMapping("/api/admin/cards/{cardId}/offer-preview")
+    OfferService.Preview offerPreview(@PathVariable UUID cardId) {
+        cardItems.get(cardId);
+        return offers.preview(cardId);
+    }
+
+    /** Records an arrival for the buyer when no label was bought (the card shipped another way). The note says how. */
+    @PostMapping("/api/admin/deals/{listingId}/received")
+    @ResponseStatus(HttpStatus.CREATED)
+    void adminReceived(@PathVariable UUID listingId, @RequestParam UUID buyerOrgId, @Valid @RequestBody ReceivedBody body) {
+        listings.received(buyerOrgId, listingId, body.pricePaid(), body.note(), true);
+    }
+
+    /** Records a return for the buyer when no label was bought. The note says how the card shipped. */
+    @PostMapping("/api/admin/deals/{listingId}/returned")
+    @ResponseStatus(HttpStatus.CREATED)
+    void adminReturned(@PathVariable UUID listingId, @RequestParam UUID buyerOrgId, @Valid @RequestBody ReturnedBody body) {
+        listings.returned(buyerOrgId, listingId, body.reason(), body.note(), true);
+    }
 
     /** Buys the label for any deal, e.g. once a shipping account is set up. */
     @PostMapping("/api/admin/deals/{listingId}/label")

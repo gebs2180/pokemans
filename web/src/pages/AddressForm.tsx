@@ -42,16 +42,31 @@ export function AddressForm({ orgId, onSaved }: { orgId: string; onSaved: () => 
 
   return (
     <form onSubmit={save} className="stack">
-      {field('name', 'Name', { required: true, maxLength: 100 })}
-      {field('company', 'Company (optional)', { maxLength: 100 })}
-      {field('street1', 'Street address', { required: true, maxLength: 200 })}
-      {field('street2', 'Apartment, suite (optional)', { maxLength: 200 })}
+      {field('name', 'Name', { required: true, maxLength: 100, autoComplete: 'name' })}
+      {field('company', 'Company (optional)', { maxLength: 100, autoComplete: 'organization' })}
+      {field('street1', 'Street address', { required: true, maxLength: 200, autoComplete: 'address-line1' })}
+      {field('street2', 'Apartment, suite (optional)', { maxLength: 200, autoComplete: 'address-line2' })}
       <div className="row">
-        {field('city', 'City', { required: true, maxLength: 100 })}
-        {field('state', 'State', { required: true, pattern: '[A-Z]{2}', maxLength: 2, className: 'narrow' })}
-        {field('zip', 'ZIP code', { required: true, pattern: '\\d{5}(-\\d{4})?', className: 'narrow' })}
+        {field('city', 'City', { required: true, maxLength: 100, autoComplete: 'address-level2' })}
+        {field('state', 'State', {
+          required: true,
+          pattern: '[A-Z]{2}',
+          maxLength: 2,
+          className: 'narrow',
+          autoComplete: 'address-level1',
+          placeholder: 'State, e.g. IL',
+          title: 'The two-letter state code, e.g. IL',
+        })}
+        {field('zip', 'ZIP code', {
+          required: true,
+          pattern: '\\d{5}(-\\d{4})?',
+          className: 'narrow',
+          autoComplete: 'postal-code',
+          inputMode: 'numeric',
+          title: 'A 5-digit ZIP code, e.g. 62701',
+        })}
       </div>
-      {field('phone', 'Phone (optional, for the carrier)', { maxLength: 30 })}
+      {field('phone', 'Phone (optional, for the carrier)', { maxLength: 30, autoComplete: 'tel', type: 'tel' })}
       <button type="submit" disabled={busy}>
         Save address
       </button>

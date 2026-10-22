@@ -15,7 +15,8 @@ interface CatalogProvider {
     CatalogCard.Provider id();
 
     /**
-     * Cards whose name matches, optionally only those with this collector number.
+     * Cards whose name matches, optionally only those with this collector number. A number given as
+     * printed ("4/102") puts the sets of that size first.
      *
      * @param language ISO 639-1 code, e.g. "en" or "ja"
      */
@@ -24,8 +25,16 @@ interface CatalogProvider {
     /** Full detail for one provider card, or empty if the provider doesn't know it. */
     Optional<ProviderCard> card(String externalId, String language);
 
-    /** A search result: enough to show a thumbnail and pick. */
-    record Hit(String externalId, String number, String name, String setId, String imageUrl) {
+    /**
+     * A search result: enough to show a thumbnail and pick.
+     *
+     * @param setName  the set's name, e.g. "Base Set", or null if unknown
+     * @param setTotal the set size printed after the slash (102 in 4/102), or null if unknown
+     */
+    record Hit(String externalId, String number, String name, String setId, String imageUrl, String setName, Integer setTotal) {
+        Hit(String externalId, String number, String name, String setId, String imageUrl) {
+            this(externalId, number, name, setId, imageUrl, null, null);
+        }
     }
 
     /**

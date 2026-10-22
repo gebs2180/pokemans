@@ -76,7 +76,7 @@ class Shipping {
             return existing.get();
         }
         ShippingProvider shipper = provider.orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                "No shipping account is set up yet, so the label will follow."));
+                "No shipping account is set up yet."));
         ShipAddress from = address(sellerOrgId).orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "The seller has no address"));
         ShipAddress to = address(buyerOrgId).orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "The buyer has no address"));
         ShippingProperties.Parcel p = properties.parcel();

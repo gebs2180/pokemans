@@ -14,6 +14,7 @@ import {
 import { DateInput, MoneyInput } from '../inputs'
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
+import { CompCsvImport } from './CompCsvImport'
 
 const COMPANIES: GradingCompany[] = ['PSA', 'CGC', 'BGS', 'SGC', 'TAG', 'ACE']
 const RAW_CONDITIONS: RawCondition[] = ['NEAR_MINT', 'LIGHTLY_PLAYED', 'MODERATELY_PLAYED', 'HEAVILY_PLAYED', 'DAMAGED', 'ALTERED']
@@ -45,7 +46,7 @@ function today() {
 }
 
 /** Admin: sold comps for the identified catalog card, entered by hand, and its price table per grader. */
-export function PricesPanel({ catalogCardId }: { catalogCardId: string }) {
+export function PricesPanel({ catalogCardId, number = null }: { catalogCardId: string; number?: string | null }) {
   const api = useApi()
   const base = apiPath`/api/admin/catalog-cards/${catalogCardId}`
   const { data, error, reload } = useLoad(() => api<PricesView>('GET', `${base}/prices`), [api, base])
@@ -76,6 +77,7 @@ export function PricesPanel({ catalogCardId }: { catalogCardId: string }) {
       </p>
       {error && <p className="error" role="alert">{error}</p>}
       <CompForm base={base} onAdded={reload} />
+      <CompCsvImport base={base} number={number} onAdded={reload} />
       {data && <CompList comps={data.comps} />}
       <p>
         <button onClick={refresh} disabled={busy}>
@@ -105,7 +107,8 @@ export function PricesPanel({ catalogCardId }: { catalogCardId: string }) {
           <PriceTableView grades={t.grades} />
           <p className="muted small">
             σ {t.sigma === null ? `not enough history (${t.sigmaChanges} monthly changes)` : `${(t.sigma * 100).toFixed(1)}%`} ·{' '}
-            {t.salesPerMonth} sales/month (all sales of the card) · parameters {t.parameterSet}
+            {t.salesPerMonth} sales/month (all sales of the card) · pricing parameters {t.parameterSet} (offers and valuations have
+            their own set)
           </p>
         </div>
       ))}

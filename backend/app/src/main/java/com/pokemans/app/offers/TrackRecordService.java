@@ -52,13 +52,14 @@ class TrackRecordService {
     /**
      * What happened to the cards buyers took.
      *
-     * @param inTransit      taken, with no arrival or return recorded yet
+     * @param inTransit      taken and labelled, with no arrival or return recorded yet
+     * @param awaitingLabel  taken, with no label bought and nothing recorded yet
      * @param returnRate     returned / (received + returned); null with none recorded
      * @param returnedBy     returns per reason
      * @param earlierModel   taken under the per-grade offers that came before firm prices; left out of the rest
      * @param medianHoursToArrival label bought to arrival or return recorded
      */
-    record Deliveries(int taken, int labels, int inTransit, int received, int returned, BigDecimal returnRate, Map<String, Integer> returnedBy,
+    record Deliveries(int taken, int labels, int inTransit, int awaitingLabel, int received, int returned, BigDecimal returnRate, Map<String, Integer> returnedBy,
                       int earlierModel, BigDecimal medianHoursToArrival) {
     }
 
@@ -127,7 +128,9 @@ class TrackRecordService {
         Map<String, Integer> byReason = new LinkedHashMap<>();
         firm.stream().filter(r -> "RETURNED".equals(r.outcome())).forEach(r -> byReason.merge(r.returnedReason(), 1, Integer::sum));
         BigDecimal hours = median(firm.stream().map(Row::hoursToOutcome).filter(h -> h != null).toList());
-        return new Deliveries(firm.size(), (int) firm.stream().filter(Row::labelled).count(), firm.size() - received - returned, received,
+        int open = (int) firm.stream().filter(r -> r.outcome() == null).count();
+        int unlabelled = (int) firm.stream().filter(r -> r.outcome() == null && !r.labelled()).count();
+        return new Deliveries(firm.size(), (int) firm.stream().filter(Row::labelled).count(), open - unlabelled, unlabelled, received,
                 returned, share(returned, received + returned), byReason, earlier, hours == null ? null : hours.setScale(1, RoundingMode.HALF_UP));
     }
 

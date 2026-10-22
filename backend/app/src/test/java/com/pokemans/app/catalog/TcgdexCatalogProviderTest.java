@@ -29,7 +29,10 @@ class TcgdexCatalogProviderTest {
                      "variants":{"firstEdition":true,"holo":true,"normal":false,"reverse":false,"wPromo":false},
                      "variants_detailed":[{"type":"holo","size":"standard"},{"type":"holo","size":"standard","stamp":["1st-edition"]}]}""",
             "/v2/en/sets/base1", """
-                    {"id":"base1","name":"Base Set","releaseDate":"1999-01-09","serie":{"id":"base","name":"Base"}}""");
+                    {"id":"base1","name":"Base Set","releaseDate":"1999-01-09","serie":{"id":"base","name":"Base"}}""",
+            "/v2/en/sets", """
+                    [{"id":"ex5","name":"Hidden Legends","cardCount":{"total":102,"official":101}},
+                     {"id":"ex11","name":"Delta Species","cardCount":{"total":114,"official":113}}]""");
 
     private HttpServer server;
     private TcgdexCatalogProvider provider;
@@ -64,6 +67,23 @@ class TcgdexCatalogProviderTest {
         assertThat(provider.search("metagross", "11", "en").getFirst().setId()).isEqualTo("ex5");
         assertThat(provider.search("metagross", "3", "en")).singleElement()
                 .satisfies(hit -> assertThat(hit.setId()).isEqualTo("30th-c"));
+    }
+
+    @Test
+    void searchShowsSetNamesAndPutsTheSetOfThePrintedSizeFirst() {
+        // "11/113" is Delta Species (113 cards), not Hidden Legends (101), though TCGdex lists Hidden Legends first.
+        assertThat(provider.search("metagross", "11/113", "en")).extracting(CatalogProvider.Hit::externalId)
+                .containsExactly("ex11-11", "ex5-11");
+        assertThat(provider.search("metagross", "11/113", "en").getFirst())
+                .satisfies(hit -> assertThat(hit.setName()).isEqualTo("Delta Species"))
+                .satisfies(hit -> assertThat(hit.setTotal()).isEqualTo(113));
+        assertThat(provider.search("metagross", "11", "en")).extracting(CatalogProvider.Hit::externalId)
+                .containsExactly("ex5-11", "ex11-11");
+        assertThat(provider.search("metagross", null, "en")).filteredOn(h -> h.externalId().equals("swsh6-112"))
+                .singleElement().satisfies(hit -> assertThat(hit.setName()).isNull());
+        assertThat(TcgdexCatalogProvider.setTotal("4/102")).isEqualTo(102);
+        assertThat(TcgdexCatalogProvider.setTotal("SWSH050")).isNull();
+        assertThat(TcgdexCatalogProvider.setTotal("TG01/TG30")).isNull();
     }
 
     @Test

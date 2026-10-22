@@ -2,7 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import {
   apiPath,
+  money,
   OUTCOMES,
+  SIDE_LABEL,
   useApi,
   type Assessment,
   type CardCondition,
@@ -11,12 +13,14 @@ import {
   type Confidence,
   type Distribution,
   type Edition,
+  type OfferPreview,
   type ProviderCard,
   type Variant,
 } from '../api'
 import { DateInput } from '../inputs'
 import { safeHref } from '../safeHref'
 import { useLoad, usePoll } from '../useLoad'
+import { searchFromLabel } from '../searchFromLabel'
 import { PricesPanel } from './PricesPanel'
 import { ProvenancePanel } from './ProvenancePanel'
 
@@ -56,13 +60,14 @@ export function ReviewCardPage() {
 
       <section className="panel">
         <h2>Photos</h2>
+        <p className="muted small">The current photo of each side, as buyers see it. Earlier attempts are kept, but not shown.</p>
         <div className="photos">
           {data.photos.map((p) => (
             <a key={p.id} href={safeHref(p.url)} target="_blank" rel="noreferrer" className="photo">
-              <img src={safeHref(p.cropUrl) ?? safeHref(p.url)} alt={`${p.side} photo`} />
-              <span className="muted small">
-                {p.side.toLowerCase()}
-                {p.cropUrl ? ' · card crop, tap for original' : ''}
+              <img src={safeHref(p.cropUrl) ?? safeHref(p.url)} alt={`${SIDE_LABEL[p.side]} photo`} />
+              <span className="small">
+                <strong>{SIDE_LABEL[p.side]}</strong>
+                <span className="muted">{p.cropUrl ? ' · card crop, tap for original' : ''}</span>
               </span>
             </a>
           ))}
@@ -70,8 +75,13 @@ export function ReviewCardPage() {
       </section>
 
       <Identification data={data} base={base} onChange={reload} />
+      {/* Keys are prefixed per panel: two siblings both keyed "none" made React duplicate a panel (audit finding 10). */}
       {data.identification ? (
-        <PricesPanel key={data.identification.catalogCardId} catalogCardId={data.identification.catalogCardId} />
+        <PricesPanel
+          key={`prices:${data.identification.catalogCardId}`}
+          catalogCardId={data.identification.catalogCardId}
+          number={data.identification.number}
+        />
       ) : (
         <section className="panel">
           <h2>Sold comps and prices</h2>
@@ -80,22 +90,76 @@ export function ReviewCardPage() {
       )}
       {/* Keyed on the identity: re-identifying can unresolve the authenticity flag. */}
       <ProvenancePanel
-        key={data.identification ? `${data.identification.catalogCardId}@${data.identification.identifiedSince}` : 'none'}
+        key={`provenance:${data.identification ? `${data.identification.catalogCardId}@${data.identification.identifiedSince}` : 'none'}`}
         orgId={orgId}
         cardId={cardId}
         admin
         photos={data.photos}
       />
       <Predictions data={data} base={base} onChange={reload} />
-      <AssessmentPanel key={current?.id ?? 'none'} data={data} current={current} base={base} onChange={reload} />
+      <AssessmentPanel key={`assessment:${current?.id ?? 'none'}`} data={data} current={current} base={base} onChange={reload} />
+      <OfferPreviewPanel
+        key={`preview:${data.identification?.catalogCardId ?? 'none'}:${current?.id ?? 'none'}`}
+        cardId={cardId}
+      />
     </>
+  )
+}
+
+/** What the seller would be offered right now, or why nothing: the confidence and the steps that set it. */
+export function OfferPreviewPanel({ cardId }: { cardId: string }) {
+  const api = useApi()
+  const { data, error, reload } = useLoad(() => api<OfferPreview>('GET', apiPath`/api/admin/cards/${cardId}/offer-preview`), [api, cardId])
+  return (
+    <section className="panel">
+      <h2>Offer preview</h2>
+      <p className="muted small">
+        What the seller would be offered if they asked now. Nothing is stored.{' '}
+        <button className="link" onClick={reload}>
+          Refresh
+        </button>
+      </p>
+      {error && <p className="error" role="alert">{error}</p>}
+      {data &&
+        (data.offered ? (
+          <p className="ok">
+            Offer {money(data.price)} at confidence {data.confidence}
+            {data.buyerMargin != null && `, leaving the buyer ${Math.round(data.buyerMargin * 100)}%`} (FMV {money(data.fmv)}).
+          </p>
+        ) : (
+          <p className="warn">
+            No offer: {data.refusal}
+            {data.confidence && ` (confidence ${data.confidence})`}
+          </p>
+        ))}
+      {data && data.why.length > 0 && (
+        <>
+          <h3>How the confidence was set</h3>
+          <ul className="list small">
+            {data.why.map((st, i) => (
+              <li key={i}>
+                <strong>
+                  {st.subject.replaceAll('_', ' ')} {st.value}
+                </strong>{' '}
+                <span className="muted">
+                  {st.rule}
+                  {st.detail && ` · ${st.detail}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   )
 }
 
 function Identification({ data, base, onChange }: { data: CardCondition; base: string; onChange: () => void }) {
   const api = useApi()
-  const [name, setName] = useState('')
-  const [number, setNumber] = useState('')
+  // Start from the collector's own words; the reviewer corrects them as needed.
+  const [initial] = useState(() => searchFromLabel(data.label))
+  const [name, setName] = useState(initial.name)
+  const [number, setNumber] = useState(initial.number)
   const [language, setLanguage] = useState('en')
   const [hits, setHits] = useState<CatalogHit[] | null>(null)
   const [picked, setPicked] = useState<ProviderCard | null>(null)
@@ -210,7 +274,8 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
               <button key={h.externalId} type="button" className="hit" onClick={() => pick(h)}>
                 {h.imageUrl ? <img src={`${h.imageUrl}/low.webp`} alt="" loading="lazy" /> : <span className="noimg">No image</span>}
                 <span>
-                  {h.name} · {h.setId} {h.number}
+                  {h.name} · {h.setName ?? h.setId} · {h.number}
+                  {h.setTotal != null && `/${h.setTotal}`}
                 </span>
               </button>
             ))}
@@ -502,6 +567,7 @@ export function AssessmentPanel({
 
   const total = OUTCOMES.reduce((sum, o) => sum + (Number(values[o]) || 0), 0)
   const totalOk = Math.abs(total - 100) < 0.001
+  const noCloseUp = modernHoloWithoutCloseUp(data)
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -552,6 +618,7 @@ export function AssessmentPanel({
               <label key={o}>
                 <span>{o}</span>
                 <input
+                  aria-label={`Grade ${o}, percent`}
                   inputMode="decimal"
                   value={values[o]}
                   onChange={(e) => setValues((v) => ({ ...v, [o]: e.target.value }))}
@@ -570,6 +637,12 @@ export function AssessmentPanel({
             </select>
             <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why (required)" aria-label="Why" required maxLength={2000} />
           </div>
+          {confidence === 'A' && noCloseUp && (
+            <p className="warn small" role="note">
+              No passing close-up of this modern holo. The methodology shifts its surface down by default unless a close-up clears
+              it, so confidence A needs one: pick B or lower, or ask the collector for a close-up.
+            </p>
+          )}
           <div className="row">
             <button type="submit" disabled={busy || !totalOk}>
               Save version
@@ -600,6 +673,17 @@ export function AssessmentPanel({
       )}
     </section>
   )
+}
+
+/** End of the WotC era (AuthenticityRisk.END_OF_WOTC_ERA): holos after it get the default surface shift. */
+const END_OF_WOTC_ERA = '2003-07-01'
+
+/** A holo or reverse holo from after the WotC era with no passing close-up: the surface shift hasn't been cleared. */
+function modernHoloWithoutCloseUp(data: CardCondition) {
+  const id = data.identification
+  if (!id || (id.variant !== 'HOLO' && id.variant !== 'REVERSE_HOLO')) return false
+  if (id.setReleaseDate != null && id.setReleaseDate < END_OF_WOTC_ERA) return false
+  return !data.photos.some((p) => p.side === 'DETAIL')
 }
 
 function Bars({ distribution }: { distribution: Distribution }) {

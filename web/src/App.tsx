@@ -13,6 +13,7 @@ const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default:
 const AdminOutcomesPage = lazy(() => import('./pages/AdminOutcomesPage').then((m) => ({ default: m.AdminOutcomesPage })))
 const AdminOffersPage = lazy(() => import('./pages/AdminOffersPage').then((m) => ({ default: m.AdminOffersPage })))
 const OfferTrackRecordPage = lazy(() => import('./pages/OfferTrackRecordPage').then((m) => ({ default: m.OfferTrackRecordPage })))
+const AdminLabelsPage = lazy(() => import('./pages/AdminLabelsPage').then((m) => ({ default: m.AdminLabelsPage })))
 const ShippingChargesPage = lazy(() => import('./pages/ShippingChargesPage').then((m) => ({ default: m.ShippingChargesPage })))
 const ReviewQueuePage = lazy(() => import('./pages/ReviewQueuePage').then((m) => ({ default: m.ReviewQueuePage })))
 const ReviewCardPage = lazy(() => import('./pages/ReviewCardPage').then((m) => ({ default: m.ReviewCardPage })))
@@ -34,7 +35,7 @@ function App() {
         </Link>
         {isAuthenticated && (
           <span className="who">
-            {user?.email ?? user?.name}{' '}
+            <span className="email">{user?.email ?? user?.name}</span>{' '}
             <button className="link" onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>
               Log out
             </button>
@@ -48,7 +49,12 @@ function App() {
       {!isLoading && !isAuthenticated && (
         <main>
           <p>{COLLATERAL ? 'Raw collection collateral reports.' : 'Instant offers on raw cards.'}</p>
-          <button onClick={() => loginWithRedirect({ appState: { returnTo: location.pathname + location.search } })}>Log in</button>
+          {location.pathname.startsWith('/invite/') && (
+            <p>You've been invited to join pokemans. Log in, or sign up, to see the invite and accept it.</p>
+          )}
+          <button onClick={() => loginWithRedirect({ appState: { returnTo: location.pathname + location.search } })}>
+            {location.pathname.startsWith('/invite/') ? 'Log in or sign up' : 'Log in'}
+          </button>
         </main>
       )}
 
@@ -63,6 +69,7 @@ function App() {
               <Route path="/admin/offers" element={<OfferTrackRecordPage />} />
               <Route path="/admin/deals" element={<AdminOffersPage />} />
               <Route path="/admin/shipping" element={<ShippingChargesPage />} />
+              <Route path="/admin/labels" element={<AdminLabelsPage />} />
               <Route path="/admin/review/:orgId/:cardId" element={<ReviewCardPage />} />
               {COLLATERAL && <Route path="/admin/valuation/:orgId/:collectionId" element={<ValuationPage />} />}
               {COLLATERAL && <Route path="/admin/valuation-runs/:runId" element={<ValuationRunPage />} />}

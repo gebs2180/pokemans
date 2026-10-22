@@ -119,6 +119,18 @@ function Containers({ orgId, orgName, kind }: { orgId: string; orgName: string; 
       {createError && <p className="error" role="alert">{createError}</p>}
       {error && <p className="error" role="alert">{error}</p>}
       {data && data.length === 0 && <p className="muted">No {kind.plural.toLowerCase()} yet.</p>}
+      {data && data.length === 0 && kind.path === 'collections' && (
+        <section className="panel">
+          <h2>How selling works</h2>
+          <ol className="small">
+            <li>Create a collection, e.g. "Binder 1".</li>
+            <li>Add each card worth $25 or more, with its name and number.</li>
+            <li>Photograph its front and back on the card's page.</li>
+            <li>We identify it and review its condition by hand, usually within a couple of days. We don't send notifications yet, so check back.</li>
+            <li>Get one firm instant offer, and sell at it if you like. A buyer who accepts sends you a prepaid label.</li>
+          </ol>
+        </section>
+      )}
       <ul className="list">
         {data?.map((c) => (
           <li key={c.id}>

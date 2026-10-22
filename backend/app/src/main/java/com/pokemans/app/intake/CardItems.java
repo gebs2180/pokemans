@@ -79,9 +79,31 @@ public class CardItems {
     public List<PhotoRef> passedPhotos(UUID cardId) {
         return photos.findByCardItemIdOrderByCreatedAtAsc(cardId).stream()
                 .filter(p -> p.getStatus() == Photo.Status.PASSED)
-                .map(p -> new PhotoRef(p.getId(), p.getCardItemId(), p.getSide().name(), p.getStorageKey(), p.getContentType(),
-                        p.getCropKey(), p.getCapturedAt(), p.getUploadedAt(), p.getSha256()))
+                .map(CardItems::ref)
                 .toList();
+    }
+
+    private static PhotoRef ref(Photo p) {
+        return new PhotoRef(p.getId(), p.getCardItemId(), p.getSide().name(), p.getStorageKey(), p.getContentType(),
+                p.getCropKey(), p.getCapturedAt(), p.getUploadedAt(), p.getSha256());
+    }
+
+    /**
+     * Each side's newest passing photo, front, back then close-up: what buyers and reviewers are shown.
+     * Earlier passing photos are kept, but superseded. No access check.
+     */
+    @Transactional(readOnly = true)
+    public List<PhotoRef> currentPhotos(UUID cardId) {
+        return IntakeViews.current(photos.findByCardItemIdOrderByCreatedAtAsc(cardId)).stream().map(CardItems::ref).toList();
+    }
+
+    /**
+     * Takes the card's row lock until the transaction ends: the lock photo confirms hold, so a caller
+     * that freezes the photos (posting it for sale) can't interleave with one. No access check.
+     */
+    @Transactional
+    public void lockForCapture(UUID cardId) {
+        cards.findLockedById(cardId).orElseThrow(() -> IntakeService.notFound("Card"));
     }
 
     /** Every card, across orgs, whose capture is complete, oldest first. No access check. */

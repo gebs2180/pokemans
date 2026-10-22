@@ -7,10 +7,14 @@ import com.pokemans.app.identity.OrgType;
 import com.pokemans.app.intake.IntakeViews.CardView;
 import com.pokemans.app.intake.IntakeViews.ContainerDetail;
 import com.pokemans.app.intake.IntakeViews.ContainerSummary;
+import com.pokemans.app.storage.BlobStore;
+import com.pokemans.app.storage.StorageProperties;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,15 +33,22 @@ class IntakeService {
     private final CardCollectionRepository collections;
     private final CardItemRepository cards;
     private final PhotoRepository photos;
+    private final BlobStore blobs;
+    private final StorageProperties storage;
+    private final ObjectProvider<CaptureFreeze> freezes;
 
     IntakeService(OrgAccess access, CurrentUser currentUser, SubmissionBatchRepository batches,
-                  CardCollectionRepository collections, CardItemRepository cards, PhotoRepository photos) {
+                  CardCollectionRepository collections, CardItemRepository cards, PhotoRepository photos, BlobStore blobs,
+                  StorageProperties storage, ObjectProvider<CaptureFreeze> freezes) {
         this.access = access;
         this.currentUser = currentUser;
         this.batches = batches;
         this.collections = collections;
         this.cards = cards;
         this.photos = photos;
+        this.blobs = blobs;
+        this.storage = storage;
+        this.freezes = freezes;
     }
 
     // Batches
@@ -131,7 +142,14 @@ class IntakeService {
     @Transactional(readOnly = true)
     CardView card(UUID orgId, UUID cardId) {
         CardItem card = requireCard(orgId, cardId);
-        return IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId()));
+        return IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId()),
+                p -> blobs.presignDownload(storage.photoBucket(), p.getCropKey() != null ? p.getCropKey() : p.getStorageKey()),
+                frozenReason(card.getId()));
+    }
+
+    /** Why the card's photos can't change any more (it is posted or sold), or null. */
+    String frozenReason(UUID cardId) {
+        return freezes.orderedStream().map(f -> f.frozenReason(cardId)).flatMap(Optional::stream).findFirst().orElse(null);
     }
 
     private List<CardView> cardViews(List<CardItem> items) {
@@ -141,7 +159,8 @@ class IntakeService {
         Map<UUID, List<Photo>> byCard = photos.findByCardItemIdInOrderByCreatedAtAsc(items.stream().map(CardItem::getId).toList())
                 .stream()
                 .collect(Collectors.groupingBy(Photo::getCardItemId));
-        return items.stream().map(c -> IntakeViews.card(c, byCard.getOrDefault(c.getId(), List.of()))).toList();
+        return items.stream().map(c -> IntakeViews.card(c, byCard.getOrDefault(c.getId(), List.of()), p -> null, frozenReason(c.getId())))
+                .toList();
     }
 
     static ResponseStatusException notFound(String what) {

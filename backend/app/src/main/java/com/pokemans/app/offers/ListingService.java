@@ -2,6 +2,7 @@ package com.pokemans.app.offers;
 
 import com.pokemans.app.identity.CurrentUser;
 import com.pokemans.app.identity.Directory;
+import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.storage.BlobStore;
 import com.pokemans.app.storage.StorageProperties;
 import com.pokemans.app.valuation.CardInputs;
@@ -9,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -90,6 +92,7 @@ class ListingService {
                     Map<String, BigDecimal> distribution, String gradedAs) {
     }
 
+    /** @param side FRONT, BACK or DETAIL (the close-up) */
     record PhotoLink(String side, String url) {
     }
 
@@ -99,6 +102,11 @@ class ListingService {
     /** @param cancelled set once we cancelled the deal: nothing more to record, and the label isn't used */
     record DealView(UUID listingId, CardView card, OfferView offer, List<PhotoLink> photos, Party seller, Instant acceptedAt,
                     LabelView label, OutcomeView outcome, UndoView cancelled) {
+    }
+
+    /** A deal whose label hasn't been bought, for the admin: the label to retry, or the arrival to record by hand. */
+    record AwaitingLabel(UUID listingId, UUID buyerOrgId, Party buyer, Party seller, CardView card, OfferView offer,
+                         List<PhotoLink> photos, Instant acceptedAt) {
     }
 
     private final CardOfferRepository offers;
@@ -111,11 +119,12 @@ class ListingService {
     private final BlobStore blobs;
     private final StorageProperties storage;
     private final CurrentUser currentUser;
+    private final CardItems cardItems;
     private final JdbcTemplate jdbc;
 
     ListingService(CardOfferRepository offers, CardOfferVoidRepository voids, SaleListingRepository listings, ListingEventRepository events,
                    OffersProperties properties, Directory directory, Shipping shipping, BlobStore blobs, StorageProperties storage,
-                   CurrentUser currentUser, JdbcTemplate jdbc) {
+                   CurrentUser currentUser, CardItems cardItems, JdbcTemplate jdbc) {
         this.offers = offers;
         this.voids = voids;
         this.listings = listings;
@@ -126,6 +135,7 @@ class ListingService {
         this.blobs = blobs;
         this.storage = storage;
         this.currentUser = currentUser;
+        this.cardItems = cardItems;
         this.jdbc = jdbc;
     }
 
@@ -158,6 +168,13 @@ class ListingService {
         }
         if (shipping.address(orgId).isEmpty()) {
             throw conflict("Add the address you'll ship from first.");
+        }
+        // Buyers see the photos the offer was priced on, and from here on they can't change: hold the lock
+        // photo confirms take, and refuse an offer whose photos were retaken since.
+        cardItems.lockForCapture(cardItemId);
+        Set<UUID> priced = new HashSet<>(OfferService.inputs(offer).photos().stream().map(CardInputs.Photo::photoId).toList());
+        if (cardItems.passedPhotos(cardItemId).stream().anyMatch(p -> !priced.contains(p.id()))) {
+            throw conflict("Your photos changed after this offer. Get a new offer, so buyers see the photos it's based on.");
         }
         Optional<SaleListing> latest = listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardItemId);
         if (latest.isPresent()) {
@@ -248,25 +265,78 @@ class ListingService {
             ListingEvent acceptedEvent = h.stream().filter(e -> e.getType() == ListingEvent.Type.ACCEPTED).findFirst().orElseThrow();
             Directory.Contact seller = directory.contact(l.getOrgId(), l.getListedBy());
             deals.add(new DealView(l.getId(), card(in), offerView(offer), photos(in), new Party(seller.orgName(), seller.email()),
-                    acceptedEvent.getCreatedAt(), label(l.getId()), outcome(h), undone(h, ListingEvent.Type.CANCELLED)));
+                    acceptedEvent.getCreatedAt(), forBuyer(label(l.getId())), outcome(h), undone(h, ListingEvent.Type.CANCELLED)));
         }
         return deals;
     }
 
-    /** The card arrived genuine and as shown, and the buyer paid. Once per deal. */
+    /**
+     * The card arrived genuine and as shown, and the buyer paid. Once per deal, and only once a label
+     * was bought, since nothing can have shipped before. A price other than the offer needs a note.
+     *
+     * @param byAdmin the admin records it for the buyer, e.g. when the card shipped without our label;
+     *                it then needs a note saying so
+     */
     @Transactional
-    void received(UUID buyerOrgId, UUID listingId, BigDecimal pricePaid, String note) {
-        requireDeal(buyerOrgId, listingId);
+    void received(UUID buyerOrgId, UUID listingId, BigDecimal pricePaid, String note, boolean byAdmin) {
+        SaleListing listing = requireDeal(buyerOrgId, listingId);
         requireNotCancelled(listingId);
-        recordOutcome(ListingEvent.received(listingId, buyerOrgId, currentUser.id(), pricePaid, blankToNull(note)));
+        requireShippable(listingId, note, byAdmin);
+        BigDecimal price = offers.findById(listing.getOfferId()).orElseThrow().getPrice();
+        if (pricePaid.compareTo(price) != 0 && blankToNull(note) == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Say in the note why the amount paid differs from the $" + price.toPlainString() + " offer.");
+        }
+        recordOutcome(ListingEvent.received(listingId, buyerOrgId, currentUser.id(), pricePaid, adminNote(note, byAdmin)));
     }
 
-    /** The card goes back: not genuine, not the listed card, or not matching its photos. Once per deal. */
+    /** The card goes back: not genuine, not the listed card, or not matching its photos. Once per deal, once it could have shipped. */
     @Transactional
-    void returned(UUID buyerOrgId, UUID listingId, ListingEvent.DeclinedReason reason, String note) {
+    void returned(UUID buyerOrgId, UUID listingId, ListingEvent.DeclinedReason reason, String note, boolean byAdmin) {
         requireDeal(buyerOrgId, listingId);
         requireNotCancelled(listingId);
-        recordOutcome(ListingEvent.returned(listingId, buyerOrgId, currentUser.id(), reason, blankToNull(note)));
+        requireShippable(listingId, note, byAdmin);
+        recordOutcome(ListingEvent.returned(listingId, buyerOrgId, currentUser.id(), reason, adminNote(note, byAdmin)));
+    }
+
+    /** Nothing ships before the label is bought; the admin may record it anyway, saying why. */
+    private void requireShippable(UUID listingId, String note, boolean byAdmin) {
+        if (byAdmin) {
+            if (blankToNull(note) == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Say in the note how the card was shipped, or why it's recorded by hand.");
+            }
+            return;
+        }
+        if (shipping.label(listingId).isEmpty()) {
+            throw conflict("There's no label for this card yet, so it can't have arrived. Record it once the label is bought and the card ships.");
+        }
+    }
+
+    private static String adminNote(String note, boolean byAdmin) {
+        String n = blankToNull(note);
+        return byAdmin ? "Recorded by the admin: " + n : n;
+    }
+
+    /** Deals with no label and nothing recorded yet, oldest accept first. */
+    @Transactional(readOnly = true)
+    List<AwaitingLabel> awaitingLabels() {
+        List<SaleListing> accepted = listings.findAllAccepted();
+        Map<UUID, List<ListingEvent>> history = history(accepted);
+        List<AwaitingLabel> waiting = new ArrayList<>();
+        for (SaleListing l : accepted) {
+            List<ListingEvent> h = history.getOrDefault(l.getId(), List.of());
+            if (status(l, h, Instant.now()) != Status.ACCEPTED || outcome(h) != null || shipping.label(l.getId()).isPresent()) {
+                continue;
+            }
+            ListingEvent acceptedEvent = h.stream().filter(e -> e.getType() == ListingEvent.Type.ACCEPTED).findFirst().orElseThrow();
+            CardOffer offer = offers.findById(l.getOfferId()).orElseThrow();
+            CardInputs in = OfferService.inputs(offer);
+            Directory.Contact buyer = directory.contact(acceptedEvent.getActorOrgId(), acceptedEvent.getActorUserId());
+            Directory.Contact seller = directory.contact(l.getOrgId(), l.getListedBy());
+            waiting.add(new AwaitingLabel(l.getId(), acceptedEvent.getActorOrgId(), new Party(buyer.orgName(), buyer.email()),
+                    new Party(seller.orgName(), seller.email()), card(in), offerView(offer), photos(in), acceptedEvent.getCreatedAt()));
+        }
+        return waiting;
     }
 
     private void recordOutcome(ListingEvent event) {
@@ -358,6 +428,16 @@ class ListingService {
                 .map(e -> new UndoView(e.getNote(), e.getCreatedAt())).orElse(null);
     }
 
+    /**
+     * The label as the buyer sees it: carrier and tracking, but not the printable label, which shows the
+     * seller's address. Buyers never learn where a seller is, so they can't meet up and deal around us
+     * (Zach, 2026-10-21).
+     */
+    private static LabelView forBuyer(LabelView label) {
+        return label == null ? null
+                : new LabelView(label.carrier(), label.service(), label.trackingCode(), null, label.insuredValue(), label.boughtAt());
+    }
+
     LabelView label(UUID listingId) {
         return shipping.label(listingId)
                 .map(x -> new LabelView(x.getCarrier(), x.getService(), x.getTrackingCode(), x.getLabelUrl(), x.getInsuredValue(),
@@ -399,11 +479,21 @@ class ListingService {
                 in.graded() == null ? null : in.graded().gradingCompany() + " " + in.graded().grade().stripTrailingZeros().toPlainString());
     }
 
+    /** The photos the offer was priced on: each side's newest, front, back then close-up, never superseded attempts. */
     private List<PhotoLink> photos(CardInputs in) {
-        return in.photos().stream()
+        return current(in.photos()).stream()
                 .map(p -> new PhotoLink(p.side(), blobs.presignDownload(storage.photoBucket(), p.cropKey() != null ? p.cropKey() : p.storageKey())
                         .toString()))
                 .toList();
+    }
+
+    /** Each side's newest photo (the list is oldest first), in the order front, back, close-up. */
+    static List<CardInputs.Photo> current(List<CardInputs.Photo> oldestFirst) {
+        Map<String, CardInputs.Photo> latest = new LinkedHashMap<>();
+        for (String side : List.of("FRONT", "BACK", "DETAIL")) {
+            oldestFirst.stream().filter(p -> side.equals(p.side())).reduce((a, b) -> b).ifPresent(p -> latest.put(side, p));
+        }
+        return List.copyOf(latest.values());
     }
 
     private static ResponseStatusException conflict(String reason) {
