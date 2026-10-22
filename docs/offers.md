@@ -68,7 +68,10 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
 - **Valuation:** `Valuations.current(cardItemId)` values one card as of now with the run engine, so offers and valuation runs can't drift apart.
 - **identity:**
   - a `BUYER` org type and role;
-  - buyer terms, versioned in `Consents` (`buyer-firm-2026-10-19`). The text is a plain-language **draft for Zach**, not reviewed legal wording;
+  - terms, versioned in `Consents`; each is a plain-language **draft for Zach**, not reviewed legal wording, and a new version must be accepted again:
+    - buyer terms (`buyer-firm-2026-10-21`), accepted before a buyer sees the market;
+    - seller terms (`seller-2026-10-21`), accepted by collectors before they upload photos, get an offer or post a card. Contributors accept the same seller terms inside their own (`contributor-2026-10-21`), since they can sell too;
+    - the 2026-10-21 versions cover shipping within 3 days of the label, transit loss (we claim on the label's insurance and pay the seller; the buyer owes nothing), cards subject to authentication, disputes (Zach decides from the photos), the admin's undo, no dealing around the app during the test, and non-payment ending a buyer's part in the test;
   - `Directory` for names and contact details.
 - **`offers` module (V14, V16, V18; all append-only):**
   - `card_offer`: every input, the firm price, the ladder and the trace.
