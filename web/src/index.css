@@ -1,47 +1,247 @@
+/*
+ * Design tokens. Every colour, size and shadow below comes from these, so a brand direction is a swap of this block
+ * (docs/brand-directions.md). The accent is a neutral placeholder until one is chosen. Text pairs meet WCAG AA (4.5:1)
+ * on --color-surface and --color-surface-raised; *-soft backgrounds keep AA with their own *-text colour.
+ */
 :root {
   color-scheme: light dark;
-  font-family: system-ui, sans-serif;
-  line-height: 1.5;
-  --accent: #1f3a5f;
-  --ok: #2e7d32;
-  --warn: #b26a00;
-  --error: #c62828;
-  --muted: #6b7280;
-  --border: #d1d5db;
+
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #eef0f3;
+  --color-text: #15181d;
+  --color-muted: #555d6b;
+  --color-border: #d5d9e0;
+  --color-border-strong: #9aa2af;
+
+  --color-accent: #334e7d;
+  --color-accent-hover: #283e64;
+  --color-accent-contrast: #ffffff;
+  --color-accent-soft: #e6ecf6;
+  --color-accent-text: #2a4270;
+
+  --color-success: #1e7a3c;
+  --color-success-soft: #e5f4ea;
+  --color-success-text: #17602f;
+  --color-warning: #b26a00;
+  --color-warning-soft: #fdf1dc;
+  --color-warning-text: #7a4800;
+  --color-danger: #b42318;
+  --color-danger-hover: #931c13;
+  --color-danger-soft: #fdeceb;
+  --color-danger-text: #9a1d14;
+  --color-info-soft: var(--color-accent-soft);
+  --color-info-text: var(--color-accent-text);
+  --color-focus: #2463eb;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-weight-display: 700;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-pill: 999px;
+
+  --shadow-1: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.08);
+  --shadow-2: 0 4px 12px rgb(16 24 40 / 0.12), 0 2px 4px rgb(16 24 40 / 0.06);
+
+  --tap: 44px;
+  --measure: 42rem;
+
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f1115;
+    --color-surface: #171a20;
+    --color-surface-raised: #1d2128;
+    --color-surface-sunken: #12151a;
+    --color-text: #e8eaee;
+    --color-muted: #a4abb8;
+    --color-border: #2f3540;
+    --color-border-strong: #4d5564;
+
+    --color-accent: #a9bfe6;
+    --color-accent-hover: #c3d3f0;
+    --color-accent-contrast: #111723;
+    --color-accent-soft: #222c3d;
+    --color-accent-text: #bccdee;
+
+    --color-success: #6fcf8f;
+    --color-success-soft: #15291c;
+    --color-success-text: #8ddca6;
+    --color-warning: #f0b45a;
+    --color-warning-soft: #2d2212;
+    --color-warning-text: #f5c77f;
+    --color-danger: #ff8a80;
+    --color-danger-hover: #ffaba3;
+    --color-danger-soft: #331816;
+    --color-danger-text: #ffaaa2;
+    --color-focus: #7fa6ff;
+
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-2: 0 6px 18px rgb(0 0 0 / 0.5);
+  }
+}
+
+/* ---------- Base ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-display);
+  line-height: var(--leading-tight);
+  overflow-wrap: break-word;
+}
+
+h1 {
+  font-size: var(--text-2xl);
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+h2 {
+  font-size: var(--text-lg);
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+h3 {
+  font-size: var(--text-base);
+  margin: 0 0 var(--space-1);
+}
+
+p {
+  margin: var(--space-2) 0;
+}
+
+a {
+  color: var(--color-accent-text);
+  text-underline-offset: 0.15em;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+img {
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- Shell ---------- */
+
 .shell {
-  max-width: 44rem;
+  max-width: var(--measure);
   margin: 0 auto;
-  padding: 0 1rem 3rem;
+  padding: 0 var(--space-4) var(--space-7);
+}
+
+.shell.wide {
+  max-width: 64rem;
 }
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 1rem;
+  gap: var(--space-4);
+  min-height: 3.5rem;
+  margin: 0 calc(-1 * var(--space-4)) var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  /* Full width on a wide screen without a 100vw box (which would scroll sideways under a scrollbar). */
+  box-shadow:
+    0 0 0 100vmax var(--color-surface),
+    0 1px 0 100vmax var(--color-border);
+  clip-path: inset(0 -100vmax -1px);
 }
 
 .brand {
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--text-lg);
+  letter-spacing: -0.01em;
   text-decoration: none;
-  color: inherit;
+  color: var(--color-text);
+}
+
+/* The placeholder mark: a card outline in the accent. A brand direction replaces it. */
+.brand::before {
+  content: '';
+  width: 0.85rem;
+  height: 1.15rem;
+  border: 2.5px solid var(--color-accent);
+  border-radius: 3px;
+  transform: rotate(-8deg);
 }
 
 .who {
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
+  color: var(--color-muted);
 }
 
 /* A long email shortens on a phone instead of pushing Log out off the bar. */
@@ -56,166 +256,778 @@ body {
   flex-shrink: 0;
 }
 
-button,
-.capture {
-  font: inherit;
-  padding: 0.6rem 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: white;
-  cursor: pointer;
+/* Signed out: what Rawmark is, and the way in. */
+.welcome {
+  padding: var(--space-6) 0;
 }
 
+.welcome .lead {
+  font-size: var(--text-xl);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-display);
+  line-height: var(--leading-tight);
+  margin-bottom: var(--space-5);
+}
+
+/* "← Back" and the like: small, but a full tap target. */
+.back {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.back a,
+.back button.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+}
+
+/* ---------- Buttons ---------- */
+
+button,
+.button,
+.capture {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: 0.55rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:hover:not(:disabled),
+.button:hover,
+.capture:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+button.secondary,
+.button.secondary,
+.capture.secondary {
+  background: var(--color-surface);
+  color: var(--color-accent-text);
+  border-color: var(--color-border-strong);
+}
+
+button.secondary:hover:not(:disabled),
+.button.secondary:hover,
+.capture.secondary:hover {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+button.danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-surface);
+}
+
+button.danger:hover:not(:disabled) {
+  background: var(--color-danger-hover);
+  border-color: var(--color-danger-hover);
+}
+
+button:disabled,
+.capture:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Busy: the button keeps its name, and a spinner says it's working. */
+button[aria-busy='true'] {
+  cursor: progress;
+}
+
+button[aria-busy='true']::before,
+.loading::before {
+  content: '';
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A button that reads as a link inside a sentence. The padding, cancelled by the margin, grows its tap area without
+   moving the text around it. */
 button.link {
+  display: inline-block;
+  min-height: 0;
+  padding: 0.6rem 0.2rem;
+  margin: -0.6rem -0.2rem;
   background: none;
   border: none;
-  color: inherit;
+  color: var(--color-accent-text);
+  font-weight: inherit;
   text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+button.link:hover:not(:disabled) {
+  background: none;
+  color: var(--color-text);
+}
+
+/* A link-style button standing on its own (not inside a sentence) still gets a full tap target. */
+.actions button.link,
+.who button.link,
+.back button.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 var(--space-2);
+  margin: 0;
+}
+
+.back button.link {
   padding: 0;
 }
 
+.welcome button {
+  max-width: 22rem;
+}
+
+.block {
+  width: 100%;
+}
+
+/* A row of buttons: on a phone each gets an equal share; a lone primary is full width. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin: var(--space-3) 0 0;
+}
+
+.actions > button:not(.link),
+.actions > .button,
+.actions > .capture {
+  flex: 1 1 9rem;
+}
+
+/* Two capture buttons share a phone's width: keep each label on one line. */
+.actions > .capture {
+  padding-inline: var(--space-3);
+  white-space: nowrap;
+}
+
+@media (min-width: 40rem) {
+  .actions > button:not(.link),
+  .actions > .button,
+  .actions > .capture {
+    flex: 0 0 auto;
+  }
+}
+
+/* The page's one primary action stays in reach at the bottom of a phone screen while its panel is on screen. */
+.action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  margin: var(--space-3) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--color-surface-raised);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.action-bar .actions {
+  margin: 0;
+}
+
+@media (min-width: 40rem) {
+  .action-bar {
+    position: static;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    border: none;
+    background: none;
+  }
+}
+
+/* ---------- Form controls ---------- */
+
 input,
-select {
+select,
+textarea {
   font: inherit;
-  padding: 0.55rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border);
+  color: var(--color-text);
+  background: var(--color-surface);
+  min-height: var(--tap);
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
   min-width: 0;
+  max-width: 100%;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--color-muted);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-offset: 0;
+  border-color: var(--color-focus);
+}
+
+input[aria-invalid='true'],
+select[aria-invalid='true'],
+textarea[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+/* A checkbox or radio with its label: the whole line is the tap target. */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  cursor: pointer;
+}
+
+/* Radio choices drawn as tappable options. */
+.choices {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.choice:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.field-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.field-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+.field-error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-danger-text);
+  font-weight: 600;
+}
+
+.field-row {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+}
+
+.form {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
 }
 
 .row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
 }
 
-.row input:not([type='checkbox']) {
+.row input:not([type='checkbox']):not([type='radio']) {
   flex: 1 1 12rem;
 }
 
 .stack {
   display: grid;
-  gap: 0.5rem;
-  margin: 1rem 0;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
 }
 
 .narrow {
-  width: 6rem;
+  width: 6.5rem;
+}
+
+.row input.narrow {
+  flex: 0 0 6.5rem;
+}
+
+/* ---------- Surfaces ---------- */
+
+.panel,
+.side {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.panel > h2:first-child,
+.side > h2:first-child,
+.panel-head h2 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.panel-head h2,
+.panel-head h3 {
+  margin: 0;
+}
+
+/* A list of things to open: each row is one big tap target (the link stretches over it). */
+.tile-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-3) 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.tile {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  min-height: 3.5rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+
+.tile:has(a:hover) {
+  border-color: var(--color-border-strong);
+}
+
+.tile:has(a:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.tile a {
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.tile a:focus-visible {
+  outline: none;
+}
+
+.tile a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.tile-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+.tile .muted {
+  font-size: var(--text-sm);
 }
 
 .list {
-  padding-left: 1.1rem;
+  padding-left: 1.2rem;
 }
 
 .list li {
-  margin: 0.4rem 0;
-}
-
-.invite {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.4rem;
-}
-
-.invite input {
-  flex: 1 1 16rem;
-}
-
-.side {
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem 1rem;
-  margin: 1rem 0;
-}
-
-.side h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.1rem;
-}
-
-/* The file input is hidden; the label is the big tap target. */
-.capture {
-  display: inline-block;
-  margin-top: 0.25rem;
-}
-
-.capture input {
-  display: none;
-}
-
-/* The second way in: a photo already taken, from the library. */
-.capture.secondary {
-  background: none;
-  color: inherit;
-}
-
-.muted {
-  color: var(--muted);
-}
-
-.ok {
-  color: var(--ok);
-}
-
-.warn {
-  color: var(--warn);
-}
-
-.error {
-  color: var(--error);
-}
-
-.shell.wide {
-  max-width: 64rem;
-}
-
-.small {
-  font-size: 0.85rem;
-}
-
-.panel {
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem 1rem;
-  margin: 1rem 0;
-}
-
-.panel h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.1rem;
+  margin: var(--space-2) 0;
 }
 
 details summary {
   cursor: pointer;
-  margin: 0.5rem 0;
+  margin: var(--space-2) 0;
 }
+
+/* A disclosure that reads as a control: "How we priced it". */
+details.disclosure {
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  margin: var(--space-3) 0;
+}
+
+details.disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  list-style: none;
+}
+
+details.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.disclosure > summary::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+details.disclosure[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+details.disclosure > :last-child {
+  margin-bottom: var(--space-3);
+}
+
+/* ---------- Text roles ---------- */
+
+.muted {
+  color: var(--color-muted);
+}
+
+.small {
+  font-size: var(--text-sm);
+}
+
+.ok {
+  color: var(--color-success-text);
+}
+
+.warn {
+  color: var(--color-warning-text);
+}
+
+.error {
+  color: var(--color-danger-text);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* ---------- Alerts ---------- */
+
+/* Inline alerts. A page's error message (p.error with role alert) is drawn as one too. */
+.alert,
+p.error[role='alert'],
+p.error[role='status'] {
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  border-left-width: 4px;
+}
+
+.alert > :first-child {
+  margin-top: 0;
+}
+
+.alert > :last-child {
+  margin-bottom: 0;
+}
+
+.alert ul {
+  margin: var(--space-2) 0 0;
+  padding-left: 1.2rem;
+}
+
+.alert-title {
+  font-weight: 700;
+}
+
+.alert-info {
+  background: var(--color-info-soft);
+  color: var(--color-info-text);
+  border-color: var(--color-accent);
+}
+
+.alert-success {
+  background: var(--color-success-soft);
+  color: var(--color-success-text);
+  border-color: var(--color-success);
+}
+
+.alert-warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-text);
+  border-color: var(--color-warning);
+}
+
+.alert-danger,
+p.error[role='alert'],
+p.error[role='status'] {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
+  border-color: var(--color-danger);
+}
+
+.alert a,
+.alert button.link {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* ---------- Chips ---------- */
+
+.chip,
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.chip::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.chip-neutral,
+.badge {
+  background: var(--color-surface-sunken);
+  color: var(--color-muted);
+  border-color: var(--color-border);
+}
+
+.chip-info {
+  background: var(--color-info-soft);
+  color: var(--color-info-text);
+}
+
+.chip-success {
+  background: var(--color-success-soft);
+  color: var(--color-success-text);
+}
+
+.chip-warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-text);
+}
+
+.chip-danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
+}
+
+/* ---------- Loading and empty ---------- */
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-muted);
+  padding: var(--space-4) 0;
+}
+
+.empty {
+  margin: var(--space-3) 0;
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+  color: var(--color-muted);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.empty-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* ---------- Tables ---------- */
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .table th,
 .table td {
   text-align: left;
-  padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
   vertical-align: top;
+}
+
+.table th {
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+/* Wide tables scroll inside their own box instead of the page. */
+.scroll {
+  overflow-x: auto;
+}
+
+/* ---------- Card page: photos ---------- */
+
+.capture-summary {
+  margin: var(--space-3) 0;
+}
+
+.shot {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.shot-body > :first-child {
+  margin-top: 0;
+}
+
+.shot .thumb,
+.shot-empty {
+  width: 100%;
+}
+
+/* Where a photo goes before there is one: a card's shape, dashed. */
+.shot-empty {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 63 / 88;
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  text-align: center;
+  padding: var(--space-1);
+}
+
+/* The file input is visually hidden but still focusable; the label is the big tap target and shows the focus. */
+.capture {
+  position: relative;
+}
+
+.capture input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+  min-height: 0;
+}
+
+.capture:has(input:focus-visible) {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .photos {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .photo {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--space-1);
   width: 10rem;
   text-decoration: none;
   color: inherit;
@@ -224,33 +1036,196 @@ details summary {
 .photo img,
 .identity img {
   width: 100%;
-  border-radius: 0.4rem;
-  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
 }
+
+/* Labelled photos on listings and deals: three fit across a phone. */
+.photo.compact {
+  width: 6rem;
+}
+
+/* Card photos on instant-offer listings. */
+.thumb {
+  display: block;
+  width: 6rem;
+  height: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+}
+
+.status-line {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-3);
+}
+
+.status-line p {
+  margin: 0;
+}
+
+/* ---------- Offers ---------- */
+
+/* The firm offer on a card: the one number that matters. */
+.offer-price {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  margin: var(--space-1) 0;
+}
+
+.offer-panel {
+  border-color: var(--color-accent);
+  border-width: 2px;
+}
+
+.confirm {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-md);
+}
+
+.confirm > p:first-child {
+  margin-top: 0;
+}
+
+.meta {
+  margin: var(--space-1) 0;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+/* Listings and deals: the card, its photos and its price. */
+.listing-top {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.listing-top .offer-price {
+  margin: 0;
+}
+
+@media (min-width: 40rem) {
+  .listing-top {
+    grid-template-columns: 1fr auto;
+    align-items: start;
+  }
+
+  .listing-top .offer-price {
+    text-align: right;
+  }
+}
+
+/* Buyers: Cards for sale and Your deals, as two tabs. */
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 var(--space-3);
+  padding: var(--space-1);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+
+.tabs a {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.tabs a[aria-current='page'] {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-1);
+}
+
+/* ---------- Org page ---------- */
+
+/* The terms to accept: scrolls in its own box, so "I agree" stays close. */
+.terms {
+  white-space: pre-wrap;
+  font: inherit;
+  font-size: var(--text-sm);
+  max-height: 55vh;
+  overflow: auto;
+  margin: var(--space-3) 0 0;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+.gate-bar {
+  position: sticky;
+  bottom: 0;
+  margin: 0 calc(-1 * var(--space-4));
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--color-bg);
+}
+
+.gate-bar button {
+  width: 100%;
+}
+
+@media (min-width: 40rem) {
+  .gate-bar button {
+    width: auto;
+  }
+}
+
+.invite {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.invite input {
+  flex: 1 1 16rem;
+}
+
+/* ---------- Admin and review ---------- */
 
 .identity {
   display: grid;
   grid-template-columns: 6rem 1fr;
-  gap: 1rem;
+  gap: var(--space-4);
   align-items: start;
 }
 
 .hits {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
-  gap: 0.5rem;
-  margin: 0.75rem 0;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
 }
 
 .hit {
   display: grid;
-  gap: 0.25rem;
-  padding: 0.4rem;
-  background: none;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--color-surface);
   color: inherit;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   text-align: left;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+.hit:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
 }
 
 .hit img {
@@ -261,24 +1236,23 @@ details summary {
   display: grid;
   place-items: center;
   aspect-ratio: 63 / 88;
-  color: var(--muted);
+  color: var(--color-muted);
 }
 
 .grades {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
-  gap: 0.4rem;
+  gap: var(--space-2);
 }
 
 .grades label {
   display: grid;
   gap: 0.15rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .grades input {
   width: 100%;
-  box-sizing: border-box;
 }
 
 .bars {
@@ -287,7 +1261,7 @@ details summary {
   gap: 0.3rem;
   height: 9rem;
   align-items: end;
-  margin: 0.5rem 0 1rem;
+  margin: var(--space-2) 0 var(--space-4);
 }
 
 .bar {
@@ -299,40 +1273,32 @@ details summary {
 
 .bar .fill {
   align-self: end;
-  background: var(--accent);
+  background: var(--color-accent);
   border-radius: 0.2rem 0.2rem 0 0;
   min-height: 1px;
 }
 
 .bar .value {
   font-size: 0.7rem;
-  color: var(--muted);
+  color: var(--color-muted);
 }
 
 .bar .label {
-  font-size: 0.85rem;
-  border-top: 1px solid var(--border);
-}
-
-.terms {
-  white-space: pre-wrap;
-  font: inherit;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
+  font-size: var(--text-sm);
+  border-top: 1px solid var(--color-border);
 }
 
 .suggestions {
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-3);
 }
 
 .suggestion {
   display: grid;
   grid-template-columns: 4rem 1fr auto;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: center;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .suggestion img,
@@ -342,7 +1308,7 @@ details summary {
 
 /* Valuation run summary: a row of figures that wraps on narrow screens. */
 .tiles {
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: stretch;
 }
 
@@ -352,51 +1318,15 @@ details summary {
 }
 
 .tiles strong {
-  font-size: 1.2rem;
+  font-size: var(--text-xl);
 }
 
-/* Wide tables scroll inside their own box instead of the page. */
-.scroll {
-  overflow-x: auto;
-}
-
-/* Labelled photos on listings and deals: three fit across a phone. */
-.photo.compact {
-  width: 6rem;
-}
-
-/* Where a seller's card is on the way to a sale. */
-.badge {
-  display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  font-size: 0.85rem;
-}
-
-.status-line p {
-  margin: 0.25rem 0;
-}
-
-/* Card photos on instant-offer listings. */
-.thumb {
-  width: 6rem;
-  height: auto;
-  border-radius: 0.4rem;
-  border: 1px solid var(--border);
-}
-
-/* The firm offer on a card: the one number that matters. */
-.offer-price {
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin: 0.25rem 0;
-}
+/* ---------- Date input ---------- */
 
 .date-input {
   position: relative;
   display: inline-flex;
-  gap: 0.25rem;
+  gap: var(--space-1);
   align-items: center;
 }
 
@@ -405,34 +1335,35 @@ details summary {
 }
 
 .date-toggle {
-  padding: 0.45rem 0.55rem;
+  padding: 0 0.7rem;
   line-height: 0;
 }
 
 .calendar {
   position: absolute;
-  top: calc(100% + 0.25rem);
+  top: calc(100% + var(--space-1));
   left: 0;
-  z-index: 10;
-  padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: Canvas;
-  color: CanvasText;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+  z-index: 30;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-2);
 }
 
 .calendar-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
   font-weight: 600;
 }
 
 .calendar-head button {
-  padding: 0.2rem 0.6rem;
+  min-height: 2.25rem;
+  padding: 0 0.7rem;
 }
 
 .calendar table {
@@ -441,8 +1372,8 @@ details summary {
 
 .calendar th {
   font-weight: normal;
-  font-size: 0.8rem;
-  color: var(--muted);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
   padding: 0.15rem;
 }
 
@@ -451,25 +1382,28 @@ details summary {
 }
 
 .calendar .day {
-  width: 2.1rem;
-  padding: 0.3rem 0;
+  width: 2.4rem;
+  min-height: 2.4rem;
+  padding: 0;
   border: 1px solid transparent;
   background: none;
   color: inherit;
+  font-weight: 400;
 }
 
 .calendar .day:hover:not(:disabled) {
-  border-color: var(--border);
+  background: var(--color-accent-soft);
+  border-color: var(--color-border);
 }
 
 .calendar .day.selected {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 
 .calendar .day:disabled {
-  color: var(--muted);
+  color: var(--color-muted);
   opacity: 0.5;
   cursor: default;
 }
