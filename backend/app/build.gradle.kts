@@ -21,7 +21,7 @@ dependencies {
     // Report PDFs, rendered in the JVM: Thymeleaf (Apache-2.0) fills XHTML templates and OpenHTMLtoPDF
     // (LGPL-2.1, used unmodified as a library; PDFBox underneath is Apache-2.0) lays them out.
     implementation("org.thymeleaf:thymeleaf")
-    implementation("io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.85")
+    implementation("io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.100")
     // Error reports to Sentry (docs/hosting.md). Does nothing unless SENTRY_DSN is set.
     implementation("io.sentry:sentry-spring-boot-4-starter:8.61.0")
     implementation("io.sentry:sentry-logback:8.61.0")
