@@ -1,6 +1,6 @@
 # Brand directions
 
-Three visual directions for Rawmark, made for the closed beta (2026-10-26). None is chosen yet. Compare them side by side, on a phone, on the Artifact page: https://claude.ai/artifact/JPNCXYRWjYVsLg7BC9zK7c (the card page and its offer panel at phone width, in light and dark).
+Three visual directions for Rawmark, made for the closed beta (2026-10-26). **Chosen: 3. Hobby energy (Zach, 2026-10-26).** Applied in `web/src/index.css`; fonts are self-hosted from `@fontsource-variable/bricolage-grotesque` and `@fontsource-variable/figtree` (SIL OFL). Compare them side by side, on a phone, on the Artifact page: https://claude.ai/artifact/JPNCXYRWjYVsLg7BC9zK7c (the card page and its offer panel at phone width, in light and dark).
 
 The web app's look comes from the token block at the top of [web/src/index.css](../web/src/index.css). Each direction below lists the tokens it changes, under the same names. Applying one means:
 
