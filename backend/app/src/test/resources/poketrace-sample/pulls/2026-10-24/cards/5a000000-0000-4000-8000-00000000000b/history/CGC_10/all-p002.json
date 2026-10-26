@@ -1,0 +1,30 @@
+{
+ "request": "https://api.poketrace.com/v1/cards/5a000000-0000-4000-8000-00000000000b/prices/CGC_10/history?period=all&limit=50",
+ "fetchedAt": "2026-10-24T12:00:00+00:00",
+ "response": {
+  "data": [
+   {
+    "date": "2026-09-03",
+    "source": "ebay",
+    "avg": 242.47,
+    "low": 242.47,
+    "high": 242.47,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-09-10",
+    "source": "ebay",
+    "avg": 225.38,
+    "low": 225.38,
+    "high": 225.38,
+    "saleCount": 1,
+    "approxSaleCount": false
+   }
+  ],
+  "pagination": {
+   "hasMore": false,
+   "nextCursor": null
+  }
+ }
+}

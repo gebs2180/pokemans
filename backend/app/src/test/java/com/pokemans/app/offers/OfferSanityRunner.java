@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.pokemans.app.TestApi;
 import com.pokemans.app.TestcontainersConfiguration;
 import com.pokemans.app.identity.SecurityProperties;
+import com.pokemans.app.pricing.PokeTraceImport;
 import com.pokemans.app.valuation.Valuations;
 import com.pokemans.valuation.Confidence;
 import com.pokemans.valuation.Grade;
@@ -24,34 +25,49 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Not a test: a report for the vendor spot check (docs/offer-sanity-2026-10-26.md). Every card in a
- * comps CSV (the columns of comps.csv) goes in through the admin comp API, the price tables come from a
- * refresh, and each card is then assessed at a sweep of condition distributions and photo confidences
- * and quoted by {@link OfferService}, exactly as the admin preview would. Prints a Markdown table and
- * writes it to {@code build/reports/offer-sanity.md}; asserts nothing.
+ * Not a test: a report for the vendor spot check (docs/offer-sanity-2026-10-26.md). Every card goes in
+ * with its comps, the price tables come from a refresh, and each card is then assessed at a sweep of
+ * condition distributions and photo confidences and quoted by {@link OfferService}, exactly as the
+ * admin preview would. Prints a Markdown table and writes it to {@code build/reports/offer-sanity.md};
+ * asserts nothing. Two inputs, either or both:
+ * <ul>
+ *   <li>{@code POKEMANS_OFFER_SANITY_CSV}: a comps CSV (the columns of comps.csv), posted through the
+ *       admin comp API like the comp form's CSV import;</li>
+ *   <li>{@code POKEMANS_OFFER_SANITY_POKETRACE}: a PokeTrace pilot folder (docs/poketrace-pilot.md),
+ *       its {@code manifest.csv} cards ingested through {@code CompIngestionService}. The folder in
+ *       {@code src/test/resources/poketrace-sample} is made up, for trying it without a key.</li>
+ * </ul>
  *
- * <p>Runs only when {@code POKEMANS_OFFER_SANITY_CSV} names the CSV, and on its own (the refresh prices
- * every card in the database, so other test classes' comps would change the era ratios):
- * {@code POKEMANS_OFFER_SANITY_CSV=... ./gradlew :app:test --tests '*OfferSanityRunner'}.
+ * <p>Run it on its own (the refresh prices every card in the database, so other test classes' comps
+ * would change the era ratios): {@code ./gradlew :app:test --tests '*OfferSanityRunner'}.
  */
 @SpringBootTest(properties = "pokemans.condition.worker.enabled=false")
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 @Testcontainers(disabledWithoutDocker = true)
-@EnabledIfEnvironmentVariable(named = "POKEMANS_OFFER_SANITY_CSV", matches = ".+")
+@EnabledIf("inputGiven")
 class OfferSanityRunner {
 
     private static final LocalDate TODAY = LocalDate.now(ZoneOffset.UTC);
+    private static final String CSV_INPUT = System.getenv("POKEMANS_OFFER_SANITY_CSV");
+    private static final String POKETRACE_INPUT = System.getenv("POKEMANS_OFFER_SANITY_POKETRACE");
+
+    static boolean inputGiven() {
+        return (CSV_INPUT != null && !CSV_INPUT.isBlank()) || (POKETRACE_INPUT != null && !POKETRACE_INPUT.isBlank());
+    }
 
     /** Condition sweep: centred on 10 down to 6, one grade apart, then a wide one. */
     private static final Map<String, Map<String, Double>> DISTRIBUTIONS = new LinkedHashMap<>();
@@ -65,16 +81,21 @@ class OfferSanityRunner {
         DISTRIBUTIONS.put("wide5-10", Map.of("5", 0.1, "6", 0.15, "7", 0.2, "8", 0.25, "9", 0.2, "10", 0.1));
     }
 
-    /** Identity per comps.csv card: set, release date, variant and rarity as the catalog would have them. */
-    private record Card(String name, String set, String number, String released, String variant, String rarity) {
+    /**
+     * Identity as the catalog would have it: set, release date, variant and rarity.
+     *
+     * @param poketraceId the card's PokeTrace id, for PokeTrace input; null for CSV input
+     */
+    private record Card(String name, String set, String number, String released, String variant, String rarity, String poketraceId) {
     }
 
-    private static final List<Card> CARDS = List.of(
-            new Card("Charizard", "Base Set (Unlimited)", "4/102", "1999-01-09", "HOLO", "Rare Holo"),
-            new Card("Umbreon VMAX", "Evolving Skies", "215/203", "2021-08-27", "HOLO", "Rare Secret"),
-            new Card("Pikachu VMAX", "Vivid Voltage", "188/185", "2020-11-13", "HOLO", "Rare Rainbow"),
-            new Card("Giratina V", "Lost Origin", "186/196", "2022-09-09", "HOLO", "Rare Ultra"),
-            new Card("Lugia V", "Silver Tempest", "186/195", "2022-11-11", "HOLO", "Rare Ultra"));
+    /** The comps.csv cards. */
+    private static final List<Card> CSV_CARDS = List.of(
+            new Card("Charizard", "Base Set (Unlimited)", "4/102", "1999-01-09", "HOLO", "Rare Holo", null),
+            new Card("Umbreon VMAX", "Evolving Skies", "215/203", "2021-08-27", "HOLO", "Rare Secret", null),
+            new Card("Pikachu VMAX", "Vivid Voltage", "188/185", "2020-11-13", "HOLO", "Rare Rainbow", null),
+            new Card("Giratina V", "Lost Origin", "186/196", "2022-09-09", "HOLO", "Rare Ultra", null),
+            new Card("Lugia V", "Silver Tempest", "186/195", "2022-11-11", "HOLO", "Rare Ultra", null));
 
     @Autowired
     private MockMvc mvc;
@@ -85,15 +106,31 @@ class OfferSanityRunner {
     @Autowired
     private OfferService offers;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private ApplicationContext context;
+
     @Test
     void report() throws Exception {
-        List<String[]> csv = csv(Path.of(System.getenv("POKEMANS_OFFER_SANITY_CSV")));
         TestApi api = new TestApi(mvc, security);
         String orgId = api.collectorOrg("Offer sanity " + UUID.randomUUID(), "auth0|sanity-" + UUID.randomUUID());
+        StringBuilder out = new StringBuilder("Generated " + TODAY + ".\n\n");
+
+        List<Card> cards = new ArrayList<>();
+        List<String[]> csv = CSV_INPUT == null || CSV_INPUT.isBlank() ? List.of() : csv(Path.of(CSV_INPUT));
+        if (!csv.isEmpty()) {
+            cards.addAll(CSV_CARDS);
+        }
+        Path poketrace = POKETRACE_INPUT == null || POKETRACE_INPUT.isBlank() ? null : Path.of(POKETRACE_INPUT);
+        if (poketrace != null) {
+            cards.addAll(manifest(poketrace.resolve("manifest.csv")));
+        }
 
         Map<Card, String> items = new LinkedHashMap<>();
         Map<Card, String> catalogIds = new LinkedHashMap<>();
-        for (Card c : CARDS) {
+        for (Card c : cards) {
             String item = api.card(orgId, c.name(), api.admin());
             String catalog = TestApi.read(api.postJson("/api/admin/orgs/" + orgId + "/cards/" + item + "/identifications",
                     "{\"provider\":\"MANUAL\",\"language\":\"en\",\"edition\":\"UNLIMITED\",\"variant\":\"" + c.variant()
@@ -104,29 +141,37 @@ class OfferSanityRunner {
             catalogIds.put(c, catalog);
         }
 
-        // The comps, as the CSV import in the comp form would post them: graded sold rows for the card's number.
-        Map<Card, BigDecimal> lowestPsa9 = new LinkedHashMap<>();
+        // CSV comps, as the CSV import in the comp form would post them: graded sold rows for the card's number.
         for (String[] r : csv) {
-            Card c = CARDS.stream().filter(x -> x.number().equals(r[2]) && x.name().equals(r[0])).findFirst().orElseThrow();
+            Card c = CSV_CARDS.stream().filter(x -> x.number().equals(r[2]) && x.name().equals(r[0])).findFirst().orElseThrow();
             String url = r[9].startsWith("http") ? ",\"url\":\"" + r[9] + "\"" : "";
             api.postJson("/api/admin/catalog-cards/" + catalogIds.get(c) + "/comps", "{\"gradingCompany\":\"" + r[3] + "\",\"grade\":" + r[4]
                     + ",\"price\":" + r[5] + ",\"soldOn\":\"" + r[6] + "\",\"listingType\":\"" + r[7] + "\",\"marketplace\":\"" + r[8]
                     + "\",\"note\":\"Imported from CSV\"" + url + "}", api.admin()).andExpect(status().isCreated());
-            if (r[3].equals("PSA") && r[4].equals("9")) {
-                lowestPsa9.merge(c, new BigDecimal(r[5]), BigDecimal::min);
-            }
         }
-        api.postJson("/api/admin/catalog-cards/" + catalogIds.get(CARDS.getFirst()) + "/prices/refresh", "", api.admin())
+        if (!csv.isEmpty()) {
+            out.append(csv.size()).append(" comps from ").append(CSV_INPUT).append(".\n\n");
+        }
+        // PokeTrace daily rows, through the ingestion a licensed source will use, over its lookback.
+        if (poketrace != null) {
+            Map<UUID, String> ids = new LinkedHashMap<>();
+            cards.stream().filter(c -> c.poketraceId() != null).forEach(c -> ids.put(UUID.fromString(catalogIds.get(c)), c.poketraceId()));
+            PokeTraceImport.Result imported = PokeTraceImport.ingest(context, poketrace, ids, TODAY.minusDays(400), TODAY);
+            out.append("PokeTrace ").append(poketrace).append(": ").append(ids.size()).append(" cards, ").append(imported.fetched())
+                    .append(" sales from daily rows, ").append(imported.inserted()).append(" stored, ").append(imported.rejected())
+                    .append(" rejected").append(imported.errors().isEmpty() ? "" : ", errors " + imported.errors()).append(".\n\n");
+        }
+        api.postJson("/api/admin/catalog-cards/" + catalogIds.get(cards.getFirst()) + "/prices/refresh", "", api.admin())
                 .andExpect(status().isOk());
 
-        StringBuilder out = new StringBuilder();
-        out.append("Generated ").append(TODAY).append(" from ").append(csv.size()).append(" comps.\n\n");
         List<String> tables = new ArrayList<>();
         out.append("| Card | Dist | Photo conf | Offer conf | Firm price | Refusal | FMV | Engine price before refusal | Price at m(A/B/C) | Derived share | ")
-                .append("Lowest PSA 9 | Ladder 10..5 (method) |\n");
-        out.append("|---|---|---|---|---|---|---|---|---|---|---|---|\n");
-        for (Card c : CARDS) {
+                .append("Lowest PSA 9 (90d) | Lowest raw NM (90d) | Ladder 10..5 (method) |\n");
+        out.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+        for (Card c : cards) {
             boolean tablePrinted = false;
+            BigDecimal lowestPsa9 = lowest(catalogIds.get(c), "grading_company = 'PSA' and grade = 9");
+            BigDecimal lowestRawNm = lowest(catalogIds.get(c), "raw_condition = 'NEAR_MINT'");
             for (Map.Entry<String, Map<String, Double>> d : DISTRIBUTIONS.entrySet()) {
                 for (Confidence photo : List.of(Confidence.A, Confidence.B, Confidence.C)) {
                     api.postJson("/api/admin/orgs/" + orgId + "/cards/" + items.get(c) + "/assessments",
@@ -138,7 +183,7 @@ class OfferSanityRunner {
                         tables.add(priceTable(c, v));
                         tablePrinted = true;
                     }
-                    out.append(row(c, d.getKey(), photo, q, lowestPsa9.get(c))).append('\n');
+                    out.append(row(c, d.getKey(), photo, q, lowestPsa9, lowestRawNm)).append('\n');
                 }
             }
         }
@@ -151,10 +196,31 @@ class OfferSanityRunner {
         Files.writeString(report, out.toString());
     }
 
-    private String row(Card c, String dist, Confidence photo, OfferService.Quote q, BigDecimal lowestPsa9) {
+    /** The card's lowest stored sale matching {@code where} in the last 90 days, or null. */
+    private BigDecimal lowest(String catalogCardId, String where) {
+        return jdbc.queryForObject("select min(price) from sold_comp where catalog_card_id = ?::uuid and sold_on >= ? and " + where,
+                BigDecimal.class, catalogCardId, TODAY.minusDays(90));
+    }
+
+    /** The pilot's cards: poketrace.py's manifest.csv (our number, else PokeTrace's). */
+    private static List<Card> manifest(Path file) throws IOException {
+        List<String> lines = Files.readAllLines(file).stream().filter(l -> !l.isBlank()).toList();
+        List<String> header = List.of(lines.getFirst().split(",", -1));
+        List<Card> cards = new ArrayList<>();
+        for (String line : lines.subList(1, lines.size())) {
+            String[] f = line.split(",", -1);
+            Function<String, String> col = name -> header.indexOf(name) < 0 ? "" : f[header.indexOf(name)].trim();
+            String number = col.apply("number").isEmpty() ? col.apply("pt_number") : col.apply("number");
+            cards.add(new Card(col.apply("name"), col.apply("set"), number, col.apply("released"), "HOLO",
+                    col.apply("rarity").isEmpty() ? "Rare" : col.apply("rarity"), col.apply("poketrace_id")));
+        }
+        return cards;
+    }
+
+    private String row(Card c, String dist, Confidence photo, OfferService.Quote q, BigDecimal lowestPsa9, BigDecimal lowestRawNm) {
         Valuations.CurrentValue v = q.value();
         if (v.valuation() == null) {
-            return "| " + c.name() + " | " + dist + " | " + photo + " | | | " + q.refusal() + " | | | | | | " + v.inputs().unvaluedReason() + " |";
+            return "| " + c.name() + " | " + dist + " | " + photo + " | | | " + q.refusal() + " | | | | | | | " + v.inputs().unvaluedReason() + " |";
         }
         // Why the offer is at its confidence: the base (photo and comps) and the derived-grade step, from the trace.
         String offerConf = v.valuation().offerConfidence().name() + " ("
@@ -189,7 +255,8 @@ class OfferSanityRunner {
         return "| " + c.name() + " | " + dist + " | " + photo + " | " + offerConf + " | "
                 + (q.offer() == null ? "—" : q.offer().price().toPlainString()) + " | " + (q.refusal() == null ? "" : q.refusal()) + " | "
                 + v.valuation().fmv().toPlainString() + " | " + uncapped + " | " + String.join(" / ", byMargin) + " | " + derivedShare + " | "
-                + (lowestPsa9 == null ? "" : lowestPsa9.toPlainString()) + " | " + ladder.toString().trim() + " |";
+                + (lowestPsa9 == null ? "" : lowestPsa9.toPlainString()) + " | " + (lowestRawNm == null ? "" : lowestRawNm.toPlainString())
+                + " | " + ladder.toString().trim() + " |";
     }
 
     /** Share of the firm price carried by grades whose price was derived, not observed. */

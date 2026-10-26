@@ -1,0 +1,57 @@
+{
+ "request": "https://api.poketrace.com/v1/cards/5a000000-0000-4000-8000-00000000000c/prices/NEAR_MINT/history?period=all&limit=50",
+ "fetchedAt": "2026-10-24T12:00:00+00:00",
+ "response": {
+  "data": [
+   {
+    "date": "2026-07-28",
+    "source": "ebay",
+    "avg": 184.13,
+    "low": 184.13,
+    "high": 184.13,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-02",
+    "source": "ebay",
+    "avg": 167.5,
+    "low": 167.5,
+    "high": 167.5,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-07",
+    "source": "ebay",
+    "avg": 192.11,
+    "low": 192.11,
+    "high": 192.11,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-08",
+    "source": "ebay",
+    "avg": 174.71,
+    "low": 174.71,
+    "high": 174.71,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-12",
+    "source": "ebay",
+    "avg": 162.63,
+    "low": 162.63,
+    "high": 162.63,
+    "saleCount": 1,
+    "approxSaleCount": false
+   }
+  ],
+  "pagination": {
+   "hasMore": true,
+   "nextCursor": "c2"
+  }
+ }
+}

@@ -1,0 +1,66 @@
+{
+ "request": "https://api.poketrace.com/v1/cards/5a000000-0000-4000-8000-00000000000a/prices/LIGHTLY_PLAYED/history?period=all&limit=50",
+ "fetchedAt": "2026-10-24T12:00:00+00:00",
+ "response": {
+  "data": [
+   {
+    "date": "2026-07-29",
+    "source": "ebay",
+    "avg": 200.86,
+    "low": 200.86,
+    "high": 200.86,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-04",
+    "source": "ebay",
+    "avg": 206.04,
+    "low": 206.04,
+    "high": 206.04,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-12",
+    "source": "ebay",
+    "avg": 196.94,
+    "low": 190.76,
+    "high": 203.12,
+    "saleCount": 2,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-13",
+    "source": "ebay",
+    "avg": 176.82,
+    "low": 175.49,
+    "high": 178.15,
+    "saleCount": 2,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-14",
+    "source": "ebay",
+    "avg": 206.59,
+    "low": 206.59,
+    "high": 206.59,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-27",
+    "source": "ebay",
+    "avg": 171.54,
+    "low": 171.54,
+    "high": 171.54,
+    "saleCount": 1,
+    "approxSaleCount": false
+   }
+  ],
+  "pagination": {
+   "hasMore": true,
+   "nextCursor": "c2"
+  }
+ }
+}

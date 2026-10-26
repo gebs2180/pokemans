@@ -1,0 +1,75 @@
+{
+ "request": "https://api.poketrace.com/v1/cards/5a000000-0000-4000-8000-00000000000a/prices/PSA_6/history?period=all&limit=50",
+ "fetchedAt": "2026-10-24T12:00:00+00:00",
+ "response": {
+  "data": [
+   {
+    "date": "2026-10-01",
+    "source": "ebay",
+    "avg": 209.64,
+    "low": 209.64,
+    "high": 209.64,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-04",
+    "source": "ebay",
+    "avg": 200.14,
+    "low": 200.14,
+    "high": 200.14,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-10",
+    "source": "ebay",
+    "avg": 217.52,
+    "low": 217.52,
+    "high": 217.52,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-13",
+    "source": "ebay",
+    "avg": 210.3,
+    "low": 210.3,
+    "high": 210.3,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-14",
+    "source": "ebay",
+    "avg": 215.93,
+    "low": 215.93,
+    "high": 215.93,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-17",
+    "source": "ebay",
+    "avg": 200.48,
+    "low": 200.48,
+    "high": 200.48,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-20",
+    "source": "ebay",
+    "avg": 211.81,
+    "low": 211.81,
+    "high": 211.81,
+    "saleCount": 1,
+    "approxSaleCount": false
+   }
+  ],
+  "pagination": {
+   "hasMore": false,
+   "nextCursor": null
+  }
+ }
+}

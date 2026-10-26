@@ -1,0 +1,35 @@
+{
+ "request": "https://api.poketrace.com/v1/cards/5a000000-0000-4000-8000-00000000000c",
+ "fetchedAt": "2026-10-24T12:00:00+00:00",
+ "response": {
+  "data": {
+   "id": "5a000000-0000-4000-8000-00000000000c",
+   "name": "Sample Deep Lugia",
+   "cardNumber": "3/100",
+   "set": {
+    "slug": "sample",
+    "name": "Sample Tempest"
+   },
+   "variant": "Holofoil",
+   "currency": "USD",
+   "market": "US",
+   "game": "pokemon",
+   "gradedOptions": [
+    "PSA_5",
+    "PSA_6",
+    "PSA_7",
+    "PSA_8",
+    "PSA_9",
+    "PSA_10",
+    "CGC_10"
+   ],
+   "conditionOptions": [
+    "NEAR_MINT",
+    "LIGHTLY_PLAYED",
+    "DAMAGED"
+   ],
+   "prices": {},
+   "totalSaleCount": 110
+  }
+ }
+}
