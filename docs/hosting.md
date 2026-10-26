@@ -78,9 +78,10 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
 
 1. Hetzner → Servers → Add server: **CX23**, Ubuntu 24.04, location Nuremberg/Falkenstein/Helsinki (the CX line is the cheapest; US locations cost about 20% more), your SSH key, IPv4 on. Optionally tick **Backups** (+20%, weekly whole-disk snapshots on top of our nightly ones).
 2. Firewalls → Create: allow inbound TCP 22 (ideally from your IP only), TCP 80, TCP 443 and UDP 443, then apply it to the server.
-3. Pick the site address:
-   - with a domain: add an A record such as `beta.yourdomain.com` → the server's IPv4;
-   - without one: use `<ip-with-dashes>.sslip.io` (e.g. `203-0-113-7.sslip.io`), which resolves to that IP. Caddy can get a certificate for it. Free, but the URL is ugly.
+3. Pick the site address. The product is called Rawmark, and Zach bought `rawmark.app` on 2026-10-25. The site is either `https://rawmark.app` or `https://beta.rawmark.app`; Zach picks which when setting up DNS:
+   - add an A record for `rawmark.app` (the bare domain) or `beta` (for `beta.rawmark.app`) → the server's IPv4, at the registrar or wherever the domain's DNS is hosted;
+   - set `SITE_ADDRESS` in `.env` (step 5) to that host name, without `https://`. `.app` domains only work over HTTPS, which Caddy provides.
+   - Before DNS is ready you can test on `<ip-with-dashes>.sslip.io` (e.g. `203-0-113-7.sslip.io`), which resolves to that IP and gets a certificate too.
 4. SSH in and set up the box:
    ```bash
    ssh root@<server-ip>
@@ -193,7 +194,7 @@ At most a day of data is lost (the last nightly backup), plus whatever Hetzner's
 | Hetzner backups (optional) | +20%, ~€0.90 |
 | Cloudflare R2 | $0 up to 10 GB. The beta is likely 5–15 GB counting the backup copy (photos are 3–8 MB; 15 testers × ~50 cards × 2–3 photos), so $0–0.10; requests stay inside the free tier |
 | Sentry Developer, healthchecks.io, UptimeRobot | $0 |
-| Domain (optional) | ~$10–15 a year, or $0 with sslip.io |
+| Domain | `rawmark.app`, already bought (2026-10-25) |
 | **Total** | **~$5–7 a month**, about $10 for the whole 6-week beta |
 
 The card reader (Claude API) and EasyPost labels, when switched on, are billed per use on their own accounts and are not counted here.

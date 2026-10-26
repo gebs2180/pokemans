@@ -31,7 +31,7 @@ function App() {
     <div className={/^\/admin\/(review|valuation)/.test(location.pathname) ? 'shell wide' : 'shell'}>
       <header className="topbar">
         <Link to="/" className="brand">
-          pokemans
+          Rawmark
         </Link>
         {isAuthenticated && (
           <span className="who">
@@ -50,7 +50,7 @@ function App() {
         <main>
           <p>{COLLATERAL ? 'Raw collection collateral reports.' : 'Instant offers on raw cards.'}</p>
           {location.pathname.startsWith('/invite/') && (
-            <p>You've been invited to join pokemans. Log in, or sign up, to see the invite and accept it.</p>
+            <p>You've been invited to join Rawmark. Log in, or sign up, to see the invite and accept it.</p>
           )}
           <button onClick={() => loginWithRedirect({ appState: { returnTo: location.pathname + location.search } })}>
             {location.pathname.startsWith('/invite/') ? 'Log in or sign up' : 'Log in'}

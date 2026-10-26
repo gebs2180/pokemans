@@ -1,5 +1,7 @@
 # pokemans — raw collection collateral reports
 
+**Product name:** Rawmark (`rawmark.app`, chosen 2026-10-25). "pokemans" stays the internal name in packages, Gradle, databases, buckets and Auth0 identifiers.
+
 Collateral reports for raw-heavy Pokémon card collections: what a collection recovers in a forced sale, with stated confidence, so a lender can advance against it. Also replacement values for insurers. We don't lend, hold cards, or set advance rates.
 
 **Source of truth:** the *Raw Collection Valuation Methodology* Claude Doc (https://claude.ai/artifact/1XVmPmLtueJk37u2hXgDmL). This file summarizes it as of 2026-10-18. If they disagree, the doc wins: re-read it and update this file.
