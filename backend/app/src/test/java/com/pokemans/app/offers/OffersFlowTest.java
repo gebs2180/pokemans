@@ -233,10 +233,11 @@ class OffersFlowTest {
                 "{\"status\":\"COUNTERFEIT\",\"method\":\"IN_HAND_INSPECTION\"}", api.admin()).andExpect(status().isCreated());
         api.postJson(offers(fake), "", seller).andExpect(status().isConflict()).andExpect(jsonPath("$.detail", containsString("doubt")));
 
-        // Above the maximum firm price, no offer (Zach, 2026-10-21; pokemans.offers.max-price, $500 by default).
-        String grail = pricedCard("Grail", 3000);
+        // Above the maximum firm price, no offer: EasyPost's $5,000 insurance limit (pokemans.offers.max-price;
+        // the $500 beta maximum was lifted on 2026-10-26).
+        String grail = pricedCard("Grail", 30000);
         api.postJson(offers(grail), "", seller).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail", containsString("go up to $500")));
+                .andExpect(jsonPath("$.detail", containsString("go up to $5,000")));
         assertThat(jdbc.queryForObject("select count(*) from card_offer where card_item_id = ?::uuid", Integer.class, grail)).isZero();
 
         // A vintage holo nobody has verified still gets an offer, subject to authentication in hand.

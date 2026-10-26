@@ -8,7 +8,7 @@ Status 2026-10-26 (first drafted 2026-10-19) · for the closed test of Rawmark w
 
 ## Where it stands
 
-Built and tested: the whole offer flow, the E2E audit fixes, the $500 maximum, admin undo, the terms, and the clearer upload error. Decided: the brand (Rawmark) and going ahead without employer clearance.
+Built and tested: the whole offer flow, the E2E audit fixes, the offer maximum, admin undo, the terms, and the clearer upload error. Decided: the brand (Rawmark) and going ahead without employer clearance.
 
 Not yet done, in rough order:
 1. **Deploy** the planned hosting ([hosting.md](hosting.md)).
@@ -36,11 +36,11 @@ Not yet done, in rough order:
 - [ ] **Comps entered** for every card that gets an offer: real sold comps that can be shown. Hand-entered is fine for a closed test if they're real sales and their sources are allowed to be used; a licensed source is needed before opening it up. The admin's comp form takes a CSV in the `comps.csv` columns (PR #26). With realistic comps, three fresh sales at each of PSA 8, 9 and 10 now get an offer at confidence C (audit finding 1).
 - [ ] **Zach reviews each card's condition distribution by hand.** The pre-grade APIs stay off until their terms are confirmed in writing. Choosing A for a modern holo without a passing close-up now warns the reviewer (audit finding 25).
 - [ ] **Vendor spot check:** about 20 offers compared against what a vendor would pay. If the vendors laugh, tune `m` (buyer margin: 10% at A, 13% at B, 17% at C) before anyone else sees a price.
-- [x] **A maximum offer of $500**, on the firm price, so a miscalibrated price can't hurt anyone much and every label stays under EasyPost's $5,000 insurance cap. *Checked:* `OffersFlowTest` (PR #24). Raise it with `pokemans.offers.max-price`.
+- [x] **A maximum offer**, on the firm price: $5,000, EasyPost's insurance limit, so every label is insured for the full price. *Checked:* `OffersFlowTest` (PR #24). It was $500 until Zach lifted it on 2026-10-26, because too many cards were above it; set `pokemans.offers.max-price` lower to cap the beta again.
 
 ### People know what they're agreeing to
-- [x] **Seller, buyer and contributor terms** reviewed. *Checked:* Zach agreed every call on 2026-10-21 (PR #27; recorded in [offers.md](offers.md)). The versions are `seller-2026-10-21`, `buyer-firm-2026-10-21` and `contributor-2026-10-21` in `identity.Consents`; any change means a new version string. They are plain-language drafts with no liability cap or "as is" wording until a lawyer drafts it.
-- [ ] **A one-page "how this test works"** for testers: firm price, no re-grade, pay within 7 days of arrival, the three return reasons, who pays postage, the $500 maximum, no notifications yet, and that it's a test. *Drafted:* `docs/tester-guide.md` in PR #29, waiting for Zach's review.
+- [x] **Seller, buyer and contributor terms** reviewed. *Checked:* Zach agreed every call on 2026-10-21 (PR #27; recorded in [offers.md](offers.md)). The versions are `seller-2026-10-26`, `buyer-firm-2026-10-21` and `contributor-2026-10-26` (2026-10-26 dropped the $500 line) in `identity.Consents`; any change means a new version string. They are plain-language drafts with no liability cap or "as is" wording until a lawyer drafts it.
+- [ ] **A one-page "how this test works"** for testers: firm price, no re-grade, pay within 7 days of arrival, the three return reasons, who pays postage, the $5,000 maximum, no notifications yet, and that it's a test. *Drafted:* `docs/tester-guide.md` in PR #29, waiting for Zach's review.
 - [x] **The employer's outside-interest question:** Zach decided on 2026-10-21 to go ahead with the offers beta without clearance. Personal accounts and infrastructure only. Raise it again before the lender and insurer side resumes.
 - [x] **The name:** Rawmark, with `rawmark.app` bought (2026-10-25). Renaming the visible text from "pokemans" is being done separately.
 
