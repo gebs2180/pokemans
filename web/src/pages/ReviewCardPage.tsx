@@ -692,10 +692,14 @@ function Bars({ distribution }: { distribution: Distribution }) {
     <div className="bars" role="img" aria-label="Probability per grade">
       {OUTCOMES.map((o) => {
         const p = distribution[o] ?? 0
+        const h = Math.max((p / max) * 100, 0.5)
         return (
           <div key={o} className="bar">
             <span className="value small">{p > 0 ? percent(p) : ''}</span>
-            <span className="fill" style={{ height: `${(p / max) * 100}%` }} />
+            {/* An SVG bar, not an inline style: the site's CSP allows no style attributes. */}
+            <svg className="fill" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true">
+              <rect x="0" y={100 - h} width="10" height={h} />
+            </svg>
             <span className="label">{o}</span>
           </div>
         )
