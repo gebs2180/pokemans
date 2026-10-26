@@ -161,7 +161,7 @@ export function useApi() {
   )
 }
 
-export const UNREACHABLE = "Couldn't reach pokemans. Check your connection and try again."
+export const UNREACHABLE = "Couldn't reach Rawmark. Check your connection and try again."
 export const UPLOAD_FAILED = "The photo didn't upload. Check your connection and try again."
 
 /**
