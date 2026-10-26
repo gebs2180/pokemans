@@ -180,7 +180,9 @@ The marker for this sentence and the next is on item 13's sentence: "(Zach, 2026
 
 **Changes row:** 2026-10-21 · Step 7 · Derived grades price offers.
 
-### 14. The $500 maximum offer (2026-10-21)
+### 14. The maximum offer (2026-10-21, lifted to $5,000 on 2026-10-26)
+
+*2026-10-26: Zach lifted the $500 beta maximum because too many cards were above it. The maximum is now EasyPost's $5,000 insurance limit; read the wording below with $5,000 for $500.*
 
 **`CLAUDE.md` (Pipeline 8):**
 > No offer for lots, doubted cards, confidence D, FMV under $25, or a price above the $500 maximum (`pokemans.offers.max-price`, which also keeps every label under EasyPost's $5,000 insurance cap; Zach, 2026-10-21; not yet in the methodology doc); unverified high-risk cards get one subject to authentication in hand.

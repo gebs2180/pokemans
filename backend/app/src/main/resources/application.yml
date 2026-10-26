@@ -98,9 +98,9 @@ pokemans:
     # B 13%, C 17%). An offer stands for a week; a posted offer waits two weeks.
     offer-valid-for: 7d
     listing-open-for: 14d
-    # No offer above this firm price (Zach, 2026-10-21): limits a mistake's cost in the beta and keeps
-    # every label under EasyPost's $5,000 insurance cap.
-    max-price: 500
+    # No offer above this firm price: EasyPost's $5,000 insurance limit, so every label is insured for
+    # the full price. The $500 beta maximum was lifted on 2026-10-26 (Zach); set this lower to cap again.
+    max-price: 5000
   shipping:
     # Prepaid, insured labels for taken cards, bought on our account and billed to buyers monthly
     # (Zach, 2026-10-19). Off until a key is set in the environment; a test key buys test labels.

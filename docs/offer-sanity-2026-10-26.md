@@ -2,6 +2,8 @@
 
 Before the vendor spot check (show ~20 offers to card vendors, then tune the buyer margin), every card in `comps.csv` went through the real offer engine. Nothing in pricing was changed. Every finding below is for Zach to decide.
 
+> **Since this ran:** Zach lifted the $500 maximum on 2026-10-26. It is now EasyPost's $5,000 insurance limit, so most of the "over $500" rows below now get an offer; re-run the runner for current numbers.
+
 ## How it was run
 
 - **Runner:** `backend/app/src/test/java/com/pokemans/app/offers/OfferSanityRunner.java`. It's a Testcontainers flow test that asserts nothing and only runs when `POKEMANS_OFFER_SANITY_CSV` names a comps CSV:
