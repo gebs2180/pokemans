@@ -1,0 +1,29 @@
+# Postgres and MinIO for the browser tests only (compose project pokemans-e2e). Data lives in tmpfs, so every run
+# starts empty and `down` leaves nothing behind. Ports come from stack/ports.mjs. Throwaway credentials, loopback only.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: pokemans_e2e
+      POSTGRES_USER: pokemans_e2e
+      POSTGRES_PASSWORD: pokemans_e2e
+    ports:
+      - "127.0.0.1:${E2E_POSTGRES_PORT:-5446}:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pokemans_e2e -d pokemans_e2e"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: pokemans_e2e
+      MINIO_ROOT_PASSWORD: pokemans_e2e
+    ports:
+      - "127.0.0.1:${E2E_MINIO_PORT:-9016}:9000"
+    tmpfs:
+      - /data
