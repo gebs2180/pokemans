@@ -1,0 +1,5 @@
+poketrace_id,group,name,set,number,released,rarity,pt_name,pt_set,pt_number,pt_variant,raw_nm_avg,why
+5a000000-0000-4000-8000-00000000000a,SWSH,Sample Deep Umbreon,Sample Skies,1,2021-08-27,Rare Secret,Sample Deep Umbreon,Sample Skies,1/100,Holofoil,270.0,sample
+5a000000-0000-4000-8000-00000000000b,SWSH,Sample Deep Pikachu,Sample Skies,2,2021-08-27,Rare Secret,Sample Deep Pikachu,Sample Skies,2/100,Holofoil,90.0,sample
+5a000000-0000-4000-8000-00000000000c,SWSH,Sample Deep Lugia,Sample Tempest,3,2022-11-11,Rare Secret,Sample Deep Lugia,Sample Tempest,3/100,Holofoil,180.0,sample
+5a000000-0000-4000-8000-00000000000d,SWSH,Sample Thin Mew,Sample Tempest,4,2022-11-11,Rare Secret,Sample Thin Mew,Sample Tempest,4/100,Holofoil,150.0,sample

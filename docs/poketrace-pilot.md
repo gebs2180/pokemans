@@ -93,11 +93,51 @@ A production `PokeTraceSource` would price real offers from daily aggregates rat
 - **Licence:** confirm with PokeTrace in writing that collector offers priced from their data are allowed, and whether data can be kept after cancelling. The terms are silent on both; `PriceSource`'s own rule is "only added, and only enabled, once its licence covers" storage and use.
 - **Cost:** staying on Pro is $19.99 a month for the whole catalog. That's cheap if the answers are yes.
 
+## Built (2026-10-26): day 1 is buy, set the key, run
+
+Everything below is tested offline against made-up responses; nothing has touched the real API yet.
+
+- **Puller:** `analysis/poketrace/poketrace.py`, standard library only. `candidates.csv` lists the candidates; `test_poketrace.py` is its offline tests (`python -m unittest test_poketrace`). `make_sample.py` writes a made-up pilot folder.
+- **Source:** `PokeTraceDailySource` (backend test scope, `pricing` package). It reads the saved folder, expands daily rows as described above and goes through `CompIngestionService`. It keeps only eBay rows for graded tiers, and eBay or TCGplayer rows for raw tiers; never Cardmarket or `cardmarket_unsold` (listings). `PokeTraceDailySourceTest` checks it against `src/test/resources/poketrace-sample`.
+- **Runner:** `OfferSanityRunner` takes `POKEMANS_OFFER_SANITY_POKETRACE=<folder>` (alongside or instead of the CSV). It adds a "lowest raw NM (90 days)" column, the floor a vendor checks first.
+
+**Day 1, in PowerShell** (data lands in `C:\Users\chief\pokemans-data\poketrace` unless `POKETRACE_DATA_DIR` says otherwise):
+
+```
+cd analysis\poketrace
+$env:POKETRACE_API_KEY = "<key from the PokeTrace dashboard>"
+python poketrace.py find          # ~43 candidates -> candidates-found.csv (about 90 requests)
+python poketrace.py shortlist     # -> manifest.csv; review it, swap cards by hand if you like
+python poketrace.py history       # full daily history per tier (a few thousand requests, ~20-40 min; rerun to resume)
+python poketrace.py check --comps C:\Users\chief\Pictures\pokemans-test-cards\comps.csv
+```
+
+Then the sanity check on the pulled cards (Docker running):
+
+```
+cd backend
+$env:POKEMANS_OFFER_SANITY_POKETRACE = "C:\Users\chief\pokemans-data\poketrace"
+.\gradlew.bat :app:test --tests "*OfferSanityRunner" --rerun
+```
+
+Weekly after that: `python poketrace.py snapshot`. On day 29: `python poketrace.py history --period 30d`. A later pull's row for the same day replaces the earlier one.
+
+**What `check` decides.** If it reports "Rows look like rolling windows", the history isn't per-day sales: stop before importing and ask PokeTrace. Rolling windows would show as the same count and average repeated day after day. The cross-check line shows how many of the comps.csv sales fall inside PokeTrace's low–high range for that day.
+
+**What the sample run showed** (made-up data, so only the mechanics count):
+
+- **Deep cards reach confidence A.** With 11–14 sales a grade, PSA 5–10 are all observed. The sales rate comes out at 30–40 a month (HIGH, d = 5%), σ is measured and U is priced from damaged sales.
+- **A card with sales only at PSA 9 and 10 gets no PSA table at all,** even though the era has ratios down to grade 5.
+  - The cause: grades below 5 still need an era ratio. The card's own ladder needs two sold grades at least 2 apart, which it doesn't have. So "otherwise leave it unpriced" (CLAUDE.md step 3, 2026-10-17) applies to the whole table.
+  - That's why the pull includes PSA 1–4: era ratios for the low grades are what let thin cards be priced at all.
+  - It's worth Zach deciding whether one unpriceable low grade should sink the whole table.
+- **The engine has 4 eras for step-down ratios, not 6:** WOTC; EX_TO_BW (from 2003-06); XY_TO_SM (from 2014-02); SWSH_ON (from 2020-02). The six candidate groups fold into those, so each engine era gets 5–15 cards.
+
 ## Timeline
 
 | When | What | Who |
 |---|---|---|
-| Before buying (1 session) | Build the puller (Python in `analysis/`, key from `POKETRACE_API_KEY`, resumable, rate-limited to 30 per 10 s), `PokeTraceDailySource` and the runner input, tested against a hand-made response file | Claude |
+| Before buying | Done 2026-10-26 (see "Built") | Claude |
 | Day 1 | Buy Pro, set the key, run the candidate pull, pick the 30, run the full history pull | Zach (buy and key), then the script |
 | Day 1 checks | History depth (does `all` reach 2021?). Do PSA 5–7 tiers exist with counts? Cross-check the four comps.csv cards: are our Umbreon PSA 9 sales of 2026-10-19 and 10-20 in the daily rows? If depth or 5–7 coverage is poor, stop and email PokeTrace before using the rest of the month. | Claude |
 | Day 2 | Email contact@poketrace.com: data retention after cancelling, and use in collector offers | Zach (send) |

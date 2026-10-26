@@ -1,0 +1,21 @@
+{
+ "request": "https://api.poketrace.com/v1/cards/5a000000-0000-4000-8000-00000000000d/prices/PSA_10/history?period=all&limit=50",
+ "fetchedAt": "2026-10-24T12:00:00+00:00",
+ "response": {
+  "data": [
+   {
+    "date": "2026-09-08",
+    "source": "ebay",
+    "avg": 523.22,
+    "low": 523.22,
+    "high": 523.22,
+    "saleCount": 1,
+    "approxSaleCount": false
+   }
+  ],
+  "pagination": {
+   "hasMore": false,
+   "nextCursor": null
+  }
+ }
+}
