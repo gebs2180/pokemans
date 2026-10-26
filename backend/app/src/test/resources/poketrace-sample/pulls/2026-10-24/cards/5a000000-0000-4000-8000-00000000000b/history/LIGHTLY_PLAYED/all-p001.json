@@ -1,0 +1,48 @@
+{
+ "request": "https://api.poketrace.com/v1/cards/5a000000-0000-4000-8000-00000000000b/prices/LIGHTLY_PLAYED/history?period=all&limit=50",
+ "fetchedAt": "2026-10-24T12:00:00+00:00",
+ "response": {
+  "data": [
+   {
+    "date": "2026-07-28",
+    "source": "ebay",
+    "avg": 62.36,
+    "low": 59.62,
+    "high": 65.09,
+    "saleCount": 2,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-06",
+    "source": "ebay",
+    "avg": 58.65,
+    "low": 58.65,
+    "high": 58.65,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-19",
+    "source": "ebay",
+    "avg": 63.38,
+    "low": 63.38,
+    "high": 63.38,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-08-25",
+    "source": "ebay",
+    "avg": 64.77,
+    "low": 64.77,
+    "high": 64.77,
+    "saleCount": 1,
+    "approxSaleCount": false
+   }
+  ],
+  "pagination": {
+   "hasMore": true,
+   "nextCursor": "c2"
+  }
+ }
+}
