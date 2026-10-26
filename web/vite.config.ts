@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'pokemans',
-        short_name: 'pokemans',
-        description: 'Card capture and collateral reports',
+        name: 'Rawmark',
+        short_name: 'Rawmark',
+        description: 'Instant offers on raw Pokémon cards',
         theme_color: '#1f3a5f',
         background_color: '#ffffff',
         display: 'standalone',

@@ -32,7 +32,7 @@ import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
  */
 final class ReportRenderer {
 
-    static final String PRODUCER = "pokemans reports";
+    static final String PRODUCER = "Rawmark reports";
     private static final String FONT = "Noto Sans";
 
     private final TemplateEngine templates;
