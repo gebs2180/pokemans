@@ -1,6 +1,6 @@
-# How the [APP NAME] test works
+# How the Rawmark test works
 
-Thanks for testing. [APP NAME] gives you one firm price for a raw card, worked out from the grade it's likely to get. If a buyer takes it, you get a prepaid shipping label. This page is the short version. The terms you accept in the app are what count, so read them too, and ask Zach if anything is unclear.
+Thanks for testing. Rawmark gives you one firm price for a raw card, worked out from the grade it's likely to get. If a buyer takes it, you get a prepaid shipping label. This page is the short version. The terms you accept in the app are what count, so read them too, and ask Zach if anything is unclear.
 
 ## It's a test
 
