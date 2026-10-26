@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { apiPath, useApi, type InvitePreview } from '../api'
+import { Loading } from '../ui'
 import { useLoad } from '../useLoad'
 
 const ROLE_LABEL: Record<string, string> = { PARTNER: 'submission partner', COLLECTOR: 'collector', CONTRIBUTOR: 'contributor' }
@@ -27,7 +28,7 @@ export function InvitePage() {
   }
 
   if (error) return <p className="error" role="alert">This invite link is not valid. {error}</p>
-  if (!invite) return <p>Loading…</p>
+  if (!invite) return <Loading />
 
   return (
     <>
@@ -36,9 +37,11 @@ export function InvitePage() {
         You have been invited as a {ROLE_LABEL[invite.role] ?? invite.role.toLowerCase()}.
       </p>
       {invite.usable ? (
-        <button onClick={accept} disabled={busy}>
-          Accept invite
-        </button>
+        <div className="actions">
+          <button onClick={accept} disabled={busy} aria-busy={busy}>
+            Accept invite
+          </button>
+        </div>
       ) : (
         <p className="error" role="alert">This invite has expired or was already used. Ask for a new link.</p>
       )}
