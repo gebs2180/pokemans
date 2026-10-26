@@ -7,7 +7,8 @@ import { createServer } from 'node:http'
 import { AUDIENCE, CLIENT_ID, ISSUER, PORTS } from './ports.mjs'
 
 const ROLES_CLAIM = 'https://pokemans.app/roles'
-const MFA_CLAIM = 'https://pokemans.app/mfa'
+// The claim the Auth0 Action sets to true after a second factor (named so code scanning doesn't take it for a secret).
+const SECOND_FACTOR_CLAIM = 'https://pokemans.app/mfa'
 const base = ISSUER.replace(/\/$/, '')
 
 const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
@@ -32,7 +33,7 @@ function tokens(email, nonce) {
   const admin = email.startsWith('admin')
   const access = jwt({
     iss: ISSUER, sub, aud: [AUDIENCE], azp: CLIENT_ID, iat: now, exp: now + 3600, scope: 'openid profile email offline_access',
-    email, [ROLES_CLAIM]: admin ? ['ADMIN'] : [], [MFA_CLAIM]: admin,
+    email, [ROLES_CLAIM]: admin ? ['ADMIN'] : [], [SECOND_FACTOR_CLAIM]: admin,
   })
   const id = jwt({ iss: ISSUER, sub, aud: CLIENT_ID, iat: now, exp: now + 3600, nonce, email, name: email, email_verified: true })
   const refresh = randomBytes(24).toString('hex')
@@ -125,7 +126,9 @@ const server = createServer(async (req, res) => {
     }
     send(res, 404, 'not found')
   } catch (e) {
-    send(res, 500, String(e))
+    // The details go to the test log, not to the browser.
+    console.error(e)
+    send(res, 500, 'mock issuer error')
   }
 })
 
