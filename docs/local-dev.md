@@ -93,3 +93,40 @@ cd backend; .\gradlew.bat test
 ```
 
 Database and storage tests use Testcontainers and are **skipped without Docker**. CI always runs them.
+
+## Browser tests of the beta flow (e2e)
+
+`e2e/` clicks through the whole instant-offer flow in Chromium, at a phone width (375 px) and a desktop one: the admin makes a collector and a buyer org with invites; the collector accepts the seller terms, creates a collection, adds a card and uploads its front and back; the admin identifies it by hand, imports comps from a CSV, refreshes prices and saves a condition distribution; the collector gets the offer, saves a ship-from address and posts it; the buyer accepts the buyer terms, saves an address, buys it (the label comes from the tests' fake shipping provider) and records the arrival; the seller sees the label and the arrival; the track record counts one more card bought, labelled and paid at the offer. On the phone run it also checks no page scrolls sideways.
+
+One-time setup (Docker Desktop running):
+
+```powershell
+cd web; npm.cmd ci
+cd ..\e2e; npm.cmd ci; npx.cmd playwright install chromium
+```
+
+Run it (about a minute; the first run longer, while Gradle compiles and Docker pulls the images):
+
+```powershell
+cd e2e; npm.cmd test
+```
+
+That one command starts everything, runs both widths, and stops and removes it all again. It never touches the dev stack: it has its own compose project (`pokemans-e2e`, with data in tmpfs, so every run starts empty) and its own ports, all on 127.0.0.1:
+
+| | Port | |
+|---|---|---|
+| Postgres | 5446 | database `pokemans_e2e` |
+| MinIO | 9016 | |
+| API | 8096 | the app plus the tests' `FakeShippingProvider` (`:app:e2eArgs`, the `e2e` source set; never in the boot jar) |
+| Web | 5186 | a production build (`vite build`) logging in to the mock issuer, served with `vite preview` |
+| Mock OIDC issuer | 8098 | `e2e/stack/mock-oidc.mjs`, in place of Auth0 |
+
+Set `E2E_POSTGRES_PORT`, `E2E_MINIO_PORT`, `E2E_API_PORT`, `E2E_WEB_PORT` or `E2E_OIDC_PORT` to move one. Everything is configured through environment variables and Vite build variables; no production default changes.
+
+- **Login:** the mock issuer's sign-in page takes any email. One starting with `admin` gets the ADMIN role and the MFA claim, as the Auth0 Action sets them; anyone else signs in as a plain user and joins an org through its invite.
+- **Off:** TCGdex, card reading, pre-grading, EasyPost, price ingestion and Sentry, whatever your shell has set. So identity and condition are entered by hand, and nothing leaves the machine.
+- **Photos:** drawn in the browser (a whole card on a speckled table, like the backend's test images) and set through the "Choose a … photo" file inputs. The camera input isn't used.
+- **When it fails:** `npm.cmd run report` opens the HTML report, with a trace and screenshots per failure. The API's log is in `e2e/test-results/stack/backend.log`. `$env:E2E_KEEP_STACK="true"` leaves the containers up afterwards for a look; the next run removes them.
+- Selectors are roles and labels, not visible copy, where the page has them, so renaming the app doesn't break the test.
+
+Not covered: real Auth0 (sign-up, MFA), real or test EasyPost labels, the phone camera, TCGdex search and card reading, withdrawing or expiring a listing, returns, admin undo, and contributor and graded cards.

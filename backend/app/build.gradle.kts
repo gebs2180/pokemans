@@ -49,3 +49,36 @@ tasks.withType<Test>().configureEach {
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
 }
+
+// End-to-end runs (e2e/): the app plus the tests' fake shipping provider, so a taken card gets a label without
+// EasyPost. Only the e2e suite uses this source set; the boot jar and the production image never contain it.
+val e2e by sourceSets.creating {
+    java {
+        srcDir("src/test/java")
+        include("com/pokemans/app/offers/FakeShippingProvider.java", "com/pokemans/app/offers/E2eApplication.java")
+    }
+    compileClasspath += sourceSets.main.get().output
+    runtimeClasspath += sourceSets.main.get().output
+}
+configurations[e2e.implementationConfigurationName].extendsFrom(configurations.implementation.get())
+configurations[e2e.runtimeOnlyConfigurationName].extendsFrom(configurations.runtimeOnly.get())
+dependencies {
+    // FakeShippingProvider is a @TestConfiguration; E2eApplication adds it to the app.
+    "e2eImplementation"("org.springframework.boot:spring-boot-test")
+}
+
+// Compiles the e2e classpath and writes a java argfile for it, so e2e/ starts the app as a plain java process it can
+// stop (a bootRun would live in the Gradle daemon). Run it with: java @app/build/e2e/java.args
+tasks.register("e2eArgs") {
+    description = "Writes build/e2e/java.args: the app with the fake shipping provider, for the browser tests in e2e/."
+    val classpath = e2e.runtimeClasspath
+    dependsOn(classpath)
+    val out = layout.buildDirectory.file("e2e/java.args")
+    outputs.file(out)
+    doLast {
+        val path = classpath.files.joinToString(File.pathSeparator) { it.absolutePath }
+        val lines = listOf("--enable-native-access=ALL-UNNAMED", "-cp", "\"" + path.replace('\\', '/') + "\"",
+            "com.pokemans.app.offers.E2eApplication")
+        out.get().asFile.writeText(lines.joinToString("\n", postfix = "\n"))
+    }
+}
