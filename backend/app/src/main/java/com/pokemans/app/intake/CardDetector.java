@@ -381,6 +381,20 @@ class CardDetector {
         return image.submat(dy, image.rows() - dy, dx, image.cols() - dx);
     }
 
+    /**
+     * The photo decoded and written again as a JPEG, so none of the upload's metadata (EXIF, with the
+     * place it was taken) comes along; the EXIF orientation is applied first. Null if it doesn't decode.
+     * Call only on images {@link com.pokemans.app.storage.ImageGuard} let through.
+     */
+    static byte[] withoutMetadata(byte[] imageBytes) {
+        Mat image = Imgcodecs.imdecode(new MatOfByte(imageBytes), Imgcodecs.IMREAD_COLOR);
+        try {
+            return image.empty() ? null : jpeg(image);
+        } finally {
+            image.release();
+        }
+    }
+
     private static byte[] jpeg(Mat image) {
         MatOfByte out = new MatOfByte();
         try {
