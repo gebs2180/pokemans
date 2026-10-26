@@ -28,6 +28,15 @@ public class CardItems {
                            Instant capturedAt, Instant uploadedAt, String sha256) {
     }
 
+    /**
+     * The stored object to show someone other than the photo's owner (a buyer): the card crop, else the
+     * copy made without the upload's metadata. Never the upload itself, whose EXIF can say where the
+     * seller lives. Both are written when a photo passes.
+     */
+    public static String shownKey(String storageKey, String cropKey) {
+        return cropKey != null ? cropKey : Photo.viewStorageKey(storageKey);
+    }
+
     /** A collection as other modules see it. */
     public record CollectionRef(UUID id, UUID orgId, String name) {
     }

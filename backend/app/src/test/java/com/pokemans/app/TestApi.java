@@ -74,12 +74,25 @@ public class TestApi {
 
     /** Requests an upload slot, PUTs the bytes to storage, and confirms. Returns the confirm response. */
     public ResultActions uploadPhoto(String orgId, String cardId, String side, byte[] png, JwtRequestPostProcessor who) throws Exception {
+        return uploadPhoto(orgId, cardId, side, png, "image/png", who);
+    }
+
+    /** {@link #uploadPhoto}, for a photo of the given type. */
+    public ResultActions uploadPhoto(String orgId, String cardId, String side, byte[] png, String contentType, JwtRequestPostProcessor who)
+            throws Exception {
         String body = postJson("/api/orgs/" + orgId + "/cards/" + cardId + "/photos",
-                "{\"side\":\"" + side + "\",\"contentType\":\"image/png\",\"sizeBytes\":" + png.length + "}", who)
+                "{\"side\":\"" + side + "\",\"contentType\":\"" + contentType + "\",\"sizeBytes\":" + png.length + "}", who)
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String photoId = JsonPath.read(body, "$.photoId");
         assertThat(put(JsonPath.read(body, "$.url"), JsonPath.read(body, "$.headers"), png)).isEqualTo(200);
         return mvc.perform(post("/api/orgs/" + orgId + "/photos/" + photoId + "/confirm").with(who));
+    }
+
+    /** GETs a presigned link, e.g. a photo a buyer is shown. */
+    public byte[] download(String url) throws Exception {
+        HttpResponse<byte[]> response = http.send(HttpRequest.newBuilder(URI.create(url)).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+        assertThat(response.statusCode()).isEqualTo(200);
+        return response.body();
     }
 
     public int put(String url, Map<String, Object> headers, byte[] body) throws Exception {

@@ -77,6 +77,15 @@ class Photo {
         return storageKey + ".card.jpg";
     }
 
+    /** Key for the copy of a photo without a crop that others are shown: re-encoded, so without the upload's metadata. */
+    String viewStorageKey() {
+        return viewStorageKey(storageKey);
+    }
+
+    static String viewStorageKey(String storageKey) {
+        return storageKey + ".view.jpg";
+    }
+
     /**
      * Records the uploaded object and the quality check result.
      *

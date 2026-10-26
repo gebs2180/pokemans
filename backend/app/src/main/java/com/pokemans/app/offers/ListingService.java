@@ -233,8 +233,14 @@ class ListingService {
         return listing;
     }
 
-    /** Buys the label for a deal (again, if the first try failed), unless we cancelled it. */
+    /**
+     * Buys the label for a deal (again, if the first try failed), unless we cancelled it. Holds the card's
+     * listing lock throughout, so a second request waits and gets the label the first bought instead of
+     * buying another on our account, and a cancel can't land between the check and the purchase.
+     */
+    @Transactional
     ShippingLabel buyLabel(SaleListing listing, UUID buyerOrgId) {
+        jdbc.queryForObject("select pg_advisory_xact_lock(hashtext(?))", Object.class, "listing:" + listing.getCardItemId());
         requireNotCancelled(listing.getId());
         CardOffer offer = offers.findById(listing.getOfferId()).orElseThrow();
         return shipping.buy(listing.getId(), listing.getOrgId(), buyerOrgId, offer.getPrice());
@@ -479,10 +485,13 @@ class ListingService {
                 in.graded() == null ? null : in.graded().gradingCompany() + " " + in.graded().grade().stripTrailingZeros().toPlainString());
     }
 
-    /** The photos the offer was priced on: each side's newest, front, back then close-up, never superseded attempts. */
+    /**
+     * The photos the offer was priced on: each side's newest, front, back then close-up, never superseded
+     * attempts. Never the uploads themselves: their EXIF can say where the seller is.
+     */
     private List<PhotoLink> photos(CardInputs in) {
         return current(in.photos()).stream()
-                .map(p -> new PhotoLink(p.side(), blobs.presignDownload(storage.photoBucket(), p.cropKey() != null ? p.cropKey() : p.storageKey())
+                .map(p -> new PhotoLink(p.side(), blobs.presignDownload(storage.photoBucket(), CardItems.shownKey(p.storageKey(), p.cropKey()))
                         .toString()))
                 .toList();
     }

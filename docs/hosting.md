@@ -36,7 +36,7 @@ Not chosen: **Render**, unless your time matters more than ~$30/mo; it is the si
 | `backend/Dockerfile` | Builds the boot jar (tests run in CI, not here) and runs it on a Temurin 25 JRE as a non-root user, with the `prod` profile and a health check |
 | `web/Dockerfile` | Builds the PWA with the Auth0 build args and puts it in a Caddy image |
 | `deploy/compose.prod.yml` | Caddy (ports 80/443), backend, Postgres 18 and backup, with log rotation. Only Caddy is reachable from outside |
-| `deploy/Caddyfile` | HTTPS, `/api/*` and `/actuator/health` proxied to the backend, other actuator paths answer 404, SPA fallback, cache headers |
+| `deploy/Caddyfile` | HTTPS, `/api/*` and `/actuator/health` proxied to the backend, other actuator paths answer 404, SPA fallback, cache headers, and a Content-Security-Policy naming `R2_ENDPOINT` (photos) and `AUTH0_DOMAIN` (login) |
 | `deploy/.env.example` | Every variable the stack reads. Copy it to `deploy/.env` on the server; `.env` is git-ignored |
 | `deploy/backup/` | Backup image (Postgres 18 tools + rclone), `schedule.sh` (daily), `backup.sh`, `restore-test.sh` |
 | `deploy/r2-cors.json` | CORS rule for the photo bucket (browsers upload straight to it) |
@@ -55,7 +55,7 @@ Compose sets these from `deploy/.env`; another host would set them directly.
 | `STORAGE_ENDPOINT` | yes | `https://<account-id>.r2.cloudflarestorage.com` |
 | `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` | yes | R2 token: Object Read & Write on the photo bucket only |
 | `STORAGE_PHOTO_BUCKET` | yes | e.g. `pokemans-photos` |
-| `STORAGE_PUBLIC_ENDPOINT` | no | Only if browsers must use a different endpoint than the app |
+| `STORAGE_PUBLIC_ENDPOINT` | no | Only if browsers must use a different endpoint than the app. Then set the Caddy container's `PHOTO_ORIGIN` to it too, or the Content-Security-Policy blocks photos |
 | `STORAGE_REGION` | no | Default `auto` (R2) |
 | `SENTRY_DSN`, `SENTRY_ENVIRONMENT` | no | Without a DSN, Sentry is off |
 | `CARD_READER_ENABLED` + `ANTHROPIC_API_KEY`, `EASYPOST_ENABLED` + `EASYPOST_API_KEY`, `XIMILAR_*`, `CARDGRADE_*`, `PRICING_INGESTION_ENABLED`, `COLLATERAL_ENABLED` | no | Feature switches, all off by default (`docs/local-dev.md`) |

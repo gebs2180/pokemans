@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 
@@ -16,6 +19,9 @@ class FakeShippingProvider implements ShippingProvider {
     final List<Bought> bought = new CopyOnWriteArrayList<>();
     final List<String> refunded = new CopyOnWriteArrayList<>();
     volatile boolean failing;
+    /** While set, a purchase waits here: a test can hold one in flight and see what a second request does. */
+    volatile CountDownLatch gate;
+    final AtomicInteger inFlight = new AtomicInteger();
 
     @Override
     public String name() {
@@ -26,6 +32,18 @@ class FakeShippingProvider implements ShippingProvider {
     public Label buy(Address from, Address to, Parcel parcel, BigDecimal insuredValue, String reference) {
         if (failing) {
             throw new IllegalStateException("carrier is down");
+        }
+        inFlight.incrementAndGet();
+        try {
+            CountDownLatch g = gate;
+            if (g != null && !g.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("the test never opened the gate");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        } finally {
+            inFlight.decrementAndGet();
         }
         bought.add(new Bought(from, to, insuredValue, reference));
         String tracking = "9400" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);

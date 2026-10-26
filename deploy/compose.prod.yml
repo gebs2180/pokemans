@@ -69,6 +69,9 @@ services:
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      # Named in the Content-Security-Policy (Caddyfile): where photos load from and upload to, and the login.
+      PHOTO_ORIGIN: ${R2_ENDPOINT:?set R2_ENDPOINT in .env}
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN:?set AUTH0_DOMAIN in .env}
     ports:
       - "80:80"
       - "443:443"
