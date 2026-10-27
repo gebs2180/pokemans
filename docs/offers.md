@@ -49,7 +49,7 @@ The lender and insurer side is paused while Zach clears his outside interest wit
   - cards whose authenticity is doubted;
   - confidence D;
   - FMV under $25;
-  - a firm price above the maximum, $500 by default (`pokemans.offers.max-price`; Zach, 2026-10-21). It caps what one mistake can cost a buyer during the beta, and keeps every label under EasyPost's $5,000 insurance limit. The seller is told instant offers go up to $500 for now; no offer row is stored.
+  - a firm price above the maximum, $5,000 by default (`pokemans.offers.max-price`): EasyPost's insurance limit, so every label is insured for the full price. The seller is told instant offers go up to $5,000, the most a label can insure; no offer row is stored. It was $500 from 2026-10-21 to cap what one mistake could cost a buyer during the beta, and Zach lifted it on 2026-10-26 because too many cards were above it. Set it lower to cap the beta again.
 
   Unverified high-risk cards (vintage holos, Japanese promos) get an offer, marked "subject to the buyer authenticating the card in hand".
 
@@ -70,7 +70,7 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
   - a `BUYER` org type and role;
   - terms, versioned in `Consents`; each is a plain-language **draft for Zach**, not reviewed legal wording, and a new version must be accepted again:
     - buyer terms (`buyer-firm-2026-10-21`), accepted before a buyer sees the market;
-    - seller terms (`seller-2026-10-21`), accepted by collectors before they upload photos, get an offer or post a card. Contributors accept the same seller terms inside their own (`contributor-2026-10-21`), since they can sell too;
+    - seller terms (`seller-2026-10-26`; the 2026-10-21 version said offers go up to $500), accepted by collectors before they upload photos, get an offer or post a card. Contributors accept the same seller terms inside their own (`contributor-2026-10-26`), since they can sell too;
     - the 2026-10-21 versions cover shipping within 3 days of the label, transit loss (we claim on the label's insurance and pay the seller; the buyer owes nothing), cards subject to authentication, disputes (Zach decides from the photos), the admin's undo, no dealing around the app during the test, and non-payment ending a buyer's part in the test. Zach agreed each of these on 2026-10-21, along with return postage staying with the buyer and contributors keeping their free collection report. No liability cap or "as is" wording until a lawyer drafts it;
   - `Directory` for names and contact details.
 - **`offers` module (V14, V16, V18; all append-only):**
@@ -148,7 +148,7 @@ The realized sales are the evidence for the later lender and insurer pitch: our 
 ## Open
 
 - **Buyer terms wording:** review before inviting the first buyer.
-- **EasyPost account:** create one, test with a test key (labels are fake), then set the production key. EasyPost insures up to $5,000 a parcel; the $500 offer maximum keeps well under it, but its terms need a look before raising the maximum.
+- **EasyPost account:** create one, test with a test key (labels are fake), then set the production key. EasyPost insures up to $5,000 a parcel, and the offer maximum is set to that limit. Read its insurance terms (what's excluded, how claims are paid) before the first expensive card ships.
 - **Undo, open (2026-10-21):** the seller sees a voided offer's reason as the admin typed it, so write it for them; a cancelled deal after the card shipped needs the card back by hand; a refund's later status (EasyPost moves `submitted` to `refunded` or `rejected`) isn't fetched yet.
 - **Invoices:** monthly postage bills are produced by hand from "Postage to bill". There is no invoicing or payment collection.
 - **Grade accuracy:** add a way for buyers to report a grader's result when they slab a card they bought, as calibration data from a grader.

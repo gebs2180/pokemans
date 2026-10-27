@@ -1,6 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { apiPath, useApi, type ConsentStatus, type ContainerSummary } from '../api'
+import { EmptyState, Loading } from '../ui'
+import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { containerKind, useOrg } from '../useOrg'
 import { AddressPanel } from './AddressForm'
@@ -9,16 +11,16 @@ export function OrgPage() {
   const { orgId = '' } = useParams()
   const { data: org, error: orgError } = useOrg(orgId)
   if (orgError) return <p className="error" role="alert">{orgError}</p>
-  if (!org) return <p>Loading…</p>
+  if (!org) return <Loading />
   if (org.type === 'BUYER') {
     return (
       <ConsentGate orgId={orgId} title="Before you buy" intro="Please read what accepting an offer commits you to." accepted="buyer terms">
         <h1>{org.name}</h1>
-        <ul className="list">
-          <li>
+        <ul className="tile-list">
+          <li className="tile">
             <Link to={`/orgs/${orgId}/market`}>Cards for sale</Link> <span className="muted">raw cards at one firm price each</span>
           </li>
-          <li>
+          <li className="tile">
             <Link to={`/orgs/${orgId}/deals`}>Your deals</Link> <span className="muted">cards you bought, labels, and arrivals to record</span>
           </li>
         </ul>
@@ -66,7 +68,7 @@ function ConsentGate({
   }
 
   if (error) return <p className="error" role="alert">{error}</p>
-  if (!data) return <p>Loading…</p>
+  if (!data) return <Loading />
   if (data.acceptedAt) {
     return (
       <>
@@ -81,9 +83,14 @@ function ConsentGate({
     <>
       <h1>{title}</h1>
       <p>{intro}</p>
-      <pre className="terms">{data.text}</pre>
-      <button onClick={accept}>I agree</button>
+      {/* Scrolls in its own box, so it takes keyboard focus to scroll. */}
+      <pre className="terms" tabIndex={0} role="region" aria-label="Terms">
+        {data.text}
+      </pre>
       {acceptError && <p className="error" role="alert">{acceptError}</p>}
+      <div className="gate-bar">
+        <button onClick={accept}>I agree</button>
+      </div>
     </>
   )
 }
@@ -97,6 +104,7 @@ function Containers({ orgId, orgName, kind }: { orgId: string; orgName: string; 
   const [name, setName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const formError = useFormError(createError)
 
   async function create(e: FormEvent) {
     e.preventDefault()
@@ -117,15 +125,25 @@ function Containers({ orgId, orgName, kind }: { orgId: string; orgName: string; 
     <>
       <h1>{orgName}</h1>
       <h2>{kind.plural}</h2>
-      <form onSubmit={create} className="row">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={`New ${kind.singular} name`} aria-label={`New ${kind.singular} name`} required maxLength={200} />
-        <button type="submit" disabled={creating}>
+      <form onSubmit={create} className="row" aria-describedby={formError.describedBy}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={`New ${kind.singular} name`}
+          aria-label={`New ${kind.singular} name`}
+          aria-invalid={createError ? true : undefined}
+          aria-describedby={formError.describedBy}
+          required
+          maxLength={200}
+        />
+        <button type="submit" disabled={creating} aria-busy={creating}>
           Create
         </button>
       </form>
-      {createError && <p className="error" role="alert">{createError}</p>}
+      {formError.message}
       {error && <p className="error" role="alert">{error}</p>}
-      {data && data.length === 0 && <p className="muted">No {kind.plural.toLowerCase()} yet.</p>}
+      {!data && !error && <Loading />}
+      {data && data.length === 0 && <EmptyState title={`No ${kind.plural.toLowerCase()} yet.`} />}
       {data && data.length === 0 && kind.path === 'collections' && (
         <section className="panel">
           <h2>How selling works</h2>
@@ -138,9 +156,9 @@ function Containers({ orgId, orgName, kind }: { orgId: string; orgName: string; 
           </ol>
         </section>
       )}
-      <ul className="list">
+      <ul className="tile-list">
         {data?.map((c) => (
-          <li key={c.id}>
+          <li key={c.id} className="tile">
             <Link to={`/orgs/${orgId}/${kind.path}/${c.id}`}>{c.name}</Link>{' '}
             <span className="muted">
               {c.cards} card{c.cards === 1 ? '' : 's'} · {new Date(c.createdAt).toLocaleDateString()}

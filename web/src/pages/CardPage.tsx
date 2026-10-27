@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router'
 import {
   apiPath,
   SIDE_LABEL,
-  STAGE_LABEL,
   uploadToStorage,
   useApi,
   type CardStatus,
@@ -17,6 +16,7 @@ import {
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { useOrg } from '../useOrg'
+import { Chip, Loading, StageChip } from '../ui'
 import { OfferPanel } from './OfferPanel'
 import { ProvenancePanel } from './ProvenancePanel'
 
@@ -66,49 +66,81 @@ export function CardPage() {
   }
 
   if (error) return <p className="error" role="alert">{error}</p>
-  if (!card) return <p>Loading…</p>
+  if (!card) return <Loading />
 
   const sides: Side[] = card.lot ? ['FRONT', 'DETAIL'] : ['FRONT', 'BACK', 'DETAIL']
+  const offerPanel = seller && !card.lot && (
+    <OfferPanel
+      key={photoVersion}
+      orgId={orgId}
+      cardId={cardId}
+      onChange={() => {
+        reload()
+        setSaleVersion((v) => v + 1)
+      }}
+    />
+  )
+  // Once the photos pass, the offer is the next thing to do: it comes first, above the photos.
+  const offerFirst = card.captureComplete
   return (
     <>
-      <p>
+      <p className="back">
         <button className="link" onClick={() => navigate(-1)}>
           ← Back
         </button>
       </p>
       <h1>{card.label}</h1>
       {seller && !card.lot && <StatusLine key={`${photoVersion}:${saleVersion}`} orgId={orgId} cardId={cardId} />}
-      <p className={card.captureComplete ? 'ok' : 'warn'}>
+      <p className={`capture-summary alert ${card.captureComplete ? 'alert-success' : 'alert-warning'}`}>
         {card.captureComplete
           ? 'All required photos passed.'
           : `Still needed: ${card.missingSides.map((s) => SIDE_LABEL[s].toLowerCase()).join(' and ')}.`}
       </p>
-      {card.photosFrozen && <p className="muted">{card.photosFrozen}</p>}
+      {card.photosFrozen && <p className="muted small">{card.photosFrozen}</p>}
       {card.lot && <p className="muted">Lot of {card.quantity}: one photo of the whole lot, laid out flat, is enough. Lots don't get offers.</p>}
       {uploadError && <p className="error" role="alert">{uploadError}</p>}
+      {offerFirst && offerPanel}
 
       {sides.map((side) => {
         const attempts = card.photos.filter((p) => p.side === side && p.status !== 'AWAITING_UPLOAD')
         const current = attempts.find((p) => p.current) ?? null
         const latest = attempts.at(-1)
         const required = side !== 'DETAIL'
+        const retake = latest && latest !== current ? latest : null
         return (
           <section key={side} className="side" aria-label={`${SIDE_LABEL[side]} photo`}>
-            <h2>
-              {SIDE_LABEL[side]} {!required && <span className="muted">(optional)</span>}
-            </h2>
-            <p className="muted small">{SIDE_HINT[side]}</p>
-            {current && <CurrentPhoto side={side} photo={current} />}
-            {latest && latest !== current && (
-              <RetakeResult photo={latest} keeping={current !== null} />
-            )}
+            <div className="panel-head">
+              <h2>{SIDE_LABEL[side]}</h2>
+              {current ? (
+                <Chip tone="success">Passed</Chip>
+              ) : retake ? (
+                <Chip tone="warning">Retake needed</Chip>
+              ) : required ? (
+                <Chip tone="warning">Needed</Chip>
+              ) : (
+                <Chip>Optional</Chip>
+              )}
+            </div>
+            <div className="shot">
+              {current ? <CurrentPhoto side={side} photo={current} /> : <div className="shot-empty" aria-hidden="true">No photo yet</div>}
+              <div className="shot-body">
+                <p className="muted small">{SIDE_HINT[side]}</p>
+                {current && (
+                  <p className="muted small">
+                    {current.width}×{current.height}
+                  </p>
+                )}
+                {attempts.length > 1 && <p className="muted small">{attempts.length} attempts, all kept; the one shown is used.</p>}
+              </div>
+            </div>
+            {retake && <RetakeResult photo={retake} keeping={current !== null} />}
             {!card.photosFrozen &&
               (busy === side ? (
-                <p className="muted">Uploading and checking…</p>
+                <Loading>Uploading and checking…</Loading>
               ) : (
-                <div className="row">
+                <div className="actions">
                   {/* The camera straight away, or a photo already taken (e.g. from a lightbox setup): Android opens only the camera with capture set. */}
-                  <label className="capture">
+                  <label className={current ? 'capture secondary' : 'capture'}>
                     <input
                       type="file"
                       accept="image/jpeg,image/png"
@@ -117,7 +149,7 @@ export function CardPage() {
                       onChange={(e) => capture(side, e)}
                       aria-label={`${latest ? 'Retake' : 'Take'} ${SIDE_LABEL[side].toLowerCase()} photo`}
                     />
-                    {latest ? 'Retake' : `Take ${SIDE_LABEL[side].toLowerCase()} photo`}
+                    {latest ? 'Retake' : 'Take photo'}
                   </label>
                   <label className="capture secondary">
                     <input
@@ -131,20 +163,11 @@ export function CardPage() {
                   </label>
                 </div>
               ))}
-            {attempts.length > 1 && <p className="muted small">{attempts.length} attempts, all kept; the one shown is used.</p>}
           </section>
         )
       })}
       {org?.type === 'CONTRIBUTOR' && !card.lot && <GradedResult orgId={orgId} cardId={cardId} ready={card.captureComplete} />}
-      {seller && !card.lot && <OfferPanel
-          key={photoVersion}
-          orgId={orgId}
-          cardId={cardId}
-          onChange={() => {
-            reload()
-            setSaleVersion((v) => v + 1)
-          }}
-        />}
+      {!offerFirst && offerPanel}
       {/* Authenticity, and who holds the card (needed before it can back an advance; hidden while collateral is off). */}
       {org && org.type !== 'CONTRIBUTOR' && <ProvenancePanel orgId={orgId} cardId={cardId} admin={false} />}
     </>
@@ -164,8 +187,9 @@ function StatusLine({ orgId, cardId }: { orgId: string; cardId: string }) {
         </p>
       )}
       <p>
-        <span className="badge">{STAGE_LABEL[data.stage]}</span> <span className="muted small">{data.nextStep}</span>
+        <StageChip stage={data.stage} />
       </p>
+      <p className="muted small">{data.nextStep}</p>
     </div>
   )
 }
@@ -174,10 +198,7 @@ function CurrentPhoto({ side, photo }: { side: Side; photo: PhotoView }) {
   const href = safeHref(photo.url)
   return (
     <div className="current-photo">
-      {href && <img src={href} alt={`${SIDE_LABEL[side]} photo you took`} className="thumb" />}
-      <p className="ok">
-        Passed · {photo.width}×{photo.height}
-      </p>
+      {href ? <img src={href} alt={`${SIDE_LABEL[side]} photo you took`} className="thumb" /> : <div className="shot-empty">Passed</div>}
     </div>
   )
 }
@@ -266,8 +287,8 @@ function GradedResult({ orgId, cardId, ready }: { orgId: string; cardId: string;
 /** The newest attempt, when it didn't pass: why, and whether an earlier photo is still the one used. */
 function RetakeResult({ photo, keeping }: { photo: PhotoView; keeping: boolean }) {
   return (
-    <div className="warn">
-      <p>{keeping ? 'Your last try needs a retake (the photo above is still the one used):' : 'Retake needed:'}</p>
+    <div className="alert alert-warning">
+      <p className="alert-title">{keeping ? 'Your last try needs a retake (the photo above is still the one used):' : 'Retake needed:'}</p>
       <ul>
         {photo.retakeReasons.map((r) => (
           <li key={r.code}>{r.message}</li>

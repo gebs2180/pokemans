@@ -18,6 +18,9 @@ export function MoneyInput({
   placeholder?: string
   className?: string
   required?: boolean
+  id?: string
+  'aria-describedby'?: string
+  'aria-invalid'?: true
 }) {
   function change(e: ChangeEvent<HTMLInputElement>) {
     const amount = parseMoney(e.target.value)

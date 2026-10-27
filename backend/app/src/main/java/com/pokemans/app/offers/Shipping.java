@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,6 +32,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @EnableConfigurationProperties(ShippingProperties.class)
 class Shipping {
+
+    private static final Logger log = LoggerFactory.getLogger(Shipping.class);
 
     private final ShipAddressRepository addresses;
     private final ShippingLabelRepository labels;
@@ -85,7 +89,10 @@ class Shipping {
             bought = shipper.buy(from.toAddress(), to.toAddress(), new ShippingProvider.Parcel(p.length(), p.width(), p.height(), p.weightOz()),
                     insuredValue, listingId.toString());
         } catch (RuntimeException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Couldn't buy the shipping label: " + e.getMessage(), e);
+            // The provider's answer can quote either address, so it goes to the log (and Sentry), not to the caller.
+            log.error("Couldn't buy the label for listing {}", listingId, e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "We couldn't buy the shipping label just now. Try again later; we've been told.", e);
         }
         return labels.save(new ShippingLabel(listingId, buyerOrgId, from.getId(), to.getId(), bought, insuredValue));
     }

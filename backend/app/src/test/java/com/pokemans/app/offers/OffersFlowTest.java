@@ -18,6 +18,11 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,6 +78,7 @@ class OffersFlowTest {
         seller = api.user(subject, List.of());
         collectionId = TestApi.read(api.postJson("/api/orgs/" + orgId + "/collections", "{\"name\":\"For sale\"}", seller), "$.id");
         shipper.failing = false;
+        shipper.gate = null;
     }
 
     @Test
@@ -176,15 +182,105 @@ class OffersFlowTest {
         shipper.failing = true;
 
         api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk())
-                .andExpect(jsonPath("$.labelPending", containsString("carrier is down")))
+                // What the provider said stays with us (it can quote the seller's address): the buyer gets a plain reason.
+                .andExpect(jsonPath("$.labelPending", containsString("couldn't buy the shipping label")))
+                .andExpect(jsonPath("$.labelPending", org.hamcrest.Matchers.not(containsString("carrier is down"))))
                 .andExpect(jsonPath("$.deals[0].label").isEmpty());
         String retry = "/api/orgs/" + buyerOrg + "/deals/" + listingId + "/label";
-        api.postJson(retry, "", buyer).andExpect(status().isBadGateway());
+        api.postJson(retry, "", buyer).andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.detail", org.hamcrest.Matchers.not(containsString("carrier is down"))));
 
         shipper.failing = false;
         api.postJson(retry, "", buyer).andExpect(status().isOk()).andExpect(jsonPath("$[0].label.trackingCode").isNotEmpty());
         api.postJson(retry, "", buyer).andExpect(status().isOk()); // already bought: the same label, not a second one
         assertThat(shipper.bought.stream().filter(b -> b.reference().equals(listingId))).hasSize(1);
+    }
+
+    @Test
+    void twoLabelRequestsAtOnceBuyOneLabel() throws Exception {
+        // Security review 2026-10-26: a retry while the first purchase was still with the provider bought a second label
+        // on our account, which the unique index then refused to record, so it was neither billed nor refundable here.
+        String listingId = postedCard("Double Click Dragonite", 200);
+        JwtRequestPostProcessor buyer = buyer("Double Clicker");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Double Clicker");
+        shipper.failing = true;
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
+        shipper.failing = false;
+
+        String retry = "/api/orgs/" + buyerOrg + "/deals/" + listingId + "/label";
+        shipper.gate = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<Integer>> calls = List.of(
+                    pool.submit(() -> api.postJson(retry, "", buyer).andReturn().getResponse().getStatus()),
+                    pool.submit(() -> api.postJson(retry, "", buyer).andReturn().getResponse().getStatus()));
+            long deadline = System.currentTimeMillis() + 10_000;
+            while (shipper.inFlight.get() == 0 && System.currentTimeMillis() < deadline) {
+                Thread.onSpinWait();
+            }
+            Thread.sleep(500); // time for the second request to reach the provider too, if nothing stops it
+            shipper.gate.countDown();
+            for (Future<Integer> call : calls) {
+                assertThat(call.get(20, TimeUnit.SECONDS)).isEqualTo(200);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(shipper.bought.stream().filter(b -> b.reference().equals(listingId))).hasSize(1);
+    }
+
+    @Test
+    void buyersNeverGetThePhotosMetadata() throws Exception {
+        // Security review 2026-10-26: a close-up has no card crop, so buyers were linked to the file as uploaded, and a
+        // phone photo's EXIF carries where it was taken: the seller's home, which buyers must never learn.
+        String card = card("Geotagged Lugia");
+        api.uploadPhoto(orgId, card, "FRONT", TestImages.goodFront(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, card, "BACK", TestImages.goodBack(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, card, "DETAIL", geotaggedJpeg(TestImages.goodRetake(3)), "image/jpeg", seller)
+                .andExpect(jsonPath("$.status").value("PASSED"));
+        priceLadder(identify(card, "Lugia " + UUID.randomUUID().toString().substring(0, 4), "2015-05-06", "NORMAL", "Rare"), 300);
+        assess(card);
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
+
+        JwtRequestPostProcessor buyer = buyer("Curious Buyer");
+        String buyerOrg = lastBuyerOrg;
+        String market = api.get("/api/orgs/" + buyerOrg + "/market", buyer).andReturn().getResponse().getContentAsString();
+        List<String> urls = JsonPath.read(market, "$[?(@.listingId == '" + listingId + "')].photos[*].url");
+        assertThat(urls).hasSize(3);
+        for (String url : urls) {
+            byte[] served = api.download(url);
+            assertThat(javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(served))).as("an image").isNotNull();
+            assertThat(new String(served, java.nio.charset.StandardCharsets.ISO_8859_1)).doesNotContain("Exif").doesNotContain(GPS_SECRET);
+        }
+    }
+
+    private static final String GPS_SECRET = "GPS 39.7817N 89.6501W";
+
+    /** The photo as a JPEG with an EXIF segment after the start marker, as a phone camera writes one. */
+    private static byte[] geotaggedJpeg(byte[] png) throws Exception {
+        java.awt.image.BufferedImage decoded = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
+        java.awt.image.BufferedImage rgb = new java.awt.image.BufferedImage(decoded.getWidth(), decoded.getHeight(),
+                java.awt.image.BufferedImage.TYPE_INT_RGB);
+        rgb.getGraphics().drawImage(decoded, 0, 0, null);
+        java.io.ByteArrayOutputStream jpeg = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(rgb, "jpg", jpeg);
+        byte[] plain = jpeg.toByteArray();
+        // "Exif  ", then a big-endian TIFF header with an empty first IFD, then the payload a GPS IFD would hold.
+        java.io.ByteArrayOutputStream exif = new java.io.ByteArrayOutputStream();
+        exif.write("Exif  ".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+        exif.write(new byte[] {'M', 'M', 0, 42, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0});
+        exif.write(GPS_SECRET.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+        int length = exif.size() + 2;
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        out.write(plain, 0, 2); // SOI
+        out.write(new byte[] {(byte) 0xFF, (byte) 0xE1, (byte) (length >> 8), (byte) length});
+        exif.writeTo(out);
+        out.write(plain, 2, plain.length - 2);
+        return out.toByteArray();
     }
 
     @Test
@@ -233,10 +329,11 @@ class OffersFlowTest {
                 "{\"status\":\"COUNTERFEIT\",\"method\":\"IN_HAND_INSPECTION\"}", api.admin()).andExpect(status().isCreated());
         api.postJson(offers(fake), "", seller).andExpect(status().isConflict()).andExpect(jsonPath("$.detail", containsString("doubt")));
 
-        // Above the maximum firm price, no offer (Zach, 2026-10-21; pokemans.offers.max-price, $500 by default).
-        String grail = pricedCard("Grail", 3000);
+        // Above the maximum firm price, no offer: EasyPost's $5,000 insurance limit (pokemans.offers.max-price;
+        // the $500 beta maximum was lifted on 2026-10-26).
+        String grail = pricedCard("Grail", 30000);
         api.postJson(offers(grail), "", seller).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail", containsString("go up to $500")));
+                .andExpect(jsonPath("$.detail", containsString("go up to $5,000")));
         assertThat(jdbc.queryForObject("select count(*) from card_offer where card_item_id = ?::uuid", Integer.class, grail)).isZero();
 
         // A vintage holo nobody has verified still gets an offer, subject to authentication in hand.

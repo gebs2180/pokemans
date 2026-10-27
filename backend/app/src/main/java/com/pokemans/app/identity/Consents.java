@@ -26,7 +26,10 @@ public class Consents {
     public record Terms(String version, String text, String sha256) {
     }
 
-    /** What a seller commits to by posting a card (2026-10-21). Shared by collectors and contributors. */
+    /**
+     * What a seller commits to by posting a card (2026-10-21). Shared by collectors and contributors.
+     * 2026-10-26: the $500 beta maximum is gone; offers go up to what a label can insure.
+     */
     static final String SELLER_TERMS_BODY = """
             1. Each card you post is yours to sell, genuine, and the card you listed, as its photos show it. \
             You tell us about anything the photos don't show, such as a crease, writing, or a trimmed or altered card.
@@ -49,10 +52,10 @@ public class Consents {
             8. We are not a party to the sale and don't hold cards or money. If buyer and seller disagree about \
             whether a card matches its photos, Zach decides from the photos and what each of you says. We can void \
             an offer or cancel a deal that went wrong; each is recorded with who, when and why.
-            9. This is a test. Offers can be wrong and the app can stop working or be paused. Offers go up to $500 \
-            for now. Breaking these terms can end your part in the test.""";
+            9. This is a test. Offers can be wrong and the app can stop working or be paused. Offers go up to \
+            $5,000, the most a shipping label can insure. Breaking these terms can end your part in the test.""";
 
-    public static final String SELLER_TERMS_VERSION = "seller-2026-10-21";
+    public static final String SELLER_TERMS_VERSION = "seller-2026-10-26";
 
     static final String SELLER_TERMS_TEXT = "By posting a card for sale here you agree that:\n\n" + SELLER_TERMS_BODY
             + "\n\nAsk Zach if anything here is unclear.";
@@ -60,7 +63,7 @@ public class Consents {
     private static final Terms SELLER_TERMS = new Terms(SELLER_TERMS_VERSION, SELLER_TERMS_TEXT, sha256(SELLER_TERMS_TEXT));
 
     /** Contributors can sell too, so their terms carry the seller terms (2026-10-21). */
-    public static final String CONTRIBUTOR_TERMS_VERSION = "contributor-2026-10-21";
+    public static final String CONTRIBUTOR_TERMS_VERSION = "contributor-2026-10-26";
 
     static final String CONTRIBUTOR_TERMS_TEXT = """
             By sharing photos and grading results here you agree that:

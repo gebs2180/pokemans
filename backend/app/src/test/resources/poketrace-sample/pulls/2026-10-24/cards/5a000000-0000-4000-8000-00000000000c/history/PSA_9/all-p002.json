@@ -1,0 +1,64 @@
+{
+ "request": "https://api.poketrace.com/v1/cards/5a000000-0000-4000-8000-00000000000c/prices/PSA_9/history?period=all&limit=50",
+ "fetchedAt": "2026-10-24T12:00:00+00:00",
+ "response": {
+  "data": [
+   {
+    "date": "2026-10-07",
+    "source": "ebay",
+    "avg": 317.77,
+    "low": 317.77,
+    "high": 317.77,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-11",
+    "source": "ebay",
+    "avg": 327.97,
+    "low": 327.97,
+    "high": 327.97,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-12",
+    "source": "ebay",
+    "avg": 330.81,
+    "low": 330.81,
+    "high": 330.81,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-14",
+    "source": "ebay",
+    "avg": 331.01,
+    "low": 331.01,
+    "high": 331.01,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-14",
+    "source": "cardmarket_unsold",
+    "avg": 1,
+    "low": 1,
+    "high": 1,
+    "saleCount": 9
+   },
+   {
+    "date": "2026-10-14",
+    "source": "tcgplayer",
+    "avg": 1,
+    "low": 1,
+    "high": 1,
+    "saleCount": 9
+   }
+  ],
+  "pagination": {
+   "hasMore": false,
+   "nextCursor": null
+  }
+ }
+}

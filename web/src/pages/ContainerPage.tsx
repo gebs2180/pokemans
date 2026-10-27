@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { apiPath, STAGE_LABEL, useApi, type CardStatus, type CardView, type ContainerDetail, type Me, type ReportView } from '../api'
+import { apiPath, useApi, type CardStatus, type CardView, type ContainerDetail, type Me, type ReportView } from '../api'
+import { Chip, EmptyState, Field, Loading, StageChip } from '../ui'
+import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { ReportsList } from './ReportsPanel'
 
@@ -29,6 +31,7 @@ export function ContainerPage() {
   const [quantity, setQuantity] = useState(1)
   const [addError, setAddError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const formError = useFormError(addError)
 
   if (kind !== 'batches' && kind !== 'collections') return <p>Page not found.</p>
 
@@ -52,12 +55,12 @@ export function ContainerPage() {
   }
 
   if (error) return <p className="error" role="alert">{error}</p>
-  if (!data) return <p>Loading…</p>
+  if (!data) return <Loading />
 
   const complete = data.cards.filter((c) => c.captureComplete).length
   return (
     <>
-      <p>
+      <p className="back">
         <Link to={`/orgs/${orgId}`}>← Back</Link>
       </p>
       <h1>{data.name}</h1>
@@ -65,17 +68,21 @@ export function ContainerPage() {
         {complete} of {data.cards.length} card{data.cards.length === 1 ? '' : 's'} fully photographed
       </p>
 
-      <form onSubmit={addCard} className="stack">
-        <input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="Card, e.g. Charizard 4/102"
-          aria-label="Card name and number"
-          required
-          maxLength={300}
-        />
+      <form onSubmit={addCard} className="panel form" aria-describedby={formError.describedBy}>
+        <Field label="Card name and number" hint="Its name and number, as printed. One card worth $25 or more at a time.">
+          {(control) => (
+            <input
+              {...control}
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Card, e.g. Charizard 4/102"
+              required
+              maxLength={300}
+            />
+          )}
+        </Field>
         <div className="row">
-          <label>
+          <label className="check">
             <input type="checkbox" checked={lot} onChange={(e) => setLot(e.target.checked)} /> Lot of cheaper cards
           </label>
           {lot && (
@@ -90,28 +97,31 @@ export function ContainerPage() {
           )}
         </div>
         {lot && <p className="muted small">Lots are kept with their photos, but don't get offers: add cards worth $25 or more one by one.</p>}
-        <button type="submit" disabled={adding}>
-          Add card
-        </button>
+        <div className="actions">
+          <button type="submit" disabled={adding} aria-busy={adding}>
+            Add card
+          </button>
+        </div>
+        {formError.message}
       </form>
-      {addError && <p className="error" role="alert">{addError}</p>}
 
-      <ul className="list">
+      {data.cards.length === 0 && <EmptyState title="No cards yet.">Add the first one above, then photograph it.</EmptyState>}
+      <ul className="tile-list">
         {data.cards.map((card) => {
           const status = statuses?.find((s) => s.cardId === card.id)
           return (
-            <li key={card.id}>
-              <Link to={`/orgs/${orgId}/cards/${card.id}`}>{card.label}</Link>{' '}
-              {card.lot && <span className="muted">lot of {card.quantity}</span>}{' '}
-              {!card.captureComplete ? (
-                <span className="warn">Needs {card.missingSides.map((s) => s.toLowerCase()).join(' and ')}</span>
-              ) : status ? (
-                <span className={status.stage === 'NO_OFFER' ? 'warn' : status.stage === 'SOLD' || status.stage === 'READY' || status.stage === 'OFFERED' ? 'ok' : 'muted'}>
-                  {STAGE_LABEL[status.stage]}
-                </span>
-              ) : (
-                <span className="ok">Photos OK</span>
-              )}
+            <li key={card.id} className="tile">
+              <div className="tile-head">
+                <Link to={`/orgs/${orgId}/cards/${card.id}`}>{card.label}</Link>
+                {!card.captureComplete ? (
+                  <Chip tone="warning">Needs {card.missingSides.map((s) => s.toLowerCase()).join(' and ')}</Chip>
+                ) : status ? (
+                  <StageChip stage={status.stage} />
+                ) : (
+                  <Chip tone="success">Photos OK</Chip>
+                )}
+              </div>
+              {card.lot && <span className="muted">lot of {card.quantity}</span>}
               {status?.identity && <div className="muted small">{status.identity}</div>}
             </li>
           )

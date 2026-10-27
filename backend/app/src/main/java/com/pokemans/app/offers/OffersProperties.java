@@ -12,12 +12,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *
  * @param offerValidFor  how long an offer stands before it is priced again (prices move)
  * @param listingOpenFor how long a posted offer waits for a buyer before it expires
- * @param maxPrice       the highest firm price we offer (Zach, 2026-10-21): a card priced above it gets no
- *                       offer. Caps what one mistake can cost a buyer in the beta, and keeps every label
- *                       under EasyPost's $5,000 insurance limit
+ * @param maxPrice       the highest firm price we offer: a card priced above it gets no offer. It is
+ *                       EasyPost's $5,000 insurance limit, so every label can be insured for the full
+ *                       price. The $500 beta maximum (2026-10-21) was lifted on 2026-10-26 (Zach): too
+ *                       many cards were above it. Set it lower to cap the beta again
  */
 @ConfigurationProperties("pokemans.offers")
 record OffersProperties(@DefaultValue("7d") Duration offerValidFor,
                         @DefaultValue("14d") Duration listingOpenFor,
-                        @DefaultValue("500") BigDecimal maxPrice) {
+                        @DefaultValue("5000") BigDecimal maxPrice) {
 }

@@ -7,6 +7,9 @@
 	encode zstd gzip
 
 	header {
+		# Our own scripts only: the SPA keeps its Auth0 refresh tokens in localStorage, so injected script would
+		# own the account. Photos load and upload straight from storage (presigned), the login talks to Auth0.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: {$PHOTO_ORIGIN}; connect-src 'self' https://{$AUTH0_DOMAIN} {$PHOTO_ORIGIN}; font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin

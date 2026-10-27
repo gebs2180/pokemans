@@ -36,7 +36,7 @@ Not chosen: **Render**, unless your time matters more than ~$30/mo; it is the si
 | `backend/Dockerfile` | Builds the boot jar (tests run in CI, not here) and runs it on a Temurin 25 JRE as a non-root user, with the `prod` profile and a health check |
 | `web/Dockerfile` | Builds the PWA with the Auth0 build args and puts it in a Caddy image |
 | `deploy/compose.prod.yml` | Caddy (ports 80/443), backend, Postgres 18 and backup, with log rotation. Only Caddy is reachable from outside |
-| `deploy/Caddyfile` | HTTPS, `/api/*` and `/actuator/health` proxied to the backend, other actuator paths answer 404, SPA fallback, cache headers |
+| `deploy/Caddyfile` | HTTPS, `/api/*` and `/actuator/health` proxied to the backend, other actuator paths answer 404, SPA fallback, cache headers, and a Content-Security-Policy naming `R2_ENDPOINT` (photos) and `AUTH0_DOMAIN` (login) |
 | `deploy/.env.example` | Every variable the stack reads. Copy it to `deploy/.env` on the server; `.env` is git-ignored |
 | `deploy/backup/` | Backup image (Postgres 18 tools + rclone), `schedule.sh` (daily), `backup.sh`, `restore-test.sh` |
 | `deploy/r2-cors.json` | CORS rule for the photo bucket (browsers upload straight to it) |
@@ -55,7 +55,7 @@ Compose sets these from `deploy/.env`; another host would set them directly.
 | `STORAGE_ENDPOINT` | yes | `https://<account-id>.r2.cloudflarestorage.com` |
 | `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` | yes | R2 token: Object Read & Write on the photo bucket only |
 | `STORAGE_PHOTO_BUCKET` | yes | e.g. `pokemans-photos` |
-| `STORAGE_PUBLIC_ENDPOINT` | no | Only if browsers must use a different endpoint than the app |
+| `STORAGE_PUBLIC_ENDPOINT` | no | Only if browsers must use a different endpoint than the app. Then set the Caddy container's `PHOTO_ORIGIN` to it too, or the Content-Security-Policy blocks photos |
 | `STORAGE_REGION` | no | Default `auto` (R2) |
 | `SENTRY_DSN`, `SENTRY_ENVIRONMENT` | no | Without a DSN, Sentry is off |
 | `CARD_READER_ENABLED` + `ANTHROPIC_API_KEY`, `EASYPOST_ENABLED` + `EASYPOST_API_KEY`, `XIMILAR_*`, `CARDGRADE_*`, `PRICING_INGESTION_ENABLED`, `COLLATERAL_ENABLED` | no | Feature switches, all off by default (`docs/local-dev.md`) |
@@ -78,9 +78,10 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
 
 1. Hetzner → Servers → Add server: **CX23**, Ubuntu 24.04 or 26.04 (the beta server runs 26.04), location Nuremberg/Falkenstein/Helsinki (the CX line is the cheapest and isn't sold in the US: there, Ashburn and Hillsboro offer CPX only, and the 4 GB CPX22 was $22.99/mo on 2026-10-26; the 2 GB CPX12 is too small. The beta runs in the EU: photos go from the phone straight to R2, so only short API calls cross the Atlantic, and moving later is the restore procedure below plus a DNS change), your SSH key, IPv4 on. Optionally tick **Backups** (+20%, weekly whole-disk snapshots on top of our nightly ones).
 2. Firewalls → Create: allow inbound TCP 22 (ideally from your IP only), TCP 80, TCP 443 and UDP 443, then apply it to the server.
-3. Pick the site address:
-   - with a domain: add an A record such as `beta.yourdomain.com` → the server's IPv4;
-   - without one: use `<ip-with-dashes>.sslip.io` (e.g. `203-0-113-7.sslip.io`), which resolves to that IP. Caddy can get a certificate for it. Free, but the URL is ugly.
+3. Pick the site address. The product is called Rawmark, and Zach bought `rawmark.app` on 2026-10-25. The beta runs at `https://beta.rawmark.app` (set up 2026-10-26):
+   - add an A record for `beta` → the server's IPv4 in Cloudflare DNS, set to **DNS only** (grey cloud) so Caddy can get the certificate itself;
+   - set `SITE_ADDRESS` in `.env` (step 5) to that host name, without `https://`. `.app` domains only work over HTTPS, which Caddy provides.
+   - Before DNS is ready you can test on `<ip-with-dashes>.sslip.io` (e.g. `203-0-113-7.sslip.io`), which resolves to that IP and gets a certificate too.
 4. SSH in and set up the box. Paste one line at a time: `dpkg-reconfigure` opens a dialog that swallows any lines pasted after it.
    ```bash
    ssh root@<server-ip>
@@ -195,7 +196,7 @@ At most a day of data is lost (the last nightly backup), plus whatever Hetzner's
 | Hetzner backups (optional) | +20%, ~€0.90 |
 | Cloudflare R2 | $0 up to 10 GB. The beta is likely 5–15 GB counting the backup copy (photos are 3–8 MB; 15 testers × ~50 cards × 2–3 photos), so $0–0.10; requests stay inside the free tier |
 | Sentry Developer, healthchecks.io, UptimeRobot | $0 |
-| Domain (optional) | ~$10–15 a year, or $0 with sslip.io |
+| Domain | `rawmark.app`, already bought (2026-10-25) |
 | **Total** | **~$5–7 a month**, about $10 for the whole 6-week beta |
 
 The card reader (Claude API) and EasyPost labels, when switched on, are billed per use on their own accounts and are not counted here.

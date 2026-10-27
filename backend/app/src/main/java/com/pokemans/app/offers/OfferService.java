@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -101,8 +102,9 @@ class OfferService {
         OfferLadder.Offer offer = new OfferLadder(value.params(), margin)
                 .offer(value.distribution(), value.prices(), in.prices().salesPerMonth());
         if (offer.price().compareTo(properties.maxPrice()) > 0) {
-            return new Quote(value, "Instant offers go up to $" + properties.maxPrice().stripTrailingZeros().toPlainString()
-                    + " for now, and this card is worth more than that, so it gets no offer.", null, null);
+            return new Quote(value, "Instant offers go up to $" + String.format(Locale.US, "%,d", properties.maxPrice().longValue())
+                    + ", the most a shipping label can insure, and this card is worth more than that, so it gets no offer.",
+                    null, null);
         }
         return new Quote(value, null, margin, offer);
     }

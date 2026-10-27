@@ -7,6 +7,7 @@ import { HomePage } from './pages/HomePage'
 import { InvitePage } from './pages/InvitePage'
 import { DealsPage, MarketPage } from './pages/MarketPage'
 import { OrgPage } from './pages/OrgPage'
+import { Loading } from './ui'
 
 // Admin and review screens are only for us, so partners' phones don't download them.
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })))
@@ -31,7 +32,7 @@ function App() {
     <div className={/^\/admin\/(review|valuation)/.test(location.pathname) ? 'shell wide' : 'shell'}>
       <header className="topbar">
         <Link to="/" className="brand">
-          pokemans
+          Rawmark
         </Link>
         {isAuthenticated && (
           <span className="who">
@@ -44,15 +45,15 @@ function App() {
       </header>
 
       {error && <p className="error" role="alert">Login error: {error.message}</p>}
-      {isLoading && <p>Loading…</p>}
+      {isLoading && <Loading />}
 
       {!isLoading && !isAuthenticated && (
-        <main>
-          <p>{COLLATERAL ? 'Raw collection collateral reports.' : 'Instant offers on raw cards.'}</p>
+        <main className="welcome">
+          <p className="lead">{COLLATERAL ? 'Raw collection collateral reports.' : 'Instant offers on raw cards.'}</p>
           {location.pathname.startsWith('/invite/') && (
-            <p>You've been invited to join pokemans. Log in, or sign up, to see the invite and accept it.</p>
+            <p>You've been invited to join Rawmark. Log in, or sign up, to see the invite and accept it.</p>
           )}
-          <button onClick={() => loginWithRedirect({ appState: { returnTo: location.pathname + location.search } })}>
+          <button className="block" onClick={() => loginWithRedirect({ appState: { returnTo: location.pathname + location.search } })}>
             {location.pathname.startsWith('/invite/') ? 'Log in or sign up' : 'Log in'}
           </button>
         </main>
@@ -60,7 +61,7 @@ function App() {
 
       {isAuthenticated && (
         <main>
-          <Suspense fallback={<p>Loading…</p>}>
+          <Suspense fallback={<Loading />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/admin" element={<AdminPage />} />

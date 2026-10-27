@@ -4,7 +4,7 @@ Thanks for testing. Rawmark gives you one firm price for a raw card, worked out 
 
 ## It's a test
 
-- Offers go up to **$500** for now. Cards worth more won't get one yet.
+- Offers go up to **$5,000**, the most a shipping label can insure. Cards worth more won't get one.
 - Offers can be wrong, and the app can stop working or be paused.
 - **There are no notifications yet.** Nobody gets an email when a card is posted, a buyer takes it or a label is ready. Open the app to check, and watch the Discord.
 - During the test, don't buy from or sell to someone you met here outside the app.

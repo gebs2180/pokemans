@@ -1,0 +1,66 @@
+{
+ "request": "https://api.poketrace.com/v1/cards/5a000000-0000-4000-8000-00000000000b/prices/DAMAGED/history?period=all&limit=50",
+ "fetchedAt": "2026-10-24T12:00:00+00:00",
+ "response": {
+  "data": [
+   {
+    "date": "2026-09-09",
+    "source": "ebay",
+    "avg": 19.64,
+    "low": 19.64,
+    "high": 19.64,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-09-12",
+    "source": "ebay",
+    "avg": 18.05,
+    "low": 18.05,
+    "high": 18.05,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-09-15",
+    "source": "ebay",
+    "avg": 16.94,
+    "low": 16.94,
+    "high": 16.94,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-09-24",
+    "source": "ebay",
+    "avg": 19.78,
+    "low": 19.78,
+    "high": 19.78,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-02",
+    "source": "ebay",
+    "avg": 18.31,
+    "low": 18.31,
+    "high": 18.31,
+    "saleCount": 1,
+    "approxSaleCount": false
+   },
+   {
+    "date": "2026-10-06",
+    "source": "ebay",
+    "avg": 18.43,
+    "low": 18.43,
+    "high": 18.43,
+    "saleCount": 1,
+    "approxSaleCount": false
+   }
+  ],
+  "pagination": {
+   "hasMore": false,
+   "nextCursor": null
+  }
+ }
+}

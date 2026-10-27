@@ -8,8 +8,8 @@ import { AddressForm } from './AddressForm'
 export function HowPriced({ offer }: { offer: Offer }) {
   const { likely, lower } = likelyRungs(offer.ladder)
   return (
-    <details>
-      <summary className="muted small">How we priced it</summary>
+    <details className="disclosure">
+      <summary>How we priced it</summary>
       <table className="table">
         <thead>
           <tr>
@@ -95,15 +95,19 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
   // Only offer the button when asking can work; otherwise say what happens first.
   const askButton = (text: string) =>
     status?.canOffer ? (
-      <button onClick={getOffer} disabled={busy}>
-        {text}
-      </button>
+      <div className="action-bar">
+        <div className="actions">
+          <button onClick={getOffer} disabled={busy} aria-busy={busy}>
+            {text}
+          </button>
+        </div>
+      </div>
     ) : (
       status && <p className="muted">{status.nextStep}</p>
     )
 
   return (
-    <section className="panel">
+    <section className="panel offer-panel">
       <h2>Instant offer</h2>
       {!offer && (
         <>
@@ -119,14 +123,14 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
           {!live &&
             (offer.voided ? (
               <>
-                <p>
+                <p className="alert alert-warning">
                   We withdrew this offer on {new Date(offer.voided.at).toLocaleDateString()}: {offer.voided.reason}.
                 </p>
                 {askButton('Get a new offer')}
               </>
             ) : offer.expired ? (
               <>
-                <p>This offer has expired; prices move.</p>
+                <p className="alert alert-warning">This offer has expired; prices move.</p>
                 {askButton('Get a new offer')}
               </>
             ) : (
@@ -137,7 +141,7 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
                 </p>
                 {shipFrom && (address == null || editingAddress) ? (
                   <>
-                    <p>Where will you ship from?</p>
+                    <h3>Where will you ship from?</h3>
                     <AddressForm
                       orgId={orgId}
                       onSaved={() => {
@@ -149,7 +153,7 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
                 ) : (
                   <>
                     {address && (
-                      <p className="muted small">
+                      <p className="meta">
                         Ships from {address.name}, {address.street1}
                         {address.street2 && ` ${address.street2}`}, {address.city}, {address.state} {address.zip}.{' '}
                         <button className="link" onClick={() => setEditingAddress(true)}>
@@ -157,29 +161,34 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
                         </button>
                       </p>
                     )}
-                    {confirming === 'sell' ? (
-                      <div className="stack">
-                        <p>
-                          If a buyer accepts, you're committing to ship them the card, as shown in your photos, for{' '}
-                          {money(offer.price)}.
-                        </p>
-                        <p className="row">
-                          <button
-                            onClick={() => act('POST', apiPath`/api/orgs/${orgId}/cards/${cardId}/listings`, { offerId: offer.id })}
-                            disabled={busy}
-                          >
-                            Confirm: post for {money(offer.price)}
+                    <div className="action-bar">
+                      {confirming === 'sell' ? (
+                        <div className="confirm">
+                          <p>
+                            If a buyer accepts, you're committing to ship them the card, as shown in your photos, for{' '}
+                            {money(offer.price)}.
+                          </p>
+                          <div className="actions">
+                            <button
+                              onClick={() => act('POST', apiPath`/api/orgs/${orgId}/cards/${cardId}/listings`, { offerId: offer.id })}
+                              disabled={busy}
+                              aria-busy={busy}
+                            >
+                              Confirm: post for {money(offer.price)}
+                            </button>
+                            <button className="secondary" onClick={() => setConfirming(null)}>
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="actions">
+                          <button onClick={() => setConfirming('sell')} disabled={busy || !shipFrom} aria-busy={busy}>
+                            Sell for {money(offer.price)}
                           </button>
-                          <button className="link" onClick={() => setConfirming(null)}>
-                            Cancel
-                          </button>
-                        </p>
-                      </div>
-                    ) : (
-                      <button onClick={() => setConfirming('sell')} disabled={busy || !shipFrom}>
-                        Sell for {money(offer.price)}
-                      </button>
-                    )}
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
               </>
@@ -188,44 +197,53 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
       )}
 
       {listing?.status === 'OPEN' && (
-        <p>
-          Waiting for a buyer, until {new Date(listing.expiresAt).toLocaleDateString()}.{' '}
-          {confirming === 'withdraw' ? (
-            <>
-              <button onClick={() => act('POST', apiPath`/api/orgs/${orgId}/listings/${listing.id}/withdraw`)} disabled={busy}>
-                Confirm: take it off the market
-              </button>{' '}
-              <button className="link" onClick={() => setConfirming(null)}>
-                Keep it posted
+        <div className="alert alert-info">
+          <p>Waiting for a buyer, until {new Date(listing.expiresAt).toLocaleDateString()}.</p>
+          <div className="actions">
+            {confirming === 'withdraw' ? (
+              <>
+                <button
+                  className="danger"
+                  onClick={() => act('POST', apiPath`/api/orgs/${orgId}/listings/${listing.id}/withdraw`)}
+                  disabled={busy}
+                  aria-busy={busy}
+                >
+                  Confirm: take it off the market
+                </button>
+                <button className="secondary" onClick={() => setConfirming(null)}>
+                  Keep it posted
+                </button>
+              </>
+            ) : (
+              <button className="link" onClick={() => setConfirming('withdraw')} disabled={busy}>
+                Withdraw
               </button>
-            </>
-          ) : (
-            <button className="link" onClick={() => setConfirming('withdraw')} disabled={busy}>
-              Withdraw
-            </button>
-          )}
-        </p>
+            )}
+          </div>
+        </div>
       )}
       {listing?.status === 'ACCEPTED' && (
-        <div className="ok">
+        <div className="alert alert-success">
           <p>
             Sold to {listing.buyer?.orgName ?? 'a buyer'}
             {listing.buyer?.email && ` (${listing.buyer.email})`} on {new Date(listing.closedAt!).toLocaleDateString()}. They pay
             you {offer && money(offer.price)} once it arrives as shown.
           </p>
           {listing.label && labelHref ? (
-            <p>
-              <a href={labelHref} target="_blank" rel="noreferrer">
-                Print your prepaid label
-              </a>{' '}
-              <span className="muted small">
+            <>
+              <p className="actions">
+                <a href={labelHref} target="_blank" rel="noreferrer" className="button">
+                  Print your prepaid label
+                </a>
+              </p>
+              <p className="small">
                 {listing.label.carrier} {listing.label.service}
                 {listing.label.trackingCode && `, tracking ${listing.label.trackingCode}`}, insured for {money(listing.label.insuredValue)}
-              </span>
-            </p>
+              </p>
+            </>
           ) : (
             !listing.outcome && (
-              <p className="warn">
+              <p className="alert alert-warning">
                 Your prepaid label isn't ready yet: buying it didn't go through. Don't ship the card until the label shows here; we'll
                 be in touch.
               </p>
@@ -243,7 +261,7 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
         </div>
       )}
       {listing?.status === 'CANCELLED' && listing.offerId === offer?.id && (
-        <p className="warn">
+        <p className="alert alert-danger">
           We cancelled the sale{listing.buyer?.orgName && ` to ${listing.buyer.orgName}`}
           {listing.undone && ` on ${new Date(listing.undone.at).toLocaleDateString()}: ${listing.undone.reason}`}. Don't ship the card, and
           don't use its label.

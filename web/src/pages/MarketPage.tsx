@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, NavLink, useParams } from 'react-router'
 import {
   apiPath,
   money,
@@ -16,6 +16,8 @@ import {
 } from '../api'
 import { MoneyInput } from '../inputs'
 import { safeHref } from '../safeHref'
+import { EmptyState, Field, Loading } from '../ui'
+import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { HowPriced } from './OfferPanel'
 
@@ -47,6 +49,25 @@ export function Photos({ photos }: { photos: PhotoLink[] }) {
         ) : null
       })}
     </div>
+  )
+}
+
+/** A buyer's two lists, as tabs, with the way back to the org. */
+function BuyerNav({ orgId }: { orgId: string }) {
+  return (
+    <>
+      <p className="back">
+        <Link to={`/orgs/${orgId}`}>← Back</Link>
+      </p>
+      <nav className="tabs" aria-label="Buying">
+        <NavLink to={`/orgs/${orgId}/market`} end>
+          Cards for sale
+        </NavLink>
+        <NavLink to={`/orgs/${orgId}/deals`} end>
+          Your deals
+        </NavLink>
+      </nav>
+    </>
   )
 }
 
@@ -87,38 +108,53 @@ export function MarketPage() {
   if (error) return <p className="error" role="alert">{error}</p>
   return (
     <>
-      <p>
-        <Link to={`/orgs/${orgId}`}>← Back</Link> · <Link to={`/orgs/${orgId}/deals`}>Your deals</Link>
-      </p>
+      <BuyerNav orgId={orgId} />
       <h1>Cards for sale</h1>
       <p className="muted">
         Each raw card has one firm price, based on the grade it's likely to be. Accepting buys it at that price, whatever it grades;
         we send the seller a prepaid label to you, billed to you monthly.
       </p>
-      {message && <p role="status">{message}</p>}
-      {!data && <p>Loading…</p>}
-      {data?.length === 0 && <p className="muted">Nothing posted right now.</p>}
+      {message && (
+        <p role="status" className={message.startsWith('Bought:') ? 'alert alert-success' : 'alert alert-warning'}>
+          {message}
+        </p>
+      )}
+      {!data && <Loading />}
+      {data?.length === 0 && (
+        <EmptyState title="Nothing posted right now.">
+          <p>New cards show here as collectors post them.</p>
+        </EmptyState>
+      )}
       {data?.map((item) => (
         <section key={item.listingId} className="panel">
-          <CardTitle card={item.card} />
+          <div className="listing-top">
+            <div>
+              <CardTitle card={item.card} />
+            </div>
+            <p className="offer-price">{money(item.offer.price)}</p>
+          </div>
           <Photos photos={item.photos} />
-          <p className="offer-price">{money(item.offer.price)}</p>
-          {item.offer.subjectToAuthentication && <p className="muted small">Not yet authenticated: check it in hand.</p>}
+          {item.offer.subjectToAuthentication && <p className="alert alert-warning small">Not yet authenticated: check it in hand.</p>}
           <HowPriced offer={item.offer} />
-          <p className="muted small">
+          <p className="meta">
             Posted {new Date(item.listedAt).toLocaleDateString()}, open until {new Date(item.expiresAt).toLocaleDateString()}.
           </p>
           {confirming === item.listingId ? (
-            <p className="row">
-              <button onClick={() => accept(item.listingId)} disabled={busy}>
-                Confirm: buy for {money(item.offer.price)}
-              </button>
-              <button className="link" onClick={() => setConfirming(null)}>
-                Cancel
-              </button>
-            </p>
+            <div className="confirm">
+              <p>You buy it at this price, whatever it grades.</p>
+              <div className="actions">
+                <button onClick={() => accept(item.listingId)} disabled={busy} aria-busy={busy}>
+                  Confirm: buy for {money(item.offer.price)}
+                </button>
+                <button className="secondary" onClick={() => setConfirming(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
           ) : (
-            <button onClick={() => setConfirming(item.listingId)}>Buy</button>
+            <div className="actions">
+              <button onClick={() => setConfirming(item.listingId)}>Buy</button>
+            </div>
           )}
           {failed?.listingId === item.listingId && (
             <p className="error" role="alert">
@@ -157,18 +193,25 @@ export function DealsPage() {
   if (error) return <p className="error" role="alert">{error}</p>
   return (
     <>
-      <p>
-        <Link to={`/orgs/${orgId}/market`}>← Cards for sale</Link>
-      </p>
+      <BuyerNav orgId={orgId} />
       <h1>Your deals</h1>
       {labelError && <p className="error" role="alert">{labelError}</p>}
-      {!data && <p>Loading…</p>}
-      {data?.length === 0 && <p className="muted">You haven't bought any cards yet.</p>}
+      {!data && <Loading />}
+      {data?.length === 0 && (
+        <EmptyState title="You haven't bought any cards yet.">
+          <p>Cards you buy show here with their labels.</p>
+        </EmptyState>
+      )}
       {data?.map((deal) => (
         <section key={deal.listingId} className="panel">
-          <CardTitle card={deal.card} />
+          <div className="listing-top">
+            <div>
+              <CardTitle card={deal.card} />
+            </div>
+            <p className="offer-price">{money(deal.offer.price)}</p>
+          </div>
           <Photos photos={deal.photos} />
-          <p>
+          <p className="small">
             Bought for {money(deal.offer.price)} on {new Date(deal.acceptedAt).toLocaleDateString()} from {deal.seller.orgName ?? 'a seller'}
             {deal.seller.email && (
               <>
@@ -179,25 +222,27 @@ export function DealsPage() {
             .
           </p>
           {deal.cancelled ? (
-            <p className="warn">
+            <p className="alert alert-danger">
               We cancelled this deal on {new Date(deal.cancelled.at).toLocaleDateString()}: {deal.cancelled.reason}. You don't pay for
               it, and its label isn't billed to you.
             </p>
           ) : deal.label ? (
-            <p className="muted small">
+            <p className="alert alert-info small">
               {deal.label.carrier} {deal.label.service}
               {deal.label.trackingCode && `, tracking ${deal.label.trackingCode}`}, insured for {money(deal.label.insuredValue)}.
             </p>
           ) : (
-            <p className="warn">
-              No label yet.{' '}
-              <button className="link" onClick={() => retryLabel(deal.listingId)}>
-                Try the label again
-              </button>
-            </p>
+            <div className="alert alert-warning">
+              <p>No label yet.</p>
+              <div className="actions">
+                <button className="secondary" onClick={() => retryLabel(deal.listingId)}>
+                  Try the label again
+                </button>
+              </div>
+            </div>
           )}
           {deal.outcome ? (
-            <p className="ok">
+            <p className="alert alert-success">
               {deal.outcome.type === 'RECEIVED' && `Arrived; you recorded paying ${money(deal.outcome.pricePaid)}.`}
               {deal.outcome.type === 'RETURNED' && deal.outcome.returnedReason && `Returned: ${RETURN_REASON[deal.outcome.returnedReason]}.`}
               {deal.outcome.type === 'INSPECTED' && `Inspected at PSA ${deal.outcome.inspectedGrade}.`}
@@ -240,6 +285,7 @@ export function ArrivalForm({
   const needsNote = noteRequired || differs
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const formError = useFormError(error)
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -262,48 +308,61 @@ export function ArrivalForm({
   }
 
   return (
-    <form onSubmit={save} className="stack">
-      <div className="row">
-        <label>
+    <form onSubmit={save} className="form" aria-describedby={formError.describedBy}>
+      <h3>When it arrives</h3>
+      <div className="choices">
+        <label className="choice">
           <input type="radio" checked={!returning} onChange={() => setReturning(false)} /> Arrived as shown, paid
         </label>
-        <label>
+        <label className="choice">
           <input type="radio" checked={returning} onChange={() => setReturning(true)} /> Sending it back
         </label>
       </div>
       {returning ? (
-        <label>
-          Because it's{' '}
-          <select value={reason} onChange={(e) => setReason(e.target.value as DeclinedReason)} aria-label="Return reason" required>
-            <option value="" disabled>
-              choose a reason
-            </option>
-            {(Object.keys(RETURN_REASON) as DeclinedReason[]).map((r) => (
-              <option key={r} value={r}>
-                {RETURN_REASON[r]}
+        <Field label="Return reason">
+          {(control) => (
+            <select
+              {...control}
+              value={reason}
+              onChange={(e) => setReason(e.target.value as DeclinedReason)}
+              aria-label="Return reason"
+              required
+            >
+              <option value="" disabled>
+                choose a reason
               </option>
-            ))}
-          </select>
-        </label>
+              {(Object.keys(RETURN_REASON) as DeclinedReason[]).map((r) => (
+                <option key={r} value={r}>
+                  {RETURN_REASON[r]}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
       ) : (
-        <label>
-          Paid ($){' '}
-          <MoneyInput value={paid} onChange={setPaid} min={0} className="narrow" aria-label="Price paid" required />
-        </label>
+        <Field label="Price paid ($)" hint={differs ? `That's not the ${money(price)} offer: say why in the note.` : undefined}>
+          {(control) => <MoneyInput {...control} value={paid} onChange={setPaid} min={0} className="narrow" aria-label="Price paid" required />}
+        </Field>
       )}
-      {differs && <p className="muted small">That's not the {money(price)} offer: say why in the note.</p>}
-      <input
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder={noteRequired ? 'How the card shipped, or why this is recorded by hand' : differs ? 'Why you paid a different amount' : 'Note (optional)'}
-        aria-label="Note"
-        maxLength={2000}
-        required={needsNote}
-      />
-      <button type="submit" disabled={busy}>
-        Record
-      </button>
-      {error && <p className="error" role="alert">{error}</p>}
+      <Field label={needsNote ? 'Note' : 'Note (optional)'}>
+        {(control) => (
+          <input
+            {...control}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={noteRequired ? 'How the card shipped, or why this is recorded by hand' : differs ? 'Why you paid a different amount' : 'Note (optional)'}
+            aria-label="Note"
+            maxLength={2000}
+            required={needsNote}
+          />
+        )}
+      </Field>
+      <div className="actions">
+        <button type="submit" disabled={busy} aria-busy={busy}>
+          Record
+        </button>
+      </div>
+      {formError.message}
     </form>
   )
 }

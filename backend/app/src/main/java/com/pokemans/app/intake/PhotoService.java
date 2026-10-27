@@ -110,6 +110,13 @@ class PhotoService {
         }
         boolean wasComplete = IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId())).captureComplete();
         photo.checked(stored.size(), sha256, result, ExifReader.capturedAt(bytes), extra, cropKey);
+        if (cropKey == null && photo.getStatus() == Photo.Status.PASSED) {
+            // Buyers are shown this copy (CardItems.shownKey), never the upload with its EXIF location.
+            byte[] clean = CardDetector.withoutMetadata(bytes);
+            if (clean != null) {
+                blobs.putIfAbsent(storage.photoBucket(), photo.viewStorageKey(), clean, "image/jpeg");
+            }
+        }
         photos.flush();
         if (!wasComplete && IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId())).captureComplete()) {
             events.publishEvent(new CardItems.CaptureCompleted(orgId, card.getId()));
