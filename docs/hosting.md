@@ -76,7 +76,7 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
 
 ### 2. Server
 
-1. Hetzner → Servers → Add server: **CX23**, Ubuntu 24.04, location Nuremberg/Falkenstein/Helsinki (the CX line is the cheapest; US locations cost about 20% more), your SSH key, IPv4 on. Optionally tick **Backups** (+20%, weekly whole-disk snapshots on top of our nightly ones).
+1. Hetzner → Servers → Add server: **CX23**, Ubuntu 24.04, location Nuremberg/Falkenstein/Helsinki (the CX line is the cheapest and isn't sold in the US: there, Ashburn and Hillsboro offer CPX only, and the 4 GB CPX22 was $22.99/mo on 2026-10-26; the 2 GB CPX12 is too small. The beta runs in the EU: photos go from the phone straight to R2, so only short API calls cross the Atlantic, and moving later is the restore procedure below plus a DNS change), your SSH key, IPv4 on. Optionally tick **Backups** (+20%, weekly whole-disk snapshots on top of our nightly ones).
 2. Firewalls → Create: allow inbound TCP 22 (ideally from your IP only), TCP 80, TCP 443 and UDP 443, then apply it to the server.
 3. Pick the site address:
    - with a domain: add an A record such as `beta.yourdomain.com` → the server's IPv4;
@@ -89,8 +89,10 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
    curl -fsSL https://get.docker.com | sh            # Docker Engine + compose plugin
    adduser --disabled-password --gecos "" deploy && usermod -aG docker deploy
    mkdir -p /home/deploy/.ssh && cp ~/.ssh/authorized_keys /home/deploy/.ssh/ && chown -R deploy:deploy /home/deploy/.ssh
-   sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && systemctl reload ssh
+   echo 'PasswordAuthentication no' > /etc/ssh/sshd_config.d/00-no-password.conf && systemctl reload ssh
+   sshd -T | grep -i passwordauthentication          # must print "passwordauthentication no"
    ```
+   The setting goes in `sshd_config.d`, not the main file: sshd keeps the first value it reads, and it reads that folder first. On the first server (2026-10-26) editing `sshd_config` left password logins on.
    Add 2 GB of swap: the first build compiles Java and the web app on the box.
    ```bash
    fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
