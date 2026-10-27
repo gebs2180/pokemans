@@ -76,12 +76,12 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
 
 ### 2. Server
 
-1. Hetzner → Servers → Add server: **CX23**, Ubuntu 24.04, location Nuremberg/Falkenstein/Helsinki (the CX line is the cheapest and isn't sold in the US: there, Ashburn and Hillsboro offer CPX only, and the 4 GB CPX22 was $22.99/mo on 2026-10-26; the 2 GB CPX12 is too small. The beta runs in the EU: photos go from the phone straight to R2, so only short API calls cross the Atlantic, and moving later is the restore procedure below plus a DNS change), your SSH key, IPv4 on. Optionally tick **Backups** (+20%, weekly whole-disk snapshots on top of our nightly ones).
+1. Hetzner → Servers → Add server: **CX23**, Ubuntu 24.04 or 26.04 (the beta server runs 26.04), location Nuremberg/Falkenstein/Helsinki (the CX line is the cheapest and isn't sold in the US: there, Ashburn and Hillsboro offer CPX only, and the 4 GB CPX22 was $22.99/mo on 2026-10-26; the 2 GB CPX12 is too small. The beta runs in the EU: photos go from the phone straight to R2, so only short API calls cross the Atlantic, and moving later is the restore procedure below plus a DNS change), your SSH key, IPv4 on. Optionally tick **Backups** (+20%, weekly whole-disk snapshots on top of our nightly ones).
 2. Firewalls → Create: allow inbound TCP 22 (ideally from your IP only), TCP 80, TCP 443 and UDP 443, then apply it to the server.
 3. Pick the site address:
    - with a domain: add an A record such as `beta.yourdomain.com` → the server's IPv4;
    - without one: use `<ip-with-dashes>.sslip.io` (e.g. `203-0-113-7.sslip.io`), which resolves to that IP. Caddy can get a certificate for it. Free, but the URL is ugly.
-4. SSH in and set up the box:
+4. SSH in and set up the box. Paste one line at a time: `dpkg-reconfigure` opens a dialog that swallows any lines pasted after it.
    ```bash
    ssh root@<server-ip>
    apt update && apt -y upgrade && apt -y install unattended-upgrades git
