@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     implementation(platform(org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES))
-    implementation(platform("org.springframework.modulith:spring-modulith-bom:2.1.1"))
+    implementation(platform("org.springframework.modulith:spring-modulith-bom:2.1.2"))
     implementation(platform("software.amazon.awssdk:bom:2.56.0"))
 
     implementation(project(":valuation-core"))
@@ -21,10 +21,10 @@ dependencies {
     // Report PDFs, rendered in the JVM: Thymeleaf (Apache-2.0) fills XHTML templates and OpenHTMLtoPDF
     // (LGPL-2.1, used unmodified as a library; PDFBox underneath is Apache-2.0) lays them out.
     implementation("org.thymeleaf:thymeleaf")
-    implementation("io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.85")
+    implementation("io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.100")
     // Error reports to Sentry (docs/hosting.md). Does nothing unless SENTRY_DSN is set.
-    implementation("io.sentry:sentry-spring-boot-4-starter:8.61.0")
-    implementation("io.sentry:sentry-logback:8.61.0")
+    implementation("io.sentry:sentry-spring-boot-4-starter:8.61.1")
+    implementation("io.sentry:sentry-logback:8.61.1")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
