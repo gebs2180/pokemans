@@ -1468,6 +1468,9 @@ button.link:active:not(:disabled) {
   text-transform: uppercase;
   letter-spacing: 0.02em;
   transform: rotate(-3deg);
+  /* Stays one word on a phone; the email beside it shortens instead. */
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .brand::before {
