@@ -51,6 +51,7 @@ const status: CardStatus = {
   identity: null,
   nextStep: 'We identify each card by hand from its photos, usually within a couple of days.',
   canOffer: false,
+  condition: null,
 }
 
 function renderCard(view: CardView, cardStatus: CardStatus = status) {
@@ -95,6 +96,18 @@ describe('CardPage', () => {
     expect(await screen.findByText('Pikachu VMAX · Vivid Voltage 188 · EN · holo')).toBeInTheDocument()
     expect(screen.getByText('Waiting for condition review')).toBeInTheDocument()
     expect(screen.getAllByText("We're reviewing its condition from the photos.").length).toBeGreaterThan(0)
+  })
+
+  it('shows our likely grade and what holds it back, as an estimate', async () => {
+    renderCard(card(), {
+      ...status,
+      stage: 'READY',
+      condition: { low: 7, high: 9, mostLikely: 8, mayBeUngradable: false, holdingBack: ['surface', 'centering'] },
+    })
+    expect(await screen.findByText('PSA 7–9, most likely 8')).toBeInTheDocument()
+    expect(screen.getByText('surface and centering', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText(/not a grade/)).toBeInTheDocument()
+    expect(screen.queryByText(/may not be gradable/)).not.toBeInTheDocument()
   })
 
   it('hides Retake once the card is posted or sold', async () => {
