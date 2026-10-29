@@ -2,10 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import type { CardCondition, CatalogHit, IdentifiedCard, OfferPreview, ProvenanceView, ProviderCard } from '../api'
+import type { CardCondition, CatalogHit, IdentifiedCard, OfferPreview, Prediction, ProvenanceView, ProviderCard } from '../api'
 import { respond } from '../test/auth0'
 import { searchFromLabel } from '../searchFromLabel'
-import { AssessmentPanel, OfferPreviewPanel, ReviewCardPage } from './ReviewCardPage'
+import { AssessmentPanel, OfferPreviewPanel, Predictions, ReviewCardPage } from './ReviewCardPage'
 
 const card: CardCondition = {
   cardId: 'card1',
@@ -39,6 +39,32 @@ describe('AssessmentPanel', () => {
 
     await user.type(eight, '.5')
     expect(save).toBeDisabled()
+  })
+})
+
+describe('Predictions', () => {
+  const prediction = (details: Record<string, unknown>): Prediction => ({
+    id: 'pr1', provider: 'XIMILAR', modelVersion: null, succeeded: true, overallGrade: 2.5, psaGrade: null,
+    centering: 8, corners: 9, edges: 8, surface: 6, details, error: null, latencyMs: 1, createdAt: '2026-10-28T22:17:19Z',
+  })
+
+  it("shows the back's grades and a damage flag, which explain a low overall", () => {
+    render(
+      <Predictions
+        data={{ ...card, predictions: [prediction({ backGrades: { final: 2, centering: 9, corners: 3, edges: 2.5, surface: 2 }, damaged: { name: 'Crease', prob: 0.91 } })] }}
+        base="/b"
+        onChange={() => {}}
+      />,
+    )
+    const back = screen.getByText('XIMILAR · back').closest('tr')!
+    expect(back).toHaveTextContent('2932.52')
+    expect(screen.getByText(/Damage check: Crease \(91% sure\)/)).toHaveTextContent('caps the overall grade')
+  })
+
+  it('shows an OK damage check without a warning, and no back row when there are no back grades', () => {
+    render(<Predictions data={{ ...card, predictions: [prediction({ damaged: { name: 'OK', prob: 0.88 } })] }} base="/b" onChange={() => {}} />)
+    expect(screen.queryByText('XIMILAR · back')).not.toBeInTheDocument()
+    expect(screen.getByText(/Damage check: OK/)).not.toHaveTextContent('caps')
   })
 })
 
