@@ -14,6 +14,7 @@ import {
   type Distribution,
   type Edition,
   type OfferPreview,
+  type Prediction,
   type ProviderCard,
   type Variant,
 } from '../api'
@@ -456,7 +457,7 @@ function Suggestions({
   )
 }
 
-function Predictions({ data, base, onChange }: { data: CardCondition; base: string; onChange: () => void }) {
+export function Predictions({ data, base, onChange }: { data: CardCondition; base: string; onChange: () => void }) {
   const api = useApi()
   const [err, setErr] = useState<string | null>(null)
   const open = data.requests.filter((r) => r.status === 'PENDING' || r.status === 'SUBMITTED')
@@ -513,16 +514,7 @@ function Predictions({ data, base, onChange }: { data: CardCondition; base: stri
           <tbody>
             {data.predictions.map((p) =>
               p.succeeded ? (
-                <tr key={p.id}>
-                  <td>{p.provider}</td>
-                  <td>{p.overallGrade ?? '–'}</td>
-                  <td>{p.psaGrade ?? '–'}</td>
-                  <td>{p.centering ?? '–'}</td>
-                  <td>{p.corners ?? '–'}</td>
-                  <td>{p.edges ?? '–'}</td>
-                  <td>{p.surface ?? '–'}</td>
-                  <td className="muted small">{new Date(p.createdAt).toLocaleString()}</td>
-                </tr>
+                <PredictionRows key={p.id} p={p} />
               ) : (
                 <tr key={p.id}>
                   <td>{p.provider}</td>
@@ -538,6 +530,61 @@ function Predictions({ data, base, onChange }: { data: CardCondition; base: stri
       )}
       {err && <p className="error" role="alert">{err}</p>}
     </section>
+  )
+}
+
+/** A provider's sub-grade breakdown for one side, as stored in a prediction's details. */
+type SideGrades = { final?: number; centering?: number; corners?: number; edges?: number; surface?: number }
+
+/** A damage tag a provider found, e.g. { name: 'OK', prob: 0.88 }. */
+type DamageTag = { name?: string; prob?: number }
+
+/**
+ * One prediction: the overall grade with the front's sub-grades, then the back's when the provider
+ * graded it separately, then any damage it flagged. The overall covers both sides and damage, so a low
+ * back or a damage tag explains an overall well under the front's sub-grades.
+ */
+function PredictionRows({ p }: { p: Prediction }) {
+  const back = p.details?.backGrades as SideGrades | undefined
+  const damaged = p.details?.damaged as DamageTag | undefined
+  const flagged = damaged?.name != null && damaged.name.toUpperCase() !== 'OK'
+  return (
+    <>
+      <tr>
+        <td>
+          {p.provider}
+          {back && <span className="muted small"> · front</span>}
+        </td>
+        <td>{p.overallGrade ?? '–'}</td>
+        <td>{p.psaGrade ?? '–'}</td>
+        <td>{p.centering ?? '–'}</td>
+        <td>{p.corners ?? '–'}</td>
+        <td>{p.edges ?? '–'}</td>
+        <td>{p.surface ?? '–'}</td>
+        <td className="muted small">{new Date(p.createdAt).toLocaleString()}</td>
+      </tr>
+      {back && (
+        <tr>
+          <td className="muted small">{p.provider} · back</td>
+          <td className="muted">{back.final ?? '–'}</td>
+          <td />
+          <td>{back.centering ?? '–'}</td>
+          <td>{back.corners ?? '–'}</td>
+          <td>{back.edges ?? '–'}</td>
+          <td>{back.surface ?? '–'}</td>
+          <td />
+        </tr>
+      )}
+      {damaged?.name != null && (
+        <tr>
+          <td colSpan={8} className={flagged ? 'warn small' : 'muted small'}>
+            Damage check: {damaged.name}
+            {damaged.prob != null && ` (${percent(damaged.prob)} sure)`}
+            {flagged && ' — this caps the overall grade'}
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
