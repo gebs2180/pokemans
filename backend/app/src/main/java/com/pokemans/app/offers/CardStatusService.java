@@ -1,5 +1,6 @@
 package com.pokemans.app.offers;
 
+import com.pokemans.app.condition.Assessments;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.valuation.CardInputs;
 import java.time.Instant;
@@ -23,8 +24,17 @@ class CardStatusService {
      * @param identity  the card as we identified it, e.g. "Charizard · Base Set 4/102 · EN · holo", or null
      * @param nextStep  what happens next, and who does it, in words for the seller
      * @param canOffer  true when asking for an offer can work right now
+     * @param condition the grades the card likely is, in our view, once we've assessed it; else null
      */
-    record CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer) {
+    record CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer, Assessments.Summary condition) {
+
+        CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer) {
+            this(cardId, stage, identity, nextStep, canOffer, null);
+        }
+
+        CardStatus withCondition(Assessments.Summary summary) {
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, summary);
+        }
     }
 
     private static final String NO_NOTIFICATIONS = " We don't send notifications yet, so check back here.";
@@ -34,10 +44,12 @@ class CardStatusService {
     private final ListingEventRepository events;
     private final CardItems cardItems;
     private final CardOfferVoidRepository voids;
+    private final Assessments assessments;
 
     CardStatusService(OfferService offers, SaleListingRepository listings, ListingEventRepository events, CardItems cardItems,
-                      CardOfferVoidRepository voids) {
+                      CardOfferVoidRepository voids, Assessments assessments) {
         this.offers = offers;
+        this.assessments = assessments;
         this.voids = voids;
         this.listings = listings;
         this.events = events;
@@ -46,6 +58,11 @@ class CardStatusService {
 
     @Transactional(readOnly = true)
     CardStatus status(UUID cardId) {
+        CardStatus status = stage(cardId);
+        return status.stage() == Stage.LOT ? status : status.withCondition(assessments.summary(cardId).orElse(null));
+    }
+
+    private CardStatus stage(UUID cardId) {
         CardItems.CardItemRef card = cardItems.get(cardId);
         if (card.lot()) {
             return new CardStatus(cardId, Stage.LOT, null, "Lots don't get offers: add the cards worth $25 or more one by one.", false);

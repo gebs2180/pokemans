@@ -73,7 +73,17 @@ export const STAGE_LABEL: Record<CardStage, string> = {
 }
 
 /** @param identity the card as we identified it, or null; @param canOffer asking for an offer can work now */
-export type CardStatus = { cardId: string; stage: CardStage; identity: string | null; nextStep: string; canOffer: boolean }
+/** Our view of a card's condition, for its seller: the grades it likely is, and what holds it back. */
+export type ConditionSummary = { low: number; high: number; mostLikely: number; mayBeUngradable: boolean; holdingBack: string[] }
+
+export type CardStatus = {
+  cardId: string
+  stage: CardStage
+  identity: string | null
+  nextStep: string
+  canOffer: boolean
+  condition: ConditionSummary | null
+}
 
 export type UploadSlot = {
   photoId: string

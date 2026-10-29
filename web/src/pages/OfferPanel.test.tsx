@@ -34,7 +34,7 @@ const offer = (over: Partial<Offer> = {}): Offer => ({
 
 const address: ShipAddress = { name: 'Sam', company: null, street1: '1 Main St', street2: null, city: 'Springfield', state: 'IL', zip: '62701', country: 'US', phone: null }
 
-const ready: CardStatus = { cardId: 'card1', stage: 'READY', identity: 'Umbreon VMAX · Evolving Skies 215 · EN', nextStep: 'Ready for an instant offer.', canOffer: true }
+const ready: CardStatus = { cardId: 'card1', stage: 'READY', identity: 'Umbreon VMAX · Evolving Skies 215 · EN', nextStep: 'Ready for an instant offer.', canOffer: true, condition: null }
 
 /** Answers GETs by path (sale answers in turn), records POSTs and answers them with {@code postAnswer}. */
 function stubApi(
@@ -116,6 +116,7 @@ describe('OfferPanel', () => {
       identity: null,
       nextStep: "We identify each card by hand from its photos, usually within a couple of days. We don't send notifications yet, so check back here.",
       canOffer: false,
+      condition: null,
     }
     stubApi([{ offer: null, listing: null }], address, undefined, identifying)
     render(<OfferPanel orgId="org1" cardId="card1" />)

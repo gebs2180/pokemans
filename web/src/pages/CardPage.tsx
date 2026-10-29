@@ -7,6 +7,7 @@ import {
   useApi,
   type CardStatus,
   type CardView,
+  type ConditionSummary,
   type Grader,
   type OutcomeView,
   type PhotoView,
@@ -186,10 +187,32 @@ function StatusLine({ orgId, cardId }: { orgId: string; cardId: string }) {
           <span className="muted">Identified as</span> <strong>{data.identity}</strong>
         </p>
       )}
+      {data.condition && <LikelyGrade condition={data.condition} />}
       <p>
         <StageChip stage={data.stage} />
       </p>
       <p className="muted small">{data.nextStep}</p>
+    </div>
+  )
+}
+
+/** Our estimate of the grade from the photos, in words. Never a provider's grade: the offer is what's firm. */
+export function LikelyGrade({ condition }: { condition: ConditionSummary }) {
+  const { low, high, mostLikely, mayBeUngradable, holdingBack } = condition
+  if (mostLikely === 0) return null
+  const range = low === high ? `PSA ${low}` : `PSA ${low}–${high}, most likely ${mostLikely}`
+  return (
+    <div className="likely-grade">
+      <p>
+        <span className="muted">Likely grade</span> <strong>{range}</strong>
+      </p>
+      {holdingBack.length > 0 && (
+        <p className="small">
+          <span className="muted">Holding it back:</span> {holdingBack.join(' and ')}
+        </p>
+      )}
+      {mayBeUngradable && <p className="small warn">It may not be gradable at all, e.g. if it's been altered or damaged.</p>}
+      <p className="muted small">Our estimate from your photos, not a grade. An offer's price stays the same whatever grade the card gets.</p>
     </div>
   )
 }
