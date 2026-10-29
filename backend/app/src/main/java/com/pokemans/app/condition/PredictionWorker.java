@@ -43,7 +43,19 @@ class PredictionWorker {
     private record Submitted(String externalRequestId) implements Outcome {
     }
 
-    private record Polled(PreGradeProvider.Poll poll, long latencyMs) implements Outcome {
+    /** The provider said something about the card (done, failed or still pending): stored as it comes. */
+    private sealed interface Answer extends Outcome {
+
+        PreGradeProvider.Poll poll();
+
+        long latencyMs();
+    }
+
+    private record Polled(PreGradeProvider.Poll poll, long latencyMs) implements Answer {
+    }
+
+    /** A {@link PreGradeProvider.Local} provider answered in one call: there was nothing to submit. */
+    private record Answered(PreGradeProvider.Poll poll, long latencyMs) implements Answer {
     }
 
     private record CallFailed(String error) implements Outcome {
@@ -159,6 +171,9 @@ class PredictionWorker {
         }
         long started = System.nanoTime();
         try {
+            if (provider instanceof PreGradeProvider.Local local) {
+                return new Answered(local.grade(photos(request)), elapsedMs(started));
+            }
             if (request.getStatus() == PredictionRequest.Status.PENDING) {
                 return new Submitted(provider.submit(photos(request), request.getId().toString()));
             }
@@ -176,12 +191,12 @@ class PredictionWorker {
      */
     private PredictionRequest apply(UUID id, Instant leasedUntil, Outcome outcome) {
         PredictionRequest request = requests.findById(id).orElseThrow();
-        if (outcome instanceof Polled(PreGradeProvider.Poll poll, long latencyMs)) {
-            switch (poll) {
-                case PreGradeProvider.Done done ->
-                        predictions.save(ProviderPrediction.succeeded(request, done.reading(), withoutImages(done.raw()), latencyMs));
-                case PreGradeProvider.Failed failed ->
-                        predictions.save(ProviderPrediction.rejected(request, failed.reason(), withoutImages(failed.raw()), latencyMs));
+        if (outcome instanceof Answer answer) {
+            switch (answer.poll()) {
+                case PreGradeProvider.Done done -> predictions.save(
+                        ProviderPrediction.succeeded(request, done.reading(), withoutImages(done.raw()), answer.latencyMs()));
+                case PreGradeProvider.Failed failed -> predictions.save(
+                        ProviderPrediction.rejected(request, failed.reason(), withoutImages(failed.raw()), answer.latencyMs()));
                 case PreGradeProvider.Pending pending -> {
                 }
             }
@@ -196,6 +211,14 @@ class PredictionWorker {
             case Polled polled -> {
                 switch (polled.poll()) {
                     case PreGradeProvider.Pending pending -> request.stillPending(Duration.ofSeconds(10), properties.worker().maxPending());
+                    case PreGradeProvider.Done done -> request.done();
+                    case PreGradeProvider.Failed failed -> request.rejected(failed.reason());
+                }
+            }
+            case Answered answered -> {
+                switch (answered.poll()) {
+                    case PreGradeProvider.Pending pending ->
+                            request.callFailed("A local provider answered pending", properties.worker().maxAttempts());
                     case PreGradeProvider.Done done -> request.done();
                     case PreGradeProvider.Failed failed -> request.rejected(failed.reason());
                 }

@@ -21,6 +21,9 @@ import java.util.TreeMap;
  *   <li>Each provider grade is folded down to a whole grade (half grades fold down) and spread over
  *       neighbouring grades, more below than above.</li>
  *   <li>Providers are averaged.</li>
+ *   <li>A centering-only reading (our own measurement) caps the result: whatever probability sits
+ *       above the best grade the centering allows moves onto that grade. It never adds a grade of its
+ *       own to the average, since a card centred for a 10 can still have the corners of a 4.</li>
  *   <li>Confidence comes from how many providers answered, how far apart they are, and whether every
  *       photo showed the whole card. Lower confidence moves probability down.</li>
  *   <li>Modern holos get the default surface shift down; a reviewer can clear it after a close-up.</li>
@@ -37,8 +40,13 @@ final class DistributionBuilder {
      * @param providerGrades     one grade per provider that answered (provider name to grade), 1–10 scale
      * @param wholeCardInPhotos  every photo used had the whole card detected
      * @param modernHolo         the card is identified as a holo or reverse holo from after the WotC era
+     * @param centeringCap       the best grade measured centering allows, or null when it wasn't measured
      */
-    record Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, boolean modernHolo) {
+    record Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, boolean modernHolo, Integer centeringCap) {
+
+        Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, boolean modernHolo) {
+            this(providerGrades, wholeCardInPhotos, modernHolo, null);
+        }
     }
 
     record Result(GradeDistribution distribution, Confidence confidence, Map<String, Object> basis) {
@@ -63,6 +71,10 @@ final class DistributionBuilder {
             perProvider.add(spread(whole));
         });
         GradeDistribution distribution = average(perProvider);
+        // Before the confidence and holo shifts, so they still move mass below the cap.
+        if (input.centeringCap() != null) {
+            distribution = distribution.capAt(Grade.of(Math.max(1, Math.min(10, input.centeringCap()))));
+        }
 
         DoubleSummaryStatistics stats = input.providerGrades().values().stream().mapToDouble(Double::doubleValue).summaryStatistics();
         double gap = stats.getMax() - stats.getMin();
@@ -90,6 +102,7 @@ final class DistributionBuilder {
         basis.put("providerGrades", input.providerGrades());
         basis.put("foldedGrades", folded);
         basis.put("providerGap", gap);
+        basis.put("centeringCap", input.centeringCap());
         basis.put("wholeCardInPhotos", input.wholeCardInPhotos());
         basis.put("modernHolo", input.modernHolo());
         basis.put("confidencePenalty", confidencePenalty);

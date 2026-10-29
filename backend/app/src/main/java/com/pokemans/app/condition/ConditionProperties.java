@@ -27,7 +27,8 @@ record ConditionProperties(
         @DefaultValue("0.25") BigDecimal holoSurfacePenalty,
         @DefaultValue Worker worker,
         @DefaultValue Ximilar ximilar,
-        @DefaultValue CardGrade cardgrade) {
+        @DefaultValue CardGrade cardgrade,
+        @DefaultValue Centering centering) {
 
     /** Mostly on the provider's grade, more below than above: conservative by default. */
     static final Map<Integer, BigDecimal> DEFAULT_SPREAD = Map.of(
@@ -95,6 +96,17 @@ record ConditionProperties(
             return "CardGrade[enabled=" + enabled + ", apiKey=" + redacted(apiKey) + ", baseUrl=" + baseUrl
                     + ", gradingCompany=" + gradingCompany + "]";
         }
+    }
+
+    /**
+     * Our own centering measurement from the passing front and back ({@link CenteringPreGradeProvider}).
+     * Off until it has been checked against returned grades.
+     *
+     * @param measurementMargin percentage points added to each measured larger share before PSA's
+     *                          table is applied, for measurement error: conservative by default
+     */
+    record Centering(@DefaultValue("false") boolean enabled,
+                     @DefaultValue("1.0") double measurementMargin) {
     }
 
     private static String redacted(String secret) {

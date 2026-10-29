@@ -61,6 +61,21 @@ describe('Predictions', () => {
     expect(screen.getByText(/Damage check: Crease \(91% sure\)/)).toHaveTextContent('caps the overall grade')
   })
 
+  it('shows measured centering per side and the grade it allows, or why a side was not measured', () => {
+    const ours: Prediction = {
+      ...prediction({
+        frontCentering: { leftRight: '49.1/50.9', topBottom: '48.4/51.6' },
+        backCentering: { unmeasured: 'no clear inner edge of the left border' },
+        psaCenteringCap: 10,
+      }),
+      provider: 'RAWMARK_CENTERING', overallGrade: null, centering: 10, corners: null, edges: null, surface: null,
+    }
+    render(<Predictions data={{ ...card, predictions: [ours] }} base="/b" onChange={() => {}} />)
+    expect(screen.getByText(/Centering: front L\/R 49.1\/50.9, T\/B 48.4\/51.6/)).toHaveTextContent(
+      'back not measured (no clear inner edge of the left border) — allows PSA 10 at best',
+    )
+  })
+
   it('shows an OK damage check without a warning, and no back row when there are no back grades', () => {
     render(<Predictions data={{ ...card, predictions: [prediction({ damaged: { name: 'OK', prob: 0.88 } })] }} base="/b" onChange={() => {}} />)
     expect(screen.queryByText('XIMILAR · back')).not.toBeInTheDocument()

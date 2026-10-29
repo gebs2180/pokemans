@@ -40,6 +40,21 @@ class GradeDistributionTest {
     }
 
     @Test
+    void capAtMovesHigherGradesOntoTheCapAndLeavesTheRest() {
+        GradeDistribution dist = GradeDistribution.of(Map.of(
+                Grade.G6, d("0.2"), Grade.G8, d("0.3"), Grade.G9, d("0.2"), Grade.G10, d("0.2"), Grade.U, d("0.1")));
+
+        GradeDistribution capped = dist.capAt(Grade.G8);
+
+        assertThat(capped.p(Grade.G8)).isEqualByComparingTo("0.7");
+        assertThat(capped.p(Grade.G6)).isEqualByComparingTo("0.2");
+        assertThat(capped.p(Grade.U)).isEqualByComparingTo("0.1");
+        assertThat(capped.p(Grade.G9)).isEqualByComparingTo("0");
+        assertThat(capped.p(Grade.G10)).isEqualByComparingTo("0");
+        assertThat(GradeDistribution.certain(Grade.G5).capAt(Grade.G8)).isEqualTo(GradeDistribution.certain(Grade.G5));
+    }
+
+    @Test
     void shiftDownRejectsUpwardShifts() {
         assertThatThrownBy(() -> GradeDistribution.certain(Grade.G5).shiftDown(-1))
                 .isInstanceOf(IllegalArgumentException.class);

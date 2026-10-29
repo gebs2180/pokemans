@@ -9,8 +9,31 @@ import java.util.Map;
  *
  * <p>Check the provider's terms before enabling it: we store every answer and train on it
  * (docs/pregrade-providers.md).
+ *
+ * <p>Our own measurements are {@link Local}: they run in-process and answer at once.
  */
 interface PreGradeProvider {
+
+    /**
+     * A provider that runs in-process, such as our own centering measurement: the worker calls
+     * {@link #grade} once instead of submit and poll, and stores the answer straight away. There is
+     * no job id to keep, and a restart in the middle simply measures again.
+     */
+    interface Local extends PreGradeProvider {
+
+        /** {@link Done} or {@link Failed}; never {@link Pending}. */
+        Poll grade(Photos photos);
+
+        @Override
+        default String submit(Photos photos, String idempotencyKey) {
+            throw new UnsupportedOperationException(name() + " runs in-process: call grade");
+        }
+
+        @Override
+        default Poll poll(String externalRequestId) {
+            throw new UnsupportedOperationException(name() + " runs in-process: call grade");
+        }
+    }
 
     /** Stable name stored with every request and prediction, e.g. "XIMILAR". */
     String name();

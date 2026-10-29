@@ -77,3 +77,13 @@ Every accuracy figure below is self-reported on the vendor's own blog. There is 
 - **CardGrade.io:** Pro is $24.99/mo for 80 grades at 10 requests per minute. Business is $74.99/mo for 300 grades at 30 per minute. API Starter is $149.99/mo for 1,000 (15¢ each). It doesn't say whether front plus back is one credit. Confirm that.
 - **Controlled set (30 cards):** about $11 on a Ximilar top-up (or its free plan over a few months) plus one month of CardGrade.io Pro ($24.99), so about $36 in all.
 - **Per 1,000 partner cards:** about $69 (Ximilar) + $150 (CardGrade.io API Starter), so about $220. That's about 22¢ per card for both opinions. Only cards that pass quality checks and are worth over $25 get sent, and each card is sent once.
+
+## Our own: centering (RAWMARK_CENTERING), off by default
+
+The first step towards our own grader. It runs in the app, so there are no terms to clear and no cost. Turn it on with `CENTERING_ENABLED=true`.
+
+- **What it does:** on the passing front and back it straightens the card from its outline, refines the four outer edges at full resolution, finds each border's inner edge, and reports left/right and top/bottom ratios with the border widths in mm (`CenteringMeasurer`).
+- **What it reports:** centering only. Its centering grade is the best PSA grade the ratios allow, from PSA's published table (`PsaCentering`, read from psacard.com/gradingstandards on 2026-10-28), with 1 percentage point added for measurement error (`pokemans.condition.centering.measurement-margin`).
+- **How it's used:** it caps the system distribution (probability above the allowed grade moves onto it) and is never averaged in as a grade, so it can only lower a card.
+- **When it says nothing:** full-art and borderless cards, glare, sleeves, borders under about 0.6 mm, and cards whose inner edge isn't found in 5 of 8 pieces along a side come back "not measured" with the reason. A side that isn't measured doesn't limit the cap.
+- **Calibration:** `RealPhotoCenteringTest` with `POKEMANS_REAL_PHOTOS=<folder>` prints the ratios and writes each straightened card with the measured lines drawn on it.

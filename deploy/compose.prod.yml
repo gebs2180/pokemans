@@ -54,6 +54,7 @@ services:
       XIMILAR_API_KEY: ${XIMILAR_API_KEY:-}
       CARDGRADE_ENABLED: ${CARDGRADE_ENABLED:-false}
       CARDGRADE_API_KEY: ${CARDGRADE_API_KEY:-}
+      CENTERING_ENABLED: ${CENTERING_ENABLED:-false}
     # A 4 GB VPS: the JVM takes 60% of this limit as heap.
     mem_limit: 1536m
     logging: *logging
