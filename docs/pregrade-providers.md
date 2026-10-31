@@ -7,15 +7,15 @@ We need three rights from a provider (HLD §3, CLAUDE.md "store everything"):
 2. **Train and evaluate** our own condition model on those predictions (calibration, comparison against returned PSA grades).
 3. **Show** derived results to third parties: lenders and insurers who get PDF reports, not app logins.
 
-## Ximilar (Czech Republic): usable
+## Ximilar (Czech Republic): usable, confirmed in writing
 
 - **API:** `/v2/grade` gives 1–10 grades per corner, edge, surface and centering, plus a final grade (geometric mean, 70/30 front/back by default) and a condition label. `/v2/centering` gives L/R and T/B ratios and margins. It reports detection and tag probabilities, but no probability distribution over grades. It wants a short side of at least 2000 px, unedited, and no sleeve or slab.
-- **Storing results:** not restricted. The data-security FAQ says the customer "retain[s] all rights to your own training data and its outputs", including prediction results, and that results are exportable through the API.
-- **Training our own model:** not restricted. The terms have no clause against competing models, benchmarking or reverse engineering. The model engine itself stays Ximilar's.
-- **Our photos:** inference images are processed in memory and not stored. Ximilar won't use our content to train models offered to other customers without written permission.
-- **Third parties:** not addressed for users.
+- **Storing results:** confirmed. Ximilar wrote on 2026-10-30 that the results are ours, and we can keep them as long as we want, with our own photos and any later grades.
+- **Training our own model:** confirmed in the same reply. The model engine itself stays Ximilar's.
+- **Our photos:** Ximilar keeps images temporarily so we can see the grading visualization, and removes them automatically after a week. This corrects the 2026-10-16 reading that inference images aren't stored. It says it uses no customer data for training.
+- **Third parties:** confirmed. Commercial use is allowed, including values derived from the results in reports for our business customers.
 - **Other:** liability is capped at fees paid, and is zero on the free plan. Czech law applies, with Vienna Rules arbitration. Pricing is credit-based and wasn't checked.
-- **Confirm in writing:** that we may keep results indefinitely, train our own model on them, and include derived values in reports for lenders.
+- **Confirmed in writing:** Michal at Ximilar replied by email on 2026-10-30, covering storage, training, commercial use and image handling. Zach has the email. Grading costs 100 credits per card, per the same reply.
 
 Sources: [terms](https://www.ximilar.com/terms-of-use-privacy/), [data security FAQ](https://www.ximilar.com/faq/data-security/), [grading docs](https://docs.ximilar.com/collectibles/card-grading).
 
@@ -67,7 +67,7 @@ Every accuracy figure below is self-reported on the vendor's own blog. There is 
 
 - **Provider A: Ximilar.** Its terms fit and it doesn't keep our photos.
 - **Provider B: CardGrade.io.** Its terms don't restrict our use of results, and it gives the richest output (PSA/BGS/CGC predictions, limiting factor, zone scores). Opt out of training before sending partner photos. Start on Pro ($24.99) for the controlled set before paying for an API tier.
-- **Before M2 stores production data:** email both to confirm the rights listed above.
+- **Before M2 stores production data:** email both to confirm the rights listed above. Ximilar confirmed on 2026-10-30; CardGrade.io has not replied yet.
 - **Dropped:** CardGrader.AI (§4 bans storing and training). CardMintAI unless it clarifies output rights in writing.
 - **Neither A nor B** returns a grade distribution. Our distribution comes from their point grades and sub-grades plus the reviewer, which is what M2 planned.
 

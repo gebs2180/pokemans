@@ -34,7 +34,7 @@ Not yet done, in rough order:
 
 ### The prices are defensible
 - [ ] **Comps entered** for every card that gets an offer: real sold comps that can be shown. Hand-entered is fine for a closed test if they're real sales and their sources are allowed to be used; a licensed source is needed before opening it up. The admin's comp form takes a CSV in the `comps.csv` columns (PR #26). With realistic comps, three fresh sales at each of PSA 8, 9 and 10 now get an offer at confidence C (audit finding 1).
-- [ ] **Zach reviews each card's condition distribution by hand.** The pre-grade APIs stay off until their terms are confirmed in writing. Choosing A for a modern holo without a passing close-up now warns the reviewer (audit finding 25).
+- [ ] **Zach reviews each card's condition distribution by hand.** Ximilar is on: it confirmed storing, training and commercial use in writing on 2026-10-30 ([pregrade-providers.md](pregrade-providers.md)). CardGrade stays off until its reply comes. Choosing A for a modern holo without a passing close-up now warns the reviewer (audit finding 25).
 - [ ] **Vendor spot check:** about 20 offers compared against what a vendor would pay. If the vendors laugh, tune `m` (buyer margin: 10% at A, 13% at B, 17% at C) before anyone else sees a price.
 - [x] **A maximum offer**, on the firm price: $5,000, EasyPost's insurance limit, so every label is insured for the full price. *Checked:* `OffersFlowTest` (PR #24). It was $500 until Zach lifted it on 2026-10-26, because too many cards were above it; set `pokemans.offers.max-price` lower to cap the beta again.
 
