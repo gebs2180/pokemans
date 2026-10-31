@@ -120,6 +120,8 @@ class PhotoService {
         photos.flush();
         if (!wasComplete && IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId())).captureComplete()) {
             events.publishEvent(new CardItems.CaptureCompleted(orgId, card.getId()));
+        } else if (wasComplete && photo.getStatus() == Photo.Status.PASSED && photo.getSide() != Photo.Side.DETAIL) {
+            events.publishEvent(new CardItems.PhotoRetaken(orgId, card.getId()));
         }
         return IntakeViews.photo(photo);
     }

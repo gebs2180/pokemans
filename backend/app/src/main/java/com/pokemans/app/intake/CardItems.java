@@ -45,6 +45,10 @@ public class CardItems {
     public record CaptureCompleted(UUID orgId, UUID cardItemId) {
     }
 
+    /** Published when a passing front or back replaces one on a card whose capture was already complete. */
+    public record PhotoRetaken(UUID orgId, UUID cardItemId) {
+    }
+
     private final IntakeService intake;
     private final CardItemRepository cards;
     private final PhotoRepository photos;

@@ -76,7 +76,20 @@ class ConditionService {
     void onCaptureCompleted(CardItems.CaptureCompleted event) {
         CardItems.CardItemRef card = cardItems.get(event.cardItemId());
         if (!card.lot()) {
-            enqueue(card, null);
+            enqueue(card, null, enabledProviders);
+        }
+    }
+
+    /**
+     * A photo was retaken: measure centering again, since the seller is shown it as measured from their
+     * photos. The paid providers wait for "Ask again". Lots aren't graded.
+     */
+    @TransactionalEventListener
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    void onPhotoRetaken(CardItems.PhotoRetaken event) {
+        CardItems.CardItemRef card = cardItems.get(event.cardItemId());
+        if (!card.lot() && enabledProviders.contains(CenteringPreGradeProvider.NAME)) {
+            enqueue(card, null, List.of(CenteringPreGradeProvider.NAME));
         }
     }
 
@@ -90,10 +103,10 @@ class ConditionService {
         if (card.lot()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Lots aren't pre-graded");
         }
-        return enqueue(card, currentUser.id());
+        return enqueue(card, currentUser.id(), enabledProviders);
     }
 
-    private List<PredictionRequest> enqueue(CardItems.CardItemRef card, UUID requestedBy) {
+    private List<PredictionRequest> enqueue(CardItems.CardItemRef card, UUID requestedBy, List<String> providers) {
         List<CardItems.PhotoRef> photos = cardItems.passedPhotos(card.id());
         Optional<CardItems.PhotoRef> front = latest(photos, "FRONT");
         Optional<CardItems.PhotoRef> back = latest(photos, "BACK");
@@ -104,7 +117,7 @@ class ConditionService {
                 .filter(PredictionRequest::isOpen).map(PredictionRequest::getProvider).toList();
         List<PredictionRequest> created = new ArrayList<>();
         try {
-            for (String provider : enabledProviders) {
+            for (String provider : providers) {
                 if (!open.contains(provider)) {
                     created.add(requests.saveAndFlush(new PredictionRequest(card.orgId(), card.id(), provider,
                             List.of(front.get().id(), back.get().id()), requestedBy)));
@@ -138,7 +151,7 @@ class ConditionService {
         for (CardItems.CardItemRef card : cardItems.captureCompletedBetween(now.minus(worker.sweepWindow()), now.minus(worker.sweepMinAge()))) {
             if (!card.lot() && !requests.existsByCardItemId(card.id())) {
                 log.warn("Card {} completed capture but has no prediction requests; queuing them now", card.id());
-                enqueue(card, null);
+                enqueue(card, null, enabledProviders);
                 queued++;
             }
         }
