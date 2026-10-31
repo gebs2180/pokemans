@@ -74,7 +74,21 @@ export const STAGE_LABEL: Record<CardStage, string> = {
 
 /** @param identity the card as we identified it, or null; @param canOffer asking for an offer can work now */
 /** Our view of a card's condition, for its seller: the grades it likely is, and what holds it back. */
-export type ConditionSummary = { low: number; high: number; mostLikely: number; mayBeUngradable: boolean; holdingBack: string[] }
+/** One side's measured ratios in whole percent, left or top border first, e.g. "49/51". */
+export type SideCentering = { leftRight: string; topBottom: string }
+
+/** Our own centering measurement; a side that wasn't measured is null. */
+export type MeasuredCentering = { front: SideCentering | null; back: SideCentering | null }
+
+/** mostLikely is 0 before there's an assessment; a centering measurement can come first. */
+export type ConditionSummary = {
+  low: number
+  high: number
+  mostLikely: number
+  mayBeUngradable: boolean
+  holdingBack: string[]
+  centering: MeasuredCentering | null
+}
 
 export type CardStatus = {
   cardId: string

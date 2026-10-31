@@ -1,7 +1,9 @@
 package com.pokemans.app.condition;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.pokemans.app.TestApi;
 import com.pokemans.app.TestcontainersConfiguration;
@@ -66,6 +68,13 @@ class CenteringFlowTest {
         assertThat(jdbc.queryForObject(
                 "select status from prediction_request where card_item_id = ?::uuid and provider = 'RAWMARK_CENTERING'", String.class, cardId))
                 .isEqualTo("DONE");
+        // Measured but not assessed yet (the fake provider is still open): no grades, but the seller sees the ratios.
+        String seller = "/api/orgs/" + orgId + "/cards/" + cardId + "/status";
+        api.get(seller, collector)
+                .andExpect(jsonPath("$.condition.mostLikely").value(0))
+                .andExpect(jsonPath("$.condition.centering.front.leftRight").value(matchesPattern("\\d+/\\d+")))
+                .andExpect(jsonPath("$.condition.centering.back.topBottom").value(matchesPattern("\\d+/\\d+")));
+
         runWorker(); // fake: still working
         runWorker(); // fake: done, and the assessment is built from both
 
@@ -78,5 +87,17 @@ class CenteringFlowTest {
                 .andExpect(jsonPath("$.assessments[0].basis.centeringCap").value(10))
                 .andExpect(jsonPath("$.assessments[0].basis.providerGrades.RAWMARK_CENTERING").doesNotExist())
                 .andExpect(jsonPath("$.assessments[0].median").value("7"));
+
+        // The seller's view keeps the measurement beside the grades, and names no provider.
+        String view = api.get(seller, collector)
+                .andExpect(jsonPath("$.condition.mostLikely").value(org.hamcrest.Matchers.greaterThan(0)))
+                .andExpect(jsonPath("$.condition.centering.front.leftRight").exists())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(view).doesNotContain("RAWMARK_CENTERING", "FAKE");
+
+        // A reviewer's assessment doesn't hide it.
+        String reviewed = "{\"distribution\":{\"U\":0,\"7\":0.5,\"8\":0.5},\"confidence\":\"B\",\"reason\":\"Checked by hand\"}";
+        api.postJson(base + "/assessments", reviewed, api.admin()).andExpect(status().isCreated());
+        api.get(seller, collector).andExpect(jsonPath("$.condition.centering.front.leftRight").exists());
     }
 }

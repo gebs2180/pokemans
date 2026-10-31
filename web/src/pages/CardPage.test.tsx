@@ -102,12 +102,38 @@ describe('CardPage', () => {
     renderCard(card(), {
       ...status,
       stage: 'READY',
-      condition: { low: 7, high: 9, mostLikely: 8, mayBeUngradable: false, holdingBack: ['surface', 'centering'] },
+      condition: { low: 7, high: 9, mostLikely: 8, mayBeUngradable: false, holdingBack: ['surface', 'centering'], centering: null },
     })
     expect(await screen.findByText('PSA 7–9, most likely 8')).toBeInTheDocument()
     expect(screen.getByText('surface and centering', { exact: false })).toBeInTheDocument()
     expect(screen.getByText(/not a grade/)).toBeInTheDocument()
     expect(screen.queryByText(/may not be gradable/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/measured from your photos/)).not.toBeInTheDocument()
+  })
+
+  it('shows our measured centering per side, leaving out a side that was not measured', async () => {
+    const front = { leftRight: '49/51', topBottom: '48/52' }
+    renderCard(card(), {
+      ...status,
+      stage: 'READY',
+      condition: { low: 7, high: 9, mostLikely: 8, mayBeUngradable: false, holdingBack: [], centering: { front, back: null } },
+    })
+    const line = (await screen.findByText(/measured from your photos/)).closest('p')!
+    expect(line).toHaveTextContent('front 49/51 left-right, 48/52 top-bottom')
+    expect(line).not.toHaveTextContent('back')
+  })
+
+  it('shows both sides of a measurement before there is a likely grade', async () => {
+    const side = { leftRight: '52/48', topBottom: '46/54' }
+    renderCard(card(), {
+      ...status,
+      stage: 'ASSESSING',
+      condition: { low: 0, high: 0, mostLikely: 0, mayBeUngradable: false, holdingBack: [], centering: { front: side, back: side } },
+    })
+    const line = (await screen.findByText(/measured from your photos/)).closest('p')!
+    expect(line).toHaveTextContent('front 52/48 left-right, 46/54 top-bottom · back 52/48 left-right, 46/54 top-bottom')
+    expect(screen.queryByText(/Likely grade/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/not a grade/)).not.toBeInTheDocument()
   })
 
   it('hides Retake once the card is posted or sold', async () => {

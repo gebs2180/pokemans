@@ -24,7 +24,8 @@ class CardStatusService {
      * @param identity  the card as we identified it, e.g. "Charizard · Base Set 4/102 · EN · holo", or null
      * @param nextStep  what happens next, and who does it, in words for the seller
      * @param canOffer  true when asking for an offer can work right now
-     * @param condition the grades the card likely is, in our view, once we've assessed it; else null
+     * @param condition the grades the card likely is, in our view, once we've assessed it, and our centering
+     *                  measurement if there is one; else null
      */
     record CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer, Assessments.Summary condition) {
 
