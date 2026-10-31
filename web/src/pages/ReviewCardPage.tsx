@@ -541,7 +541,7 @@ type DamageTag = { name?: string; prob?: number }
 
 /**
  * Measured centering for one side: ratios as PSA writes them (left/right, top/bottom, first number the
- * left or top border's share), or why it wasn't measured. Ximilar and our own measurement both store it.
+ * left or top border's share), or why it wasn't measured.
  */
 type SideCentering = { leftRight?: string; topBottom?: string; unmeasured?: string }
 
@@ -554,16 +554,20 @@ function centeringText(side: string, c: SideCentering | undefined) {
 /**
  * One prediction: the overall grade with the front's sub-grades, then the back's when the provider
  * graded it separately, then any damage it flagged. The overall covers both sides and damage, so a low
- * back or a damage tag explains an overall well under the front's sub-grades.
+ * back or a damage tag explains an overall well under the front's sub-grades. Ximilar's centering is
+ * still stored but not shown: on real cards it read 42/58 where the borders are nearly even.
  */
 function PredictionRows({ p }: { p: Prediction }) {
   const back = p.details?.backGrades as SideGrades | undefined
   const damaged = p.details?.damaged as DamageTag | undefined
   const flagged = damaged?.name != null && damaged.name.toUpperCase() !== 'OK'
-  const centering = [
-    centeringText('front', p.details?.frontCentering as SideCentering | undefined),
-    centeringText('back', p.details?.backCentering as SideCentering | undefined),
-  ].filter((t) => t != null)
+  const showCentering = p.provider !== 'XIMILAR'
+  const centering = showCentering
+    ? [
+        centeringText('front', p.details?.frontCentering as SideCentering | undefined),
+        centeringText('back', p.details?.backCentering as SideCentering | undefined),
+      ].filter((t) => t != null)
+    : []
   const centeringCap = p.details?.psaCenteringCap as number | undefined
   return (
     <>
@@ -574,7 +578,7 @@ function PredictionRows({ p }: { p: Prediction }) {
         </td>
         <td>{p.overallGrade ?? '–'}</td>
         <td>{p.psaGrade ?? '–'}</td>
-        <td>{p.centering ?? '–'}</td>
+        <td>{showCentering ? (p.centering ?? '–') : '–'}</td>
         <td>{p.corners ?? '–'}</td>
         <td>{p.edges ?? '–'}</td>
         <td>{p.surface ?? '–'}</td>
@@ -585,7 +589,7 @@ function PredictionRows({ p }: { p: Prediction }) {
           <td className="muted small">{p.provider} · back</td>
           <td className="muted">{back.final ?? '–'}</td>
           <td />
-          <td>{back.centering ?? '–'}</td>
+          <td>{showCentering ? (back.centering ?? '–') : '–'}</td>
           <td>{back.corners ?? '–'}</td>
           <td>{back.edges ?? '–'}</td>
           <td>{back.surface ?? '–'}</td>

@@ -87,6 +87,37 @@ class CenteringMeasurerTest {
     }
 
     @Test
+    void oneSideMayRestOnThreePiecesWhenTheFrameFits() {
+        BufferedImage image = photo(new Borders(48, 48, 48, 48), 0, true);
+        drawUnevenFrame(image, true, 0);
+
+        CenteringMeasurer.Measured m = measured(measurer.measure(png(image)));
+
+        assertThat(m.leftShare()).isCloseTo(50, within(TOLERANCE));
+        assertThat(m.fewestPieces()).isEqualTo(3);
+    }
+
+    @Test
+    void twoSidesOnThreePiecesAreUnmeasured() {
+        BufferedImage image = photo(new Borders(48, 48, 48, 48), 0, true);
+        drawUnevenFrame(image, true, 0);
+        drawUnevenFrame(image, false, 0);
+
+        assertThat(measurer.measure(png(image))).isInstanceOf(CenteringMeasurer.Unmeasured.class);
+    }
+
+    @Test
+    void aSideOnThreePiecesThatDoesNotFitTheFrameIsUnmeasured() {
+        BufferedImage image = photo(new Borders(48, 48, 48, 48), 0, true);
+        drawUnevenFrame(image, true, 20);
+
+        CenteringMeasurer.Result result = measurer.measure(png(image));
+
+        assertThat(result).isInstanceOf(CenteringMeasurer.Unmeasured.class);
+        assertThat(((CenteringMeasurer.Unmeasured) result).reason()).contains("right border isn't straight");
+    }
+
+    @Test
     void aPhotoWithNoCardIsUnmeasured() {
         CenteringMeasurer.Result result = measurer.measure(png(background(1600, 2200)));
 
@@ -136,6 +167,27 @@ class CenteringMeasurerTest {
             g.dispose();
         }
         return image;
+    }
+
+    /**
+     * Widens the border of one side of an unturned {@link #photo} in steps over the upper five of the
+     * side's eight pieces, so no two of them agree, and by {@code rest} over the lower three.
+     */
+    private static void drawUnevenFrame(BufferedImage image, boolean right, int rest) {
+        int top = 1100 - CARD_HEIGHT / 2;
+        int from = top + CARD_HEIGHT / 10;
+        int piece = (CARD_HEIGHT * 8 / 10) / 8;
+        int[] extras = {30, 65, 100, 135, 170, rest, rest, rest};
+        Graphics2D g = image.createGraphics();
+        try {
+            g.setColor(new Color(0xF2C230));
+            for (int i = 0; i < extras.length; i++) {
+                int x = right ? 800 + CARD_WIDTH / 2 - 48 - extras[i] : 800 - CARD_WIDTH / 2 + 48;
+                g.fillRect(x, from + i * piece, extras[i], piece + 1);
+            }
+        } finally {
+            g.dispose();
+        }
     }
 
     /** A full-art card: overlapping shapes of many colours and sizes right up to the card's edge. */

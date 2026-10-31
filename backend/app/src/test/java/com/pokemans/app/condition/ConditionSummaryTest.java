@@ -67,8 +67,8 @@ class ConditionSummaryTest {
     @Test
     void holdingBackTakesEachPartsLowestScoreAcrossProvidersUpToTwo() {
         List<ProviderPrediction> latest = List.of(
-                prediction("XIMILAR", 8.0, 9.0, 9.5, 7.0),
-                prediction("CARDGRADE", 9.5, 8.5, 9.0, 9.0));
+                prediction("XIMILAR", null, 9.0, 9.5, 7.0),
+                prediction("CARDGRADE", 8.0, 8.5, 9.0, 9.0));
 
         Assessments.Summary s = Assessments.summarize(dist(Grade.G8, "1"), latest);
 
@@ -148,17 +148,25 @@ class ConditionSummaryTest {
 
     @Test
     void ourFrontMeasurementReplacesOtherProvidersCenteringScores() {
-        List<ProviderPrediction> latest = List.of(prediction("XIMILAR", 7.0, 9.0, 9.0, 9.0), measured(10, EVEN, EVEN));
+        List<ProviderPrediction> latest = List.of(prediction("CARDGRADE", 7.0, 9.0, 9.0, 9.0), measured(10, EVEN, EVEN));
 
-        // Ximilar's 7 would say centering holds it back, beside ratios that say it doesn't.
+        // CardGrade's 7 would say centering holds it back, beside ratios that say it doesn't.
         assertThat(Assessments.summarize(dist(Grade.G8, "1"), latest).holdingBack()).isEmpty();
     }
 
     @Test
     void withoutAFrontMeasurementOtherProvidersScoresStillCount() {
-        List<ProviderPrediction> latest = List.of(prediction("XIMILAR", 7.0, 9.0, 9.0, 9.0), measured(10, UNMEASURED, EVEN));
+        List<ProviderPrediction> latest = List.of(prediction("CARDGRADE", 7.0, 9.0, 9.0, 9.0), measured(10, UNMEASURED, EVEN));
 
         assertThat(Assessments.summarize(dist(Grade.G8, "1"), latest).holdingBack()).containsExactly("centering");
+    }
+
+    @Test
+    void ximilarsCenteringNeverHoldsTheCardBack() {
+        List<ProviderPrediction> latest = List.of(prediction("XIMILAR", 7.0, 9.0, 9.0, 9.0), measured(10, UNMEASURED, EVEN));
+
+        assertThat(Assessments.summarize(dist(Grade.G8, "1"), latest).holdingBack()).isEmpty();
+        assertThat(Assessments.summarize(dist(Grade.G8, "1"), List.of(latest.getFirst())).holdingBack()).isEmpty();
     }
 
     @Test
