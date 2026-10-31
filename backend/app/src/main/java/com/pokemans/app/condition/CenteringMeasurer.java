@@ -32,7 +32,9 @@ import org.opencv.imgproc.Imgproc;
  *       front, the navy border meeting the swirl on the back) is printed straight, so it adds up to a
  *       sharp peak, while art, foil sparkle and uneven lighting average out. The first strong peak
  *       after a plain stretch is the border's width. The side is done in eight pieces, most of which
- *       must agree, so a symbol printed over the border doesn't spoil it.</li>
+ *       must agree, so a symbol printed over the border doesn't spoil it. One side alone may rest on
+ *       fewer pieces (foil sparkle can hide its edge along much of the side), as long as the frame it
+ *       makes fits the other three.</li>
  * </ol>
  *
  * Anything not clear-cut comes back {@link Unmeasured} with a reason instead of a guess: no plain
@@ -60,6 +62,13 @@ final class CenteringMeasurer {
      */
     private static final int SEGMENTS = 8;
     private static final int AGREEING = 5;
+    /**
+     * The fewest agreeing pieces one side may rest on, taking the group nearest the card's edge. Full
+     * art gets this many by chance on a side, so it only counts with the other three sides firm.
+     */
+    private static final int FEW_AGREEING = 3;
+    /** How far left + right may be from top + bottom when a side rests on few pieces: a printed frame's are about equal. */
+    private static final double FRAME_MATCH = 0.10;
     /**
      * How far apart (0.2 mm) pieces may be and still agree: a card that isn't quite flat, or the phone
      * lens, bows the printed edge by about this much against the straight cut.
@@ -90,8 +99,9 @@ final class CenteringMeasurer {
      * Border widths in pixels of the straightened card ({@link #PX_PER_MM} per mm).
      *
      * @param spreadPx the most the agreeing pieces of any side differed by: how straight the inner edge was
+     * @param fewestPieces the fewest pieces that agreed on any side, of {@link #SEGMENTS}
      */
-    record Measured(double left, double right, double top, double bottom, double spreadPx) implements Result {
+    record Measured(double left, double right, double top, double bottom, double spreadPx, int fewestPieces) implements Result {
 
         /** Left border's share of left + right, in percent: 55 means 55/45. */
         double leftShare() {
@@ -111,6 +121,15 @@ final class CenteringMeasurer {
     }
 
     record Unmeasured(String reason) implements Result {
+    }
+
+    /**
+     * One side's border.
+     *
+     * @param pieces how many pieces agreed
+     * @param doubt why too few pieces agreed to trust this side alone, null when enough did
+     */
+    private record InnerEdge(double width, double spreadPx, int pieces, String doubt) {
     }
 
     private enum Side {
@@ -194,14 +213,20 @@ final class CenteringMeasurer {
 
             double[] widths = new double[4];
             double spread = 0;
+            int fewest = SEGMENTS;
+            List<String> doubts = new ArrayList<>();
             for (Side side : Side.values()) {
                 Object border = innerEdge(cardLab, side);
                 if (border instanceof String reason) {
                     return new Unmeasured(reason);
                 }
-                double[] found = (double[]) border;
-                widths[side.ordinal()] = found[0];
-                spread = Math.max(spread, found[1]);
+                InnerEdge edge = (InnerEdge) border;
+                widths[side.ordinal()] = edge.width();
+                spread = Math.max(spread, edge.spreadPx());
+                fewest = Math.min(fewest, edge.pieces());
+                if (edge.doubt() != null) {
+                    doubts.add(edge.doubt());
+                }
             }
             double across = widths[0] + widths[1];
             double down = widths[2] + widths[3];
@@ -209,7 +234,10 @@ final class CenteringMeasurer {
                 return new Unmeasured("left + right (%.1f mm) and top + bottom (%.1f mm) borders are too different to be one printed frame"
                         .formatted(across / PX_PER_MM, down / PX_PER_MM));
             }
-            return new Measured(widths[0], widths[1], widths[2], widths[3], spread);
+            if (doubts.size() > 1 || (doubts.size() == 1 && Math.abs(across / down - 1) > FRAME_MATCH)) {
+                return new Unmeasured(doubts.getFirst());
+            }
+            return new Measured(widths[0], widths[1], widths[2], widths[3], spread, fewest);
         } finally {
             owned.forEach(Mat::release);
         }
@@ -308,7 +336,7 @@ final class CenteringMeasurer {
      * it adds up to a sharp peak in every piece, while art, foil sparkle and lighting don't. The
      * border's inner edge is the first strong peak in from the card's edge; the pieces must agree.
      *
-     * @return {width, spread between the agreeing pieces} in pixels, or a reason it couldn't be measured
+     * @return the {@link InnerEdge}, or a reason it couldn't be measured
      */
     private static Object innerEdge(Lab lab, Side side) {
         int length = side.vertical() ? CARD_HEIGHT : CARD_WIDTH;
@@ -337,23 +365,28 @@ final class CenteringMeasurer {
             return "no clear inner edge of the %s border (borderless or full-art card, glare or a sleeve; found in %d of %d pieces)"
                     .formatted(side.label(), found.length, SEGMENTS);
         }
-        // The largest group of pieces within BOW_PX of one of them; two groups that size is no answer.
+        // The largest group of pieces within BOW_PX of one of them, and the group of a few nearest the edge.
         double[] agreeing = new double[0];
-        boolean tied = false;
+        double[] nearest = null;
         for (double centre : found) {
             double[] group = Arrays.stream(found).filter(p -> Math.abs(p - centre) <= BOW_PX).toArray();
             if (group.length > agreeing.length) {
                 agreeing = group;
-                tied = false;
-            } else if (group.length == agreeing.length && group[0] > agreeing[agreeing.length - 1]) {
-                tied = true;
+            }
+            if (nearest == null && group.length >= FEW_AGREEING) {
+                nearest = group;
             }
         }
-        if (agreeing.length < AGREEING || tied) {
-            return "the inner edge of the %s border isn't straight along the side (%d of %d pieces agree, from %.0f to %.0f px)"
-                    .formatted(side.label(), agreeing.length, SEGMENTS, found[0], found[found.length - 1]);
+        if (agreeing.length >= AGREEING) {
+            return innerEdge(agreeing, null);
         }
-        return new double[] {percentile(agreeing, 0.5), agreeing[agreeing.length - 1] - agreeing[0]};
+        String doubt = "the inner edge of the %s border isn't straight along the side (%d of %d pieces agree, from %.0f to %.0f px)"
+                .formatted(side.label(), agreeing.length, SEGMENTS, found[0], found[found.length - 1]);
+        return nearest == null ? doubt : innerEdge(nearest, doubt);
+    }
+
+    private static InnerEdge innerEdge(double[] pieces, String doubt) {
+        return new InnerEdge(percentile(pieces, 0.5), pieces[pieces.length - 1] - pieces[0], pieces.length, doubt);
     }
 
     /**

@@ -24,7 +24,7 @@ class CenteringPreGradeProvider implements PreGradeProvider.Local {
 
     static final String NAME = "RAWMARK_CENTERING";
     /** Bump when the method changes, so stored measurements can be told apart. */
-    static final String VERSION = "centering-1";
+    static final String VERSION = "centering-2";
 
     private final CenteringMeasurer measurer;
     private final double margin;
@@ -82,6 +82,7 @@ class CenteringPreGradeProvider implements PreGradeProvider.Local {
                 out.put("bordersMm", mm);
                 out.put("pxPerMm", CenteringMeasurer.PX_PER_MM);
                 out.put("spreadPx", round(m.spreadPx(), 1));
+                out.put("fewestPieces", m.fewestPieces());
             }
             case CenteringMeasurer.Unmeasured u -> out.put("unmeasured", u.reason());
         }

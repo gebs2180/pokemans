@@ -57,8 +57,20 @@ describe('Predictions', () => {
       />,
     )
     const back = screen.getByText('XIMILAR · back').closest('tr')!
-    expect(back).toHaveTextContent('2932.52')
+    expect(back).toHaveTextContent('2–32.52')
     expect(screen.getByText(/Damage check: Crease \(91% sure\)/)).toHaveTextContent('caps the overall grade')
+  })
+
+  it("doesn't show Ximilar's centering", () => {
+    render(
+      <Predictions
+        data={{ ...card, predictions: [prediction({ frontCentering: { leftRight: '42/58', topBottom: '54/46' } })] }}
+        base="/b"
+        onChange={() => {}}
+      />,
+    )
+    expect(screen.queryByText(/42\/58/)).not.toBeInTheDocument()
+    expect(screen.getByText('XIMILAR').closest('tr')).toHaveTextContent('2.5––986')
   })
 
   it('shows measured centering per side and the grade it allows, or why a side was not measured', () => {

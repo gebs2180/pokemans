@@ -179,6 +179,7 @@ public class Assessments {
      * the likely range: a cap of 8 doesn't hold back a card that is likely a 5. When the front was
      * measured, the measurement replaces the scores, so the seller is never told centering holds the
      * card back beside ratios that say otherwise. The back alone can't: the front limits most grades.
+     * Ximilar's centering never counts: on real cards it read 42/58 where the borders are nearly even.
      */
     private static Double centeringLimit(List<ProviderPrediction> latest, int high) {
         Optional<ProviderPrediction> own = latest.stream().filter(Assessments::isOwnMeasurement).findFirst();
@@ -186,7 +187,8 @@ public class Assessments {
         if (own.isPresent() && side(own.get().getDetails(), "frontCentering") != null) {
             return cap;
         }
-        Double score = latest.stream().filter(p -> !isOwnMeasurement(p)).map(ProviderPrediction::getCentering)
+        Double score = latest.stream().filter(p -> !isOwnMeasurement(p) && !p.getProvider().equals(XimilarPreGradeProvider.NAME))
+                .map(ProviderPrediction::getCentering)
                 .filter(Objects::nonNull).min(Double::compare).orElse(null);
         return Stream.of(cap, score).filter(Objects::nonNull).min(Double::compare).orElse(null);
     }
