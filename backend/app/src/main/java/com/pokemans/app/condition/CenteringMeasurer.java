@@ -159,7 +159,8 @@ final class CenteringMeasurer {
     }
 
     Result measure(byte[] imageBytes) {
-        Mat image = Imgcodecs.imdecode(new MatOfByte(imageBytes), Imgcodecs.IMREAD_COLOR);
+        MatOfByte encoded = new MatOfByte(imageBytes);
+        Mat image = Imgcodecs.imdecode(encoded, Imgcodecs.IMREAD_COLOR);
         try {
             if (image.empty()) {
                 return new Unmeasured("the photo doesn't decode");
@@ -168,6 +169,7 @@ final class CenteringMeasurer {
                     .orElseGet(() -> new Unmeasured("no whole card found in the photo"));
         } finally {
             image.release();
+            encoded.release();
         }
     }
 

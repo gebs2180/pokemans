@@ -58,7 +58,7 @@ Compose sets these from `deploy/.env`; another host would set them directly.
 | `STORAGE_PUBLIC_ENDPOINT` | no | Only if browsers must use a different endpoint than the app. Then set the Caddy container's `PHOTO_ORIGIN` to it too, or the Content-Security-Policy blocks photos |
 | `STORAGE_REGION` | no | Default `auto` (R2) |
 | `SENTRY_DSN`, `SENTRY_ENVIRONMENT` | no | Without a DSN, Sentry is off |
-| `CARD_READER_ENABLED` + `ANTHROPIC_API_KEY`, `EASYPOST_ENABLED` + `EASYPOST_API_KEY`, `XIMILAR_*`, `CARDGRADE_*`, `PRICING_INGESTION_ENABLED`, `COLLATERAL_ENABLED` | no | Feature switches, all off by default (`docs/local-dev.md`) |
+| `CARD_READER_ENABLED` + `ANTHROPIC_API_KEY`, `EASYPOST_ENABLED` + `EASYPOST_API_KEY`, `XIMILAR_*`, `CARDGRADE_*`, `CENTERING_ENABLED`, `PRICING_INGESTION_ENABLED`, `COLLATERAL_ENABLED` | no | Feature switches, all off by default (`docs/local-dev.md`) |
 
 Web build args (baked into the bundle, not secrets): `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, `VITE_COLLATERAL_ENABLED`.
 

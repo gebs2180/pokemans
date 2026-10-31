@@ -44,7 +44,7 @@ Browsers only allow camera capture and PWA install on `https` or `localhost`. Ov
 1. As a collector or partner, capture a card's front and back. Photos now need the whole card in frame, with a little space around it. Cut-off, too-small and blurry cards get a retake reason.
 2. As ADMIN, open **Admin → Review queue** and pick the card.
 3. **Identity:** search TCGdex by name, and optionally number, then pick the print, edition, finish, stamp and promo, and confirm. If a card isn't listed, enter it by hand.
-4. **Condition:** with no provider enabled, enter the distribution by hand (percentages per grade, plus a reason). Each save is a new version.
+4. **Condition:** with no grading provider enabled (centering alone gives no grade), enter the distribution by hand (percentages per grade, plus a reason). Each save is a new version.
 5. **Contributors:** create a *Contributor* org and invite someone. They accept the data-use terms, add a card with raw front and back photos, then the grader, cert and grade. Check the cert under **Admin → Graded results to check**.
 
 ### Pre-grading providers

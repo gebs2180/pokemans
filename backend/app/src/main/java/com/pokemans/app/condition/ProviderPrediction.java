@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -86,13 +87,24 @@ class ProviderPrediction {
         return psaGrade != null ? psaGrade : overallGrade;
     }
 
+    /** Each provider's newest successful answer, from predictions newest first. */
+    static Map<String, ProviderPrediction> latestSucceeded(List<ProviderPrediction> newestFirst) {
+        Map<String, ProviderPrediction> latest = new LinkedHashMap<>();
+        newestFirst.stream().filter(ProviderPrediction::isSucceeded).forEach(p -> latest.putIfAbsent(p.provider, p));
+        return latest;
+    }
+
+    /** Our own centering measurement, as opposed to a provider's opinion of the card. */
+    boolean isOwnMeasurement() {
+        return CenteringPreGradeProvider.NAME.equals(provider);
+    }
+
     /**
-     * The best grade this reading's centering allows, when the reading is centering only (our own
-     * measurement): no overall grade, just a centering grade. Null for every full reading, whose
-     * centering sub-grade is already part of its overall grade.
+     * The best grade this reading's centering allows. Only our own measurement gives one: anyone
+     * else's centering is a sub-grade, already part of its overall grade, even if that overall is missing.
      */
     Integer centeringCap() {
-        return succeeded && gradeForDistribution() == null && centering != null ? (int) Math.floor(centering) : null;
+        return succeeded && isOwnMeasurement() && centering != null ? (int) Math.floor(centering) : null;
     }
 
     UUID getId() {

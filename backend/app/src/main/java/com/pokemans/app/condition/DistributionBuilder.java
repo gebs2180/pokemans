@@ -43,10 +43,6 @@ final class DistributionBuilder {
      * @param centeringCap       the best grade measured centering allows, or null when it wasn't measured
      */
     record Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, boolean modernHolo, Integer centeringCap) {
-
-        Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, boolean modernHolo) {
-            this(providerGrades, wholeCardInPhotos, modernHolo, null);
-        }
     }
 
     record Result(GradeDistribution distribution, Confidence confidence, Map<String, Object> basis) {

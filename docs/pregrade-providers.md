@@ -65,7 +65,7 @@ Every accuracy figure below is self-reported on the vendor's own blog. There is 
 
 ## Recommendation
 
-- **Provider A: Ximilar.** Its terms fit and it doesn't keep our photos.
+- **Provider A: Ximilar.** Its terms fit, and it removes our photos after a week. It's being turned off on prod (Zach, 2026-10-31).
 - **Provider B: CardGrade.io.** Its terms don't restrict our use of results, and it gives the richest output (PSA/BGS/CGC predictions, limiting factor, zone scores). Opt out of training before sending partner photos. Start on Pro ($24.99) for the controlled set before paying for an API tier.
 - **Before M2 stores production data:** email both to confirm the rights listed above. Ximilar confirmed on 2026-10-30; CardGrade.io has not replied yet.
 - **Dropped:** CardGrader.AI (§4 bans storing and training). CardMintAI unless it clarifies output rights in writing.
@@ -88,5 +88,7 @@ The first step towards our own grader. It runs in the app, so there are no terms
 - **What collectors see:** the rounded ratios per measured side on the card page, from this measurement only. No other provider's numbers or names reach them.
 - **When it runs:** when a card first has a passing front and back, and again when a retake of either passes. A retake doesn't ask the paid providers; they wait for "Ask again".
 - **Ximilar's centering isn't used (Zach, 2026-10-31):** on a Metagross front with nearly even borders it read 42/58 and 44/56 against about 48/52 measured. Its score and ratios are stored but no longer reach the review page or "Holding it back". Its overall grade still includes centering and is used as it comes: recomputing it without centering could raise a card.
-- **When it says nothing:** full-art and borderless cards, glare, sleeves, borders under about 0.6 mm, and cards whose inner edge isn't found come back "not measured" with the reason. A side's inner edge needs 5 of 8 pieces to agree; one side alone may rest on 3 if the other three are firm and left + right is within 10% of top + bottom. A side that isn't measured doesn't limit the cap.
+- **When it says nothing:** full-art and borderless cards, glare, sleeves, borders under about 0.6 mm, and cards whose inner edge isn't found come back "not measured" with the reason. A side's inner edge has to show in at least 5 of 8 pieces, and 5 must agree; one side alone may rest on 3 that agree if the other three are firm and left + right is within 10% of top + bottom. A side that isn't measured doesn't limit the cap.
+- **Refusals and the cap:** when a retake can't be measured at all, the seller stops seeing the older ratios, since they came from a photo that's no longer in use. The older cap still applies to the distribution: dropping it would raise the card, and an unmeasurable photo says nothing about its centering.
+- **With no grading provider on:** centering gives no grade, so there's nothing to build a system distribution from. The reviewer enters it by hand, and the cap doesn't apply to what they save: the review page warns when it goes above the cap.
 - **Calibration:** `RealPhotoCenteringTest` with `POKEMANS_REAL_PHOTOS=<folder>` prints the ratios and writes each straightened card with the measured lines drawn on it.

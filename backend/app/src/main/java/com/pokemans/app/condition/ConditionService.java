@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -94,8 +94,8 @@ class ConditionService {
     }
 
     /**
-     * Queues one request per enabled provider that has nothing open for this card, using the latest
-     * passing front and back. Returns the requests created (empty if none are enabled).
+     * Asks every enabled provider that has nothing open for this card. Returns the requests created
+     * (empty if none are enabled).
      */
     @Transactional
     List<PredictionRequest> requestPredictions(UUID orgId, UUID cardId) {
@@ -106,6 +106,7 @@ class ConditionService {
         return enqueue(card, currentUser.id(), enabledProviders);
     }
 
+    /** One request per named provider with nothing open for this card, using the latest passing front and back. */
     private List<PredictionRequest> enqueue(CardItems.CardItemRef card, UUID requestedBy, List<String> providers) {
         List<CardItems.PhotoRef> photos = cardItems.passedPhotos(card.id());
         Optional<CardItems.PhotoRef> front = latest(photos, "FRONT");
@@ -131,6 +132,23 @@ class ConditionService {
             events.publishEvent(new PredictionsQueued(card.id()));
         }
         return created;
+    }
+
+    /**
+     * A retake that passed while a centering request was still open wasn't queued: that request measured
+     * the photos it started with, so measure the ones in use now.
+     */
+    @Transactional
+    void measureRetakeMissedBy(PredictionRequest finished) {
+        if (!finished.getProvider().equals(CenteringPreGradeProvider.NAME) || !enabledProviders.contains(CenteringPreGradeProvider.NAME)) {
+            return;
+        }
+        List<CardItems.PhotoRef> photos = cardItems.passedPhotos(finished.getCardItemId());
+        List<UUID> inUse = Stream.of(latest(photos, "FRONT"), latest(photos, "BACK"))
+                .flatMap(Optional::stream).map(CardItems.PhotoRef::id).toList();
+        if (inUse.size() == 2 && !inUse.equals(finished.getPhotoIds())) {
+            enqueue(cardItems.get(finished.getCardItemId()), null, List.of(CenteringPreGradeProvider.NAME));
+        }
     }
 
     /**
@@ -182,6 +200,11 @@ class ConditionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No provider has graded this card yet"));
     }
 
+    /**
+     * A later centering refusal doesn't lift the cap: an unmeasurable photo says nothing about the card,
+     * and dropping the cap would raise it, so a glare-ridden retake could beat a measurement. The seller
+     * stops seeing the older ratios, though (Assessments#summary): they're no longer from the photo in use.
+     */
     private Optional<ConditionAssessment> build(UUID cardId, ConditionAssessment current) {
         CardItems.CardItemRef card = cardItems.get(cardId);
         Map<String, ProviderPrediction> latest = latestSuccessful(cardId);
@@ -257,9 +280,7 @@ class ConditionService {
     }
 
     private Map<String, ProviderPrediction> latestSuccessful(UUID cardId) {
-        return predictions.findByCardItemIdOrderByCreatedAtDesc(cardId).stream()
-                .filter(ProviderPrediction::isSucceeded)
-                .collect(Collectors.toMap(ProviderPrediction::getProvider, p -> p, (newer, older) -> newer, LinkedHashMap::new));
+        return ProviderPrediction.latestSucceeded(predictions.findByCardItemIdOrderByCreatedAtDesc(cardId));
     }
 
     static Optional<CardItems.PhotoRef> latest(List<CardItems.PhotoRef> photos, String side) {

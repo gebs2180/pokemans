@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import type { CardStatus, CardView, ContainerDetail, PhotoView } from '../api'
 import { respond } from '../test/auth0'
-import { CardPage } from './CardPage'
+import { CardPage, LikelyGrade } from './CardPage'
 import { ContainerPage } from './ContainerPage'
 
 const photo = (over: Partial<PhotoView>): PhotoView => ({
@@ -192,5 +192,17 @@ describe('ContainerPage', () => {
     await user.click(screen.getByRole('button', { name: 'Add card' }))
     expect(await screen.findByText('Card page')).toBeInTheDocument()
     expect(posts).toEqual([{ label: 'Mew 151/165', lot: false, quantity: 1 }])
+  })
+})
+
+describe('LikelyGrade', () => {
+  it('still warns about a card with no grade but a chance of being ungradable', () => {
+    render(<LikelyGrade condition={{ low: 0, high: 0, mostLikely: 0, mayBeUngradable: true, holdingBack: [], centering: null }} />)
+    expect(screen.getByText(/may not be gradable/)).toBeInTheDocument()
+  })
+
+  it('shows nothing with no grade, no measurement and no doubt', () => {
+    const { container } = render(<LikelyGrade condition={{ low: 0, high: 0, mostLikely: 0, mayBeUngradable: false, holdingBack: [], centering: null }} />)
+    expect(container).toBeEmptyDOMElement()
   })
 })

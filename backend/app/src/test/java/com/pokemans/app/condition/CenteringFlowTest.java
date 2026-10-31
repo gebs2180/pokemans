@@ -111,6 +111,10 @@ class CenteringFlowTest {
         runWorker();
         assertThat(requests(cardId, "RAWMARK_CENTERING")).isEqualTo(1);
 
+        // A close-up isn't what centering is measured on.
+        api.uploadPhoto(orgId, cardId, "DETAIL", TestImages.goodRetake(4), collector).andExpect(jsonPath("$.status").value("PASSED"));
+        assertThat(requests(cardId, "RAWMARK_CENTERING")).isEqualTo(1);
+
         // A retake that fails its check isn't the photo in use, so there is nothing new to measure.
         api.uploadPhoto(orgId, cardId, "FRONT", "not a photo".getBytes(), collector).andExpect(jsonPath("$.status").value("RETAKE"));
         assertThat(requests(cardId, "RAWMARK_CENTERING")).isEqualTo(1);
@@ -125,6 +129,31 @@ class CenteringFlowTest {
                 select photo_ids->>0 from prediction_request
                 where card_item_id = ?::uuid and provider = 'RAWMARK_CENTERING' order by created_at desc limit 1
                 """, String.class, cardId)).isEqualTo(retakeId);
+    }
+
+    @Test
+    void aRetakeThatPassesWhileCenteringIsOpenIsMeasuredOnceThatFinishes() throws Exception {
+        JwtRequestPostProcessor collector = api.user("auth0|centering-race", List.of());
+        String orgId = api.collectorOrg("Centering Race", "auth0|centering-race");
+        String cardId = api.card(orgId, "Quickly retaken card", collector);
+        api.uploadPhoto(orgId, cardId, "FRONT", TestImages.goodFront(), collector).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, cardId, "BACK", TestImages.goodBack(), collector).andExpect(jsonPath("$.status").value("PASSED"));
+
+        // The first measurement hasn't run yet, so the retake can't queue its own.
+        String retake = api.uploadPhoto(orgId, cardId, "BACK", TestImages.goodRetake(2), collector)
+                .andExpect(jsonPath("$.status").value("PASSED"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(requests(cardId, "RAWMARK_CENTERING")).isEqualTo(1);
+
+        runWorker();
+        assertThat(requests(cardId, "RAWMARK_CENTERING")).isEqualTo(2);
+        assertThat(jdbc.queryForObject("""
+                select photo_ids->>1 from prediction_request
+                where card_item_id = ?::uuid and provider = 'RAWMARK_CENTERING' order by created_at desc limit 1
+                """, String.class, cardId)).isEqualTo(com.jayway.jsonpath.JsonPath.<String>read(retake, "$.id"));
+
+        runWorker(); // that one measures the photos in use, so nothing more is queued
+        assertThat(requests(cardId, "RAWMARK_CENTERING")).isEqualTo(2);
     }
 
     private int requests(String cardId, String provider) {
