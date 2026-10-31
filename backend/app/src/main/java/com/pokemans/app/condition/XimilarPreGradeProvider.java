@@ -16,7 +16,8 @@ import org.springframework.web.client.RestClient;
 /**
  * <a href="https://docs.ximilar.com/collectibles/card-grading">Ximilar card grading</a> through its
  * asynchronous request API: front and back in one job (100 credits), which Ximilar weights 70/30.
- * Inference images are processed in memory and not stored by Ximilar (its terms, 2026-10-16).
+ * Ximilar keeps the images for a week so we can see its visualization, then removes them
+ * (docs/pregrade-providers.md).
  */
 @Component
 @ConditionalOnBooleanProperty("pokemans.condition.ximilar.enabled")
@@ -103,7 +104,10 @@ class XimilarPreGradeProvider implements PreGradeProvider {
         if (overall == null) {
             Double frontFinal = number(frontGrades.get("final"));
             Double backFinal = number(backGrades.get("final"));
-            overall = backFinal == null ? frontFinal : 0.7 * frontFinal + 0.3 * backFinal;
+            overall = frontFinal;
+            if (frontFinal != null && backFinal != null) {
+                overall = 0.7 * frontFinal + 0.3 * backFinal;
+            }
         }
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("condition", frontGrades.get("condition"));

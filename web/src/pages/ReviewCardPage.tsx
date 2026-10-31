@@ -27,6 +27,8 @@ import { ProvenancePanel } from './ProvenancePanel'
 
 const EDITIONS: Edition[] = ['UNLIMITED', 'FIRST_EDITION', 'SHADOWLESS']
 const VARIANTS: Variant[] = ['NORMAL', 'HOLO', 'REVERSE_HOLO']
+/** Our own centering measurement: it caps the distribution, but gives no grade to build one from. */
+const OWN_CENTERING = 'RAWMARK_CENTERING'
 /** Lender and insurer features are paused unless the build turns them on. */
 const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
 const RISK_EFFECT = COLLATERAL ? 'zero collateral until verified' : 'its offer is subject to authentication in hand'
@@ -462,6 +464,7 @@ export function Predictions({ data, base, onChange }: { data: CardCondition; bas
   const [err, setErr] = useState<string | null>(null)
   const open = data.requests.filter((r) => r.status === 'PENDING' || r.status === 'SUBMITTED')
   const failed = data.requests.filter((r) => r.status === 'FAILED')
+  const grading = data.enabledProviders.filter((p) => p !== OWN_CENTERING)
   // Providers answer in the background: check every 2 s while a request is open.
   usePoll(open.length > 0, onChange)
 
@@ -483,6 +486,7 @@ export function Predictions({ data, base, onChange }: { data: CardCondition; bas
       ) : (
         <p className="muted">
           Enabled: {data.enabledProviders.join(', ')}.{' '}
+          {grading.length === 0 && 'It only measures centering, so enter the distribution by hand below. '}
           {open.length > 0 ? `Waiting on ${open.map((r) => r.provider).join(', ')}.` : ''}{' '}
           <button className="link" onClick={ask}>
             Ask again
@@ -644,6 +648,8 @@ export function AssessmentPanel({
   const total = OUTCOMES.reduce((sum, o) => sum + (Number(values[o]) || 0), 0)
   const totalOk = Math.abs(total - 100) < 0.001
   const noCloseUp = modernHoloWithoutCloseUp(data)
+  const cap = centeringCap(data)
+  const overCap = cap == null ? 0 : OUTCOMES.reduce((sum, o) => sum + (Number(o) > cap ? Number(values[o]) || 0 : 0), 0)
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -719,11 +725,17 @@ export function AssessmentPanel({
               it, so confidence A needs one: pick B or lower, or ask the collector for a close-up.
             </p>
           )}
+          {overCap > 0 && (
+            <p className="warn small" role="note">
+              Measured centering allows PSA {cap} at best, and this puts {Math.round(overCap * 10) / 10}% above it. A saved distribution
+              isn't capped for you.
+            </p>
+          )}
           <div className="row">
             <button type="submit" disabled={busy || !totalOk}>
               Save version
             </button>
-            {data.predictions.some((p) => p.succeeded) && (
+            {data.predictions.some((p) => p.succeeded && (p.overallGrade ?? p.psaGrade) != null) && (
               <button type="button" className="link" onClick={rebuild}>
                 Rebuild from provider answers instead
               </button>
@@ -749,6 +761,12 @@ export function AssessmentPanel({
       )}
     </section>
   )
+}
+
+/** The cap a rebuild would use: our latest successful measurement. A later refusal doesn't lift it. Predictions come newest first. */
+function centeringCap(data: CardCondition) {
+  const measured = data.predictions.find((p) => p.provider === OWN_CENTERING && p.succeeded)
+  return measured?.centering ?? null
 }
 
 /** End of the WotC era (AuthenticityRisk.END_OF_WOTC_ERA): holos after it get the default surface shift. */

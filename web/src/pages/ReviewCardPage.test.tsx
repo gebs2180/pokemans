@@ -42,7 +42,71 @@ describe('AssessmentPanel', () => {
   })
 })
 
+const measured = (cap: number, over: Partial<Prediction> = {}): Prediction => ({
+  id: 'own', provider: 'RAWMARK_CENTERING', modelVersion: 'centering-2', succeeded: true, overallGrade: null, psaGrade: null,
+  centering: cap, corners: null, edges: null, surface: null, details: {}, error: null, latencyMs: 1, createdAt: '2026-10-28T22:17:19Z',
+  ...over,
+})
+
+describe('AssessmentPanel with no grading provider', () => {
+  it("doesn't offer a rebuild from centering alone, which has no grade to build from", async () => {
+    const user = userEvent.setup()
+    render(<AssessmentPanel data={{ ...card, predictions: [measured(8)] }} current={null} base="/b" onChange={() => {}} />)
+    await user.click(screen.getByText('Adjust (saves a new version)'))
+    expect(screen.queryByRole('button', { name: /Rebuild/ })).not.toBeInTheDocument()
+  })
+
+  it('offers the rebuild once a provider has given a grade', async () => {
+    const user = userEvent.setup()
+    const graded: Prediction = { ...measured(8), id: 'x', provider: 'XIMILAR', overallGrade: 8.5, centering: null }
+    render(<AssessmentPanel data={{ ...card, predictions: [graded] }} current={null} base="/b" onChange={() => {}} />)
+    await user.click(screen.getByText('Adjust (saves a new version)'))
+    expect(screen.getByRole('button', { name: /Rebuild/ })).toBeInTheDocument()
+  })
+
+  async function enterNine(predictions: Prediction[]) {
+    const user = userEvent.setup()
+    render(<AssessmentPanel data={{ ...card, predictions }} current={null} base="/b" onChange={() => {}} />)
+    await user.click(screen.getByText('Adjust (saves a new version)'))
+    const nine = screen.getByLabelText('Grade 9, percent')
+    await user.clear(nine)
+    await user.type(nine, '25')
+  }
+
+  it('warns when a hand distribution sits above the measured centering', async () => {
+    await enterNine([measured(8)])
+    expect(screen.getByRole('note')).toHaveTextContent('allows PSA 8 at best, and this puts 25% above it')
+  })
+
+  it('keeps warning after a later refusal, which leaves the cap in place', async () => {
+    await enterNine([measured(8, { id: 'r', succeeded: false, centering: null, error: 'Centering not measured' }), measured(8)])
+    expect(screen.getByRole('note')).toHaveTextContent('allows PSA 8 at best')
+  })
+
+  it("doesn't warn when the distribution stays within the cap", async () => {
+    await enterNine([measured(9)])
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+})
+
 describe('Predictions', () => {
+  it('says to enter the distribution by hand when only centering is enabled, and can still ask again', () => {
+    render(<Predictions data={{ ...card, enabledProviders: ['RAWMARK_CENTERING'] }} base="/b" onChange={() => {}} />)
+    expect(screen.getByText(/It only measures centering, so enter the distribution by hand below/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ask again' })).toBeInTheDocument()
+  })
+
+  it('says the same with no provider, with nothing to ask', () => {
+    render(<Predictions data={card} base="/b" onChange={() => {}} />)
+    expect(screen.getByText(/No provider is enabled. Enter the distribution by hand below/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ask again' })).not.toBeInTheDocument()
+  })
+
+  it("doesn't tell the reviewer to work by hand while a grading provider is enabled", () => {
+    render(<Predictions data={{ ...card, enabledProviders: ['RAWMARK_CENTERING', 'XIMILAR'] }} base="/b" onChange={() => {}} />)
+    expect(screen.queryByText(/by hand/)).not.toBeInTheDocument()
+  })
+
   const prediction = (details: Record<string, unknown>): Prediction => ({
     id: 'pr1', provider: 'XIMILAR', modelVersion: null, succeeded: true, overallGrade: 2.5, psaGrade: null,
     centering: 8, corners: 9, edges: 8, surface: 6, details, error: null, latencyMs: 1, createdAt: '2026-10-28T22:17:19Z',

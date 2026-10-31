@@ -91,7 +91,7 @@ public class Assessments {
     /** The seller's view of the card's condition, once it has a current assessment. */
     @Transactional(readOnly = true)
     public Optional<Summary> summary(UUID cardItemId) {
-        List<ProviderPrediction> latest = latestSuccessful(cardItemId);
+        List<ProviderPrediction> latest = shownToSeller(cardItemId);
         Optional<Summary> assessed = assessments.findByCardItemIdAndIsCurrentTrue(cardItemId)
                 .map(a -> summarize(a.distribution(), latest));
         if (assessed.isPresent()) {
@@ -103,20 +103,15 @@ public class Assessments {
 
     /**
      * Each provider's latest answer. For our own centering a later refusal counts too: what we show
-     * the seller as measured must be our last word on the card, not an older measurement.
+     * the seller as measured must be our last word on the card, not an older measurement. The
+     * distribution goes the other way and keeps the older cap (ConditionService#build).
      */
-    private List<ProviderPrediction> latestSuccessful(UUID cardItemId) {
+    private List<ProviderPrediction> shownToSeller(UUID cardItemId) {
         List<ProviderPrediction> all = predictions.findByCardItemIdOrderByCreatedAtDesc(cardItemId);
-        boolean refused = all.stream().filter(Assessments::isOwnMeasurement).findFirst().filter(p -> !p.isSucceeded()).isPresent();
-        return List.copyOf(all.stream()
-                .filter(ProviderPrediction::isSucceeded)
-                .filter(p -> !refused || !isOwnMeasurement(p))
-                .collect(Collectors.toMap(ProviderPrediction::getProvider, p -> p, (newer, older) -> newer, LinkedHashMap::new))
-                .values());
-    }
-
-    private static boolean isOwnMeasurement(ProviderPrediction prediction) {
-        return prediction.getProvider().equals(CenteringPreGradeProvider.NAME);
+        Map<String, ProviderPrediction> latest = ProviderPrediction.latestSucceeded(all);
+        all.stream().filter(ProviderPrediction::isOwnMeasurement).findFirst().filter(p -> !p.isSucceeded())
+                .ifPresent(refusal -> latest.remove(refusal.getProvider()));
+        return List.copyOf(latest.values());
     }
 
     /**
@@ -152,7 +147,7 @@ public class Assessments {
 
     /** Our own measurement among the latest predictions: only its ratios ever reach the seller. */
     private static MeasuredCentering measuredCentering(List<ProviderPrediction> latest) {
-        return latest.stream().filter(Assessments::isOwnMeasurement).findFirst().map(p -> {
+        return latest.stream().filter(ProviderPrediction::isOwnMeasurement).findFirst().map(p -> {
             SideCentering front = side(p.getDetails(), "frontCentering");
             SideCentering back = side(p.getDetails(), "backCentering");
             return front == null && back == null ? null : new MeasuredCentering(front, back);
@@ -182,12 +177,12 @@ public class Assessments {
      * Ximilar's centering never counts: on real cards it read 42/58 where the borders are nearly even.
      */
     private static Double centeringLimit(List<ProviderPrediction> latest, int high) {
-        Optional<ProviderPrediction> own = latest.stream().filter(Assessments::isOwnMeasurement).findFirst();
+        Optional<ProviderPrediction> own = latest.stream().filter(ProviderPrediction::isOwnMeasurement).findFirst();
         Double cap = own.map(ProviderPrediction::getCentering).filter(c -> c <= high).orElse(null);
         if (own.isPresent() && side(own.get().getDetails(), "frontCentering") != null) {
             return cap;
         }
-        Double score = latest.stream().filter(p -> !isOwnMeasurement(p) && !p.getProvider().equals(XimilarPreGradeProvider.NAME))
+        Double score = latest.stream().filter(p -> !p.isOwnMeasurement() && !p.getProvider().equals(XimilarPreGradeProvider.NAME))
                 .map(ProviderPrediction::getCentering)
                 .filter(Objects::nonNull).min(Double::compare).orElse(null);
         return Stream.of(cap, score).filter(Objects::nonNull).min(Double::compare).orElse(null);

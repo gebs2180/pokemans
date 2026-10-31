@@ -202,7 +202,7 @@ export function LikelyGrade({ condition }: { condition: ConditionSummary }) {
   const { low, high, mostLikely, mayBeUngradable, holdingBack, centering } = condition
   const measured = [centeringText('front', centering?.front), centeringText('back', centering?.back)].filter((t) => t != null)
   const graded = mostLikely !== 0
-  if (!graded && measured.length === 0) return null
+  if (!graded && measured.length === 0 && !mayBeUngradable) return null
   const range = low === high ? `PSA ${low}` : `PSA ${low}–${high}, most likely ${mostLikely}`
   return (
     <div className="likely-grade">

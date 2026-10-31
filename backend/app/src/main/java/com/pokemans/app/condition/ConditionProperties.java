@@ -65,7 +65,7 @@ record ConditionProperties(
                   @DefaultValue("2m") Duration sweepMinAge) {
     }
 
-    /** Off until the account's terms are confirmed in writing and a key is set. */
+    /** Off until a key is set. Its terms were confirmed in writing on 2026-10-30. */
     record Ximilar(@DefaultValue("false") boolean enabled,
                    String apiKey,
                    @DefaultValue("https://api.ximilar.com") URI baseUrl,

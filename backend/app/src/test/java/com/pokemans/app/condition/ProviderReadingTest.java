@@ -43,6 +43,19 @@ class ProviderReadingTest {
     }
 
     @Test
+    void ximilarWithOnlyABackFinalIsStoredWithNoOverallAndCapsNothing() {
+        Map<String, Object> job = Map.of("status", "DONE", "response", Map.of("records", List.of(
+                Map.of("grades", Map.of("centering", 6.0)), Map.of("grades", Map.of("final", 9.0)))));
+
+        PreGradeProvider.Reading reading = ((PreGradeProvider.Done) XimilarPreGradeProvider.read(job)).reading();
+        assertThat(reading.overallGrade()).isNull();
+
+        PredictionRequest request = new PredictionRequest(java.util.UUID.randomUUID(), java.util.UUID.randomUUID(), XimilarPreGradeProvider.NAME,
+                List.of(java.util.UUID.randomUUID()), null);
+        assertThat(ProviderPrediction.succeeded(request, reading, Map.of(), 1).centeringCap()).isNull();
+    }
+
+    @Test
     void ximilarRecordWithoutGradesIsARefusal() {
         Map<String, Object> job = Map.of("status", "DONE", "response", Map.of("records", List.of(
                 Map.of("_status", Map.of("code", 400, "text", "No card found")))));

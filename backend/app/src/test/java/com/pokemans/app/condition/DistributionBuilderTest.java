@@ -33,7 +33,7 @@ class DistributionBuilderTest {
 
     @Test
     void twoAgreeingProvidersOnWholeCardPhotosAreConfidenceAWithoutPenalty() {
-        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 8.5, "B", 8.0), true, false));
+        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 8.5, "B", 8.0), true, false, null));
 
         assertThat(result.confidence()).isEqualTo(Confidence.A);
         // Both fold to 8: the configured spread, unchanged.
@@ -49,7 +49,7 @@ class DistributionBuilderTest {
 
     @Test
     void halfGradesFoldDownNeverUp() {
-        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 9.9, "B", 9.5), true, false));
+        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 9.9, "B", 9.5), true, false, null));
 
         assertThat(result.distribution().median()).isEqualTo(Grade.G9);
         assertThat(result.distribution().p(Grade.G10)).isEqualByComparingTo("0.10");
@@ -57,7 +57,7 @@ class DistributionBuilderTest {
 
     @Test
     void oneProviderIsConfidenceBAndMovesSomeMassDown() {
-        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 8.0), true, false));
+        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 8.0), true, false, null));
 
         assertThat(result.confidence()).isEqualTo(Confidence.B);
         // 10% of each grade's mass moves one down: 8 keeps 0.45 and gains 0.01 from 9.
@@ -67,7 +67,7 @@ class DistributionBuilderTest {
 
     @Test
     void disagreeingProvidersAreConfidenceC() {
-        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 6.0, "B", 9.0), true, false));
+        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 6.0, "B", 9.0), true, false, null));
 
         assertThat(result.confidence()).isEqualTo(Confidence.C);
         assertThat(result.basis()).containsEntry("providerGap", 3.0);
@@ -75,14 +75,14 @@ class DistributionBuilderTest {
 
     @Test
     void photosWithoutAWholeCardAreConfidenceC() {
-        assertThat(builder.build(new DistributionBuilder.Input(grades("A", 8.0, "B", 8.0), false, false)).confidence())
+        assertThat(builder.build(new DistributionBuilder.Input(grades("A", 8.0, "B", 8.0), false, false, null)).confidence())
                 .isEqualTo(Confidence.C);
     }
 
     @Test
     void modernHolosGetTheSurfaceShiftDown() {
-        var plain = builder.build(new DistributionBuilder.Input(grades("A", 8.0, "B", 8.0), true, false)).distribution();
-        var holo = builder.build(new DistributionBuilder.Input(grades("A", 8.0, "B", 8.0), true, true)).distribution();
+        var plain = builder.build(new DistributionBuilder.Input(grades("A", 8.0, "B", 8.0), true, false, null)).distribution();
+        var holo = builder.build(new DistributionBuilder.Input(grades("A", 8.0, "B", 8.0), true, true, null)).distribution();
 
         assertThat(holo.p(Grade.G8)).isLessThan(plain.p(Grade.G8));
         assertThat(holo.p(Grade.G7)).isGreaterThan(plain.p(Grade.G7));
@@ -91,7 +91,7 @@ class DistributionBuilderTest {
 
     @Test
     void lowGradesKeepTheirMassOnGradeOne() {
-        var d = builder.build(new DistributionBuilder.Input(grades("A", 1.5, "B", 2.0), true, false)).distribution();
+        var d = builder.build(new DistributionBuilder.Input(grades("A", 1.5, "B", 2.0), true, false, null)).distribution();
 
         assertThat(d.p(Grade.G1)).isEqualByComparingTo("0.65"); // 1's own 0.5 + all its below-1 mass, plus 2's -1..-3
         assertThat(d.asMap().values().stream().reduce(BigDecimal.ZERO, BigDecimal::add)).isEqualByComparingTo("1");
@@ -99,14 +99,14 @@ class DistributionBuilderTest {
 
     @Test
     void noAnswersBuildNothing() {
-        assertThat(builder.build(new DistributionBuilder.Input(Map.of(), true, false))).isNull();
+        assertThat(builder.build(new DistributionBuilder.Input(Map.of(), true, false, null))).isNull();
         // A centering cap alone has nothing to cap.
         assertThat(builder.build(new DistributionBuilder.Input(Map.of(), true, false, 8))).isNull();
     }
 
     @Test
     void centeringCapsTheDistributionAndIsNotAveragedIn() {
-        var uncapped = builder.build(new DistributionBuilder.Input(grades("A", 9.0, "B", 9.0), true, false));
+        var uncapped = builder.build(new DistributionBuilder.Input(grades("A", 9.0, "B", 9.0), true, false, null));
         var capped = builder.build(new DistributionBuilder.Input(grades("A", 9.0, "B", 9.0), true, false, 8));
 
         // Nothing above 8; the 10 and 9 mass lands on 8. Confidence and the rest are unchanged.
@@ -120,7 +120,7 @@ class DistributionBuilderTest {
 
     @Test
     void aCenteringCapAboveTheGradesChangesNothing() {
-        var uncapped = builder.build(new DistributionBuilder.Input(grades("A", 6.0, "B", 6.0), true, false));
+        var uncapped = builder.build(new DistributionBuilder.Input(grades("A", 6.0, "B", 6.0), true, false, null));
         var capped = builder.build(new DistributionBuilder.Input(grades("A", 6.0, "B", 6.0), true, false, 10));
 
         assertThat(capped.distribution()).isEqualTo(uncapped.distribution());

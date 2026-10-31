@@ -64,8 +64,9 @@ class CardDetector {
     }
 
     Optional<Detection> detect(byte[] imageBytes) {
-        Mat full = Imgcodecs.imdecode(new MatOfByte(imageBytes), Imgcodecs.IMREAD_COLOR);
-        List<Mat> owned = new ArrayList<>(List.of(full));
+        MatOfByte encoded = new MatOfByte(imageBytes);
+        Mat full = Imgcodecs.imdecode(encoded, Imgcodecs.IMREAD_COLOR);
+        List<Mat> owned = new ArrayList<>(List.of(encoded, full));
         try {
             if (full.empty()) {
                 return Optional.empty();
@@ -403,11 +404,13 @@ class CardDetector {
      * Call only on images {@link com.pokemans.app.storage.ImageGuard} let through.
      */
     static byte[] withoutMetadata(byte[] imageBytes) {
-        Mat image = Imgcodecs.imdecode(new MatOfByte(imageBytes), Imgcodecs.IMREAD_COLOR);
+        MatOfByte encoded = new MatOfByte(imageBytes);
+        Mat image = Imgcodecs.imdecode(encoded, Imgcodecs.IMREAD_COLOR);
         try {
             return image.empty() ? null : jpeg(image);
         } finally {
             image.release();
+            encoded.release();
         }
     }
 

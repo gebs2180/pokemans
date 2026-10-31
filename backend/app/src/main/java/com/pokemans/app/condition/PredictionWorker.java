@@ -228,6 +228,7 @@ class PredictionWorker {
     }
 
     private void afterFinished(PredictionRequest request) {
+        condition.measureRetakeMissedBy(request);
         if (requests.findByCardItemIdOrderByCreatedAtDesc(request.getCardItemId()).stream().noneMatch(PredictionRequest::isOpen)) {
             condition.rebuildSystemAssessment(request.getCardItemId());
         }
