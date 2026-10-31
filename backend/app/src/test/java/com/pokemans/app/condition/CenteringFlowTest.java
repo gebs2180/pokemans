@@ -100,4 +100,35 @@ class CenteringFlowTest {
         api.postJson(base + "/assessments", reviewed, api.admin()).andExpect(status().isCreated());
         api.get(seller, collector).andExpect(jsonPath("$.condition.centering.front.leftRight").exists());
     }
+
+    @Test
+    void aPassingRetakeIsMeasuredAgainWithoutAskingThePaidProviders() throws Exception {
+        JwtRequestPostProcessor collector = api.user("auth0|centering-retake", List.of());
+        String orgId = api.collectorOrg("Centering Retake", "auth0|centering-retake");
+        String cardId = api.card(orgId, "Retaken card", collector);
+        api.uploadPhoto(orgId, cardId, "FRONT", TestImages.goodFront(), collector).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, cardId, "BACK", TestImages.goodBack(), collector).andExpect(jsonPath("$.status").value("PASSED"));
+        runWorker();
+        assertThat(requests(cardId, "RAWMARK_CENTERING")).isEqualTo(1);
+
+        // A retake that fails its check isn't the photo in use, so there is nothing new to measure.
+        api.uploadPhoto(orgId, cardId, "FRONT", "not a photo".getBytes(), collector).andExpect(jsonPath("$.status").value("RETAKE"));
+        assertThat(requests(cardId, "RAWMARK_CENTERING")).isEqualTo(1);
+
+        String retake = api.uploadPhoto(orgId, cardId, "FRONT", TestImages.goodRetake(1), collector)
+                .andExpect(jsonPath("$.status").value("PASSED"))
+                .andReturn().getResponse().getContentAsString();
+        String retakeId = com.jayway.jsonpath.JsonPath.read(retake, "$.id");
+        assertThat(requests(cardId, "RAWMARK_CENTERING")).isEqualTo(2);
+        assertThat(requests(cardId, "FAKE")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                select photo_ids->>0 from prediction_request
+                where card_item_id = ?::uuid and provider = 'RAWMARK_CENTERING' order by created_at desc limit 1
+                """, String.class, cardId)).isEqualTo(retakeId);
+    }
+
+    private int requests(String cardId, String provider) {
+        return jdbc.queryForObject("select count(*) from prediction_request where card_item_id = ?::uuid and provider = ?",
+                Integer.class, cardId, provider);
+    }
 }
