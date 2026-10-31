@@ -79,6 +79,11 @@ pokemans:
       # Opt the CardGrade account out of AI training in its Settings before enabling.
       enabled: ${CARDGRADE_ENABLED:false}
       api-key: ${CARDGRADE_API_KEY:}
+    centering:
+      # Our own centering measurement from the passing front and back. It only caps the
+      # distribution at the best grade PSA's centering table allows. Off until checked against
+      # returned grades.
+      enabled: ${CENTERING_ENABLED:false}
   pricing:
     # Valuation parameter set the snapshots are priced with (windows, half-life, trimming, confidence).
     parameter-set: 1.0.0

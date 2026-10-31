@@ -175,6 +175,8 @@ class ConditionService {
         Map<String, Double> grades = new LinkedHashMap<>();
         latest.forEach((provider, p) -> grades.put(provider, p.gradeForDistribution()));
         grades.values().removeIf(Objects::isNull);
+        Integer centeringCap = latest.values().stream().map(ProviderPrediction::centeringCap).filter(Objects::nonNull)
+                .min(Integer::compare).orElse(null);
 
         List<CardItems.PhotoRef> photos = cardItems.passedPhotos(cardId);
         boolean wholeCard = latest(photos, "FRONT").map(p -> p.cropKey() != null).orElse(false)
@@ -183,15 +185,17 @@ class ConditionService {
         // Unidentified cards get the holo surface shift too: unknown finish, so conservative.
         boolean modernHolo = identity.map(ConditionService::isModernHolo).orElse(true);
 
-        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades, wholeCard, modernHolo));
+        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades, wholeCard, modernHolo, centeringCap));
         if (result == null) {
             return Optional.empty();
         }
         Map<String, Object> basis = new LinkedHashMap<>(result.basis());
         basis.put("predictionIds", latest.values().stream().map(p -> p.getId().toString()).toList());
         basis.put("identified", identity.isPresent());
+        String reason = "Built from " + String.join(" and ", grades.keySet())
+                + (centeringCap == null ? "" : ", centering caps it at " + centeringCap);
         return Optional.of(save(card, current, result.distribution(), result.confidence(), ConditionAssessment.AuthorType.SYSTEM,
-                null, "Built from " + String.join(" and ", grades.keySet()), basis));
+                null, reason, basis));
     }
 
     /** The reviewer's own distribution: a new current version, with the change from the previous one recorded. */

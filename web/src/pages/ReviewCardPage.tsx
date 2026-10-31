@@ -540,6 +540,18 @@ type SideGrades = { final?: number; centering?: number; corners?: number; edges?
 type DamageTag = { name?: string; prob?: number }
 
 /**
+ * Measured centering for one side: ratios as PSA writes them (left/right, top/bottom, first number the
+ * left or top border's share), or why it wasn't measured. Ximilar and our own measurement both store it.
+ */
+type SideCentering = { leftRight?: string; topBottom?: string; unmeasured?: string }
+
+function centeringText(side: string, c: SideCentering | undefined) {
+  if (c?.unmeasured) return `${side} not measured (${c.unmeasured})`
+  if (typeof c?.leftRight === 'string' && typeof c.topBottom === 'string') return `${side} L/R ${c.leftRight}, T/B ${c.topBottom}`
+  return null
+}
+
+/**
  * One prediction: the overall grade with the front's sub-grades, then the back's when the provider
  * graded it separately, then any damage it flagged. The overall covers both sides and damage, so a low
  * back or a damage tag explains an overall well under the front's sub-grades.
@@ -548,6 +560,11 @@ function PredictionRows({ p }: { p: Prediction }) {
   const back = p.details?.backGrades as SideGrades | undefined
   const damaged = p.details?.damaged as DamageTag | undefined
   const flagged = damaged?.name != null && damaged.name.toUpperCase() !== 'OK'
+  const centering = [
+    centeringText('front', p.details?.frontCentering as SideCentering | undefined),
+    centeringText('back', p.details?.backCentering as SideCentering | undefined),
+  ].filter((t) => t != null)
+  const centeringCap = p.details?.psaCenteringCap as number | undefined
   return (
     <>
       <tr>
@@ -573,6 +590,14 @@ function PredictionRows({ p }: { p: Prediction }) {
           <td>{back.edges ?? '–'}</td>
           <td>{back.surface ?? '–'}</td>
           <td />
+        </tr>
+      )}
+      {centering.length > 0 && (
+        <tr>
+          <td colSpan={8} className="muted small">
+            Centering: {centering.join(' · ')}
+            {centeringCap != null && ` — allows PSA ${centeringCap} at best`}
+          </td>
         </tr>
       )}
       {damaged?.name != null && (

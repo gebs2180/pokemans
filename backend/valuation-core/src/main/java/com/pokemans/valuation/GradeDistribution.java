@@ -89,6 +89,22 @@ public final class GradeDistribution {
         return new GradeDistribution(moved);
     }
 
+    /**
+     * Moves the probability of every grade above {@code max} onto {@code max}, e.g. when the card's
+     * centering allows no higher grade. Grades at or below it and U are unchanged: downward only.
+     */
+    public GradeDistribution capAt(Grade max) {
+        if (max.isUngradable()) {
+            throw new IllegalArgumentException("Cap must be a grade from 1 to 10");
+        }
+        EnumMap<Grade, BigDecimal> capped = zeros();
+        for (Grade grade : Grade.values()) {
+            Grade target = grade.number() > max.number() ? max : grade;
+            capped.merge(target, probabilities.get(grade), BigDecimal::add);
+        }
+        return new GradeDistribution(capped);
+    }
+
     /** Photo-confidence adjustment: low confidence moves probability toward lower grades. */
     public GradeDistribution applyPhotoConfidencePenalty(BigDecimal fraction) {
         return moveMassDown(fraction);

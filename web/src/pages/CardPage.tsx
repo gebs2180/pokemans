@@ -8,6 +8,7 @@ import {
   type CardStatus,
   type CardView,
   type ConditionSummary,
+  type SideCentering,
   type Grader,
   type OutcomeView,
   type PhotoView,
@@ -198,23 +199,38 @@ function StatusLine({ orgId, cardId }: { orgId: string; cardId: string }) {
 
 /** Our estimate of the grade from the photos, in words. Never a provider's grade: the offer is what's firm. */
 export function LikelyGrade({ condition }: { condition: ConditionSummary }) {
-  const { low, high, mostLikely, mayBeUngradable, holdingBack } = condition
-  if (mostLikely === 0) return null
+  const { low, high, mostLikely, mayBeUngradable, holdingBack, centering } = condition
+  const measured = [centeringText('front', centering?.front), centeringText('back', centering?.back)].filter((t) => t != null)
+  const graded = mostLikely !== 0
+  if (!graded && measured.length === 0) return null
   const range = low === high ? `PSA ${low}` : `PSA ${low}–${high}, most likely ${mostLikely}`
   return (
     <div className="likely-grade">
-      <p>
-        <span className="muted">Likely grade</span> <strong>{range}</strong>
-      </p>
+      {graded && (
+        <p>
+          <span className="muted">Likely grade</span> <strong>{range}</strong>
+        </p>
+      )}
       {holdingBack.length > 0 && (
         <p className="small">
           <span className="muted">Holding it back:</span> {holdingBack.join(' and ')}
         </p>
       )}
+      {measured.length > 0 && (
+        <p className="small">
+          <span className="muted">Centering, measured from your photos:</span> {measured.join(' · ')}
+        </p>
+      )}
       {mayBeUngradable && <p className="small warn">It may not be gradable at all, e.g. if it's been altered or damaged.</p>}
-      <p className="muted small">Our estimate from your photos, not a grade. An offer's price stays the same whatever grade the card gets.</p>
+      {graded && (
+        <p className="muted small">Our estimate from your photos, not a grade. An offer's price stays the same whatever grade the card gets.</p>
+      )}
     </div>
   )
+}
+
+function centeringText(side: string, c: SideCentering | null | undefined) {
+  return c ? `${side} ${c.leftRight} left-right, ${c.topBottom} top-bottom` : null
 }
 
 function CurrentPhoto({ side, photo }: { side: Side; photo: PhotoView }) {

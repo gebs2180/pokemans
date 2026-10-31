@@ -86,6 +86,15 @@ class ProviderPrediction {
         return psaGrade != null ? psaGrade : overallGrade;
     }
 
+    /**
+     * The best grade this reading's centering allows, when the reading is centering only (our own
+     * measurement): no overall grade, just a centering grade. Null for every full reading, whose
+     * centering sub-grade is already part of its overall grade.
+     */
+    Integer centeringCap() {
+        return succeeded && gradeForDistribution() == null && centering != null ? (int) Math.floor(centering) : null;
+    }
+
     UUID getId() {
         return id;
     }

@@ -23,9 +23,10 @@ import org.opencv.imgproc.Imgproc;
  * fills, a perspective-corrected crop, and sharpness and glare on the card itself. A photo where no
  * whole card is found (cut off, too close to the frame edge, no card at all) gives no detection.
  *
- * <p>Centering is not measured here yet. The corners are only accurate to a few pixels on real
- * backgrounds, which is enough for the crop but shifts border widths by several percent. Centering
- * comes from the pre-grading providers until it can be validated against the controlled PSA set.
+ * <p>Centering is not measured here. The corners are only accurate to a few pixels on real
+ * backgrounds, which is enough for the crop but shifts border widths by several percent: the
+ * condition module's centering measurer starts from them ({@link CardOutline}) and refines the edges
+ * at full resolution.
  *
  * <p>Detection runs on a downscaled copy; the crop is taken from the full-resolution image. OpenCV
  * applies the EXIF orientation when decoding, so corners are in display orientation.
@@ -69,17 +70,11 @@ class CardDetector {
             if (full.empty()) {
                 return Optional.empty();
             }
-            double scale = Math.min(1.0, (double) properties.cardAnalysisLongSidePx() / Math.max(full.cols(), full.rows()));
-            Mat small = track(owned, new Mat());
-            Imgproc.resize(full, small, new Size(Math.round(full.cols() * scale), Math.round(full.rows() * scale)), 0, 0, Imgproc.INTER_AREA);
-
-            Point[] quad = findCard(small, owned);
-            if (quad == null) {
+            Point[] fullQuad = locate(full, owned);
+            if (fullQuad == null) {
                 return Optional.empty();
             }
-
-            Point[] fullQuad = Arrays.stream(quad).map(p -> new Point(p.x / scale, p.y / scale)).toArray(Point[]::new);
-            double coverage = Imgproc.contourArea(new MatOfPoint2f(quad)) / ((double) small.cols() * small.rows());
+            double coverage = Imgproc.contourArea(new MatOfPoint2f(fullQuad)) / ((double) full.cols() * full.rows());
             Mat crop = warp(full, fullQuad, owned);
             Mat cropGray = track(owned, new Mat());
             Imgproc.cvtColor(crop, cropGray, Imgproc.COLOR_BGR2GRAY);
@@ -87,13 +82,34 @@ class CardDetector {
             return Optional.of(new Detection(
                     Arrays.stream(fullQuad).map(p -> new Corner(p.x, p.y)).toList(),
                     coverage,
-                    aspect(quad),
+                    aspect(fullQuad),
                     blurScore(cropGray, owned),
                     glareFraction(cropGray, properties.glareLuma(), owned),
                     jpeg(crop)));
         } finally {
             owned.forEach(Mat::release);
         }
+    }
+
+    /**
+     * The card's corners (TL, TR, BR, BL, card upright) in full-resolution pixels, found on a
+     * downscaled copy; null when there is no whole card. Accurate to a few downscaled pixels.
+     */
+    Point[] locate(Mat full) {
+        List<Mat> owned = new ArrayList<>();
+        try {
+            return locate(full, owned);
+        } finally {
+            owned.forEach(Mat::release);
+        }
+    }
+
+    private Point[] locate(Mat full, List<Mat> owned) {
+        double scale = Math.min(1.0, (double) properties.cardAnalysisLongSidePx() / Math.max(full.cols(), full.rows()));
+        Mat small = track(owned, new Mat());
+        Imgproc.resize(full, small, new Size(Math.round(full.cols() * scale), Math.round(full.rows() * scale)), 0, 0, Imgproc.INTER_AREA);
+        Point[] quad = findCard(small, owned);
+        return quad == null ? null : Arrays.stream(quad).map(p -> new Point(p.x / scale, p.y / scale)).toArray(Point[]::new);
     }
 
     /**

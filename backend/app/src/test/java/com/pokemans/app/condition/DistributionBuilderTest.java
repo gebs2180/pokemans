@@ -17,7 +17,8 @@ class DistributionBuilderTest {
                 new ConditionProperties.Worker(false, Duration.ofSeconds(15), 8, Duration.ofHours(24), Duration.ofMinutes(10), 10,
                         Duration.ofDays(7), Duration.ofMinutes(2)),
                 new ConditionProperties.Ximilar(false, null, null, Duration.ofSeconds(30)),
-                new ConditionProperties.CardGrade(false, null, null, "PSA", Duration.ofSeconds(30)));
+                new ConditionProperties.CardGrade(false, null, null, "PSA", Duration.ofSeconds(30)),
+                new ConditionProperties.Centering(false, 1.0));
     }
 
     private final DistributionBuilder builder = new DistributionBuilder(defaults());
@@ -99,5 +100,29 @@ class DistributionBuilderTest {
     @Test
     void noAnswersBuildNothing() {
         assertThat(builder.build(new DistributionBuilder.Input(Map.of(), true, false))).isNull();
+        // A centering cap alone has nothing to cap.
+        assertThat(builder.build(new DistributionBuilder.Input(Map.of(), true, false, 8))).isNull();
+    }
+
+    @Test
+    void centeringCapsTheDistributionAndIsNotAveragedIn() {
+        var uncapped = builder.build(new DistributionBuilder.Input(grades("A", 9.0, "B", 9.0), true, false));
+        var capped = builder.build(new DistributionBuilder.Input(grades("A", 9.0, "B", 9.0), true, false, 8));
+
+        // Nothing above 8; the 10 and 9 mass lands on 8. Confidence and the rest are unchanged.
+        assertThat(capped.distribution().p(Grade.G10)).isZero();
+        assertThat(capped.distribution().p(Grade.G9)).isZero();
+        assertThat(capped.distribution().p(Grade.G8)).isEqualByComparingTo("0.85");
+        assertThat(capped.distribution().p(Grade.G7)).isEqualByComparingTo(uncapped.distribution().p(Grade.G7));
+        assertThat(capped.confidence()).isEqualTo(uncapped.confidence());
+        assertThat(capped.basis()).containsEntry("centeringCap", 8);
+    }
+
+    @Test
+    void aCenteringCapAboveTheGradesChangesNothing() {
+        var uncapped = builder.build(new DistributionBuilder.Input(grades("A", 6.0, "B", 6.0), true, false));
+        var capped = builder.build(new DistributionBuilder.Input(grades("A", 6.0, "B", 6.0), true, false, 10));
+
+        assertThat(capped.distribution()).isEqualTo(uncapped.distribution());
     }
 }
