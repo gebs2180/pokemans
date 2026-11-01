@@ -24,7 +24,7 @@ class CenteringPreGradeProvider implements PreGradeProvider.Local {
 
     static final String NAME = "RAWMARK_CENTERING";
     /** Bump when the method changes, so stored measurements can be told apart. */
-    static final String VERSION = "centering-2";
+    static final String VERSION = "centering-3";
 
     private final CenteringMeasurer measurer;
     private final double margin;

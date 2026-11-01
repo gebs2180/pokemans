@@ -201,18 +201,19 @@ class ConditionService {
     }
 
     /**
-     * A later centering refusal doesn't lift the cap: an unmeasurable photo says nothing about the card,
-     * and dropping the cap would raise it, so a glare-ridden retake could beat a measurement. The seller
-     * stops seeing the older ratios, though (Assessments#summary): they're no longer from the photo in use.
+     * A later centering refusal doesn't lift the cap, nor does a retake that measures only the other
+     * side: an unmeasurable photo says nothing about the card, and dropping the cap would raise it, so a
+     * glare-ridden retake could beat a measurement. The seller stops seeing the older ratios, though
+     * (Assessments#summary): they're no longer from the photo in use.
      */
     private Optional<ConditionAssessment> build(UUID cardId, ConditionAssessment current) {
         CardItems.CardItemRef card = cardItems.get(cardId);
-        Map<String, ProviderPrediction> latest = latestSuccessful(cardId);
+        List<ProviderPrediction> all = predictions.findByCardItemIdOrderByCreatedAtDesc(cardId);
+        Map<String, ProviderPrediction> latest = ProviderPrediction.latestSucceeded(all);
         Map<String, Double> grades = new LinkedHashMap<>();
         latest.forEach((provider, p) -> grades.put(provider, p.gradeForDistribution()));
         grades.values().removeIf(Objects::isNull);
-        Integer centeringCap = latest.values().stream().map(ProviderPrediction::centeringCap).filter(Objects::nonNull)
-                .min(Integer::compare).orElse(null);
+        Integer centeringCap = ProviderPrediction.centeringCap(all);
 
         List<CardItems.PhotoRef> photos = cardItems.passedPhotos(cardId);
         boolean wholeCard = latest(photos, "FRONT").map(p -> p.cropKey() != null).orElse(false)
