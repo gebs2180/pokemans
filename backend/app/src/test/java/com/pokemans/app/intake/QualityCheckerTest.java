@@ -1,6 +1,7 @@
 package com.pokemans.app.intake;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -124,6 +125,21 @@ class QualityCheckerTest {
         QualityChecker.Result result = checker.check(png(copy(image)));
 
         assertThat(result.reasons()).contains(RetakeReason.CARD_NOT_FOUND);
+    }
+
+    @Test
+    void wholeCardOnAStandThatRunsOffThePhotoIsFound() {
+        // A pale stand on a dark table, top to bottom of the photo: the card and stand read as one region.
+        BufferedImage image = background(1600, 2200);
+        Graphics2D g = image.createGraphics();
+        g.setColor(new Color(0xF0F0EC));
+        g.fillRect(250, 0, 1100, 2200);
+        g.dispose();
+
+        QualityChecker.Result result = checker.check(png(withCard(image, 850, 800, 1000, 0)));
+
+        assertThat(result.reasons()).isEmpty();
+        assertThat(result.card().coverage()).isCloseTo(850 * 1187.0 / (1600 * 2200), within(0.02));
     }
 
     @Test

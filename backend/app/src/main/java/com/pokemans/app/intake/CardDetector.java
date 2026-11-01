@@ -37,6 +37,8 @@ class CardDetector {
     static final double CARD_ASPECT = 63.0 / 88.0;
     static final int CROP_WIDTH = 1000;
     static final int CROP_HEIGHT = (int) Math.round(CROP_WIDTH / CARD_ASPECT);
+    /** Widest printed border as a share of its inner box's width: a 90/10 card's wide border is about 5.5 mm of 57. */
+    private static final double MAX_BORDER_SHARE = 0.10;
 
     static {
         OpenCV.loadLocally();
@@ -180,7 +182,8 @@ class CardDetector {
         if (best == null) {
             return null;
         }
-        if (region != null && region.touchesFrame() && region.area() > 1.2 * bestArea && contains(region.contour(), best)) {
+        if (region != null && region.touchesFrame() && region.area() > 1.2 * bestArea && contains(region.contour(), best)
+                && !widerThanABorderFromFrame(best, small.cols(), small.rows())) {
             return null; // what we found is inside a card that runs off the photo: an inner box, not the card
         }
         if (!clearOfFrameEdge(best, small.cols(), small.rows())) {
@@ -346,6 +349,17 @@ class CardDetector {
         double width = (distance(q[0], q[1]) + distance(q[3], q[2])) / 2;
         double height = (distance(q[0], q[3]) + distance(q[1], q[2])) / 2;
         return height == 0 ? 0 : width / height;
+    }
+
+    /**
+     * More than a printed border's width lies between every corner and the frame. An inner box of a card
+     * that runs off the photo can't have that: the frame cuts the card within its border. So whatever
+     * reaches the frame around an outline like this (a stand, say) is something else, and the outline is
+     * the card.
+     */
+    private static boolean widerThanABorderFromFrame(Point[] quad, int width, int height) {
+        double room = MAX_BORDER_SHARE * (distance(quad[0], quad[1]) + distance(quad[3], quad[2])) / 2;
+        return Arrays.stream(quad).allMatch(p -> p.x >= room && p.y >= room && p.x <= width - 1 - room && p.y <= height - 1 - room);
     }
 
     /** The card, enlarged about its centre by the required margin, still fits inside the frame. */
