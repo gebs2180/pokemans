@@ -7,7 +7,9 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -92,6 +94,36 @@ class ProviderPrediction {
         Map<String, ProviderPrediction> latest = new LinkedHashMap<>();
         newestFirst.stream().filter(ProviderPrediction::isSucceeded).forEach(p -> latest.putIfAbsent(p.provider, p));
         return latest;
+    }
+
+    /**
+     * The best grade the centering allows, from predictions newest first: the newest measurement's cap,
+     * held down by the last measurement of each side, so a side a retake couldn't measure keeps its
+     * limit. A photo that can't be measured says nothing about the card.
+     *
+     * @return the cap, or null with nothing measured
+     */
+    static Integer centeringCap(List<ProviderPrediction> newestFirst) {
+        List<ProviderPrediction> measured = newestFirst.stream().filter(p -> p.centeringCap() != null).toList();
+        if (measured.isEmpty()) {
+            return null;
+        }
+        return Stream.of(measured.getFirst().centeringCap(), lastSideCap(measured, "frontCentering"), lastSideCap(measured, "backCentering"))
+                .filter(Objects::nonNull).min(Integer::compare).orElseThrow();
+    }
+
+    private static Integer lastSideCap(List<ProviderPrediction> newestFirst, String side) {
+        return newestFirst.stream().map(p -> p.sideCap(side)).filter(Objects::nonNull).findFirst().orElse(null);
+    }
+
+    /** What one side of this measurement allows on its own, null if it wasn't measured. */
+    private Integer sideCap(String side) {
+        if (details != null && details.get(side) instanceof Map<?, ?> measured && measured.get("worstShare") instanceof Number share
+                && details.get("measurementMargin") instanceof Number margin) {
+            return side.equals("frontCentering") ? PsaCentering.cap(share.doubleValue(), null, margin.doubleValue())
+                    : PsaCentering.cap(null, share.doubleValue(), margin.doubleValue());
+        }
+        return null;
     }
 
     /** Our own centering measurement, as opposed to a provider's opinion of the card. */

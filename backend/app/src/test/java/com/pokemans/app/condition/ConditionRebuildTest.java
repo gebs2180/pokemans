@@ -35,6 +35,18 @@ class ConditionRebuildTest {
                 new PreGradeProvider.Reading(CenteringPreGradeProvider.VERSION, null, null, cap, null, null, null, Map.of()), Map.of(), 1);
     }
 
+    /** Worst shares by side, as the measurer stores them: null for a side it couldn't measure. */
+    private static ProviderPrediction measuredSides(Double front, Double back) {
+        Map<String, Object> details = Map.of("frontCentering", side(front), "backCentering", side(back), "measurementMargin", 1.0);
+        double cap = PsaCentering.cap(front, back, 1.0);
+        return ProviderPrediction.succeeded(request(CenteringPreGradeProvider.NAME),
+                new PreGradeProvider.Reading(CenteringPreGradeProvider.VERSION, null, null, cap, null, null, null, details), Map.of(), 1);
+    }
+
+    private static Map<String, Object> side(Double worstShare) {
+        return worstShare == null ? Map.of("unmeasured", "no clear inner edge") : Map.of("worstShare", worstShare);
+    }
+
     private static ProviderPrediction refused() {
         return ProviderPrediction.rejected(request(CenteringPreGradeProvider.NAME), "Centering not measured", Map.of(), 1);
     }
@@ -67,6 +79,21 @@ class ConditionRebuildTest {
         ConditionAssessment built = rebuild(measured(9), measured(7), graded("A", 9.0, null)).orElseThrow();
 
         assertThat(built.getBasis()).containsEntry("centeringCap", 9);
+    }
+
+    @Test
+    void aRetakeThatCantMeasureTheFrontKeepsTheOlderFrontsLimit() {
+        // The front measured 54.6, which caps at 9; alone, the back would allow a 10.
+        ConditionAssessment built = rebuild(measuredSides(null, 53.3), measuredSides(54.6, 53.3), graded("A", 9.0, null)).orElseThrow();
+
+        assertThat(built.getBasis()).containsEntry("centeringCap", 9);
+    }
+
+    @Test
+    void aRetakeThatMeasuresTheFrontReplacesItsLimit() {
+        ConditionAssessment built = rebuild(measuredSides(52.0, 53.3), measuredSides(54.6, 53.3), graded("A", 9.0, null)).orElseThrow();
+
+        assertThat(built.getBasis()).containsEntry("centeringCap", 10);
     }
 
     @Test

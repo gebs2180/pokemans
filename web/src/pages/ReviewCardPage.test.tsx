@@ -148,7 +148,7 @@ describe('Predictions', () => {
     }
     render(<Predictions data={{ ...card, predictions: [ours] }} base="/b" onChange={() => {}} />)
     expect(screen.getByText(/Centering: front L\/R 49.1\/50.9, T\/B 48.4\/51.6/)).toHaveTextContent(
-      'back not measured (no clear inner edge of the left border) — allows PSA 10 at best',
+      'back not measured (no clear inner edge of the left border) — the front alone allows PSA 10 at best',
     )
   })
 

@@ -566,13 +566,13 @@ function PredictionRows({ p }: { p: Prediction }) {
   const damaged = p.details?.damaged as DamageTag | undefined
   const flagged = damaged?.name != null && damaged.name.toUpperCase() !== 'OK'
   const showCentering = p.provider !== 'XIMILAR'
+  const frontCentering = p.details?.frontCentering as SideCentering | undefined
+  const backCentering = p.details?.backCentering as SideCentering | undefined
   const centering = showCentering
-    ? [
-        centeringText('front', p.details?.frontCentering as SideCentering | undefined),
-        centeringText('back', p.details?.backCentering as SideCentering | undefined),
-      ].filter((t) => t != null)
+    ? [centeringText('front', frontCentering), centeringText('back', backCentering)].filter((t) => t != null)
     : []
   const centeringCap = p.details?.psaCenteringCap as number | undefined
+  const capFrom = frontCentering?.unmeasured ? 'the back alone ' : backCentering?.unmeasured ? 'the front alone ' : ''
   return (
     <>
       <tr>
@@ -604,7 +604,7 @@ function PredictionRows({ p }: { p: Prediction }) {
         <tr>
           <td colSpan={8} className="muted small">
             Centering: {centering.join(' · ')}
-            {centeringCap != null && ` — allows PSA ${centeringCap} at best`}
+            {centeringCap != null && ` — ${capFrom}allows PSA ${centeringCap} at best`}
           </td>
         </tr>
       )}

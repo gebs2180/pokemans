@@ -118,6 +118,17 @@ class CenteringMeasurerTest {
     }
 
     @Test
+    void measuresAPaleCardOnAWhiteStandWithReflections() {
+        BufferedImage image = whiteStand(1600, 2200);
+        drawCard(image, new Borders(48, 48, 48, 48), new Color(0xE2C878), 0, true);
+
+        CenteringMeasurer.Measured m = measured(measurer.measure(png(image)));
+
+        assertThat(m.leftShare()).isCloseTo(50, within(TOLERANCE));
+        assertThat(m.topShare()).isCloseTo(50, within(TOLERANCE));
+    }
+
+    @Test
     void aPhotoWithNoCardIsUnmeasured() {
         CenteringMeasurer.Result result = measurer.measure(png(background(1600, 2200)));
 
@@ -139,6 +150,11 @@ class CenteringMeasurerTest {
      */
     static BufferedImage photo(Borders borders, double degrees, boolean art) {
         BufferedImage image = background(1600, 2200);
+        drawCard(image, borders, new Color(0xF2C230), degrees, art);
+        return image;
+    }
+
+    private static void drawCard(BufferedImage image, Borders borders, Color border, double degrees, boolean art) {
         double cx = 800;
         double cy = 1100;
         Graphics2D g = image.createGraphics();
@@ -151,7 +167,7 @@ class CenteringMeasurerTest {
             int artTop = top + borders.top();
             int artRight = left + CARD_WIDTH - borders.right();
             int artBottom = top + CARD_HEIGHT - borders.bottom();
-            g.setColor(new Color(0xF2C230));
+            g.setColor(border);
             g.fillRoundRect(left, top, CARD_WIDTH, CARD_HEIGHT, 40, 40);
             if (art) {
                 int cell = 16;
@@ -166,6 +182,21 @@ class CenteringMeasurerTest {
         } finally {
             g.dispose();
         }
+    }
+
+    /** A white stand: only lightness varies, in patches of reflection as bright and dim as a real one's. */
+    private static BufferedImage whiteStand(int width, int height) {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Random random = new Random(11);
+        Graphics2D g = image.createGraphics();
+        for (int x = 0; x < width; x += 20) {
+            for (int y = 0; y < height; y += 20) {
+                int v = 205 + random.nextInt(50);
+                g.setColor(new Color(v, v, v));
+                g.fillRect(x, y, 20, 20);
+            }
+        }
+        g.dispose();
         return image;
     }
 

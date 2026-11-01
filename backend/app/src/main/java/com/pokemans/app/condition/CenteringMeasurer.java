@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.ToDoubleBiFunction;
+import java.util.stream.Stream;
 import nu.pattern.OpenCV;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
@@ -47,6 +49,9 @@ final class CenteringMeasurer {
     static final int PX_PER_MM = 20;
     static final int CARD_WIDTH = 63 * PX_PER_MM;
     static final int CARD_HEIGHT = 88 * PX_PER_MM;
+    private static final double CARD_ASPECT = (double) CARD_WIDTH / CARD_HEIGHT;
+    /** OpenCV's 8-bit L per Lab unit of lightness. */
+    private static final double L_SCALE = 2.55;
 
     /** Background kept around the card on the first, rough straightening: covers the outline's error. */
     private static final int MARGIN = 4 * PX_PER_MM;
@@ -132,6 +137,23 @@ final class CenteringMeasurer {
     private record InnerEdge(double width, double spreadPx, int pieces, String doubt) {
     }
 
+    /**
+     * The card's four outer edges.
+     *
+     * @param photo its corners in the photo's pixels, TL, TR, BR, BL
+     * @param shape its width per height
+     */
+    private record Outline(Point[] photo, double shape) {
+
+        double offCard() {
+            return Math.abs(shape / CARD_ASPECT - 1);
+        }
+
+        boolean fitsCard() {
+            return offCard() <= 0.03;
+        }
+    }
+
     private enum Side {
         LEFT, RIGHT, TOP, BOTTOM;
 
@@ -182,31 +204,27 @@ final class CenteringMeasurer {
             Mat rough = straighten(image, quad, roughTargets(), new Size(canvasWidth, canvasHeight), owned);
             Lab roughLab = Lab.of(rough, owned);
 
-            double[][] lines = new double[4][];
+            List<List<double[]>> lines = new ArrayList<>();
             for (Side side : Side.values()) {
-                Object line = outerEdge(roughLab, side);
-                if (line instanceof String reason) {
-                    return new Unmeasured(reason);
+                Object edge = outerEdge(roughLab, side, CenteringMeasurer::distance);
+                Object paleEdge = outerEdge(roughLab, side, CenteringMeasurer::colourDistance);
+                List<double[]> found = Stream.of(edge, paleEdge).filter(double[].class::isInstance)
+                        .map(line -> general(side, (double[]) line, canvasWidth, canvasHeight)).toList();
+                if (found.isEmpty()) {
+                    return new Unmeasured((String) edge);
                 }
-                lines[side.ordinal()] = general(side, (double[]) line, canvasWidth, canvasHeight);
-            }
-            Point[] corners = {
-                    intersect(lines[Side.LEFT.ordinal()], lines[Side.TOP.ordinal()]),
-                    intersect(lines[Side.RIGHT.ordinal()], lines[Side.TOP.ordinal()]),
-                    intersect(lines[Side.RIGHT.ordinal()], lines[Side.BOTTOM.ordinal()]),
-                    intersect(lines[Side.LEFT.ordinal()], lines[Side.BOTTOM.ordinal()])};
-            double width = (distance(corners[0], corners[1]) + distance(corners[3], corners[2])) / 2;
-            double height = (distance(corners[0], corners[3]) + distance(corners[1], corners[2])) / 2;
-            if (Math.abs(width / height / ((double) CARD_WIDTH / CARD_HEIGHT) - 1) > 0.03) {
-                return new Unmeasured("the card's edges don't make a 63 × 88 mm outline (%.3f wide per high)".formatted(width / height));
+                lines.add(found);
             }
 
             // Back to the photo's pixels, and straighten again from the exact corners.
             Mat back = track(owned, new Mat());
             Core.invert(transform(quad, roughTargets(), owned), back);
-            MatOfPoint2f exact = track(owned, new MatOfPoint2f());
-            Core.perspectiveTransform(track(owned, new MatOfPoint2f(corners)), exact, back);
-            Mat card = straighten(image, exact.toArray(), new Point[] {
+            Outline outline = bestOutline(lines, back, owned);
+            if (!outline.fitsCard()) {
+                return new Unmeasured("the card's edges don't make a 63 × 88 mm outline (%.3f wide per high)".formatted(outline.shape()));
+            }
+
+            Mat card = straighten(image, outline.photo(), new Point[] {
                     new Point(0, 0), new Point(CARD_WIDTH - 1, 0),
                     new Point(CARD_WIDTH - 1, CARD_HEIGHT - 1), new Point(0, CARD_HEIGHT - 1)},
                     new Size(CARD_WIDTH, CARD_HEIGHT), owned);
@@ -245,6 +263,52 @@ final class CenteringMeasurer {
         }
     }
 
+    /**
+     * The first outline that fits a card, trying each side's edges in the order found, so the first
+     * edges win whenever they fit. Otherwise the one nearest a card's shape, for the refusal.
+     *
+     * @param lines each side's candidate lines, in {@link Side} order
+     * @param back from the rough canvas back to the photo
+     */
+    private static Outline bestOutline(List<List<double[]>> lines, Mat back, List<Mat> owned) {
+        Outline best = null;
+        for (double[] left : lines.get(Side.LEFT.ordinal())) {
+            for (double[] right : lines.get(Side.RIGHT.ordinal())) {
+                for (double[] top : lines.get(Side.TOP.ordinal())) {
+                    for (double[] bottom : lines.get(Side.BOTTOM.ordinal())) {
+                        Outline outline = outline(left, right, top, bottom, back, owned);
+                        if (outline.fitsCard()) {
+                            return outline;
+                        }
+                        if (best == null || outline.offCard() < best.offCard()) {
+                            best = outline;
+                        }
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    private static Outline outline(double[] left, double[] right, double[] top, double[] bottom, Mat back, List<Mat> owned) {
+        Point[] corners = {intersect(left, top), intersect(right, top), intersect(right, bottom), intersect(left, bottom)};
+        MatOfPoint2f exact = track(owned, new MatOfPoint2f());
+        Core.perspectiveTransform(track(owned, new MatOfPoint2f(corners)), exact, back);
+        Point[] photo = exact.toArray();
+        // The rough straightening stretches the outline's error into the shape, and a photo taken at
+        // an angle shows a card that isn't one: an edge in the wrong place is wrong in both.
+        double onCanvas = aspect(corners);
+        double inPhoto = aspect(photo);
+        return new Outline(photo, Math.abs(onCanvas - CARD_ASPECT) <= Math.abs(inPhoto - CARD_ASPECT) ? onCanvas : inPhoto);
+    }
+
+    /** Width per height of corners TL, TR, BR, BL. */
+    private static double aspect(Point[] corners) {
+        double width = (distance(corners[0], corners[1]) + distance(corners[3], corners[2])) / 2;
+        double height = (distance(corners[0], corners[3]) + distance(corners[1], corners[2])) / 2;
+        return width / height;
+    }
+
     private static Point[] roughTargets() {
         return new Point[] {
                 new Point(MARGIN, MARGIN), new Point(MARGIN + CARD_WIDTH - 1, MARGIN),
@@ -267,9 +331,10 @@ final class CenteringMeasurer {
      * Finds one outer edge on the roughly straightened copy, where the card is expected {@link #MARGIN}
      * pixels in from the canvas edge.
      *
+     * @param colours how far apart two colours are
      * @return the fitted line {a, b} with inward = a + b·along, or a reason it couldn't be found
      */
-    private static Object outerEdge(Lab lab, Side side) {
+    private static Object outerEdge(Lab lab, Side side, ToDoubleBiFunction<double[], double[]> colours) {
         int length = side.vertical() ? CARD_HEIGHT : CARD_WIDTH;
         int from = MARGIN + (int) (OUTER_SPAN * length);
         int to = MARGIN + (int) ((1 - OUTER_SPAN) * length);
@@ -282,7 +347,7 @@ final class CenteringMeasurer {
             }
         }
         double[] background = median(backgroundSamples);
-        double noise = percentile(backgroundSamples.stream().mapToDouble(v -> distance(v, background)).toArray(), 0.95);
+        double noise = percentile(backgroundSamples.stream().mapToDouble(v -> colours.applyAsDouble(v, background)).toArray(), 0.95);
         double threshold = Math.max(15, 2 * noise + 6);
 
         List<double[]> points = new ArrayList<>();
@@ -292,7 +357,7 @@ final class CenteringMeasurer {
             int depth = 2 * MARGIN;
             double[] d = new double[depth];
             for (int inward = 0; inward < depth; inward++) {
-                d[inward] = distance(lab.at(side, along, inward), background);
+                d[inward] = colours.applyAsDouble(lab.at(side, along, inward), background);
             }
             int first = firstSustained(d, backgroundTo, depth - 6, threshold, 6);
             if (first < 0) {
@@ -512,6 +577,19 @@ final class CenteringMeasurer {
 
     private static double distance(double[] a, double[] b) {
         double dl = a[0] - b[0];
+        double da = a[1] - b[1];
+        double db = a[2] - b[2];
+        return Math.sqrt(dl * dl + da * da + db * db);
+    }
+
+    /**
+     * Colour distance in true Lab units: the 8-bit L runs 0 to 255 for 0 to 100, which counts lightness
+     * 2.55 times over. A white stand's reflections differ from it in lightness only, so at full weight
+     * they read as colour and hide a pale card's edge. Tried beside the plain distance, whose edges come
+     * first: this one finds a pale edge on a white stand, and misses some the plain distance finds.
+     */
+    private static double colourDistance(double[] a, double[] b) {
+        double dl = (a[0] - b[0]) / L_SCALE;
         double da = a[1] - b[1];
         double db = a[2] - b[2];
         return Math.sqrt(dl * dl + da * da + db * db);
