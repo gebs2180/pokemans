@@ -72,6 +72,18 @@ class PokeTraceDailySourceTest {
     }
 
     @Test
+    void aRowWithBlankFieldsStillBecomesSales() {
+        Map<String, Object> row = new java.util.HashMap<>(row(1, 500, 500, 500));
+        row.put("median30d", null);
+
+        List<PriceSource.Sale> sales = PokeTraceDailySource.expand(CATALOG, DEEP, new PokeTraceDailySource.Key("PSA_9", "ebay", "2026-10-20"),
+                row, LocalDate.parse("2026-10-20"), "USD");
+
+        assertThat(sales).hasSize(1);
+        assertThat(sales.getFirst().raw()).doesNotContainKey("median30d");
+    }
+
+    @Test
     void readsEveryPageOfTheSampleAndOnlyTheSalesWePriceFrom() {
         PokeTraceDailySource source = new PokeTraceDailySource(SAMPLE, Map.of(CATALOG, DEEP));
         List<PriceSource.Sale> sales = source.soldSales(card(CATALOG), FROM, TO);

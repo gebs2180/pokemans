@@ -144,6 +144,15 @@ The pull covered 27 cards rather than 30. Several candidates didn't match, other
 - **History is shallow.** The earliest sale is 2020-12-29, but sale days by year are 50 (2021), 111 (2022), 179 (2023), 496 (2024), 6,715 (2025) and 25,555 (2026). So 12 months for σ works, while the 2021–2023 replay can't be done from this data.
 - **Grade coverage.** Vintage has PSA 5–7 sales on most cards. Modern cards often have few or none below 8, so they lean on derived prices.
 
+**Sanity check on the same data** (82,186 expanded sales, none rejected). The full report stays in the data folder, since PokeTrace bans redistribution and this repo is public:
+
+- **Coverage:** at a likely PSA 9 and photo confidence B, 22 of 27 cards get a firm offer, 4 are over the $5,000 maximum and 1 has no PSA table.
+- **Prices:** the engine's PSA 8 and 9 for Base Charizard sit within about 1% of PokeTrace's own 90-day median, which is what the method should do.
+- **Confidence is flattered:** comps grade A in 387 of 486 rows. It rests on the approximate counts, so it can't be trusted yet. Recommendation: cap prices from these rows at confidence B until the flag is explained.
+- **Thin top grades are unsafe:** Mewtwo-EX 98/99 shows a single PSA 10 sale far out of line with its raw price, and Base Charizard's PSA 10 days differ by more than 100× low to high. Trimming starts at 10 sales, so a tier with a few wild days goes through untouched. Wild days are rare overall (8 of 3,168 tier days beyond 3× the tier's median), but that test needs 5 days in a tier, so it misses the thinnest tiers.
+- **Volatility is broken by those rows:** Base Charizard's σ comes out at 20.48, where the method expects something near 0.08. Offers don't use σ, but FLV does, so it needs outlier handling before lenders resume.
+- **Some offers fall below raw:** at a likely PSA 9, 5 of the 22 offers are under the lowest raw near-mint sale of the last 90 days, so a seller would do better selling raw.
+
 ## Timeline
 
 | When | What | Who |

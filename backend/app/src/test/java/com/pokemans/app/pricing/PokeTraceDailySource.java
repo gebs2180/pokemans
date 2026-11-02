@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -26,7 +27,8 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code analysis/poketrace/poketrace.py} saved, never the API. PokeTrace Pro has no individual sales,
  * only one row per card, tier and day with the day's sale count, low, high and average, so each row
  * becomes that many sales: one sale at the average; two at the low and the high; more at the low, the
- * high and the rest at the average. The count is exact, the range is exact and the mean is close.
+ * high and the rest at the average. The range is exact and the mean is close, but eBay's count is
+ * approximate ({@code approxSaleCount}, docs/poketrace-pilot.md), so depth here is an estimate.
  *
  * <p>Calibration only. Pricing live offers from daily aggregates is a methodology decision (step 3:
  * "every price traces to sold comps") and needs PokeTrace's written licence, so this stays in test
@@ -123,6 +125,7 @@ class PokeTraceDailySource implements PriceSource {
             }
         }
         Map<String, Object> raw = new LinkedHashMap<>(row);
+        raw.values().removeIf(Objects::isNull);
         raw.put("tier", key.tier());
         raw.put("expansion", n == 1 ? "one sale at the average" : n == 2 ? "low and high" : "low, high and " + (n - 2) + " at the average");
         List<Sale> sales = new ArrayList<>();
