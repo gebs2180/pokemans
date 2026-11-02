@@ -19,6 +19,9 @@
 
 	# The API. Only health is exposed from actuator.
 	handle /api/* {
+		request_body {
+			max_size 1MB
+		}
 		reverse_proxy backend:8080
 	}
 	handle /actuator/health {
@@ -41,6 +44,12 @@
 
 	log {
 		output stdout
-		format console
+		# An invite link is a key to an org for a week, and its token is in the path.
+		format filter {
+			wrap console
+			fields {
+				request>uri regexp "^/api/invites/[^/]+" "/api/invites/REDACTED"
+			}
+		}
 	}
 }

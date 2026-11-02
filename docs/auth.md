@@ -39,6 +39,10 @@ The backend is an OAuth2 resource server (HLD §7). The SPA logs in with a manag
    exports.onExecutePostLogin = async (event, api) => {
      const roles = event.authorization?.roles ?? [];
      api.accessToken.setCustomClaim('https://pokemans.app/roles', roles);
+     // The two sides of a deal reach each other by this email. Verified only: it's shown to strangers.
+     if (event.user.email && event.user.email_verified) {
+       api.accessToken.setCustomClaim('email', event.user.email);
+     }
 
      if (roles.includes('ADMIN')) {
        // Admins must pass MFA on every login; no token is issued unless they do.

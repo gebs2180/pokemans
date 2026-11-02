@@ -22,6 +22,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -89,12 +90,18 @@ class Shipping {
             bought = shipper.buy(from.toAddress(), to.toAddress(), new ShippingProvider.Parcel(p.length(), p.width(), p.height(), p.weightOz()),
                     insuredValue, listingId.toString());
         } catch (RuntimeException e) {
-            // The provider's answer can quote either address, so it goes to the log (and Sentry), not to the caller.
-            log.error("Couldn't buy the label for listing {}", listingId, e);
+            // The provider's answer can quote either address, and ERROR lines go to Sentry, so neither the log nor the
+            // caller gets its text. The provider's own dashboard has the request and the answer.
+            log.error("Couldn't buy the label for listing {}: {}", listingId, failure(e));
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "We couldn't buy the shipping label just now. Try again later; we've been told.", e);
+                    "We couldn't buy the shipping label just now. Try again later; we've been told.");
         }
         return labels.save(new ShippingLabel(listingId, buyerOrgId, from.getId(), to.getId(), bought, insuredValue));
+    }
+
+    /** What went wrong, without the provider's answer: a RestClient exception's message carries the response body. */
+    private static String failure(RuntimeException e) {
+        return e instanceof RestClientResponseException r ? "the provider answered " + r.getStatusCode().value() : e.getClass().getSimpleName();
     }
 
     /**

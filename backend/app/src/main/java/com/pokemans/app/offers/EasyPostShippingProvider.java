@@ -14,6 +14,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -64,6 +65,10 @@ class EasyPostShippingProvider implements ShippingProvider {
 
     @Override
     public Label buy(Address from, Address to, Parcel parcel, BigDecimal insuredValue, String reference) {
+        Map<String, Object> earlier = shipmentBy(reference);
+        if (!map(earlier, "postage_label").isEmpty()) {
+            return label(earlier);
+        }
         Map<String, Object> shipment = new LinkedHashMap<>();
         shipment.put("from_address", address(from));
         shipment.put("to_address", address(to));
@@ -79,13 +84,30 @@ class EasyPostShippingProvider implements ShippingProvider {
         Map<String, Object> bought = http.post().uri("/shipments/{id}/buy", shipmentId).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("rate", Map.of("id", string(rate, "id")), "insurance", insuredValue.toPlainString()))
                 .retrieve().body(OBJECT);
+        return label(bought);
+    }
+
+    /**
+     * The shipment an earlier try made under this reference, or null. A purchase whose answer was lost (a timeout, a
+     * crash before we recorded it) is found here instead of paid for twice. EasyPost finds a shipment by id or reference;
+     * any refusal means none, but a failure to ask is thrown, since we then can't tell whether a label was bought.
+     */
+    private Map<String, Object> shipmentBy(String reference) {
+        try {
+            return http.get().uri("/shipments/{reference}", reference).retrieve().body(OBJECT);
+        } catch (HttpClientErrorException e) {
+            return null;
+        }
+    }
+
+    private static Label label(Map<String, Object> bought) {
         Map<String, Object> selected = map(bought, "selected_rate");
         Map<String, Object> label = map(bought, "postage_label");
         BigDecimal insurance = list(bought, "fees").stream()
                 .filter(f -> "InsuranceFee".equals(f.get("type")))
                 .map(f -> new BigDecimal(String.valueOf(f.get("amount"))))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new Label(NAME, shipmentId, string(selected, "carrier"), string(selected, "service"), string(bought, "tracking_code"),
+        return new Label(NAME, string(bought, "id"), string(selected, "carrier"), string(selected, "service"), string(bought, "tracking_code"),
                 string(label, "label_url"), new BigDecimal(string(selected, "rate")), insurance);
     }
 

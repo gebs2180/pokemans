@@ -23,10 +23,16 @@ public class CurrentUser {
     public AppUser get() {
         JwtAuthenticationToken token = token();
         String subject = token.getName();
-        return users.findBySubject(subject).orElseGet(() -> {
-            provisioner.createIfAbsent(subject, token.getToken().getClaimAsString("email"));
+        String email = token.getToken().getClaimAsString("email");
+        AppUser user = users.findBySubject(subject).orElseGet(() -> {
+            provisioner.createIfAbsent(subject, email);
             return users.findBySubject(subject).orElseThrow();
         });
+        // The email is how the two sides of a deal reach each other, so it follows the login.
+        if (email != null && !email.equals(user.getEmail())) {
+            provisioner.updateEmail(user.getId(), email);
+        }
+        return user;
     }
 
     public UUID id() {
