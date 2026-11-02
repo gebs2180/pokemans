@@ -100,6 +100,10 @@ public class Provenance {
         return method != AuthMethod.PHOTO_REVIEW || !highRisk(risk);
     }
 
+    /** A card was just found counterfeit or suspected of it. Published inside the finding's transaction. */
+    public record Doubted(UUID cardItemId) {
+    }
+
     private final Catalog catalog;
     private final AuthenticityVerificationRepository verifications;
     private final CustodyRecordRepository custody;

@@ -10,15 +10,21 @@ import com.pokemans.app.storage.BlobStore;
 import com.pokemans.app.storage.StorageProperties;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -30,6 +36,9 @@ class PhotoService {
 
     static final Set<String> ACCEPTED_TYPES = Set.of("image/jpeg", "image/png");
 
+    /** How long a photo waits its turn to be checked before the seller is asked to try again. */
+    private static final long CHECK_WAIT_SECONDS = 60;
+
     private final IntakeService intake;
     private final CurrentUser currentUser;
     private final PhotoRepository photos;
@@ -39,10 +48,12 @@ class PhotoService {
     private final ApplicationEventPublisher events;
     private final OrgAccess access;
     private final Consents consents;
+    private final Semaphore checks;
+    private final TransactionTemplate transaction;
 
     PhotoService(IntakeService intake, CurrentUser currentUser, PhotoRepository photos, BlobStore blobs,
                  StorageProperties storage, QualityProperties qualityProperties, ApplicationEventPublisher events,
-                 OrgAccess access, Consents consents) {
+                 OrgAccess access, Consents consents, PlatformTransactionManager transactions) {
         this.intake = intake;
         this.currentUser = currentUser;
         this.photos = photos;
@@ -52,6 +63,8 @@ class PhotoService {
         this.events = events;
         this.access = access;
         this.consents = consents;
+        this.checks = new Semaphore(storage.photoChecksAtOnce(), true);
+        this.transaction = new TransactionTemplate(transactions);
     }
 
     @Transactional
@@ -68,14 +81,47 @@ class PhotoService {
             throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE,
                     "Photos must be between 1 byte and " + storage.maxUploadBytes() + " bytes");
         }
+        requireRoom(orgId, card.getId());
         Photo photo = photos.save(new Photo(orgId, card.getId(), side, contentType, sizeBytes, currentUser.id()));
         BlobStore.PresignedUpload upload = blobs.presignUpload(storage.photoBucket(), photo.getStorageKey(), contentType, sizeBytes);
         return new UploadSlot(photo.getId(), upload.url(), upload.method(), upload.headers(), upload.expiresAt());
     }
 
-    /** Idempotent: confirming a photo that was already checked returns the stored result. */
-    @Transactional
+    private void requireRoom(UUID orgId, UUID cardId) {
+        if (photos.countByCardItemId(cardId) >= storage.maxPhotosPerCard()) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "This card has had " + storage.maxPhotosPerCard() + " upload attempts, which is the limit. Message us if you need more.");
+        }
+        if (photos.countByOrgIdAndCreatedAtAfter(orgId, Instant.now().minus(Duration.ofDays(1))) >= storage.maxPhotosPerOrgPerDay()) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "You've reached the limit of " + storage.maxPhotosPerOrgPerDay() + " uploads in a day. Try again tomorrow.");
+        }
+    }
+
+    /**
+     * Waits its turn outside the transaction, so a burst of photos holds no database connections and
+     * only a few decode at once: phone photos at full size could otherwise exhaust the server.
+     */
     PhotoView confirm(UUID orgId, UUID photoId) {
+        boolean turn;
+        try {
+            turn = checks.tryAcquire(CHECK_WAIT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            turn = false;
+        }
+        if (!turn) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "We're checking a lot of photos right now. Try again in a minute.");
+        }
+        try {
+            return transaction.execute(status -> check(orgId, photoId));
+        } finally {
+            checks.release();
+        }
+    }
+
+    /** Idempotent: confirming a photo that was already checked returns the stored result. */
+    private PhotoView check(UUID orgId, UUID photoId) {
         if (access.require(orgId, OrgType.values()).getType() != OrgType.PARTNER) {
             consents.requireAccepted(orgId);
         }

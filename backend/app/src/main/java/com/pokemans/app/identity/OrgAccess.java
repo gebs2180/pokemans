@@ -1,7 +1,9 @@
 package com.pokemans.app.identity;
 
 import java.util.Arrays;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,13 @@ public class OrgAccess {
             throw notFound();
         }
         return org;
+    }
+
+    /** Whether one login is a member of both orgs, so a sale between them would be a person selling to themself. */
+    @Transactional(readOnly = true)
+    public boolean shareMember(UUID orgId, UUID otherOrgId) {
+        Set<UUID> members = memberships.findByOrgId(orgId).stream().map(Membership::getUserId).collect(Collectors.toSet());
+        return memberships.findByOrgId(otherOrgId).stream().anyMatch(m -> members.contains(m.getUserId()));
     }
 
     private static ResponseStatusException notFound() {

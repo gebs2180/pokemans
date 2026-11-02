@@ -7,9 +7,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.SQLRestriction;
 
-/** A user's access to one org, created by accepting an invite. */
+/** A user's access to one org, created by accepting an invite. An ended row stays for the record and counts for nothing. */
 @Entity
+@SQLRestriction("ended_at is null")
 @Table(name = "membership")
 public class Membership {
 
@@ -20,6 +22,9 @@ public class Membership {
     @Enumerated(EnumType.STRING)
     private Role role;
     private Instant createdAt;
+    private Instant endedAt;
+    private UUID endedBy;
+    private String endReason;
 
     protected Membership() {
     }
@@ -30,6 +35,12 @@ public class Membership {
         this.userId = userId;
         this.role = role;
         this.createdAt = Instant.now();
+    }
+
+    void end(UUID by, String reason, Instant now) {
+        this.endedBy = by;
+        this.endReason = reason;
+        this.endedAt = now;
     }
 
     public UUID getId() {

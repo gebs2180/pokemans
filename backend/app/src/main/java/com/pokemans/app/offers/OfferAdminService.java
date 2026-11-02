@@ -2,6 +2,7 @@ package com.pokemans.app.offers;
 
 import com.pokemans.app.identity.CurrentUser;
 import com.pokemans.app.identity.Directory;
+import com.pokemans.app.provenance.Provenance;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -12,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -163,6 +165,33 @@ class OfferAdminService {
         }
         voids.saveAndFlush(new CardOfferVoid(offerId, reason, currentUser.id()));
         return views(List.of(offer)).getFirst();
+    }
+
+    /**
+     * A doubt is final until cleared (Zach, 2026-11-02), so the moment one is recorded the card's offers are
+     * voided and any listing comes down, in the finding's own transaction. One a buyer already took stays:
+     * only the admin can say whether to cancel it. A later "verified" needs a new offer.
+     */
+    @EventListener
+    void on(Provenance.Doubted doubt) {
+        lockCard(doubt.cardItemId());
+        String reason = "We have a doubt about this card's authenticity, so it came off the market.";
+        Instant now = Instant.now();
+        for (CardOffer offer : offers.findByCardItemId(doubt.cardItemId())) {
+            if (voids.findByOfferId(offer.getId()).isPresent()) {
+                continue;
+            }
+            List<SaleListing> posted = listings.findByOfferIdIn(List.of(offer.getId()));
+            Map<UUID, List<ListingEvent>> history = listingService.history(posted);
+            List<SaleListing> open = posted.stream()
+                    .filter(l -> ListingService.status(l, history.getOrDefault(l.getId(), List.of()), now) == ListingService.Status.OPEN).toList();
+            boolean taken = history.values().stream().flatMap(List::stream).anyMatch(e -> e.getType() == ListingEvent.Type.ACCEPTED);
+            if (taken || (open.isEmpty() && !offer.getExpiresAt().isAfter(now))) {
+                continue;
+            }
+            open.forEach(l -> events.saveAndFlush(ListingEvent.voided(l.getId(), currentUser.id(), reason)));
+            voids.saveAndFlush(new CardOfferVoid(offer.getId(), reason, currentUser.id()));
+        }
     }
 
     /**

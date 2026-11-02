@@ -15,6 +15,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param uploadUrlTtl   how long a presigned upload URL stays valid
  * @param downloadUrlTtl how long a presigned link for viewing a photo stays valid
  * @param maxUploadBytes largest photo accepted
+ * @param maxPhotosPerCard upload attempts allowed on one card, retakes included
+ * @param maxPhotosPerOrgPerDay upload attempts allowed for one org in 24 hours
+ * @param photoChecksAtOnce photos decoded at the same time: a 48 MP photo needs about 150 MB
  * @param autoCreateBuckets create the photo bucket (versioned) at startup if missing; local dev and tests only
  * @param chunkedEncoding aws-chunked uploads from the app; Cloudflare R2 rejects them (403), so production turns this off
  */
@@ -30,6 +33,9 @@ public record StorageProperties(
         @DefaultValue("10m") Duration uploadUrlTtl,
         @DefaultValue("15m") Duration downloadUrlTtl,
         @DefaultValue("26214400") long maxUploadBytes,
+        @DefaultValue("50") int maxPhotosPerCard,
+        @DefaultValue("200") int maxPhotosPerOrgPerDay,
+        @DefaultValue("2") int photoChecksAtOnce,
         @DefaultValue("false") boolean autoCreateBuckets,
         @DefaultValue("true") boolean chunkedEncoding) {
 

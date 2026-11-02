@@ -2,6 +2,7 @@ package com.pokemans.app.offers;
 
 import com.pokemans.app.identity.CurrentUser;
 import com.pokemans.app.identity.Directory;
+import com.pokemans.app.identity.OrgAccess;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.storage.BlobStore;
 import com.pokemans.app.storage.StorageProperties;
@@ -174,10 +175,11 @@ class ListingService {
     private final CurrentUser currentUser;
     private final CardItems cardItems;
     private final JdbcTemplate jdbc;
+    private final OrgAccess access;
 
     ListingService(CardOfferRepository offers, CardOfferVoidRepository voids, SaleListingRepository listings, ListingEventRepository events,
                    OffersProperties properties, Directory directory, Shipping shipping, BlobStore blobs, StorageProperties storage,
-                   CurrentUser currentUser, CardItems cardItems, JdbcTemplate jdbc) {
+                   CurrentUser currentUser, CardItems cardItems, JdbcTemplate jdbc, OrgAccess access) {
         this.offers = offers;
         this.voids = voids;
         this.listings = listings;
@@ -190,6 +192,7 @@ class ListingService {
         this.currentUser = currentUser;
         this.cardItems = cardItems;
         this.jdbc = jdbc;
+        this.access = access;
     }
 
     /** The seller's view: the latest offer on the card and its latest listing. */
@@ -296,6 +299,9 @@ class ListingService {
                 Status.WITHDRAWN, "The seller withdrew this card.", Status.EXPIRED, "This listing has expired.",
                 Status.VOIDED, "This card is no longer for sale.", Status.CANCELLED, "Another buyer took this card first.",
                 Status.BACK, "Another buyer took this card first."));
+        if (access.shareMember(listing.getOrgId(), buyerOrgId)) {
+            throw conflict("You can't buy your own card.");
+        }
         if (shipping.address(buyerOrgId).isEmpty()) {
             throw conflict("Add the address cards should ship to first.");
         }

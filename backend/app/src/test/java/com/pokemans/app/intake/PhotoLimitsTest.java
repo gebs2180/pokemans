@@ -80,6 +80,26 @@ class PhotoLimitsTest {
     }
 
     @Test
+    void aCardsUploadAttemptsRunOut() throws Exception {
+        for (int i = 0; i < storage.maxPhotosPerCard(); i++) {
+            slot("DETAIL", "image/jpeg", 1000).andExpect(status().isCreated());
+        }
+        slot("DETAIL", "image/jpeg", 1000).andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void anOrgsUploadAttemptsForTheDayRunOutAcrossCards() throws Exception {
+        for (int i = 0; i < storage.maxPhotosPerOrgPerDay(); i++) {
+            if (i % storage.maxPhotosPerCard() == 0) {
+                cardId = api.card(orgId, "Card " + i, seller);
+            }
+            slot("DETAIL", "image/jpeg", 1000).andExpect(status().isCreated());
+        }
+        cardId = api.card(orgId, "One more", seller);
+        slot("DETAIL", "image/jpeg", 1000).andExpect(status().isTooManyRequests());
+    }
+
+    @Test
     void theUploadHasToBeTheSizeAndTypeTheSlotWasSignedFor() throws Exception {
         byte[] photo = TestImages.goodFront();
         String body = slot("FRONT", "image/png", photo.length).andReturn().getResponse().getContentAsString();

@@ -21,6 +21,8 @@ export type Me = {
 
 export type Org = { id: string; name: string; type: OrgType; createdAt: string; members: number }
 export type CreatedInvite = { id: string; token: string; acceptPath: string; expiresAt: string }
+export type OpenInvite = { id: string; createdAt: string; expiresAt: string }
+export type OrgMember = { id: string; email: string | null; role: string; joinedAt: string }
 export type InvitePreview = { orgName: string; orgType: OrgType; role: string; expiresAt: string; usable: boolean }
 
 export type ContainerSummary = { id: string; name: string; createdAt: string; cards: number }

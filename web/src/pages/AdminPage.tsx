@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention, type Org, type OrgType, type OverdueDeals, type QueueItem } from '../api'
 import { useLoad } from '../useLoad'
 import { PageError } from '../ui'
+import { OrgPeople } from './OrgPeople'
 
 /** How much is waiting on the admin, with the way to each. A failed count says so: zero would read as all clear. */
 function NeedsAttention({ deals, dealsError }: { deals: DealAttention[] | null; dealsError: string | null }) {
@@ -44,6 +45,8 @@ export function AdminPage() {
   // The offers beta needs collector and buyer orgs; partner orgs are for the paused collateral side.
   const [type, setType] = useState<OrgType>('COLLECTOR')
   const [invites, setInvites] = useState<Record<string, CreatedInvite>>({})
+  const [people, setPeople] = useState<string | null>(null)
+  const [invitesMade, setInvitesMade] = useState(0)
   const [actionError, setActionError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
@@ -67,6 +70,7 @@ export function AdminPage() {
     try {
       const invite = await api<CreatedInvite>('POST', apiPath`/api/admin/orgs/${orgId}/invites`, {})
       setInvites((current) => ({ ...current, [orgId]: invite }))
+      setInvitesMade((made) => made + 1)
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err))
     }
@@ -115,6 +119,9 @@ export function AdminPage() {
               </span>{' '}
               <button className="link" onClick={() => createInvite(org.id)}>
                 New invite link
+              </button>{' '}
+              <button className="link" aria-expanded={people === org.id} onClick={() => setPeople(people === org.id ? null : org.id)}>
+                People and links
               </button>
               {link && (
                 <div className="invite">
@@ -125,6 +132,7 @@ export function AdminPage() {
                   </span>
                 </div>
               )}
+              {people === org.id && <OrgPeople orgId={org.id} invitesMade={invitesMade} />}
             </li>
           )
         })}

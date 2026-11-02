@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,14 +30,16 @@ class ProvenanceService {
     private final CardItems cardItems;
     private final Catalog catalog;
     private final CurrentUser currentUser;
+    private final ApplicationEventPublisher events;
 
     ProvenanceService(AuthenticityVerificationRepository verifications, CustodyRecordRepository custody, CardItems cardItems,
-                      Catalog catalog, CurrentUser currentUser) {
+                      Catalog catalog, CurrentUser currentUser, ApplicationEventPublisher events) {
         this.verifications = verifications;
         this.custody = custody;
         this.cardItems = cardItems;
         this.catalog = catalog;
         this.currentUser = currentUser;
+        this.events = events;
     }
 
     /**
@@ -69,8 +72,12 @@ class ProvenanceService {
                         "Verifying from photos needs a passing close-up of the card among the photos named");
             }
         }
-        return verifications.save(new AuthenticityVerification(orgId, cardId, identity.catalogCardId(), finding, method,
+        AuthenticityVerification saved = verifications.save(new AuthenticityVerification(orgId, cardId, identity.catalogCardId(), finding, method,
                 blankToNull(note), evidence, currentUser.id()));
+        if (finding != Provenance.Finding.VERIFIED_AUTHENTIC) {
+            events.publishEvent(new Provenance.Doubted(cardId));
+        }
+        return saved;
     }
 
     /**

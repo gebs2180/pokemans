@@ -75,5 +75,9 @@ interface PhotoRepository extends JpaRepository<Photo, UUID> {
 
     Optional<Photo> findByIdAndOrgId(UUID id, UUID orgId);
 
+    long countByCardItemId(UUID cardItemId);
+
+    long countByOrgIdAndCreatedAtAfter(UUID orgId, Instant since);
+
     boolean existsByOrgIdAndSha256AndCardItemIdNot(UUID orgId, String sha256, UUID cardItemId);
 }
