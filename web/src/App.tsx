@@ -5,9 +5,12 @@ import { CardPage } from './pages/CardPage'
 import { ContainerPage } from './pages/ContainerPage'
 import { HomePage } from './pages/HomePage'
 import { InvitePage } from './pages/InvitePage'
+import { HowItWorksPage } from './pages/HowItWorksPage'
 import { DealsPage, MarketPage } from './pages/MarketPage'
 import { OrgPage } from './pages/OrgPage'
-import { Loading } from './ui'
+import { TermsPage } from './pages/TermsPage'
+import { Loading, NotFound } from './ui'
+import { useRouteFocus } from './useRouteFocus'
 
 // Admin and review screens are only for us, so partners' phones don't download them.
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })))
@@ -29,12 +32,16 @@ export const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
 function App() {
   const { isLoading, isAuthenticated, user, error, loginWithRedirect, logout } = useAuth0()
   const location = useLocation()
+  useRouteFocus()
 
   return (
     <div className={/^\/admin\/(review|valuation|centering)/.test(location.pathname) ? 'shell wide' : 'shell'}>
       <header className="topbar">
         <Link to="/" className="brand">
           Rawmark
+        </Link>
+        <Link to="/how-it-works" className="nav-link">
+          How it works
         </Link>
         {isAuthenticated && (
           <span className="who">
@@ -49,9 +56,16 @@ function App() {
       {error && <p className="error" role="alert">Login error: {error.message}</p>}
       {isLoading && <Loading />}
 
-      {!isLoading && !isAuthenticated && (
+      {!isLoading && !isAuthenticated && location.pathname === '/how-it-works' && (
+        <main>
+          <HowItWorksPage />
+        </main>
+      )}
+
+      {!isLoading && !isAuthenticated && location.pathname !== '/how-it-works' && (
         <main className="welcome">
           <p className="lead">{COLLATERAL ? 'Raw collection collateral reports.' : 'Instant offers on raw cards.'}</p>
+          {!COLLATERAL && <p>A small closed test, run by Zach.</p>}
           {location.pathname.startsWith('/invite/') && (
             <p>You've been invited to join Rawmark. Log in, or sign up, to see the invite and accept it.</p>
           )}
@@ -66,6 +80,7 @@ function App() {
           <Suspense fallback={<Loading />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/how-it-works" element={<HowItWorksPage />} />
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/review" element={<ReviewQueuePage />} />
               <Route path="/admin/outcomes" element={<AdminOutcomesPage />} />
@@ -80,11 +95,12 @@ function App() {
               {COLLATERAL && <Route path="/admin/valuation-runs/:runId" element={<ValuationRunPage />} />}
               <Route path="/invite/:token" element={<InvitePage />} />
               <Route path="/orgs/:orgId" element={<OrgPage />} />
+              <Route path="/orgs/:orgId/terms" element={<TermsPage />} />
               <Route path="/orgs/:orgId/:kind/:containerId" element={<ContainerPage />} />
               <Route path="/orgs/:orgId/cards/:cardId" element={<CardPage />} />
               <Route path="/orgs/:orgId/market" element={<MarketPage />} />
               <Route path="/orgs/:orgId/deals" element={<DealsPage />} />
-              <Route path="*" element={<p>Page not found.</p>} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </main>

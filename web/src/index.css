@@ -1524,3 +1524,49 @@ button.link:active:not(:disabled) {
 .frame-chosen td {
   font-weight: 600;
 }
+
+/* Focus moves to a page's heading on navigation, for screen readers: nobody can act on it, so it shows no ring. */
+h1[tabindex='-1']:focus {
+  outline: none;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: var(--tap);
+  margin-right: auto;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+/* The bar can't hold the email too on a phone. */
+@media (max-width: 30rem) {
+  .who .email {
+    display: none;
+  }
+}
+
+/* A photo that didn't pass: there to compare with its reasons, and marked so it can't pass for the one in use. */
+.thumb.rejected {
+  border: 2px solid var(--color-warning, currentColor);
+  opacity: 0.85;
+}
+
+.guide h2 {
+  margin-top: var(--space-5);
+}
+
+.guide ul {
+  padding-left: 1.2rem;
+}
+
+.guide li {
+  margin: var(--space-2) 0;
+}
+
+/* The whole text on its own page, with no box of its own to scroll. */
+.terms.terms-full {
+  max-height: none;
+  overflow: visible;
+}

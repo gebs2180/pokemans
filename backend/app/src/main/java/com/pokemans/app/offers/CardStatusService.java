@@ -3,6 +3,7 @@ package com.pokemans.app.offers;
 import com.pokemans.app.condition.Assessments;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.valuation.CardInputs;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -26,17 +27,36 @@ class CardStatusService {
      * @param canOffer  true when asking for an offer can work right now
      * @param condition the grades the card likely is, in our view, once we've assessed it, and our centering
      *                  measurement if there is one; else null
+     * @param deadline  when the stage runs out: the seller's last day to ship, or when the offer or posting ends; else null
      */
-    record CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer, Assessments.Summary condition) {
+    record CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer, Assessments.Summary condition,
+                      Instant deadline) {
 
         CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer) {
-            this(cardId, stage, identity, nextStep, canOffer, null);
+            this(cardId, stage, identity, nextStep, canOffer, null, null);
         }
 
         CardStatus withCondition(Assessments.Summary summary) {
-            return new CardStatus(cardId, stage, identity, nextStep, canOffer, summary);
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, summary, deadline);
+        }
+
+        CardStatus withDeadline(Instant at) {
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, at);
         }
     }
+
+    /** What's waiting on the seller, for the home page. Everything else on the way to a sale is waiting on us or a buyer. */
+    enum Need { LABEL_READY, OFFER_EXPIRING, OFFER_READY, GET_OFFER, RETAKE }
+
+    /**
+     * @param due   when it runs out, or null
+     * @param sides for a retake, the sides to take again
+     */
+    record NeedsYou(UUID cardId, String label, Need need, Instant due, List<String> sides) {
+    }
+
+    /** An offer this close to ending says so, on top of saying it's ready. */
+    static final Duration EXPIRING_SOON = Duration.ofHours(48);
 
     private static final String NO_NOTIFICATIONS = " We don't send notifications yet, so check back here.";
 
@@ -46,10 +66,12 @@ class CardStatusService {
     private final CardItems cardItems;
     private final CardOfferVoidRepository voids;
     private final Assessments assessments;
+    private final Shipping shipping;
 
     CardStatusService(OfferService offers, SaleListingRepository listings, ListingEventRepository events, CardItems cardItems,
-                      CardOfferVoidRepository voids, Assessments assessments) {
+                      CardOfferVoidRepository voids, Assessments assessments, Shipping shipping) {
         this.offers = offers;
+        this.shipping = shipping;
         this.assessments = assessments;
         this.voids = voids;
         this.listings = listings;
@@ -63,27 +85,59 @@ class CardStatusService {
         return status.stage() == Stage.LOT ? status : status.withCondition(assessments.summary(cardId).orElse(null));
     }
 
+    /**
+     * The org's cards that are waiting on the seller. Only a collector is nudged about offers: a contributor
+     * isn't there to sell, but still ships what they sold and retakes what failed.
+     */
+    @Transactional(readOnly = true)
+    List<NeedsYou> needsYou(UUID orgId, boolean selling) {
+        Instant now = Instant.now();
+        return cardItems.inCollectionsOf(orgId).stream().map(card -> {
+            CardStatus status = stage(card.id());
+            List<String> sides = status.stage() == Stage.PHOTOS ? cardItems.sidesToRetake(card.id()) : List.of();
+            Need need = need(status, !sides.isEmpty(), now);
+            boolean wanted = need != null && (selling || need == Need.LABEL_READY || need == Need.RETAKE);
+            return wanted ? new NeedsYou(card.id(), card.label(), need, status.deadline(), sides) : null;
+        }).filter(java.util.Objects::nonNull).toList();
+    }
+
+    /** What a card in this state needs from its seller, or null. A sold card needs them until an arrival shows its label was used. */
+    static Need need(CardStatus status, boolean retake, Instant now) {
+        return switch (status.stage()) {
+            case SOLD -> status.deadline() == null ? null : Need.LABEL_READY;
+            case OFFERED -> status.deadline().isBefore(now.plus(EXPIRING_SOON)) ? Need.OFFER_EXPIRING : Need.OFFER_READY;
+            case READY -> Need.GET_OFFER;
+            case PHOTOS -> retake ? Need.RETAKE : null;
+            default -> null;
+        };
+    }
+
     private CardStatus stage(UUID cardId) {
         CardItems.CardItemRef card = cardItems.get(cardId);
         if (card.lot()) {
             return new CardStatus(cardId, Stage.LOT, null, "Lots don't get offers: add the cards worth $25 or more one by one.", false);
         }
         Optional<SaleListing> listing = listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardId);
-        ListingService.Status listed = listing.map(l -> ListingService.status(l, events.findByListingIdInOrderByCreatedAtAsc(List.of(l.getId())),
-                Instant.now())).orElse(null);
+        List<ListingEvent> history = listing.map(l -> events.findByListingIdInOrderByCreatedAtAsc(List.of(l.getId()))).orElse(List.of());
+        ListingService.Status listed = listing.map(l -> ListingService.status(l, history, Instant.now())).orElse(null);
         OfferService.Quote quote = offers.quote(cardId);
         CardInputs in = quote.value().inputs();
         String identity = identity(in.identity());
         if (listed == ListingService.Status.ACCEPTED) {
-            return new CardStatus(cardId, Stage.SOLD, identity, "A buyer took it: ship it with the prepaid label once it shows on this card's page.", false);
+            Instant shipBy = ListingService.outcome(history) != null ? null
+                    : shipping.label(listing.orElseThrow().getId()).map(l -> l.getCreatedAt().plus(ListingService.SHIP_WITHIN)).orElse(null);
+            return new CardStatus(cardId, Stage.SOLD, identity, "A buyer took it: ship it with the prepaid label once it shows on this card's page.", false)
+                    .withDeadline(shipBy);
         }
         if (listed == ListingService.Status.OPEN) {
-            return new CardStatus(cardId, Stage.LISTED, identity, "Posted to buyers: the first to accept buys it at the price.", false);
+            return new CardStatus(cardId, Stage.LISTED, identity, "Posted to buyers: the first to accept buys it at the price.", false)
+                    .withDeadline(listing.orElseThrow().getExpiresAt());
         }
         Optional<CardOffer> latest = offers.latest(cardId).filter(o -> o.getExpiresAt().isAfter(Instant.now()))
                 .filter(o -> voids.findByOfferId(o.getId()).isEmpty());
         if (latest.isPresent()) {
-            return new CardStatus(cardId, Stage.OFFERED, identity, "You have an offer: sell at it, or let it expire.", false);
+            return new CardStatus(cardId, Stage.OFFERED, identity, "You have an offer: sell at it, or let it expire.", false)
+                    .withDeadline(latest.orElseThrow().getExpiresAt());
         }
         List<CardItems.PhotoRef> photos = cardItems.passedPhotos(cardId);
         boolean captured = photos.stream().anyMatch(p -> p.side().equals("FRONT")) && photos.stream().anyMatch(p -> p.side().equals("BACK"));

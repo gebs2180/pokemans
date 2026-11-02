@@ -1,7 +1,39 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type Org, type OrgType } from '../api'
+import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention, type Org, type OrgType, type QueueItem } from '../api'
 import { useLoad } from '../useLoad'
+import { PageError } from '../ui'
+
+/** How much is waiting on the admin, with the way to each. A failed count says so: zero would read as all clear. */
+function NeedsAttention() {
+  const api = useApi()
+  const queue = useLoad(() => api<QueueItem[]>('GET', '/api/admin/review-queue'), [api])
+  const deals = useLoad(() => api<DealAttention>('GET', '/api/admin/deals/attention'), [api])
+  if (queue.error || deals.error) return <p className="error" role="alert">Couldn't load what needs attention: {queue.error ?? deals.error}</p>
+  if (!queue.data || !deals.data) return null
+
+  const lines = [
+    { count: queue.data.filter((i) => i.identified && !i.priced).length, text: 'with no comps', to: '/admin/review' },
+    { count: deals.data.returns, text: 'sent back in the last 14 days', to: '/admin/deals' },
+    { count: deals.data.overdueLabels, text: 'past the ship-by date with nothing recorded', to: '/admin/deals' },
+  ].filter((l) => l.count > 0)
+  return (
+    <section className="panel">
+      <h2>Needs attention: {lines.reduce((total, l) => total + l.count, 0)}</h2>
+      {lines.length > 0 && (
+        <ul>
+          {lines.map((l) => (
+            <li key={l.text}>
+              <Link to={l.to}>
+                {l.count} card{l.count === 1 ? '' : 's'} {l.text}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
 
 export function AdminPage() {
   const api = useApi()
@@ -42,7 +74,7 @@ export function AdminPage() {
     navigator.clipboard.writeText(link).catch(() => setActionError('Could not copy; select the link and copy it by hand.'))
   }
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
 
   return (
     <>
@@ -52,6 +84,7 @@ export function AdminPage() {
         <Link to="/admin/labels">Labels to buy →</Link> ·{' '}
         <Link to="/admin/shipping">Postage to bill →</Link> · <Link to="/admin/centering">Centering labels →</Link>
       </p>
+      <NeedsAttention />
       <h1>Orgs</h1>
       <form onSubmit={createOrg} className="row">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Org name" aria-label="Org name" required maxLength={200} />

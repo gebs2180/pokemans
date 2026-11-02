@@ -97,7 +97,33 @@ export type CardStatus = {
   nextStep: string
   canOffer: boolean
   condition: ConditionSummary | null
+  /** When the stage runs out: the last day to ship, or when the offer or posting ends. */
+  deadline: string | null
 }
+
+/** A deadline as a date nobody can misread: "Nov 5". */
+export function shortDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+/** The stage's deadline, as a date on the card. */
+export function deadlineText({ stage, deadline }: Pick<CardStatus, 'stage' | 'deadline'>) {
+  if (!deadline) return null
+  const label: Partial<Record<CardStage, string>> = { SOLD: 'Ship by', OFFERED: 'Offer good until', LISTED: 'Posted until' }
+  return label[stage] ? `${label[stage]} ${shortDate(deadline)}` : null
+}
+
+/** What's waiting on a seller, for their home page. */
+export type NeedsYouItem = {
+  cardId: string
+  label: string
+  need: 'LABEL_READY' | 'OFFER_EXPIRING' | 'OFFER_READY' | 'GET_OFFER' | 'RETAKE'
+  due: string | null
+  sides: Side[]
+}
+
+/** Deals the admin should look at. */
+export type DealAttention = { returns: number; overdueLabels: number }
 
 export type UploadSlot = {
   photoId: string
@@ -169,7 +195,12 @@ export function useApi() {
         throw new ApiError(401, 'Your session has ended. Redirecting to log in…')
       }
       if (!response.ok) {
-        let detail = `${method} ${path} failed: ${response.status}`
+        let detail =
+          response.status === 403
+            ? "You don't have access to this page."
+            : response.status === 404
+              ? "We couldn't find that."
+              : `${method} ${path} failed: ${response.status}`
         try {
           const problem = await response.json()
           detail = problem.detail ?? problem.title ?? detail

@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { STAGE_LABEL, type CardStage } from './api'
 
 /** The colour a chip, alert or message takes. Each maps to a token pair in index.css. */
@@ -30,6 +31,30 @@ export function StageChip({ stage }: { stage: CardStage }) {
 /** A page or panel still loading. Not a live region: pages already announce what they load. */
 export function Loading({ children = 'Loading…' }: { children?: ReactNode }) {
   return <p className="loading">{children}</p>
+}
+
+/** A page that couldn't be shown: why, and the way back. */
+export function PageError({ message }: { message: string }) {
+  return (
+    <>
+      <h1>Something went wrong</h1>
+      <p className="error" role="alert">{message}</p>
+      <p>
+        <Link to="/">Go to your home page</Link>
+      </p>
+    </>
+  )
+}
+
+export function NotFound() {
+  return (
+    <>
+      <h1>Page not found</h1>
+      <p>
+        <Link to="/">Go to your home page</Link>
+      </p>
+    </>
+  )
 }
 
 /** Nothing to show yet, and what to do about it. */

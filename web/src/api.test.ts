@@ -21,6 +21,11 @@ describe('useApi', () => {
     })
   })
 
+  it('words a refusal with no body for people', async () => {
+    vi.stubGlobal('fetch', async () => respond(403))
+    await expect(api()('GET', '/api/admin/orgs')).rejects.toMatchObject({ status: 403, message: "You don't have access to this page." })
+  })
+
   it('turns a problem-detail body into an ApiError', async () => {
     vi.stubGlobal('fetch', async () => respond(409, { title: 'Conflict', detail: 'Already identified' }))
 

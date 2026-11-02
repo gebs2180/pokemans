@@ -61,15 +61,18 @@ test('a raw card goes from photos to an offer, a sale and its arrival', async ({
   // 1. The collector joins from the invite and accepts the seller terms.
   const collector = await signIn(browser, testInfo, `collector-${tag}@e2e.test`, collectorInvite)
   await collector.getByRole('button', { name: /accept invite/i }).click()
+  await expect(collector.getByRole('heading', { level: 1, name: 'How it works' })).toBeVisible()
+  await expectNoSideScroll(collector)
+  await collector.getByRole('button', { name: /continue to the terms/i }).click()
   await collector.getByRole('button', { name: /i agree/i }).click()
 
-  // 2. A collection, a card, and its front and back photos through the file inputs.
-  await collector.getByLabel(/new collection name/i).fill('Binder 1')
-  await collector.getByRole('button', { name: 'Create' }).click()
-  await collector.getByRole('link', { name: 'Binder 1' }).click()
+  // 2. Straight to adding a card (a binder is waiting), and its front and back photos through the file inputs.
+  await expect(collector).toHaveURL(/\/$/)
+  await expect(collector.getByRole('heading', { level: 1, name: 'Your cards' })).toBeVisible()
   await collector.getByLabel('Card name and number').fill(label)
   await collector.getByRole('button', { name: /add card/i }).click()
   await expect(collector.getByRole('heading', { level: 1, name: label })).toBeVisible()
+  await expect(collector).toHaveTitle(`${label} · Rawmark`)
   const cardUrl = collector.url()
   for (const side of ['front', 'back'] as const) {
     await collector.getByLabel(`Choose a ${side} photo`).setInputFiles(await cardPhoto(collector, side))
@@ -122,9 +125,15 @@ test('a raw card goes from photos to an offer, a sale and its arrival', async ({
   await expect(collector.getByRole('button', { name: /withdraw/i })).toBeVisible()
   await expectNoSideScroll(collector)
 
+  // The home page has nothing for the seller while it waits for a buyer.
+  await collector.goto('/')
+  await expect(collector.getByRole('heading', { level: 1, name: 'Your cards' })).toBeVisible()
+  await expect(collector.getByRole('heading', { name: 'Needs you' })).toHaveCount(0)
+
   // 5. The buyer joins, accepts the buyer terms, sets where cards ship to and buys the listing; the fake provider sells the label.
   const buyer = await signIn(browser, testInfo, `buyer-${tag}@e2e.test`, buyerInvite)
   await buyer.getByRole('button', { name: /accept invite/i }).click()
+  await buyer.getByRole('button', { name: /continue to the terms/i }).click()
   await buyer.getByRole('button', { name: /i agree/i }).click()
   await fillAddress(buyer, 'E2E Buyer')
   await expect(buyer.getByRole('button', { name: /change/i })).toBeVisible()
@@ -139,6 +148,16 @@ test('a raw card goes from photos to an offer, a sale and its arrival', async ({
   await confirmBuy.click()
   await expect(buyer.getByRole('status')).toBeVisible()
 
+  // The seller's home page says the label's ready, and by when to ship.
+  await collector.reload()
+  const needs = collector.getByRole('region', { name: 'Needs you' })
+  await expect(needs.getByRole('link', { name: label })).toBeVisible()
+  await expect(needs.getByText(/^Ship by /)).toBeVisible()
+  await expectNoSideScroll(collector)
+  await needs.getByRole('link', { name: label }).click()
+  await expect(collector.getByRole('heading', { level: 1, name: label })).toBeFocused()
+  await expect(collector.getByText(/^Ship by /)).toBeVisible()
+
   // 6. The buyer records the arrival at the offer price.
   await buyer.getByRole('link', { name: /your deals/i }).click()
   const deal = buyer.locator('section').filter({ has: buyer.getByRole('heading', { name: CARD.name }) })
@@ -151,10 +170,13 @@ test('a raw card goes from photos to an offer, a sale and its arrival', async ({
   await expect(deal.getByRole('button', { name: 'Record' })).toHaveCount(0)
   await expectNoSideScroll(buyer)
 
-  // The seller sees the label and the arrival.
+  // The seller sees the label and the arrival, and nothing's left to do.
   await collector.goto(cardUrl)
   await expect(collector.getByRole('link', { name: /prepaid label/i })).toBeVisible()
   await expect(collector.getByText(/arrived/i)).toBeVisible()
+  await collector.goto('/')
+  await expect(collector.getByRole('heading', { level: 1, name: 'Your cards' })).toBeVisible()
+  await expect(collector.getByRole('heading', { name: 'Needs you' })).toHaveCount(0)
 
   // 7. The track record counts one more card bought, labelled and paid at the offer.
   const after = await trackRecord(admin)

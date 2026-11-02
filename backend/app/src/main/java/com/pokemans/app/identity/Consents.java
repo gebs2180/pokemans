@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,10 @@ public class Consents {
 
     /** The terms an org's members accept before taking part. */
     public record Terms(String version, String text, String sha256) {
+    }
+
+    /** A member accepted their org's terms, so it can start taking part. Published inside the transaction. */
+    public record TermsAccepted(UUID orgId, OrgType orgType, UUID userId) {
     }
 
     /**
@@ -129,11 +134,13 @@ public class Consents {
     private final ConsentRecordRepository records;
     private final OrgAccess access;
     private final CurrentUser currentUser;
+    private final ApplicationEventPublisher events;
 
-    Consents(ConsentRecordRepository records, OrgAccess access, CurrentUser currentUser) {
+    Consents(ConsentRecordRepository records, OrgAccess access, CurrentUser currentUser, ApplicationEventPublisher events) {
         this.records = records;
         this.access = access;
         this.currentUser = currentUser;
+        this.events = events;
     }
 
     public Terms contributorTerms() {
@@ -172,11 +179,14 @@ public class Consents {
     /** Records acceptance of the version the user was shown; a stale version is refused. */
     @Transactional
     public Instant accept(UUID orgId, String version) {
-        Terms terms = termsFor(access.require(orgId, TERMS_ORGS).getType()).orElseThrow();
+        OrgType type = access.require(orgId, TERMS_ORGS).getType();
+        Terms terms = termsFor(type).orElseThrow();
         if (!terms.version().equals(version)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "The terms have changed; reload and read them again");
         }
-        return records.save(new ConsentRecord(orgId, currentUser.id(), version, terms.sha256())).getAcceptedAt();
+        Instant accepted = records.save(new ConsentRecord(orgId, currentUser.id(), version, terms.sha256())).getAcceptedAt();
+        events.publishEvent(new TermsAccepted(orgId, type, currentUser.id()));
+        return accepted;
     }
 
     private static String sha256(String text) {

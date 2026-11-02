@@ -7,6 +7,7 @@ import com.pokemans.app.storage.BlobStore;
 import com.pokemans.app.storage.StorageProperties;
 import com.pokemans.app.valuation.CardInputs;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -107,6 +108,21 @@ class ListingService {
     /** A deal whose label hasn't been bought, for the admin: the label to retry, or the arrival to record by hand. */
     record AwaitingLabel(UUID listingId, UUID buyerOrgId, Party buyer, Party seller, CardView card, OfferView offer,
                          List<PhotoLink> photos, Instant acceptedAt) {
+    }
+
+    /** The seller terms' deadline, from the label showing. */
+    static final Duration SHIP_WITHIN = Duration.ofDays(3);
+
+    /** Nothing closes a return, so the admin's count looks this far back. */
+    static final Duration RECENT_RETURN = Duration.ofDays(14);
+
+    /**
+     * What the admin should look at on deals.
+     *
+     * @param returns       cards recorded as sent back in the last 14 days
+     * @param overdueLabels labels past their ship-by date with no arrival or return recorded
+     */
+    record Attention(int returns, int overdueLabels) {
     }
 
     private final CardOfferRepository offers;
@@ -343,6 +359,28 @@ class ListingService {
                     new Party(seller.orgName(), seller.email()), card(in), offerView(offer), photos(in), acceptedEvent.getCreatedAt()));
         }
         return waiting;
+    }
+
+    @Transactional(readOnly = true)
+    Attention attention() {
+        Instant now = Instant.now();
+        List<SaleListing> accepted = listings.findAllAccepted();
+        Map<UUID, List<ListingEvent>> history = history(accepted);
+        int returns = 0;
+        int overdue = 0;
+        for (SaleListing l : accepted) {
+            List<ListingEvent> h = history.getOrDefault(l.getId(), List.of());
+            if (status(l, h, now) != Status.ACCEPTED) {
+                continue;
+            }
+            OutcomeView outcome = outcome(h);
+            if (outcome == null) {
+                overdue += shipping.label(l.getId()).filter(x -> x.getCreatedAt().plus(SHIP_WITHIN).isBefore(now)).isPresent() ? 1 : 0;
+            } else if (outcome.type().equals(ListingEvent.Type.RETURNED.name()) && outcome.recordedAt().plus(RECENT_RETURN).isAfter(now)) {
+                returns++;
+            }
+        }
+        return new Attention(returns, overdue);
     }
 
     private void recordOutcome(ListingEvent event) {

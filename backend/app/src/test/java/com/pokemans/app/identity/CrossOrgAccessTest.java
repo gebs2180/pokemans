@@ -98,6 +98,7 @@ class CrossOrgAccessTest {
                 get(p + "/consent"),
                 get(p + "/cards/" + cardB + "/sale"),
                 get(p + "/cards/" + cardB + "/status"),
+                get(p + "/needs-you"),
                 get(p + "/collections/" + collectionB + "/status"),
                 post(p + "/cards/" + cardB + "/offers"),
                 postJson(p + "/cards/" + cardB + "/listings", "{\"offerId\":\"" + UUID.randomUUID() + "\"}"),
