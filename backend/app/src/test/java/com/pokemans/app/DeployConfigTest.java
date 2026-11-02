@@ -42,6 +42,21 @@ class DeployConfigTest {
     }
 
     @Test
+    void theApiTakesNoHugeBodies() throws Exception {
+        // Photos go straight to storage, so nothing the API takes is large, and any signed-in account can reach a route
+        // that parses a body. A 1 GB JSON string would end the JVM (-XX:+ExitOnOutOfMemoryError).
+        String caddy = Files.readString(REPO.resolve("deploy/Caddyfile"));
+        assertThat(caddy).contains("handle /api/* {\n\t\trequest_body {\n\t\t\tmax_size 1MB\n\t\t}");
+    }
+
+    @Test
+    void inviteTokensStayOutOfTheAccessLog() throws Exception {
+        // An invite link is a key to an org for a week, and the token is in the path.
+        String caddy = Files.readString(REPO.resolve("deploy/Caddyfile"));
+        assertThat(caddy).contains("request>uri regexp");
+    }
+
+    @Test
     void theCaddyContainerGetsTheHostsThePolicyNames() throws Exception {
         String compose = Files.readString(REPO.resolve("deploy/compose.prod.yml"));
         String caddy = compose.substring(compose.indexOf("\n  caddy:"), compose.indexOf("\n  backup:"));

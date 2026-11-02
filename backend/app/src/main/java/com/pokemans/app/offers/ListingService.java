@@ -127,6 +127,11 @@ class ListingService {
 
     record CardView(String name, String setName, String number, String language, String edition, String variant, String label,
                     Map<String, BigDecimal> distribution, String gradedAs) {
+
+        /** The card without the seller's own label: free text a stranger shouldn't be shown, and it could carry a name or a phone number. */
+        CardView forBuyer() {
+            return new CardView(name, setName, number, language, edition, variant, null, distribution, gradedAs);
+        }
     }
 
     /** @param side FRONT, BACK or DETAIL (the close-up) */
@@ -197,7 +202,7 @@ class ListingService {
     @Transactional
     SaleListing post(UUID orgId, UUID cardItemId, UUID offerId) {
         // Serialize posting per card, so two clicks can't open two listings.
-        jdbc.queryForObject("select pg_advisory_xact_lock(hashtext(?))", Object.class, "listing:" + cardItemId);
+        lockListings(cardItemId);
         CardOffer offer = offers.findById(offerId).filter(o -> o.getCardItemId().equals(cardItemId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Offer not found"));
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
@@ -258,14 +263,15 @@ class ListingService {
         for (SaleListing l : open) {
             CardOffer offer = byId.get(l.getOfferId());
             CardInputs in = OfferService.inputs(offer);
-            items.add(new MarketItem(l.getId(), card(in), offerView(offer, null), photos(in), l.getCreatedAt(), l.getExpiresAt()));
+            items.add(new MarketItem(l.getId(), card(in).forBuyer(), offerView(offer, null), photos(in), l.getCreatedAt(), l.getExpiresAt()));
         }
         return items;
     }
 
     /**
      * First come, first served: the first buyer to accept takes the card at the offer price, everyone
-     * after gets 409. The buyer needs an address on file for the label.
+     * after gets 409. The buyer needs an address on file for the label. Accepting again is how a double
+     * click or a retry after a lost answer looks, so the buyer who holds the card just gets it back.
      *
      * @return the listing taken, for the label purchase that follows the commit
      */
@@ -273,6 +279,12 @@ class ListingService {
     SaleListing accept(UUID buyerOrgId, UUID listingId) {
         SaleListing listing = listings.findById(listingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
+        lockListings(listing.getCardItemId());
+        List<ListingEvent> history = history(List.of(listing)).getOrDefault(listingId, List.of());
+        if (status(listing, history, Instant.now()) == Status.ACCEPTED
+                && history.stream().anyMatch(e -> e.getType() == ListingEvent.Type.ACCEPTED && e.getActorOrgId().equals(buyerOrgId))) {
+            return listing;
+        }
         requireOpen(listing, Map.of(Status.ACCEPTED, "Another buyer took this card first.",
                 Status.WITHDRAWN, "The seller withdrew this card.", Status.EXPIRED, "This listing has expired.",
                 Status.VOIDED, "This card is no longer for sale.", Status.CANCELLED, "Another buyer took this card first.",
@@ -285,14 +297,18 @@ class ListingService {
     }
 
     /**
-     * Buys the label for a deal (again, if the first try failed), unless we cancelled it. Holds the card's
+     * Buys the label for a deal (again, if the first try failed), unless we cancelled it or it's over: a card
+     * recorded as arrived or returned without a label shipped another way, and needs none. Holds the card's
      * listing lock throughout, so a second request waits and gets the label the first bought instead of
      * buying another on our account, and a cancel can't land between the check and the purchase.
      */
     @Transactional
     ShippingLabel buyLabel(SaleListing listing, UUID buyerOrgId) {
-        jdbc.queryForObject("select pg_advisory_xact_lock(hashtext(?))", Object.class, "listing:" + listing.getCardItemId());
+        lockListings(listing.getCardItemId());
         requireNotCancelled(listing.getId());
+        if (shipping.label(listing.getId()).isEmpty() && outcome(history(List.of(listing)).getOrDefault(listing.getId(), List.of())) != null) {
+            throw conflict("This card's arrival or return is already recorded, so it needs no label.");
+        }
         CardOffer offer = offers.findById(listing.getOfferId()).orElseThrow();
         return shipping.buy(listing.getId(), listing.getOrgId(), buyerOrgId, offer.getPrice());
     }
@@ -323,8 +339,8 @@ class ListingService {
             Directory.Contact seller = directory.contact(l.getOrgId(), l.getListedBy());
             Progress progress = progress(h);
             boolean owed = progress != null && progress.stage() != DealStage.RETURNED && progress.stage() != DealStage.BACK;
-            deals.add(new DealView(l.getId(), card(in), offerView(offer), photos(in), new Party(seller.orgName(), seller.email()),
-                    acceptedEvent.getCreatedAt(), forBuyer(label(l.getId())), outcome(h), undone(h, ListingEvent.Type.CANCELLED),
+            deals.add(new DealView(l.getId(), card(in).forBuyer(), offerView(offer), photos(in), new Party(seller.orgName(), seller.email()),
+                    acceptedEvent.getCreatedAt(), withoutPrintable(label(l.getId())), outcome(h), undone(h, ListingEvent.Type.CANCELLED),
                     owed ? shipping.address(l.getOrgId()).map(ShipAddress::payment).orElse(null) : null,
                     progress == null ? null : progress.forBuyer()));
         }
@@ -544,6 +560,10 @@ class ListingService {
         }
     }
 
+    private void lockListings(UUID cardItemId) {
+        jdbc.queryForObject("select pg_advisory_xact_lock(hashtext(?))", Object.class, "listing:" + cardItemId);
+    }
+
     /** 409 with the reason for the listing's state, unless it is open. */
     private void requireOpen(SaleListing listing, Map<Status, String> reasons) {
         Status status = status(listing, history(List.of(listing)).getOrDefault(listing.getId(), List.of()), Instant.now());
@@ -605,10 +625,11 @@ class ListingService {
                 : status == Status.VOIDED ? undone(history, ListingEvent.Type.VOIDED) : null;
         Progress progress = progress(history);
         // Once it's used, nobody needs the printable label, and printing it again could only send a second parcel.
+        // Once we cancelled, it's ours to refund: it isn't offered to the seller to print, nor is the buyer's address on it.
         boolean labelUsed = progress != null && progress.stage() != DealStage.SOLD;
+        LabelView label = labelUsed || status == Status.CANCELLED ? withoutPrintable(label(l.getId())) : label(l.getId());
         return new ListingView(l.getId(), l.getOfferId(), status, l.getCreatedAt(), l.getExpiresAt(),
-                closed == null ? null : closed.getCreatedAt(), buyer, labelUsed ? forBuyer(label(l.getId())) : label(l.getId()),
-                outcome(history), undone, progress);
+                closed == null ? null : closed.getCreatedAt(), buyer, label, outcome(history), undone, progress);
     }
 
     /** Where a deal is, from what's been recorded; null with no buyer yet, or once cancelled. */
@@ -694,11 +715,11 @@ class ListingService {
     }
 
     /**
-     * The label as the buyer sees it: carrier and tracking, but not the printable label, which shows the
+     * The label as a buyer sees it: carrier and tracking, but not the printable label, which shows the
      * seller's address. Buyers never learn where a seller is, so they can't meet up and deal around us
      * (Zach, 2026-10-21).
      */
-    private static LabelView forBuyer(LabelView label) {
+    private static LabelView withoutPrintable(LabelView label) {
         return label == null ? null
                 : new LabelView(label.carrier(), label.service(), label.trackingCode(), null, label.insuredValue(), label.boughtAt());
     }

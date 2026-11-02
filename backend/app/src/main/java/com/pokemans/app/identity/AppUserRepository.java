@@ -18,4 +18,8 @@ interface AppUserRepository extends JpaRepository<AppUser, UUID> {
             on conflict (subject) do nothing
             """, nativeQuery = true)
     void insertIfAbsent(UUID id, String subject, String email);
+
+    @Modifying
+    @Query(value = "update app_user set email = :email where id = :id", nativeQuery = true)
+    void updateEmail(UUID id, String email);
 }

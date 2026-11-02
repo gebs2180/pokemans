@@ -19,6 +19,7 @@ class FakeShippingProvider implements ShippingProvider {
     final List<Bought> bought = new CopyOnWriteArrayList<>();
     final List<String> refunded = new CopyOnWriteArrayList<>();
     volatile boolean failing;
+    volatile String failure = "carrier is down";
     /** While set, a purchase waits here: a test can hold one in flight and see what a second request does. */
     volatile CountDownLatch gate;
     final AtomicInteger inFlight = new AtomicInteger();
@@ -31,7 +32,7 @@ class FakeShippingProvider implements ShippingProvider {
     @Override
     public Label buy(Address from, Address to, Parcel parcel, BigDecimal insuredValue, String reference) {
         if (failing) {
-            throw new IllegalStateException("carrier is down");
+            throw new IllegalStateException(failure);
         }
         inFlight.incrementAndGet();
         try {

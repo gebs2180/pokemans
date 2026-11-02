@@ -22,4 +22,9 @@ class UserProvisioner {
     void createIfAbsent(String subject, String email) {
         users.insertIfAbsent(UUID.randomUUID(), subject, email);
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    void updateEmail(UUID userId, String email) {
+        users.updateEmail(userId, email);
+    }
 }
