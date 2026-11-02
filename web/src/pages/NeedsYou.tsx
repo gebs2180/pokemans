@@ -11,6 +11,14 @@ function describe(item: NeedsYouItem): { chip: string; tone: Tone; detail: strin
       return item.due && new Date(item.due) < new Date()
         ? { chip: `Was due ${due}`, tone: 'danger', detail: "Your prepaid label is ready and the ship-by date has passed. Open the card to say you've shipped it." }
         : { chip: `Ship by ${due}`, tone: 'warning', detail: "Your prepaid label is ready. Once it's with the carrier, open the card to say so." }
+    case 'PAYMENT_DUE':
+      return item.due && new Date(item.due) < new Date()
+        ? { chip: `Payment was due ${due}`, tone: 'danger', detail: "It arrived and the pay-by date has passed. Open the card to tell us whether you've been paid." }
+        : { chip: `Buyer pays by ${due}`, tone: 'info', detail: "It arrived. Open the card to tell us when you've been paid." }
+    case 'PAYMENT_CHECK':
+      return { chip: 'Did you get paid?', tone: 'warning', detail: "The buyer says they've paid you. Open the card to tell us whether you got it." }
+    case 'CARD_RETURNING':
+      return { chip: 'Coming back to you', tone: 'warning', detail: 'The buyer is sending it back. Open the card once you have it.' }
     case 'OFFER_EXPIRING':
       return { chip: `Offer ends ${due}`, tone: 'warning', detail: 'Sell at it before then, or it lapses.' }
     case 'OFFER_READY':

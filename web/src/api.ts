@@ -135,7 +135,7 @@ export function deadlineText({ stage, deadline }: Pick<CardStatus, 'stage' | 'de
 export type NeedsYouItem = {
   cardId: string
   label: string
-  need: 'LABEL_READY' | 'OFFER_EXPIRING' | 'OFFER_READY' | 'GET_OFFER' | 'RETAKE'
+  need: 'LABEL_READY' | 'PAYMENT_DUE' | 'PAYMENT_CHECK' | 'CARD_RETURNING' | 'OFFER_EXPIRING' | 'OFFER_READY' | 'GET_OFFER' | 'RETAKE'
   due: string | null
   sides: Side[]
 }

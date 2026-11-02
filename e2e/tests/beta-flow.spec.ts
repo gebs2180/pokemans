@@ -214,6 +214,9 @@ test('a raw card goes from photos to an offer, a sale, its arrival and its payme
   // The seller sees the same pay-by date, and hasn't been paid, so they say so. It reaches the admin.
   await collector.reload()
   await expect(collector.getByText(/^Arrived on/)).toBeVisible()
+  await collector.goto('/')
+  await expect(collector.getByRole('region', { name: 'Needs you' }).getByText(/^Buyer pays by /)).toBeVisible()
+  await collector.goto(cardUrl)
   await collector.getByRole('button', { name: "I haven't been paid" }).click()
   await collector.getByLabel(/anything we should know/i).fill('Nothing in my Venmo yet')
   await collector.getByRole('button', { name: "Confirm: I haven't been paid" }).click()

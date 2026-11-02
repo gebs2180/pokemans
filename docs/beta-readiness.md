@@ -17,7 +17,7 @@ Not yet done, in rough order:
 4. **Vendor spot check** of about 20 offers.
 5. **Zach's own click-through** on the deployed app, including Auth0 sign-up by invite.
 6. **iOS camera check.**
-7. **How it works page** reviewed, with `CONTACT` in `web/src/contact.ts` filled in. It replaces the tester guide in PR #29.
+7. **How it works page** reviewed. It replaces the tester guide in PR #29.
 8. **Who sends notifications by hand**, and how.
 
 ## Must have
@@ -40,7 +40,7 @@ Not yet done, in rough order:
 
 ### People know what they're agreeing to
 - [x] **Seller, buyer and contributor terms** reviewed. *Checked:* Zach agreed every call on 2026-10-21 (PR #27; recorded in [offers.md](offers.md)). The versions are `seller-2026-11-01`, `buyer-firm-2026-11-01` and `contributor-2026-11-01` in `identity.Consents` (2026-10-26 dropped the $500 line; 2026-11-01 added the payment handle and the steps after a sale, wording Zach hasn't reviewed yet); any change means a new version string. They are plain-language drafts with no liability cap or "as is" wording until a lawyer drafts it.
-- [ ] **A one-page "how this test works"** for testers: firm price, no re-grade, pay within 7 days of arrival, the three return reasons, who pays postage, the $5,000 maximum, no notifications yet, and that it's a test. *Built:* the How it works page, from `docs/tester-guide.md` in PR #29, waiting for Zach's review and a contact detail.
+- [ ] **A one-page "how this test works"** for testers: firm price, no re-grade, pay within 7 days of arrival, the three return reasons, who pays postage, the $5,000 maximum, no notifications yet, and that it's a test. *Built:* the How it works page, from `docs/tester-guide.md` in PR #29, waiting for Zach's review.
 - [x] **The employer's outside-interest question:** Zach decided on 2026-10-21 to go ahead with the offers beta without clearance. Personal accounts and infrastructure only. Raise it again before the lender and insurer side resumes.
 - [x] **The name:** Rawmark, with `rawmark.app` bought (2026-10-25). Renaming the visible text from "pokemans" is being done separately.
 

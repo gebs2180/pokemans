@@ -102,6 +102,20 @@ describe('Home', () => {
     expect(screen.getByText(/ship-by date has passed/)).toBeInTheDocument()
   })
 
+  it('asks about what comes after shipping', async () => {
+    stub(seller([
+      { cardId: 'a', label: 'Mew', need: 'PAYMENT_DUE', due: '2099-11-09T12:00:00Z', sides: [] },
+      { cardId: 'b', label: 'Eevee', need: 'PAYMENT_DUE', due: '2026-01-09T12:00:00Z', sides: [] },
+      { cardId: 'c', label: 'Pikachu', need: 'PAYMENT_CHECK', due: null, sides: [] },
+      { cardId: 'd', label: 'Snorlax', need: 'CARD_RETURNING', due: null, sides: [] },
+    ]))
+    page('/')
+    expect(await screen.findByText('Buyer pays by Nov 9')).toBeInTheDocument()
+    expect(screen.getByText('Payment was due Jan 9')).toBeInTheDocument()
+    expect(screen.getByText('Did you get paid?')).toBeInTheDocument()
+    expect(screen.getByText('Coming back to you')).toBeInTheDocument()
+  })
+
   it('says so when it can\'t load what needs the seller', async () => {
     const routes = seller()
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
@@ -184,10 +198,9 @@ describe('How it works', () => {
     expect(screen.queryByRole('link', { name: /terms/i })).not.toBeInTheDocument()
   })
 
-  it('has no contact detail until Zach sets one, and falls back to a true one', () => {
-    expect(CONTACT).toBeNull()
+  it('says how to reach us', () => {
     page('/how-it-works')
-    expect(screen.getByText('To reach us, message Zach the same way your invite came.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: CONTACT })).toHaveAttribute('href', `mailto:${CONTACT}`)
   })
 
   it('links a member to their terms, to read again', async () => {

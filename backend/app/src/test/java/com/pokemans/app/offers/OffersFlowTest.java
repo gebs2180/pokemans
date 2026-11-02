@@ -1034,6 +1034,39 @@ class OffersFlowTest {
         api.postJson("/api/orgs/" + orgId + "/listings/" + listing + "/shipped", "", seller).andExpect(status().is2xxSuccessful());
         api.get(needs, seller).andExpect(jsonPath("$.length()").value(0));
         api.get("/api/orgs/" + orgId + "/cards/" + card + "/status", seller).andExpect(jsonPath("$.deadline").doesNotExist());
+
+        // It arrived: the seller says when they've been paid, by the pay-by date.
+        String deal = "/api/orgs/" + lastBuyerOrg + "/deals/" + listing;
+        api.postJson(deal + "/received", "{}", buyer).andExpect(status().isCreated());
+        api.get(needs, seller).andExpect(jsonPath("$[0].need").value("PAYMENT_DUE"))
+                .andExpect(jsonPath("$[0].due").value(TestApi.read(api.get(sale(card), seller), "$.listing.progress.payBy")));
+
+        // Raised with us, it's off their list while we look.
+        String mine = "/api/orgs/" + orgId + "/listings/" + listing;
+        api.postJson(mine + "/dispute", "{\"note\":\"Nothing yet\"}", seller).andExpect(status().isOk());
+        api.get(needs, seller).andExpect(jsonPath("$.length()").value(0));
+        api.postJson("/api/admin/deals/" + listing + "/resolve", "{\"reason\":\"Spoke to the buyer\"}", api.admin()).andExpect(status().isOk());
+
+        // The buyer says they paid: only the seller's word closes it.
+        api.postJson(deal + "/paid", "{\"pricePaid\":1,\"note\":\"Agreed less\"}", buyer).andExpect(status().isCreated());
+        api.get(needs, seller).andExpect(jsonPath("$[0].need").value("PAYMENT_CHECK"));
+        api.postJson(mine + "/payment-confirmed", "", seller).andExpect(status().isOk());
+        api.get(needs, seller).andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void homeListsAReturnUntilTheCardIsBack() throws Exception {
+        String needs = "/api/orgs/" + orgId + "/needs-you";
+        String listing = postedCard("Coming back", 400);
+        JwtRequestPostProcessor buyer = buyer("Vendor " + UUID.randomUUID());
+        address(lastBuyerOrg, buyer, "Vendor");
+        api.postJson(accept(lastBuyerOrg, listing), "", buyer).andExpect(status().isOk());
+        api.postJson("/api/orgs/" + lastBuyerOrg + "/deals/" + listing + "/returned", "{\"reason\":\"DOES_NOT_MATCH_PHOTOS\",\"note\":\"crease\"}", buyer)
+                .andExpect(status().isCreated());
+        String mine = "$[?(@.label == 'Coming back')].need";
+        assertThat(JsonPath.<List<String>>read(api.get(needs, seller).andReturn().getResponse().getContentAsString(), mine)).containsExactly("CARD_RETURNING");
+        api.postJson("/api/orgs/" + orgId + "/listings/" + listing + "/card-back", "", seller).andExpect(status().isOk());
+        assertThat(JsonPath.<List<String>>read(api.get(needs, seller).andReturn().getResponse().getContentAsString(), mine)).doesNotContain("CARD_RETURNING");
     }
 
     @Test

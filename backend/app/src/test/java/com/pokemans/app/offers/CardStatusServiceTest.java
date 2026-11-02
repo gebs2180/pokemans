@@ -40,6 +40,21 @@ class CardStatusServiceTest {
     }
 
     @Test
+    void afterShippingADealNeedsItsSellerOnlyWhileItWaitsOnTheirWord() {
+        CardStatus arrived = new CardStatus(UUID.randomUUID(), Stage.ARRIVED, null, "", false);
+        CardStatus paid = new CardStatus(UUID.randomUUID(), Stage.PAID, null, "", false);
+        CardStatus returned = new CardStatus(UUID.randomUUID(), Stage.RETURNED, null, "", false);
+        assertThat(CardStatusService.need(arrived.withSellersWord(true), false, NOW)).isEqualTo(Need.PAYMENT_DUE);
+        assertThat(CardStatusService.need(paid.withSellersWord(true), false, NOW)).isEqualTo(Need.PAYMENT_CHECK);
+        assertThat(CardStatusService.need(returned.withSellersWord(true), false, NOW)).isEqualTo(Need.CARD_RETURNING);
+        // Raised with us, confirmed, or held for our review: nothing for them to say.
+        for (CardStatus waiting : new CardStatus[] {arrived, paid, returned}) {
+            assertThat(CardStatusService.need(waiting, false, NOW)).isNull();
+        }
+        assertThat(need(Stage.SHIPPED, null, false)).isNull();
+    }
+
+    @Test
     void photosNeedTheSellerOnlyAfterAFailedTry() {
         assertThat(need(Stage.PHOTOS, null, true)).isEqualTo(Need.RETAKE);
         assertThat(need(Stage.PHOTOS, null, false)).isNull();

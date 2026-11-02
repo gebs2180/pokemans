@@ -5,8 +5,10 @@ import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.valuation.CardInputs;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,26 +29,35 @@ class CardStatusService {
      * @param canOffer  true when asking for an offer can work right now
      * @param condition the grades the card likely is, in our view, once we've assessed it, and our centering
      *                  measurement if there is one; else null
-     * @param deadline  when the stage runs out: the seller's last day to ship, or when the offer or posting ends; else null
+     * @param deadline  when the stage runs out: the seller's last day to ship, the buyer's last day to pay, or when the
+     *                  offer or posting ends; else null
+     * @param sellersWord true after a sale while the deal waits on the seller saying something: paid, or the card's back
      */
     record CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer, Assessments.Summary condition,
-                      Instant deadline) {
+                      Instant deadline, boolean sellersWord) {
 
         CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer) {
-            this(cardId, stage, identity, nextStep, canOffer, null, null);
+            this(cardId, stage, identity, nextStep, canOffer, null, null, false);
         }
 
         CardStatus withCondition(Assessments.Summary summary) {
-            return new CardStatus(cardId, stage, identity, nextStep, canOffer, summary, deadline);
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, summary, deadline, sellersWord);
         }
 
         CardStatus withDeadline(Instant at) {
-            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, at);
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, at, sellersWord);
+        }
+
+        CardStatus withSellersWord(boolean waiting) {
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, deadline, waiting);
         }
     }
 
     /** What's waiting on the seller, for the home page. Everything else on the way to a sale is waiting on us or a buyer. */
-    enum Need { LABEL_READY, OFFER_EXPIRING, OFFER_READY, GET_OFFER, RETAKE }
+    enum Need { LABEL_READY, PAYMENT_DUE, PAYMENT_CHECK, CARD_RETURNING, OFFER_EXPIRING, OFFER_READY, GET_OFFER, RETAKE }
+
+    /** Only a collector is nudged to sell. */
+    private static final Set<Need> OFFER_NUDGES = EnumSet.of(Need.OFFER_EXPIRING, Need.OFFER_READY, Need.GET_OFFER);
 
     /**
      * @param due   when it runs out, or null
@@ -87,7 +98,7 @@ class CardStatusService {
 
     /**
      * The org's cards that are waiting on the seller. Only a collector is nudged about offers: a contributor
-     * isn't there to sell, but still ships what they sold and retakes what failed.
+     * isn't there to sell, but still sees a sale through and retakes what failed.
      */
     @Transactional(readOnly = true)
     List<NeedsYou> needsYou(UUID orgId, boolean selling) {
@@ -96,7 +107,7 @@ class CardStatusService {
             CardStatus status = stage(card.id());
             List<String> sides = status.stage() == Stage.PHOTOS ? cardItems.sidesToRetake(card.id()) : List.of();
             Need need = need(status, !sides.isEmpty(), now);
-            boolean wanted = need != null && (selling || need == Need.LABEL_READY || need == Need.RETAKE);
+            boolean wanted = need != null && (selling || !OFFER_NUDGES.contains(need));
             return wanted ? new NeedsYou(card.id(), card.label(), need, status.deadline(), sides) : null;
         }).filter(java.util.Objects::nonNull).toList();
     }
@@ -105,6 +116,9 @@ class CardStatusService {
     static Need need(CardStatus status, boolean retake, Instant now) {
         return switch (status.stage()) {
             case SOLD -> status.deadline() == null ? null : Need.LABEL_READY;
+            case ARRIVED -> status.sellersWord() ? Need.PAYMENT_DUE : null;
+            case PAID -> status.sellersWord() ? Need.PAYMENT_CHECK : null;
+            case RETURNED -> status.sellersWord() ? Need.CARD_RETURNING : null;
             case OFFERED -> status.deadline().isBefore(now.plus(EXPIRING_SOON)) ? Need.OFFER_EXPIRING : Need.OFFER_READY;
             case READY -> Need.GET_OFFER;
             case PHOTOS -> retake ? Need.RETAKE : null;
@@ -172,11 +186,13 @@ class CardStatusService {
             case SHIPPED -> new CardStatus(cardId, Stage.SHIPPED, identity,
                     "On its way to the buyer. They record it when it arrives, and then have 7 days to pay you." + NO_NOTIFICATIONS, false);
             case ARRIVED -> new CardStatus(cardId, Stage.ARRIVED, identity,
-                    "It arrived. The buyer pays you directly: tell us here when they have, or if they haven't by the date on this page.", false);
+                    "It arrived. The buyer pays you directly: tell us here when they have, or if they haven't by the date on this page.", false)
+                    .withDeadline(deal.payBy()).withSellersWord(deal.disputedAt() == null);
             case PAID -> new CardStatus(cardId, Stage.PAID, identity, deal.confirmedAt() != null ? "Paid. Nothing more to do."
-                    : "The buyer says they paid you. Tell us here whether you got it.", false);
+                    : "The buyer says they paid you. Tell us here whether you got it.", false)
+                    .withSellersWord(deal.confirmedAt() == null && deal.disputedAt() == null);
             case RETURNED -> new CardStatus(cardId, Stage.RETURNED, identity,
-                    "The buyer is sending it back. Tell us here once you have it.", false);
+                    "The buyer is sending it back. Tell us here once you have it.", false).withSellersWord(true);
             default -> new CardStatus(cardId, Stage.SOLD, identity, "A buyer took it: ship it with the prepaid label once it shows on this card's page.", false)
                     .withDeadline(shipping.label(listingId).map(l -> l.getCreatedAt().plus(ListingService.SHIP_WITHIN)).orElse(null));
         };

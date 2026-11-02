@@ -126,7 +126,9 @@ function WrongAndWho() {
           Rawmark is a small closed test run by Zach, a Pokémon card collector. We don't buy your card, hold it or handle the money: a buyer
           on Rawmark pays you directly.
         </p>
-        {CONTACT ? <p>Reach us at {CONTACT}.</p> : <p>To reach us, message Zach the same way your invite came.</p>}
+        <p>
+          Reach us at <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+        </p>
       </section>
     </>
   )
