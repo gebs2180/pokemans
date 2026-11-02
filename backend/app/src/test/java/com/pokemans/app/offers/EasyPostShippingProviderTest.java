@@ -51,6 +51,8 @@ class EasyPostShippingProviderTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         String auth = "Basic " + Base64.getEncoder().encodeToString("EZTK_test:".getBytes());
+        server.expect(requestTo("https://ep.test/v2/shipments/listing-1")).andExpect(method(HttpMethod.GET))
+                .andExpect(header("Authorization", auth)).andRespond(withStatus(HttpStatus.NOT_FOUND));
         server.expect(requestTo("https://ep.test/v2/shipments")).andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", auth))
                 .andExpect(jsonPath("$.shipment.from_address.name").value("Sam"))
@@ -78,6 +80,49 @@ class EasyPostShippingProviderTest {
     }
 
     @Test
+    void aRetryAfterALostAnswerGetsTheLabelAlreadyBoughtNotASecondOne() {
+        // Audit 2026-11-02: EasyPost sold the label and the answer timed out, so we recorded nothing. The retry must find
+        // that shipment by its reference (the listing id) instead of paying again.
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://ep.test/v2/shipments/listing-1")).andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(BOUGHT, MediaType.APPLICATION_JSON));
+
+        ShippingProvider.Label label = new EasyPostShippingProvider(CONFIG, builder)
+                .buy(FROM, TO, PARCEL, new BigDecimal("225.50"), "listing-1");
+
+        server.verify();
+        assertThat(label.shipmentId()).isEqualTo("shp_123");
+        assertThat(label.trackingCode()).isEqualTo("9400100000000000000000");
+    }
+
+    @Test
+    void aShipmentThatWasNeverBoughtDoesNotStopTheRetry() {
+        // The address may have changed since, so the retry starts a new shipment rather than reusing it.
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://ep.test/v2/shipments/listing-1")).andRespond(withSuccess(CREATED, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://ep.test/v2/shipments")).andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess(CREATED, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://ep.test/v2/shipments/shp_123/buy")).andRespond(withSuccess(BOUGHT, MediaType.APPLICATION_JSON));
+
+        new EasyPostShippingProvider(CONFIG, builder).buy(FROM, TO, PARCEL, BigDecimal.TEN, "listing-1");
+
+        server.verify();
+    }
+
+    @Test
+    void noPurchaseWhileItCantBeToldWhetherOneWasMade() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://ep.test/v2/shipments/listing-1")).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThatThrownBy(() -> new EasyPostShippingProvider(CONFIG, builder).buy(FROM, TO, PARCEL, BigDecimal.TEN, "listing-1"))
+                .isInstanceOf(RuntimeException.class);
+        server.verify();
+    }
+
+    @Test
     void asksForARefundAndReturnsItsStatus() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -97,8 +142,10 @@ class EasyPostShippingProviderTest {
     void failsLoudlyWhenThereAreNoRatesOrTheApiRefuses() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://ep.test/v2/shipments/x")).andRespond(withStatus(HttpStatus.NOT_FOUND));
         server.expect(requestTo("https://ep.test/v2/shipments"))
                 .andRespond(withSuccess("{\"id\":\"shp_1\",\"rates\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://ep.test/v2/shipments/x")).andRespond(withStatus(HttpStatus.NOT_FOUND));
         server.expect(requestTo("https://ep.test/v2/shipments")).andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
         EasyPostShippingProvider easyPost = new EasyPostShippingProvider(CONFIG, builder);
 
