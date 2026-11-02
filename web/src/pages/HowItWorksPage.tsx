@@ -53,7 +53,8 @@ function Selling() {
         <li>
           <strong>Shipping.</strong> You don't pay postage: the buyer does. Wait until the prepaid label shows on the card's page, then ship{' '}
           <strong>within 3 days</strong>, with that label, the card in a <strong>sleeve and toploader inside a bubble mailer</strong>. Don't
-          ship before the label shows. If you can't ship, tell us and we'll cancel the deal.
+          ship before the label shows. Press <strong>I've shipped it</strong> on the card's page once it's with the carrier. If you can't
+          ship, tell us and we'll cancel the deal.
         </li>
         <li>
           <strong>Getting paid.</strong> The buyer pays you the offer price directly, not through the app,{' '}

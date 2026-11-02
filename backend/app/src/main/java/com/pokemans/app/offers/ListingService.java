@@ -31,14 +31,48 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * Posting firm offers to buyers and what happens next: the first buyer to accept takes the card at
  * the offer price, the seller may withdraw until then, a prepaid label follows, and on arrival the
- * buyer records that the card came as shown and was paid for, or returns it. No access checks: the
+ * buyer records that the card came as shown, then that they paid, or returns it. Rawmark never touches
+ * the money: from the sale on, these rows record what each side says. No access checks: the
  * controllers have done them.
  */
 @Service
 class ListingService {
 
-    /** VOIDED: we took it down with its offer. CANCELLED: a buyer took it and we undid the deal (Zach, 2026-10-21). */
-    enum Status { OPEN, ACCEPTED, WITHDRAWN, EXPIRED, VOIDED, CANCELLED }
+    /** The buyer terms' deadline: payment within 7 days of the card arriving. */
+    static final Duration PAY_WITHIN = Duration.ofDays(7);
+
+    static final String HELD = "A buyer said this card isn't genuine, so we review that before it can get a new offer.";
+
+    /**
+     * VOIDED: we took it down with its offer. CANCELLED: a buyer took it and we undid the deal (Zach,
+     * 2026-10-21). BACK: a buyer took it and sent it back, and the seller has it again, so it's free for
+     * a new offer.
+     */
+    enum Status { OPEN, ACCEPTED, WITHDRAWN, EXPIRED, VOIDED, CANCELLED, BACK }
+
+    /** Where a deal is, after Sold (UX review, 2026-11-01). Each has its own next step. */
+    enum DealStage { SOLD, SHIPPED, ARRIVED, PAID, RETURNED, BACK }
+
+    /**
+     * What each side has said about a deal, for both of them to see.
+     *
+     * @param payBy       when payment is due: 7 days from the recorded arrival; null until then
+     * @param paidAt      when the buyer says they paid
+     * @param confirmedAt when the seller said they got paid
+     * @param disputedAt  when the seller raised something that's still open, or null
+     * @param disputeNote what they said; the seller's and the admin's to read
+     * @param review      how the admin last closed something on this deal, written for both sides
+     * @param held        the buyer returned it as not genuine and we haven't reviewed that: no new offer yet
+     */
+    record Progress(DealStage stage, Instant shippedAt, Instant arrivedAt, Instant payBy, Instant paidAt, BigDecimal pricePaid,
+                    String paidNote, Instant confirmedAt, Instant disputedAt, String disputeNote, UndoView review, boolean held,
+                    Instant cardBackAt) {
+
+        private Progress forBuyer() {
+            return new Progress(stage, shippedAt, arrivedAt, payBy, paidAt, pricePaid, paidNote, confirmedAt, disputedAt, null, review,
+                    held, cardBackAt);
+        }
+    }
 
     record RungView(String grade, BigDecimal probability, BigDecimal price) {
     }
@@ -69,8 +103,9 @@ class ListingService {
     /**
      * What happened once the card arrived.
      *
-     * @param type           RECEIVED (as shown, paid), RETURNED (with the reason), or INSPECTED (a grade
+     * @param type           RECEIVED (as shown), RETURNED (with the reason), or INSPECTED (a grade
      *                       recorded under the per-grade offers that came before)
+     * @param pricePaid      only on a RECEIVED from before payment became a step of its own
      * @param inspectedGrade only for INSPECTED
      */
     record OutcomeView(String type, BigDecimal pricePaid, String returnedReason, BigDecimal inspectedGrade, String note,
@@ -78,12 +113,13 @@ class ListingService {
     }
 
     /**
-     * @param buyer  who took it, once accepted (shown to the seller)
-     * @param label  the prepaid label, once bought; null while it follows
-     * @param undone why we took it down (VOIDED) or cancelled the deal (CANCELLED)
+     * @param buyer    who took it, once accepted (shown to the seller)
+     * @param label    the prepaid label, once bought; null while it follows. Its printable link goes once it's used
+     * @param undone   why we took it down (VOIDED) or cancelled the deal (CANCELLED)
+     * @param progress where the deal is, once a buyer took it; null otherwise or once cancelled
      */
     record ListingView(UUID id, UUID offerId, Status status, Instant listedAt, Instant expiresAt, Instant closedAt, Party buyer,
-                       LabelView label, OutcomeView outcome, UndoView undone) {
+                       LabelView label, OutcomeView outcome, UndoView undone, Progress progress) {
     }
 
     record SaleView(OfferView offer, ListingView listing) {
@@ -100,9 +136,13 @@ class ListingService {
     record MarketItem(UUID listingId, CardView card, OfferView offer, List<PhotoLink> photos, Instant listedAt, Instant expiresAt) {
     }
 
-    /** @param cancelled set once we cancelled the deal: nothing more to record, and the label isn't used */
+    /**
+     * @param payTo     how the seller gets paid, only ever shown once a buyer has accepted; null once
+     *                  nothing is owed (cancelled or returned), or if the seller gave none
+     * @param cancelled set once we cancelled the deal: nothing more to record, and the label isn't used
+     */
     record DealView(UUID listingId, CardView card, OfferView offer, List<PhotoLink> photos, Party seller, Instant acceptedAt,
-                    LabelView label, OutcomeView outcome, UndoView cancelled) {
+                    LabelView label, OutcomeView outcome, UndoView cancelled, PaymentHandle payTo, Progress progress) {
     }
 
     /** A deal whose label hasn't been bought, for the admin: the label to retry, or the arrival to record by hand. */
@@ -113,16 +153,8 @@ class ListingService {
     /** The seller terms' deadline, from the label showing. */
     static final Duration SHIP_WITHIN = Duration.ofDays(3);
 
-    /** Nothing closes a return, so the admin's count looks this far back. */
-    static final Duration RECENT_RETURN = Duration.ofDays(14);
-
-    /**
-     * What the admin should look at on deals.
-     *
-     * @param returns       cards recorded as sent back in the last 14 days
-     * @param overdueLabels labels past their ship-by date with no arrival or return recorded
-     */
-    record Attention(int returns, int overdueLabels) {
+    /** @param labels sold cards past their ship-by date that nobody has said shipped */
+    record Overdue(int labels) {
     }
 
     private final CardOfferRepository offers;
@@ -182,8 +214,12 @@ class ListingService {
         if (!offer.getExpiresAt().isAfter(now)) {
             throw conflict("This offer has expired. Get a new one first.");
         }
-        if (shipping.address(orgId).isEmpty()) {
+        Optional<ShipAddress> shipFrom = shipping.address(orgId);
+        if (shipFrom.isEmpty()) {
             throw conflict("Add the address you'll ship from first.");
+        }
+        if (shipFrom.get().payment() == null) {
+            throw conflict("Add how you'd like to be paid first.");
         }
         // Buyers see the photos the offer was priced on, and from here on they can't change: hold the lock
         // photo confirms take, and refuse an offer whose photos were retaken since.
@@ -201,6 +237,10 @@ class ListingService {
             if (status == Status.ACCEPTED) {
                 throw conflict("A buyer has already taken this card.");
             }
+            if (status == Status.BACK && latest.get().getOfferId().equals(offerId)) {
+                throw conflict("This offer has already been sold once. Get a new one first.");
+            }
+            requireNotHeld(cardItemId);
         }
         return listings.save(new SaleListing(offerId, orgId, cardItemId, currentUser.id(), now, now.plus(properties.listingOpenFor())));
     }
@@ -211,7 +251,8 @@ class ListingService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
         requireOpen(listing, Map.of(Status.ACCEPTED, "A buyer has already taken this card, so it can't be withdrawn.",
                 Status.WITHDRAWN, "This listing is already withdrawn.", Status.EXPIRED, "This listing has already expired.",
-                Status.VOIDED, "We've already taken this listing down.", Status.CANCELLED, "This deal was cancelled."));
+                Status.VOIDED, "We've already taken this listing down.", Status.CANCELLED, "This deal was cancelled.",
+                Status.BACK, "A buyer has already taken this card, so it can't be withdrawn."));
         close(ListingEvent.withdrawn(listingId, orgId, currentUser.id()), "A buyer took this card before it was withdrawn.");
     }
 
@@ -241,7 +282,8 @@ class ListingService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
         requireOpen(listing, Map.of(Status.ACCEPTED, "Another buyer took this card first.",
                 Status.WITHDRAWN, "The seller withdrew this card.", Status.EXPIRED, "This listing has expired.",
-                Status.VOIDED, "This card is no longer for sale.", Status.CANCELLED, "Another buyer took this card first."));
+                Status.VOIDED, "This card is no longer for sale.", Status.CANCELLED, "Another buyer took this card first.",
+                Status.BACK, "Another buyer took this card first."));
         if (shipping.address(buyerOrgId).isEmpty()) {
             throw conflict("Add the address cards should ship to first.");
         }
@@ -286,37 +328,68 @@ class ListingService {
             List<ListingEvent> h = history.getOrDefault(l.getId(), List.of());
             ListingEvent acceptedEvent = h.stream().filter(e -> e.getType() == ListingEvent.Type.ACCEPTED).findFirst().orElseThrow();
             Directory.Contact seller = directory.contact(l.getOrgId(), l.getListedBy());
+            Progress progress = progress(h);
+            boolean owed = progress != null && progress.stage() != DealStage.RETURNED && progress.stage() != DealStage.BACK;
             deals.add(new DealView(l.getId(), card(in), offerView(offer), photos(in), new Party(seller.orgName(), seller.email()),
-                    acceptedEvent.getCreatedAt(), forBuyer(label(l.getId())), outcome(h), undone(h, ListingEvent.Type.CANCELLED)));
+                    acceptedEvent.getCreatedAt(), forBuyer(label(l.getId())), outcome(h), undone(h, ListingEvent.Type.CANCELLED),
+                    owed ? shipping.address(l.getOrgId()).map(ShipAddress::payment).orElse(null) : null,
+                    progress == null ? null : progress.forBuyer()));
         }
         return deals;
     }
 
     /**
-     * The card arrived genuine and as shown, and the buyer paid. Once per deal, and only once a label
-     * was bought, since nothing can have shipped before. A price other than the offer needs a note.
+     * The card arrived genuine and as shown, which starts the 7 days to pay. Once per deal, and only
+     * once a label was bought, since nothing can have shipped before.
      *
      * @param byAdmin the admin records it for the buyer, e.g. when the card shipped without our label;
      *                it then needs a note saying so
      */
     @Transactional
-    void received(UUID buyerOrgId, UUID listingId, BigDecimal pricePaid, String note, boolean byAdmin) {
-        SaleListing listing = requireDeal(buyerOrgId, listingId);
+    void received(UUID buyerOrgId, UUID listingId, String note, boolean byAdmin) {
+        requireDeal(buyerOrgId, listingId);
         requireNotCancelled(listingId);
         requireShippable(listingId, note, byAdmin);
+        recordOutcome(ListingEvent.received(listingId, buyerOrgId, currentUser.id(), adminNote(note, byAdmin)));
+    }
+
+    /** The buyer says they paid the seller, once the card arrived. A price other than the offer needs a note. */
+    @Transactional
+    void paid(UUID buyerOrgId, UUID listingId, BigDecimal pricePaid, String note) {
+        SaleListing listing = lockDeal(requireDeal(buyerOrgId, listingId));
+        Progress progress = progress(history(List.of(listing)).getOrDefault(listingId, List.of()));
+        if (progress == null) {
+            throw conflict("We cancelled this deal, so there's nothing more to do on it.");
+        }
+        if (progress.stage() == DealStage.RETURNED || progress.stage() == DealStage.BACK) {
+            throw conflict("This card went back, so nothing is owed on it.");
+        }
+        if (progress.arrivedAt() == null) {
+            throw conflict("Record that the card arrived first.");
+        }
+        if (progress.paidAt() != null) {
+            throw conflict("You've already recorded paying for this card.");
+        }
         BigDecimal price = offers.findById(listing.getOfferId()).orElseThrow().getPrice();
         if (pricePaid.compareTo(price) != 0 && blankToNull(note) == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Say in the note why the amount paid differs from the $" + price.toPlainString() + " offer.");
         }
-        recordOutcome(ListingEvent.received(listingId, buyerOrgId, currentUser.id(), pricePaid, adminNote(note, byAdmin)));
+        close(ListingEvent.paid(listingId, buyerOrgId, currentUser.id(), pricePaid, blankToNull(note)),
+                "You've already recorded paying for this card.");
     }
 
-    /** The card goes back: not genuine, not the listed card, or not matching its photos. Once per deal, once it could have shipped. */
+    /**
+     * The card goes back: not genuine, not the listed card, or not matching its photos. Once per deal,
+     * once it could have shipped. "Not genuine" accuses the seller, so it has to say why.
+     */
     @Transactional
     void returned(UUID buyerOrgId, UUID listingId, ListingEvent.DeclinedReason reason, String note, boolean byAdmin) {
         requireDeal(buyerOrgId, listingId);
         requireNotCancelled(listingId);
+        if (reason == ListingEvent.DeclinedReason.NOT_GENUINE && blankToNull(note) == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Say in the note why you think the card isn't genuine.");
+        }
         requireShippable(listingId, note, byAdmin);
         recordOutcome(ListingEvent.returned(listingId, buyerOrgId, currentUser.id(), reason, adminNote(note, byAdmin)));
     }
@@ -362,25 +435,24 @@ class ListingService {
     }
 
     @Transactional(readOnly = true)
-    Attention attention() {
+    Overdue overdue() {
         Instant now = Instant.now();
         List<SaleListing> accepted = listings.findAllAccepted();
         Map<UUID, List<ListingEvent>> history = history(accepted);
-        int returns = 0;
         int overdue = 0;
         for (SaleListing l : accepted) {
             List<ListingEvent> h = history.getOrDefault(l.getId(), List.of());
-            if (status(l, h, now) != Status.ACCEPTED) {
-                continue;
-            }
-            OutcomeView outcome = outcome(h);
-            if (outcome == null) {
-                overdue += shipping.label(l.getId()).filter(x -> x.getCreatedAt().plus(SHIP_WITHIN).isBefore(now)).isPresent() ? 1 : 0;
-            } else if (outcome.type().equals(ListingEvent.Type.RETURNED.name()) && outcome.recordedAt().plus(RECENT_RETURN).isAfter(now)) {
-                returns++;
+            if (status(l, h, now) == Status.ACCEPTED
+                    && shipping.label(l.getId()).filter(x -> overdue(x.getCreatedAt(), progress(h).stage(), now)).isPresent()) {
+                overdue++;
             }
         }
-        return new Attention(returns, overdue);
+        return new Overdue(overdue);
+    }
+
+    /** A label is overdue past its ship-by date, until the seller says it shipped or the card is shown to have. */
+    static boolean overdue(Instant labelledAt, DealStage stage, Instant now) {
+        return stage == DealStage.SOLD && labelledAt.plus(SHIP_WITHIN).isBefore(now);
     }
 
     private void recordOutcome(ListingEvent event) {
@@ -399,6 +471,99 @@ class ListingService {
         }
         return events.findByListingIdInOrderByCreatedAtAsc(listingIds).stream()
                 .filter(e -> e.getType() == ListingEvent.Type.CANCELLED).map(ListingEvent::getListingId).collect(Collectors.toSet());
+    }
+
+    // What the seller says after the sale. Each is one more row, for the record: none of it moves money.
+
+    /** The card is with the carrier, so its label is used. */
+    @Transactional
+    void shipped(UUID sellerOrgId, UUID listingId) {
+        Progress progress = sellerDeal(sellerOrgId, listingId);
+        if (shipping.label(listingId).isEmpty()) {
+            throw conflict("Don't ship the card until its label shows here.");
+        }
+        if (progress.stage() != DealStage.SOLD) {
+            throw conflict("This card has already shipped.");
+        }
+        close(ListingEvent.shipped(listingId, sellerOrgId, currentUser.id()), "This card has already shipped.");
+    }
+
+    /** The seller got paid. That ends the deal, whatever the buyer recorded. */
+    @Transactional
+    void paymentConfirmed(UUID sellerOrgId, UUID listingId) {
+        Progress progress = sellerDeal(sellerOrgId, listingId);
+        requireAwaitingPayment(progress);
+        close(ListingEvent.paymentConfirmed(listingId, sellerOrgId, currentUser.id()), "You've already said you got paid.");
+    }
+
+    /** The seller hasn't been paid, or disagrees with a return: it goes to the admin's list. */
+    @Transactional
+    void disputed(UUID sellerOrgId, UUID listingId, String note) {
+        Progress progress = sellerDeal(sellerOrgId, listingId);
+        if (progress.stage() == DealStage.RETURNED) {
+            if (blankToNull(note) == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Say why you disagree with the return.");
+            }
+        } else {
+            requireAwaitingPayment(progress);
+        }
+        if (progress.disputedAt() != null) {
+            throw conflict("We already have this from you, and we'll be in touch.");
+        }
+        events.saveAndFlush(ListingEvent.disputed(listingId, sellerOrgId, currentUser.id(), blankToNull(note)));
+    }
+
+    /** A returned card is back with the seller, so it can get a new offer and its photos can change. */
+    @Transactional
+    void cardBack(UUID sellerOrgId, UUID listingId) {
+        Progress progress = sellerDeal(sellerOrgId, listingId);
+        if (progress.stage() != DealStage.RETURNED) {
+            throw conflict("Only a card the buyer is sending back can come back.");
+        }
+        close(ListingEvent.cardBack(listingId, sellerOrgId, currentUser.id()), "You've already said this card is back.");
+    }
+
+    /** Where a live deal of this seller is, under the card's lock so what's checked can't change before the row lands. */
+    private Progress sellerDeal(UUID sellerOrgId, UUID listingId) {
+        SaleListing listing = lockDeal(listings.findByIdAndOrgId(listingId, sellerOrgId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found")));
+        List<ListingEvent> h = history(List.of(listing)).getOrDefault(listingId, List.of());
+        Status status = status(listing, h, Instant.now());
+        if (status == Status.CANCELLED) {
+            throw conflict("We cancelled this deal, so there's nothing more to do on it.");
+        }
+        if (status != Status.ACCEPTED && status != Status.BACK) {
+            throw conflict("No buyer has taken this card.");
+        }
+        return progress(h);
+    }
+
+    private SaleListing lockDeal(SaleListing listing) {
+        jdbc.queryForObject("select pg_advisory_xact_lock(hashtext(?))", Object.class, "listing:" + listing.getCardItemId());
+        return listing;
+    }
+
+    private static void requireAwaitingPayment(Progress progress) {
+        if (progress.confirmedAt() != null) {
+            throw conflict("You've already said you got paid.");
+        }
+        if (progress.stage() == DealStage.SOLD) {
+            throw conflict("Payment comes once the card has shipped and arrived.");
+        }
+        if (progress.stage() == DealStage.RETURNED || progress.stage() == DealStage.BACK) {
+            throw conflict("This card went back, so nothing is owed on it.");
+        }
+    }
+
+    /** 409 while the latest deal on the card is a "not genuine" return we haven't reviewed: no new offer until we have. */
+    @Transactional(readOnly = true)
+    void requireNotHeld(UUID cardItemId) {
+        listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardItemId).ifPresent(l -> {
+            Progress progress = progress(history(List.of(l)).getOrDefault(l.getId(), List.of()));
+            if (progress != null && progress.held()) {
+                throw conflict(HELD);
+            }
+        });
     }
 
     private void requireNotCancelled(UUID listingId) {
@@ -438,6 +603,9 @@ class ListingService {
         if (types.contains(ListingEvent.Type.CANCELLED)) {
             return Status.CANCELLED;
         }
+        if (types.contains(ListingEvent.Type.CARD_BACK)) {
+            return Status.BACK;
+        }
         if (types.contains(ListingEvent.Type.ACCEPTED)) {
             return Status.ACCEPTED;
         }
@@ -463,8 +631,89 @@ class ListingService {
         }
         UndoView undone = status == Status.CANCELLED ? undone(history, ListingEvent.Type.CANCELLED)
                 : status == Status.VOIDED ? undone(history, ListingEvent.Type.VOIDED) : null;
+        Progress progress = progress(history);
+        // Once it's used, nobody needs the printable label, and printing it again could only send a second parcel.
+        boolean labelUsed = progress != null && progress.stage() != DealStage.SOLD;
         return new ListingView(l.getId(), l.getOfferId(), status, l.getCreatedAt(), l.getExpiresAt(),
-                closed == null ? null : closed.getCreatedAt(), buyer, label(l.getId()), outcome(history), undone);
+                closed == null ? null : closed.getCreatedAt(), buyer, labelUsed ? forBuyer(label(l.getId())) : label(l.getId()),
+                outcome(history), undone, progress);
+    }
+
+    /** Where a deal is, from what's been recorded; null with no buyer yet, or once cancelled. */
+    static Progress progress(List<ListingEvent> history) {
+        boolean live = history.stream().anyMatch(e -> e.getType() == ListingEvent.Type.ACCEPTED)
+                && history.stream().noneMatch(e -> e.getType() == ListingEvent.Type.CANCELLED);
+        if (!live) {
+            return null;
+        }
+        Instant shippedAt = null;
+        Instant arrivedAt = null;
+        Instant paidAt = null;
+        BigDecimal pricePaid = null;
+        String paidNote = null;
+        Instant confirmedAt = null;
+        ListingEvent dispute = null;
+        ListingEvent resolved = null;
+        boolean returned = false;
+        boolean held = false;
+        Instant cardBackAt = null;
+        for (ListingEvent e : history) {
+            switch (e.getType()) {
+                case SHIPPED -> shippedAt = e.getCreatedAt();
+                case INSPECTED -> arrivedAt = e.getCreatedAt();
+                case RECEIVED -> {
+                    arrivedAt = e.getCreatedAt();
+                    if (e.getPricePaid() != null) { // from before payment was a step of its own
+                        paidAt = e.getCreatedAt();
+                        pricePaid = e.getPricePaid();
+                        paidNote = e.getNote();
+                    }
+                }
+                case PAID -> {
+                    paidAt = e.getCreatedAt();
+                    pricePaid = e.getPricePaid();
+                    paidNote = e.getNote();
+                }
+                case PAYMENT_CONFIRMED -> {
+                    confirmedAt = e.getCreatedAt();
+                    dispute = null;
+                }
+                case RETURNED -> {
+                    returned = true;
+                    held = e.getDeclinedReason() == ListingEvent.DeclinedReason.NOT_GENUINE;
+                }
+                case DISPUTED -> dispute = e;
+                case RESOLVED -> {
+                    resolved = e;
+                    dispute = null;
+                    held = false;
+                }
+                case CARD_BACK -> cardBackAt = e.getCreatedAt();
+                default -> { }
+            }
+        }
+        DealStage stage = cardBackAt != null ? DealStage.BACK
+                : returned ? DealStage.RETURNED
+                : paidAt != null || confirmedAt != null ? DealStage.PAID
+                : arrivedAt != null ? DealStage.ARRIVED
+                : shippedAt != null ? DealStage.SHIPPED
+                : DealStage.SOLD;
+        return new Progress(stage, shippedAt, arrivedAt, arrivedAt == null ? null : arrivedAt.plus(PAY_WITHIN), paidAt, pricePaid, paidNote,
+                confirmedAt, dispute == null ? null : dispute.getCreatedAt(), dispute == null ? null : dispute.getNote(),
+                resolved == null ? null : new UndoView(resolved.getNote(), resolved.getCreatedAt()), held, cardBackAt);
+    }
+
+    /** What on this deal is waiting for the admin: an open DISPUTED, or a RETURNED nobody has reviewed. Null when nothing is. */
+    static ListingEvent awaitingAdmin(List<ListingEvent> history) {
+        ListingEvent waiting = null;
+        for (ListingEvent e : history) {
+            switch (e.getType()) {
+                case RETURNED, DISPUTED -> waiting = e;
+                case PAYMENT_CONFIRMED, RESOLVED, CANCELLED -> waiting = null;
+                default -> { }
+            }
+        }
+        return waiting;
     }
 
     private static UndoView undone(List<ListingEvent> history, ListingEvent.Type type) {

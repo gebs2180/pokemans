@@ -18,18 +18,26 @@ The lender and insurer side is paused while Zach clears his outside interest wit
    The offer is **one firm price**. "How we priced it" shows the per-grade ladder behind it.
 2. **Selling.** "Sell" posts the price to every buyer org, after one confirm step. The seller needs a ship-from address on file first. Posting isn't a sale: the first buyer to accept buys the card at the price, and the page says so. A listing nobody accepts expires.
    - Buyers see the photos the offer was priced on: each side's current photo (front, back, close-up), labelled, never superseded attempts. An offer whose photos were retaken since can't be posted: the seller gets a new one.
-   - From posting on, the card's photos can't change (E2E audit, 2026-10-21): the API refuses uploads while it's posted, and for good once it's sold. Withdrawing frees them again.
+   - From posting on, the card's photos can't change (E2E audit, 2026-10-21): the API refuses uploads while it's posted, and once it's sold until a returned card is back with the seller. Withdrawing frees them again.
 3. **The label.** Accepting buys a prepaid, insured label at once, on our EasyPost account, from the seller's address to the buyer's. The seller prints it from the card page. If the purchase fails (no shipping account yet, or the carrier is down), the sale still stands: the buyer retries from Your deals, or the admin from **Labels to buy** (`/admin/labels`). Meanwhile the seller is told not to ship until the label shows.
-4. **On arrival.** Once a label exists, the buyer records one of two things:
-   - the card arrived genuine and as shown, and what they paid the seller, by default the offer price; any other amount needs a note saying why;
-   - it goes back, for one of the reasons the buyer terms allow: not genuine, not the listed card, or doesn't match its photos. No reason is preselected.
+4. **After the sale** (UX review, 2026-11-01). **Rawmark never handles the money:** everything here records what each side says, one appended row at a time. The seller's card page and the buyer's Your deals both follow the deal through these stages:
+   - **Sold.** The seller gets the label and how to ship. The buyer gets the seller's payment handle (see Payment below).
+   - **Shipped.** The seller says "I've shipped it", after a confirm. The label is then gone from the screen and the API, since it's used; tracking stays. We don't read tracking yet, so this is the seller's word, and a stray tap needs the admin to pass the label back.
+   - **Arrived.** Once a label exists, the buyer taps **It arrived** and records one of two things. Neither is preselected, and **Record** asks once more, because a record can't be undone and the seller sees it:
+     - the card arrived genuine and as shown. That starts the 7 days, so both sides now see a pay-by date;
+     - it goes back, for one of the reasons the buyer terms allow: not genuine, not the listed card, or doesn't match its photos. No reason is preselected. "Not genuine" also needs a note, and its confirm says plainly what it means for the seller.
+   - **Paid.** A separate step from arriving, since the buyer has 7 days. The buyer records what they paid, by default the offer price; any other amount needs a note saying why. The seller then says **I got paid**, which closes the deal, or **I haven't been paid**.
+   - **Returned.** The seller sees the reason, the buyer's note and what happens next. **The card's back with me** frees the card: its photos can change again and it can get a new offer, never the one it sold at. **I disagree** sends Zach the seller's reason, which the buyer doesn't see.
 
-   Neither choice is preselected, and **Record** asks once more, because a record can't be undone and the seller sees it (UX review, 2026-11-01).
+   The seller can say either payment answer from Shipped on, so a buyer who never records the arrival can't leave them stuck. A card returned as **not genuine** gets no new offer until the admin closes the return, so a fake can't go straight out to the next buyer.
+
+   **What reaches the admin.** "Needs you" on `/admin/deals`, counted on `/admin` beside labels past their ship-by date (`GET /api/admin/deals/overdue`), lists every seller who says they weren't paid, every return, and every seller who disagrees with one, with both sides' contact details. The admin acts off the app, then closes the item with a note both sides see. A seller's own "I got paid" closes a payment item too.
 
    Without a label nothing can have shipped, so the API refuses both. If a card shipped another way, the admin records it for the buyer from **Labels to buy**, with a note saying how; the note is kept as "Recorded by the admin: …".
 
    No grade is judged: condition within the photos is the buyer's risk.
 5. **Billing.** Postage and insurance are billed to buyers monthly, off-platform, from `/admin/shipping`. Payment for the card is between buyer and seller, due within 7 days of a card arriving as shown. We hold no cards and no money for cards (Zach doesn't rule out becoming the middleman later).
+6. **Payment handle.** A seller gives PayPal, Venmo or Zelle details on the address form, and can't post without them; a seller whose address predates them is asked with their address prefilled. Buyers never see the handle on the market, only on a deal they took, and not once a deal is cancelled or returned. It goes to nobody else, the shipping provider included. We don't check it.
 
 ## Decisions (Zach, 2026-10-19)
 
@@ -71,17 +79,18 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
 - **identity:**
   - a `BUYER` org type and role;
   - terms, versioned in `Consents`; each is a plain-language **draft for Zach**, not reviewed legal wording, and a new version must be accepted again:
-    - buyer terms (`buyer-firm-2026-10-21`), accepted before a buyer sees the market;
-    - seller terms (`seller-2026-10-26`; the 2026-10-21 version said offers go up to $500), accepted by collectors before they upload photos, get an offer or post a card. Contributors accept the same seller terms inside their own (`contributor-2026-10-26`), since they can sell too;
+    - buyer terms (`buyer-firm-2026-11-01`), accepted before a buyer sees the market;
+    - seller terms (`seller-2026-11-01`), accepted by collectors before they upload photos, get an offer or post a card. Contributors accept the same seller terms inside their own (`contributor-2026-11-01`), since they can sell too;
+    - the 2026-11-01 versions add the payment handle and who sees it, recording arrival, payment and shipping in the app, the note a "not genuine" return needs, and the review before such a card gets a new offer. The 2026-10-26 versions dropped the $500 maximum;
     - the 2026-10-21 versions cover shipping within 3 days of the label, transit loss (we claim on the label's insurance and pay the seller; the buyer owes nothing), cards subject to authentication, disputes (Zach decides from the photos), the admin's undo, no dealing around the app during the test, and non-payment ending a buyer's part in the test. Zach agreed each of these on 2026-10-21, along with return postage staying with the buyer and contributors keeping their free collection report. No liability cap or "as is" wording until a lawyer drafts it;
   - `Directory` for names and contact details.
 - **`offers` module (V14, V16, V18; all append-only):**
   - `card_offer`: every input, the firm price, the ladder and the trace.
   - `sale_listing`.
-  - `listing_event`: ACCEPTED, WITHDRAWN, RECEIVED and RETURNED, plus INSPECTED from the per-grade offers that came before, and the admin's VOIDED and CANCELLED (V18, no actor org, the reason in the note). Partial unique indexes let a listing close only once (taken, withdrawn or voided) and a deal end once (arrived, returned or cancelled). Posting, voiding and cancelling are serialized per card with an advisory lock.
+  - `listing_event`: ACCEPTED, WITHDRAWN, RECEIVED and RETURNED, plus INSPECTED from the per-grade offers that came before, and the admin's VOIDED and CANCELLED (V18, no actor org, the reason in the note). V20 adds the seller's SHIPPED, PAYMENT_CONFIRMED, DISPUTED and CARD_BACK, the buyer's PAID, and the admin's RESOLVED. A RECEIVED with a price is from before V20, when arriving and paying were one row, and counts as both. Partial unique indexes let a listing close only once (taken, withdrawn or voided), a deal end once (arrived, returned or cancelled), and each of SHIPPED, PAID, PAYMENT_CONFIRMED and CARD_BACK happen once. DISPUTED and RESOLVED can repeat. Posting, voiding, cancelling and what's said after the sale are serialized per card with an advisory lock.
   - `card_offer_void` (V18): one per voided offer, with the reason and the admin.
   - `label_refund` (V18): each refund request, with the reason, the admin and the provider's answer or why it couldn't be asked.
-  - `ship_address`: one per org, the latest row current.
+  - `ship_address`: one per org, the latest row current; a seller's holds their payment handle too (V20).
   - `shipping_label`.
   - The `ShippingProvider` port, with an EasyPost adapter that buys the cheapest USPS rate, insured for the offer, and asks for a label's refund.
 - **API:**
@@ -90,6 +99,7 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
     - `POST .../offers`
     - `POST .../listings`
     - `POST /api/orgs/{org}/listings/{id}/withdraw`
+    - `POST /api/orgs/{org}/listings/{id}/shipped`, `.../payment-confirmed`, `.../dispute` and `.../card-back`
     - `GET /api/orgs/{org}/cards/{card}/status` and `GET /api/orgs/{org}/collections/{collection}/status`: where each card is (photos, our identification, condition review, prices, offer, posted, sold), its identity once confirmed, and what happens next
   - Both sides: `GET`/`POST /api/orgs/{org}/ship-address`.
   - Buyer (buyer org, terms accepted):
@@ -98,6 +108,7 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
     - `GET .../deals`
     - `POST .../deals/{id}/label` (retry)
     - `POST .../deals/{id}/received`
+    - `POST .../deals/{id}/paid`
     - `POST .../deals/{id}/returned`
   - Admin (admin role after an MFA login):
     - `GET /api/admin/cards/{card}/offer-preview`: the offer the seller would get now, or why none, with the trace steps that set its confidence. Stores nothing.
@@ -106,6 +117,7 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
     - `POST /api/admin/deals/{id}/received?buyerOrgId=` and `.../returned?buyerOrgId=`: an arrival or return recorded by hand, note required
     - `GET /api/admin/shipping/charges?month=yyyy-MM`: cancelled deals' labels are listed with `billed: false` and their refund state
     - `GET /api/admin/offers`: the newest 200 offers with their latest listing, label and any undo
+    - `GET /api/admin/deals/attention` and `POST /api/admin/deals/{id}/resolve` with `{"reason": "..."}`: what's waiting on the admin after a sale
     - `POST /api/admin/offers/{id}/void`, `POST /api/admin/deals/{id}/cancel`, `POST /api/admin/deals/{id}/label/refund`, each with `{"reason": "..."}`
   - The market never names the seller. Once a buyer accepts, each side sees the other's org name and email, and only the seller gets the printable label. The buyer never sees the seller's address or city, not even through the label, so the two can't meet up and deal around us (Zach, 2026-10-21). The parcel's return address still shows the seller's address on arrival: kept for the beta (Zach, 2026-10-21).
 - **Web:**
@@ -129,7 +141,8 @@ The realized sales are the evidence for the later lender and insurer pitch: our 
   - the card's identity, the offer date, the price and FMV;
   - the status (open, accepted, withdrawn, expired) and time to accept;
   - the label (carrier, postage, insurance);
-  - the outcome (received with the price paid, or returned with the reason) and the time from label to outcome.
+  - the outcome (received, or returned with the reason), the price paid, and the time from label to outcome;
+  - from V20, when it shipped, when the buyer says they paid, when the seller confirmed it, and whether the seller raised anything.
 
   V16 drops the grade-calibration view: with firm prices, nobody judges a grade on arrival.
 - **Admin page** "Offer track record" (`/admin/offers`) shows:
@@ -151,10 +164,11 @@ The realized sales are the evidence for the later lender and insurer pitch: our 
 
 - **Buyer terms wording:** review before inviting the first buyer.
 - **EasyPost account:** create one, test with a test key (labels are fake), then set the production key. EasyPost insures up to $5,000 a parcel, and the offer maximum is set to that limit. Read its insurance terms (what's excluded, how claims are paid) before the first expensive card ships.
+- **After the sale, open (2026-11-01):** Shipped is the seller's word, since we don't read tracking yet. Nobody is told when a pay-by date passes: the seller has to look. "Arrived as shown" is final in the app, so a buyer who taps it and then finds a problem needs the admin.
 - **Undo, open (2026-10-21):** the seller sees a voided offer's reason as the admin typed it, so write it for them; a cancelled deal after the card shipped needs the card back by hand; a refund's later status (EasyPost moves `submitted` to `refunded` or `rejected`) isn't fetched yet.
 - **Invoices:** monthly postage bills are produced by hand from "Postage to bill". There is no invoicing or payment collection.
 - **Grade accuracy:** add a way for buyers to report a grader's result when they slab a card they bought, as calibration data from a grader.
-- **Notifications:** buyers aren't told when a card is posted, and sellers aren't emailed their label. Email waits for the notifier (M6). Until then a seller's home page lists what needs them across their orgs (`GET /api/orgs/{orgId}/needs-you`): a label to use with its ship-by date, an offer to get or take up with its end date, and failed photos. We can't see that a card shipped, so a label stays listed until an arrival or return is recorded.
+- **Notifications:** buyers aren't told when a card is posted, and sellers aren't emailed their label. Email waits for the notifier (M6). Until then a seller's home page lists what needs them across their orgs (`GET /api/orgs/{orgId}/needs-you`): a label to use with its ship-by date, an offer to get or take up with its end date, and failed photos. A label stays listed until the seller says it shipped, or an arrival or return is recorded.
 - **"Instant" depends on the review queue.** An offer needs an identified, assessed card, and identification and condition review are still done by hand.
 - **Outside interest:** a marketplace for shops and collectors isn't "primarily to the financial services industry", but the employer's general outside-interest disclosure may still apply. Raise it in the lawyer hour.
 - **Not checked in the running app:** logging in needs Zach's Auth0 MFA.

@@ -1,13 +1,8 @@
 import { useState } from 'react'
-import { apiPath, likelyRungs, money, RETURN_REASON, useApi, type CardStatus, type Offer, type Sale, type ShipAddress } from '../api'
-import { safeHref } from '../safeHref'
+import { apiPath, likelyRungs, money, PAYMENT_METHOD, useApi, type CardStatus, type Offer, type Sale, type ShipAddress } from '../api'
 import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
-
-/** The seller terms' deadline: 3 days from the label showing. */
-function shipBy(boughtAt: string) {
-  return new Date(new Date(boughtAt).getTime() + 3 * 86_400_000).toLocaleDateString()
-}
+import { SoldPanel } from './SoldPanel'
 
 /** How the firm price was reached: what a buyer could pay at each grade the card might be, and how likely each is. */
 export function HowPriced({ offer }: { offer: Offer }) {
@@ -95,8 +90,10 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
   const { offer, listing } = sale
   const live = listing && (listing.status === 'OPEN' || listing.status === 'ACCEPTED')
   const getOffer = () => act('POST', apiPath`/api/orgs/${orgId}/cards/${cardId}/offers`)
-  const labelHref = safeHref(listing?.label?.labelUrl)
   const address = shipFrom?.address
+  const paidBy = address?.paymentMethod ? `, by ${PAYMENT_METHOD[address.paymentMethod]}` : ''
+  // The card sold at this offer and came back: it goes out again on a new one, or not at all.
+  const soldAtThisOffer = listing?.status === 'BACK' && listing.offerId === offer?.id
   // Only offer the button when asking can work; otherwise say what happens first.
   const askButton = (text: string) =>
     status?.canOffer ? (
@@ -126,7 +123,9 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
           {offer.subjectToAuthentication && <p className="muted small">Subject to the buyer authenticating the card in hand.</p>}
           <HowPriced offer={offer} />
           {!live &&
-            (offer.voided ? (
+            (soldAtThisOffer ? (
+              askButton('Get a new offer')
+            ) : offer.voided ? (
               <>
                 <p className="alert alert-warning">
                   We withdrew this offer on {new Date(offer.voided.at).toLocaleDateString()}: {offer.voided.reason}.
@@ -145,14 +144,16 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
                   accept buys the card at it, and we send you a prepaid, insured shipping label. It isn't sold until a buyer accepts.
                 </p>
                 <p className="small">
-                  <strong>The buyer pays you directly, not us,</strong> within 7 days of the card arriving as shown. Rawmark doesn't
-                  handle the money.
+                  <strong>The buyer pays you directly, not us{paidBy},</strong> within 7 days of the card arriving as shown. Rawmark
+                  doesn't handle the money.
                 </p>
-                {shipFrom && (address == null || editingAddress) ? (
+                {shipFrom && (address == null || !address.paymentHandle || editingAddress) ? (
                   <>
                     <h3>Where will you ship from?</h3>
                     <AddressForm
                       orgId={orgId}
+                      payment
+                      initial={address}
                       onSaved={() => {
                         setEditingAddress(false)
                         reloadAddress()
@@ -164,7 +165,8 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
                     {address && (
                       <p className="meta">
                         Ships from {address.name}, {address.street1}
-                        {address.street2 && ` ${address.street2}`}, {address.city}, {address.state} {address.zip}.{' '}
+                        {address.street2 && ` ${address.street2}`}, {address.city}, {address.state} {address.zip}.
+                        {address.paymentMethod && ` Paid by ${PAYMENT_METHOD[address.paymentMethod]}: ${address.paymentHandle}.`}{' '}
                         <button className="link" onClick={() => setEditingAddress(true)}>
                           Change
                         </button>
@@ -175,7 +177,7 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
                         <div className="confirm">
                           <p>
                             If a buyer accepts, you're committing to ship them the card, as shown in your photos, for{' '}
-                            {money(offer.price)}. They pay you directly, within 7 days of it arriving.
+                            {money(offer.price)}. They pay you directly{paidBy}, within 7 days of it arriving.
                           </p>
                           <div className="actions">
                             <button
@@ -234,60 +236,22 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
           </div>
         </div>
       )}
-      {listing?.status === 'ACCEPTED' && (
-        <div className="alert alert-success">
-          <p>
-            Sold to {listing.buyer?.orgName ?? 'a buyer'}
-            {listing.buyer?.email && ` (${listing.buyer.email})`} on {new Date(listing.closedAt!).toLocaleDateString()}. They pay
-            you {offer && money(offer.price)} directly, within 7 days of it arriving as shown.
-            {listing.buyer?.email && ' Email them to agree how.'}
-          </p>
-          {listing.label && labelHref ? (
-            <>
-              <p className="actions">
-                <a href={labelHref} target="_blank" rel="noreferrer" className="button">
-                  Print your prepaid label
-                </a>
-              </p>
-              <p className="small">
-                {listing.label.carrier} {listing.label.service}
-                {listing.label.trackingCode && `, tracking ${listing.label.trackingCode}`}, insured for {money(listing.label.insuredValue)}
-              </p>
-              {!listing.outcome && (
-                <>
-                  <p className="alert-title">How to ship it</p>
-                  <ul className="small">
-                    <li>Put the card in a sleeve, then a toploader, in a bubble mailer.</li>
-                    <li>Stick this label on the mailer. Use only this label: it's the insured one.</li>
-                    <li>Hand it to the carrier by {shipBy(listing.label.boughtAt)}.</li>
-                  </ul>
-                </>
-              )}
-            </>
-          ) : (
-            !listing.outcome && (
-              <p className="alert alert-warning">
-                Your prepaid label isn't ready yet: buying it didn't go through. Don't ship the card until the label shows here; we'll
-                be in touch.
-              </p>
-            )
-          )}
-          {listing.outcome?.type === 'RECEIVED' && (
-            <p>
-              Arrived. They recorded paying {money(listing.outcome.pricePaid)}
-              {listing.outcome.note ? `: "${listing.outcome.note}"` : '.'}
-            </p>
-          )}
-          {listing.outcome?.type === 'RETURNED' && listing.outcome.returnedReason && (
-            <p>They're sending it back: {RETURN_REASON[listing.outcome.returnedReason]}.</p>
-          )}
-        </div>
+      {listing && (listing.status === 'ACCEPTED' || soldAtThisOffer) && (
+        <SoldPanel
+          orgId={orgId}
+          listing={listing}
+          price={offer?.price}
+          address={address}
+          busy={busy}
+          act={act}
+          onAddressSaved={reloadAddress}
+        />
       )}
       {listing?.status === 'CANCELLED' && listing.offerId === offer?.id && (
         <p className="alert alert-danger">
           We cancelled the sale{listing.buyer?.orgName && ` to ${listing.buyer.orgName}`}
           {listing.undone && ` on ${new Date(listing.undone.at).toLocaleDateString()}: ${listing.undone.reason}`}. Don't ship the card, and
-          don't use its label.
+          don't use its label. If you already shipped it, tell us and we'll help get it back.
         </p>
       )}
       {listing && (listing.status === 'WITHDRAWN' || listing.status === 'EXPIRED') && (

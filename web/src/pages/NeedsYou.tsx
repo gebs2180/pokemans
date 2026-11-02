@@ -9,8 +9,8 @@ function describe(item: NeedsYouItem): { chip: string; tone: Tone; detail: strin
   switch (item.need) {
     case 'LABEL_READY':
       return item.due && new Date(item.due) < new Date()
-        ? { chip: `Was due ${due}`, tone: 'danger', detail: "Your prepaid label is ready and the ship-by date has passed. If you've shipped it, there's nothing more to do." }
-        : { chip: `Ship by ${due}`, tone: 'warning', detail: "Your prepaid label is ready. If you've shipped it, there's nothing more to do." }
+        ? { chip: `Was due ${due}`, tone: 'danger', detail: "Your prepaid label is ready and the ship-by date has passed. Open the card to say you've shipped it." }
+        : { chip: `Ship by ${due}`, tone: 'warning', detail: "Your prepaid label is ready. Once it's with the carrier, open the card to say so." }
     case 'OFFER_EXPIRING':
       return { chip: `Offer ends ${due}`, tone: 'warning', detail: 'Sell at it before then, or it lapses.' }
     case 'OFFER_READY':

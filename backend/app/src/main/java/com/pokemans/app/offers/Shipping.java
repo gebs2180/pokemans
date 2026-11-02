@@ -2,6 +2,8 @@ package com.pokemans.app.offers;
 
 import com.pokemans.app.identity.CurrentUser;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
@@ -58,8 +60,8 @@ class Shipping {
     }
 
     @Transactional
-    ShipAddress record(UUID orgId, ShippingProvider.Address a) {
-        return addresses.save(new ShipAddress(orgId, a, currentUser.id()));
+    ShipAddress record(UUID orgId, ShippingProvider.Address a, PaymentHandle payment) {
+        return addresses.save(new ShipAddress(orgId, a, payment, currentUser.id()));
     }
 
     @Transactional(readOnly = true)
@@ -150,7 +152,13 @@ class Shipping {
     }
 }
 
-/** Where an org ships from or to. The latest row is current. Append-only. */
+/** How a seller gets paid, off the app: where the buyer sends the money. Rawmark only passes this on. */
+record PaymentHandle(PaymentHandle.Method method, String handle) {
+
+    enum Method { PAYPAL, VENMO, ZELLE }
+}
+
+/** Where an org ships from or to, and for a seller how they get paid. The latest row is current. Append-only. */
 @Entity
 @Table(name = "ship_address")
 class ShipAddress {
@@ -167,13 +175,16 @@ class ShipAddress {
     private String zip;
     private String country;
     private String phone;
+    @Enumerated(EnumType.STRING)
+    private PaymentHandle.Method paymentMethod;
+    private String paymentHandle;
     private UUID recordedBy;
     private Instant createdAt;
 
     protected ShipAddress() {
     }
 
-    ShipAddress(UUID orgId, ShippingProvider.Address a, UUID recordedBy) {
+    ShipAddress(UUID orgId, ShippingProvider.Address a, PaymentHandle payment, UUID recordedBy) {
         this.id = UUID.randomUUID();
         this.orgId = orgId;
         this.name = a.name();
@@ -185,12 +196,19 @@ class ShipAddress {
         this.zip = a.zip();
         this.country = a.country();
         this.phone = a.phone();
+        this.paymentMethod = payment == null ? null : payment.method();
+        this.paymentHandle = payment == null ? null : payment.handle();
         this.recordedBy = recordedBy;
         this.createdAt = Instant.now();
     }
 
     ShippingProvider.Address toAddress() {
         return new ShippingProvider.Address(name, company, street1, street2, city, state, zip, country, phone);
+    }
+
+    /** Never part of {@link #toAddress()}: the shipping provider has no business with it. */
+    PaymentHandle payment() {
+        return paymentMethod == null ? null : new PaymentHandle(paymentMethod, paymentHandle);
     }
 
     UUID getId() {

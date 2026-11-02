@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 class CardStatusService {
 
     /** In order: photos, then our review (identity, condition, prices), then the offer and the sale. */
-    enum Stage { PHOTOS, LOT, IDENTIFYING, ASSESSING, PRICING, NO_OFFER, READY, OFFERED, LISTED, SOLD }
+    enum Stage { PHOTOS, LOT, IDENTIFYING, ASSESSING, PRICING, NO_OFFER, READY, OFFERED, LISTED, SOLD, SHIPPED, ARRIVED, PAID, RETURNED }
 
     /**
      * @param identity  the card as we identified it, e.g. "Charizard · Base Set 4/102 · EN · holo", or null
@@ -101,7 +101,7 @@ class CardStatusService {
         }).filter(java.util.Objects::nonNull).toList();
     }
 
-    /** What a card in this state needs from its seller, or null. A sold card needs them until an arrival shows its label was used. */
+    /** What a card in this state needs from its seller, or null. A sold card needs them until they say it shipped, or an arrival shows it did. */
     static Need need(CardStatus status, boolean retake, Instant now) {
         return switch (status.stage()) {
             case SOLD -> status.deadline() == null ? null : Need.LABEL_READY;
@@ -123,18 +123,21 @@ class CardStatusService {
         OfferService.Quote quote = offers.quote(cardId);
         CardInputs in = quote.value().inputs();
         String identity = identity(in.identity());
+        ListingService.Progress deal = ListingService.progress(history);
         if (listed == ListingService.Status.ACCEPTED) {
-            Instant shipBy = ListingService.outcome(history) != null ? null
-                    : shipping.label(listing.orElseThrow().getId()).map(l -> l.getCreatedAt().plus(ListingService.SHIP_WITHIN)).orElse(null);
-            return new CardStatus(cardId, Stage.SOLD, identity, "A buyer took it: ship it with the prepaid label once it shows on this card's page.", false)
-                    .withDeadline(shipBy);
+            return afterTheSale(cardId, identity, deal, listing.orElseThrow().getId());
+        }
+        if (listed == ListingService.Status.BACK && deal.held()) {
+            return new CardStatus(cardId, Stage.RETURNED, identity, ListingService.HELD + NO_NOTIFICATIONS, false);
         }
         if (listed == ListingService.Status.OPEN) {
             return new CardStatus(cardId, Stage.LISTED, identity, "Posted to buyers: the first to accept buys it at the price.", false)
                     .withDeadline(listing.orElseThrow().getExpiresAt());
         }
+        // A card that came back can't go out again on the offer it sold at.
+        UUID soldAt = listed == ListingService.Status.BACK ? listing.get().getOfferId() : null;
         Optional<CardOffer> latest = offers.latest(cardId).filter(o -> o.getExpiresAt().isAfter(Instant.now()))
-                .filter(o -> voids.findByOfferId(o.getId()).isEmpty());
+                .filter(o -> voids.findByOfferId(o.getId()).isEmpty()).filter(o -> !o.getId().equals(soldAt));
         if (latest.isPresent()) {
             return new CardStatus(cardId, Stage.OFFERED, identity, "You have an offer: sell at it, or let it expire.", false)
                     .withDeadline(latest.orElseThrow().getExpiresAt());
@@ -162,6 +165,21 @@ class CardStatusService {
             return new CardStatus(cardId, Stage.NO_OFFER, identity, quote.refusal() + nextStep(quote.refusal()), false);
         }
         return new CardStatus(cardId, Stage.READY, identity, "Ready for an instant offer.", true);
+    }
+
+    private CardStatus afterTheSale(UUID cardId, String identity, ListingService.Progress deal, UUID listingId) {
+        return switch (deal.stage()) {
+            case SHIPPED -> new CardStatus(cardId, Stage.SHIPPED, identity,
+                    "On its way to the buyer. They record it when it arrives, and then have 7 days to pay you." + NO_NOTIFICATIONS, false);
+            case ARRIVED -> new CardStatus(cardId, Stage.ARRIVED, identity,
+                    "It arrived. The buyer pays you directly: tell us here when they have, or if they haven't by the date on this page.", false);
+            case PAID -> new CardStatus(cardId, Stage.PAID, identity, deal.confirmedAt() != null ? "Paid. Nothing more to do."
+                    : "The buyer says they paid you. Tell us here whether you got it.", false);
+            case RETURNED -> new CardStatus(cardId, Stage.RETURNED, identity,
+                    "The buyer is sending it back. Tell us here once you have it.", false);
+            default -> new CardStatus(cardId, Stage.SOLD, identity, "A buyer took it: ship it with the prepaid label once it shows on this card's page.", false)
+                    .withDeadline(shipping.label(listingId).map(l -> l.getCreatedAt().plus(ListingService.SHIP_WITHIN)).orElse(null));
+        };
     }
 
     private static String nextStep(String refusal) {

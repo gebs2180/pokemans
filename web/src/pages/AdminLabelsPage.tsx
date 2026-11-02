@@ -67,7 +67,6 @@ export function AdminLabelsPage() {
           {byHand === deal.listingId && (
             <ArrivalForm
               path={apiPath`/api/admin/deals/${deal.listingId}?buyerOrgId=${deal.buyerOrgId}`}
-              price={deal.offer.price}
               noteRequired
               onSaved={() => {
                 setByHand(null)

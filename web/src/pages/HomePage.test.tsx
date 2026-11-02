@@ -206,13 +206,14 @@ describe('Admin', () => {
     stub({
       '/api/admin/orgs': [],
       '/api/admin/review-queue': [{ identified: true, priced: false }, { identified: true, priced: true }, { identified: false, priced: false }],
-      '/api/admin/deals/attention': { returns: 2, overdueLabels: 1 },
+      '/api/admin/deals/attention': [{}, {}],
+      '/api/admin/deals/overdue': { labels: 1 },
     })
     page('/admin')
     expect(await screen.findByRole('heading', { name: 'Needs attention: 4' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '1 card with no comps' })).toHaveAttribute('href', '/admin/review')
-    expect(screen.getByRole('link', { name: '2 cards sent back in the last 14 days' })).toHaveAttribute('href', '/admin/deals')
-    expect(screen.getByRole('link', { name: '1 card past the ship-by date with nothing recorded' })).toHaveAttribute('href', '/admin/deals')
+    expect(screen.getByRole('link', { name: '2 cards with a return or payment to sort out' })).toHaveAttribute('href', '/admin/deals')
+    expect(screen.getByRole('link', { name: '1 card past the ship-by date, not marked shipped' })).toHaveAttribute('href', '/admin/deals')
   })
 
   it("doesn't read as all clear when the count failed", async () => {

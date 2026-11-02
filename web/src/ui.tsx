@@ -21,6 +21,10 @@ const STAGE_TONE: Record<CardStage, Tone> = {
   OFFERED: 'info',
   LISTED: 'info',
   SOLD: 'success',
+  SHIPPED: 'info',
+  ARRIVED: 'info',
+  PAID: 'success',
+  RETURNED: 'warning',
 }
 
 /** Where a seller's card is on the way to a sale. */

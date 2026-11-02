@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import type { AdminListing, AdminOffer } from '../api'
+import type { AdminListing, AdminOffer, DealAttention } from '../api'
 import { respond } from '../test/auth0'
 import { AdminOffersPage } from './AdminOffersPage'
 
@@ -40,7 +40,24 @@ const offer = (id: string, name: string, over: Partial<AdminOffer> = {}): AdminO
   ...over,
 })
 
-function stub(offers: AdminOffer[]) {
+const waiting = (over: Partial<DealAttention> = {}): DealAttention => ({
+  listingId: 'l9',
+  kind: 'NOT_PAID',
+  since: '2026-10-25T10:00:00Z',
+  note: 'nothing in my Venmo',
+  sellerOrgId: 'org1',
+  cardItemId: 'c9',
+  card: { ...card, name: 'Mew' },
+  price: 300,
+  buyer: { orgName: 'Card Shop', email: 'shop@example.com' },
+  seller: { orgName: 'Sam', email: 'sam@example.com' },
+  trackingCode: '9400111',
+  outcome: null,
+  progress: null,
+  ...over,
+})
+
+function stub(offers: AdminOffer[], attention: DealAttention[] = []) {
   const posts: { url: string; body: unknown }[] = []
   vi.stubGlobal(
     'fetch',
@@ -49,7 +66,7 @@ function stub(offers: AdminOffer[]) {
         posts.push({ url, body: JSON.parse(String(init.body)) })
         return Promise.resolve(respond(200, offers[0]))
       }
-      return Promise.resolve(respond(200, offers))
+      return Promise.resolve(respond(200, url.endsWith('/attention') ? attention : offers))
     }),
   )
   return posts
@@ -64,6 +81,44 @@ function renderPage() {
 }
 
 describe('AdminOffersPage', () => {
+  it('puts what needs the admin first, with who to contact, and closes it with a note', async () => {
+    const user = userEvent.setup()
+    const posts = stub([], [waiting()])
+    renderPage()
+
+    const item = await screen.findByRole('region', { name: 'Needs attention: Mew' })
+    expect(screen.getByRole('heading', { name: 'Needs you (1)' })).toBeInTheDocument()
+    expect(within(item).getByText(/Seller says they haven't been paid/)).toBeInTheDocument()
+    expect(within(item).getByText('The seller says: "nothing in my Venmo"')).toBeInTheDocument()
+    expect(within(item).getByText(/Buyer Card Shop \(shop@example.com\) · seller Sam \(sam@example.com\)/)).toBeInTheDocument()
+    await user.click(within(item).getByRole('button', { name: 'Close' }))
+    await user.type(screen.getByLabelText('Close: reason'), 'Spoke to both')
+    await user.click(within(item).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(posts).toEqual([{ url: '/api/admin/deals/l9/resolve', body: { reason: 'Spoke to both' } }]))
+  })
+
+  it('warns that closing a "not genuine" return frees the card for a new offer', async () => {
+    stub(
+      [],
+      [
+        waiting({
+          kind: 'RETURNED',
+          note: 'wrong font',
+          outcome: { type: 'RETURNED', pricePaid: null, returnedReason: 'NOT_GENUINE', note: 'wrong font', inspectedGrade: null, recordedAt: '2026-10-25T10:00:00Z' },
+          progress: {
+            stage: 'RETURNED', shippedAt: null, arrivedAt: null, payBy: null, paidAt: null, pricePaid: null, paidNote: null, confirmedAt: null,
+            disputedAt: null, disputeNote: null, review: null, held: true, cardBackAt: null,
+          },
+        }),
+      ],
+    )
+    renderPage()
+
+    const item = await screen.findByRole('region', { name: 'Needs attention: Mew' })
+    expect(within(item).getByText('Returned: not genuine: "wrong font"')).toBeInTheDocument()
+    expect(within(item).getByText(/can't get a new offer until you close this/)).toBeInTheDocument()
+  })
+
   it('offers the undo that fits each state', async () => {
     stub([
       offer('o1', 'On the market', { listing: listing() }),

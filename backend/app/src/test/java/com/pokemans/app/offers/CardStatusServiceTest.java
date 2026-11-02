@@ -14,6 +14,15 @@ class CardStatusServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-11-01T12:00:00Z");
 
+    @Test
+    void aLabelIsOverduePastItsDateUntilTheCardShips() {
+        Instant late = NOW.minus(Duration.ofDays(4));
+        assertThat(ListingService.overdue(late, ListingService.DealStage.SOLD, NOW)).isTrue();
+        assertThat(ListingService.overdue(NOW.minus(Duration.ofDays(2)), ListingService.DealStage.SOLD, NOW)).isFalse();
+        assertThat(ListingService.overdue(late, ListingService.DealStage.SHIPPED, NOW)).isFalse();
+        assertThat(ListingService.overdue(late, ListingService.DealStage.RETURNED, NOW)).isFalse();
+    }
+
     private static Need need(Stage stage, Instant deadline, boolean retake) {
         return CardStatusService.need(new CardStatus(UUID.randomUUID(), stage, null, "", false).withDeadline(deadline), retake, NOW);
     }
