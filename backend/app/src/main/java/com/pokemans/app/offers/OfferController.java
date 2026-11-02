@@ -166,6 +166,12 @@ class OfferController {
         return cardItems.inCollection(collectionId).stream().map(c -> statuses.status(c.id())).toList();
     }
 
+    /** What's waiting on the seller across the org's collections: labels to ship, offers to take up, photos to retake. */
+    @GetMapping("/api/orgs/{orgId}/needs-you")
+    List<CardStatusService.NeedsYou> needsYou(@PathVariable UUID orgId) {
+        return statuses.needsYou(orgId, access.require(orgId, SELLER_ORGS).getType() == OrgType.COLLECTOR);
+    }
+
     /** Prices the card now. 409 with the reason when it gets no offer. */
     @PostMapping("/api/orgs/{orgId}/cards/{cardId}/offers")
     @ResponseStatus(HttpStatus.CREATED)
@@ -288,6 +294,12 @@ class OfferController {
     @GetMapping("/api/admin/deals/awaiting-label")
     List<ListingService.AwaitingLabel> awaitingLabels() {
         return listings.awaitingLabels();
+    }
+
+    /** Overdue labels, for the count on the admin page. */
+    @GetMapping("/api/admin/deals/overdue")
+    ListingService.Overdue overdue() {
+        return listings.overdue();
     }
 
     /** What an offer on the card would be now, or why it gets none, with the steps that set its confidence. Stores nothing. */

@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { apiPath, useApi, type CardStatus, type CardView, type ContainerDetail, type Me, type ReportView } from '../api'
-import { Chip, EmptyState, Field, Loading, StageChip } from '../ui'
+import { apiPath, deadlineText, useApi, type CardStatus, type CardView, type ContainerDetail, type Me, type ReportView } from '../api'
+import { Chip, EmptyState, Field, Loading, NotFound, PageError, StageChip } from '../ui'
 import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { ReportsList } from './ReportsPanel'
@@ -9,9 +9,34 @@ import { ReportsList } from './ReportsPanel'
 /** Lender and insurer reports are paused unless the build turns them on. */
 const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
 
-/** A batch or collection: its cards and their capture status. */
+/** A batch or binder on its own page. */
 export function ContainerPage() {
   const { orgId = '', kind = '', containerId = '' } = useParams()
+  if (kind !== 'batches' && kind !== 'collections') return <NotFound />
+  return <ContainerView orgId={orgId} kind={kind} containerId={containerId} />
+}
+
+/**
+ * A batch or binder: its cards and their capture status.
+ * @param title    for a binder shown inside a page of its own: the page's heading, in place of the binder's name and back link
+ * @param lead     shown under the heading
+ * @param children shown under the cards
+ */
+export function ContainerView({
+  orgId,
+  kind,
+  containerId,
+  title,
+  lead,
+  children,
+}: {
+  orgId: string
+  kind: string
+  containerId: string
+  title?: string
+  lead?: ReactNode
+  children?: ReactNode
+}) {
   const api = useApi()
   const navigate = useNavigate()
   const { data, error } = useLoad(
@@ -32,8 +57,8 @@ export function ContainerPage() {
   const [addError, setAddError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const formError = useFormError(addError)
-
-  if (kind !== 'batches' && kind !== 'collections') return <p>Page not found.</p>
+  // Lots never get offers, so sellers aren't offered them; partners' batches still take them.
+  const lots = kind === 'batches'
 
   async function addCard(e: FormEvent) {
     e.preventDefault()
@@ -54,22 +79,27 @@ export function ContainerPage() {
     }
   }
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   if (!data) return <Loading />
 
   const complete = data.cards.filter((c) => c.captureComplete).length
   return (
     <>
-      <p className="back">
-        <Link to={`/orgs/${orgId}`}>← Back</Link>
-      </p>
-      <h1>{data.name}</h1>
-      <p className="muted">
-        {complete} of {data.cards.length} card{data.cards.length === 1 ? '' : 's'} fully photographed
-      </p>
+      {title == null && (
+        <p className="back">
+          <Link to={`/orgs/${orgId}`}>← Back</Link>
+        </p>
+      )}
+      <h1>{title ?? data.name}</h1>
+      {lead}
+      {data.cards.length > 0 && (
+        <p className="muted">
+          {complete} of {data.cards.length} card{data.cards.length === 1 ? '' : 's'} fully photographed
+        </p>
+      )}
 
       <form onSubmit={addCard} className="panel form" aria-describedby={formError.describedBy}>
-        <Field label="Card name and number" hint="Its name and number, as printed. One card worth $25 or more at a time.">
+        <Field label="Card name and number" hint={lots ? 'Its name and number, as printed.' : "Its name and number, as printed. One card at a time: we'll tell you if it's under our $25 minimum."}>
           {(control) => (
             <input
               {...control}
@@ -81,21 +111,23 @@ export function ContainerPage() {
             />
           )}
         </Field>
-        <div className="row">
-          <label className="check">
-            <input type="checkbox" checked={lot} onChange={(e) => setLot(e.target.checked)} /> Lot of cheaper cards
-          </label>
-          {lot && (
-            <input
-              type="number"
-              min={1}
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-              className="narrow"
-              aria-label="Number of cards in the lot"
-            />
-          )}
-        </div>
+        {lots && (
+          <div className="row">
+            <label className="check">
+              <input type="checkbox" checked={lot} onChange={(e) => setLot(e.target.checked)} /> Lot of cheaper cards
+            </label>
+            {lot && (
+              <input
+                type="number"
+                min={1}
+                value={quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                className="narrow"
+                aria-label="Number of cards in the lot"
+              />
+            )}
+          </div>
+        )}
         {lot && <p className="muted small">Lots are kept with their photos, but don't get offers: add cards worth $25 or more one by one.</p>}
         <div className="actions">
           <button type="submit" disabled={adding} aria-busy={adding}>
@@ -109,6 +141,7 @@ export function ContainerPage() {
       <ul className="tile-list">
         {data.cards.map((card) => {
           const status = statuses?.find((s) => s.cardId === card.id)
+          const deadline = status && deadlineText(status)
           return (
             <li key={card.id} className="tile">
               <div className="tile-head">
@@ -123,11 +156,13 @@ export function ContainerPage() {
               </div>
               {card.lot && <span className="muted">lot of {card.quantity}</span>}
               {status?.identity && <div className="muted small">{status.identity}</div>}
+              {deadline && <div className="small">{deadline}</div>}
             </li>
           )
         })}
       </ul>
 
+      {children}
       {COLLATERAL && kind === 'collections' && <CollectionReports orgId={orgId} collectionId={containerId} />}
     </>
   )

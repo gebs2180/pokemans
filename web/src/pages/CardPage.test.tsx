@@ -52,6 +52,7 @@ const status: CardStatus = {
   nextStep: 'We identify each card by hand from its photos, usually within a couple of days.',
   canOffer: false,
   condition: null,
+  deadline: null,
 }
 
 function renderCard(view: CardView, cardStatus: CardStatus = status, orgType = 'COLLECTOR') {
@@ -154,6 +155,41 @@ describe('CardPage', () => {
     expect(screen.queryByText(/attempts, all kept/)).not.toBeInTheDocument()
   })
 
+  it('shows a rejected photo beside its reason, and says how to get a good one before the first try', async () => {
+    renderCard(card({ captureComplete: false, missingSides: ['FRONT', 'BACK'], photos: [] }))
+    expect(await screen.findByText(/For a good first shot/)).toBeInTheDocument()
+    expect(screen.getAllByText('No photo yet')).toHaveLength(3)
+  })
+
+  it('shows the photo that failed where no photo passed', async () => {
+    renderCard(card({ captureComplete: false, missingSides: ['FRONT', 'BACK'], photos: [photo({ status: 'RETAKE', current: false })] }))
+    expect(await screen.findByRole('img', { name: "Front photo that didn't pass" })).toHaveAttribute('src', 'https://photos.example/front.jpg')
+    expect(screen.queryByRole('img', { name: 'Front photo you took' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/For a good first shot/)).not.toBeInTheDocument()
+  })
+
+  it('shows the failed try beside its reason while an earlier photo stays in use', async () => {
+    renderCard(card())
+    const front = await screen.findByRole('region', { name: 'Front photo' })
+    expect(await within(front).findByRole('img', { name: 'Front photo you took' })).toBeInTheDocument()
+    expect(within(front).getByRole('img', { name: "Front photo that didn't pass" })).toBeInTheDocument()
+  })
+
+  it('says it when a failed photo cannot be shown', async () => {
+    renderCard(card({ captureComplete: false, missingSides: ['FRONT', 'BACK'], photos: [photo({ status: 'RETAKE', current: false, url: null })] }))
+    expect(await screen.findByText("Can't show this photo")).toBeInTheDocument()
+  })
+
+  it('shows the deadline as a date', async () => {
+    renderCard(card(), { ...status, stage: 'SOLD', deadline: '2026-11-05T12:00:00Z' })
+    expect(await screen.findByText(/^Ship by Nov 5/)).toBeInTheDocument()
+  })
+
+  it('offers a way to say something is wrong', async () => {
+    renderCard(card())
+    expect(await screen.findByRole('link', { name: 'Tell us' })).toHaveAttribute('href', '/how-it-works#contact')
+  })
+
   it('says the next step once, in the offer panel', async () => {
     renderCard(card(), { ...status, stage: 'PRICING', nextStep: "We don't have enough sold prices for this card yet." })
     expect(await screen.findByText('Waiting for prices')).toBeInTheDocument()
@@ -195,7 +231,7 @@ describe('ContainerPage', () => {
           return Promise.resolve(respond(201, { ...card(), id: 'new1', label: 'Mew 151/165' }))
         }
         if (url.endsWith('/status')) {
-          return Promise.resolve(respond(200, [{ ...status, stage: 'SOLD', identity: 'Pikachu VMAX · Vivid Voltage 188 · EN' }]))
+          return Promise.resolve(respond(200, [{ ...status, stage: 'SOLD', identity: 'Pikachu VMAX · Vivid Voltage 188 · EN', deadline: '2026-11-05T12:00:00Z' }]))
         }
         return Promise.resolve(respond(200, detail))
       }),
@@ -215,6 +251,7 @@ describe('ContainerPage', () => {
     expect(await screen.findByText('Sold')).toBeInTheDocument()
     expect(screen.getByText('Pikachu VMAX · Vivid Voltage 188 · EN')).toBeInTheDocument()
     expect(screen.getByText('Needs back')).toBeInTheDocument()
+    expect(screen.getByText(/^Ship by Nov 5/)).toBeInTheDocument()
   })
 
   it('goes straight to a new card to photograph it', async () => {
@@ -222,7 +259,8 @@ describe('ContainerPage', () => {
     const posts: unknown[] = []
     renderCollection(posts)
     await user.type(await screen.findByLabelText('Card name and number'), 'Mew 151/165')
-    expect(screen.getByLabelText('Lot of cheaper cards')).not.toBeChecked()
+    // Lots never get an offer, so a seller isn't asked about them.
+    expect(screen.queryByLabelText('Lot of cheaper cards')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add card' }))
     expect(await screen.findByText('Card page')).toBeInTheDocument()
     expect(posts).toEqual([{ label: 'Mew 151/165', lot: false, quantity: 1 }])

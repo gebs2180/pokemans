@@ -22,9 +22,15 @@ export function useOrg(orgId: string) {
   }, [api, orgId])
 }
 
-/** URL segment and labels for an org's containers: batches for partners, collections for collectors and contributors. */
+/** The org whose page is this member's home page: they have just the one, and aren't the admin or a partner. */
+export function soleOrg(me: Me) {
+  if (me.roles.includes('ADMIN') || me.memberships.length !== 1) return null
+  return me.memberships[0].orgType === 'PARTNER' ? null : me.memberships[0]
+}
+
+/** URL segment and labels for an org's containers: batches for partners, binders (collections in the API) for everyone else. */
 export function containerKind(type: OrgType) {
   return type === 'PARTNER'
     ? { path: 'batches', singular: 'batch', plural: 'Batches' }
-    : { path: 'collections', singular: 'collection', plural: 'Collections' }
+    : { path: 'collections', singular: 'binder', plural: 'Binders' }
 }

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { apiPath, useApi, type OutcomeView } from '../api'
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
+import { PageError } from '../ui'
 
 type Filter = 'UNVERIFIED' | 'VERIFIED' | 'MISMATCH' | 'ALL'
 
@@ -12,7 +13,7 @@ export function AdminOutcomesPage() {
   const [filter, setFilter] = useState<Filter>('UNVERIFIED')
   const { data, error, reload } = useLoad(() => api<OutcomeView[]>('GET', `/api/admin/outcomes?status=${filter}`), [api, filter])
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   return (
     <>
       <p>

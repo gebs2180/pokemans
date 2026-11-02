@@ -1,7 +1,8 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import {
   apiPath,
+  deadlineText,
   SIDE_LABEL,
   uploadToStorage,
   useApi,
@@ -19,7 +20,7 @@ import {
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { useOrg } from '../useOrg'
-import { Chip, Loading, StageChip } from '../ui'
+import { Chip, Loading, PageError, StageChip } from '../ui'
 import { OfferPanel } from './OfferPanel'
 import { ProvenancePanel } from './ProvenancePanel'
 
@@ -59,7 +60,8 @@ export function CardPage() {
     try {
       const slot = await api<UploadSlot>('POST', apiPath`/api/orgs/${orgId}/cards/${cardId}/photos`, {
         side,
-        contentType: file.type,
+        // Some browsers leave the type blank for a format they don't know: the API's answer says what to do.
+        contentType: file.type || 'application/octet-stream',
         sizeBytes: file.size,
       })
       await uploadToStorage(slot, file)
@@ -73,7 +75,7 @@ export function CardPage() {
     }
   }
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   if (!card) return <Loading />
 
   const sides: Side[] = card.lot ? ['FRONT', 'DETAIL'] : ['FRONT', 'BACK', 'DETAIL']
@@ -115,6 +117,13 @@ export function CardPage() {
       {card.lot && <p className="muted">Lot of {card.quantity}: one photo of the whole lot, laid out flat, is enough. Lots don't get offers.</p>}
       {offerFirst && offerPanel}
 
+      {!contributor && !card.lot && !card.photosFrozen && !card.photos.some((p) => p.status !== 'AWAITING_UPLOAD') && (
+        <p className="small">
+          <strong>For a good first shot:</strong> take the card out of its sleeve, lay it flat on a plain background that contrasts with its
+          border, and don't use the flash.
+        </p>
+      )}
+
       {sides.map((side) => {
         const attempts = card.photos.filter((p) => p.side === side && p.status !== 'AWAITING_UPLOAD')
         const current = attempts.find((p) => p.current) ?? null
@@ -136,7 +145,13 @@ export function CardPage() {
               )}
             </div>
             <div className="shot">
-              {current ? <CurrentPhoto side={side} photo={current} /> : <div className="shot-empty" aria-hidden="true">No photo yet</div>}
+              {current ? (
+                <CurrentPhoto side={side} photo={current} />
+              ) : retake ? (
+                <RejectedPhoto side={side} photo={retake} />
+              ) : (
+                <div className="shot-empty" aria-hidden="true">No photo yet</div>
+              )}
               <div className="shot-body">
                 <p className="muted small">{SIDE_HINT[side]}</p>
                 {current && (
@@ -147,7 +162,7 @@ export function CardPage() {
                 {current && attempts.length > 1 && <p className="muted small">{attempts.length} attempts, all kept; the one shown is used.</p>}
               </div>
             </div>
-            {retake && <RetakeResult photo={retake} keeping={current !== null} />}
+            {retake && <RetakeResult side={side} photo={retake} keeping={current !== null} />}
             {uploadError?.side === side && <p className="error" role="alert">{uploadError.message}</p>}
             {!card.photosFrozen &&
               (busy === side ? (
@@ -194,6 +209,11 @@ export function CardPage() {
         ))}
       {/* Authenticity, and who holds the card (needed before it can back an advance; hidden while collateral is off). */}
       {org && org.type !== 'CONTRIBUTOR' && <ProvenancePanel orgId={orgId} cardId={cardId} admin={false} />}
+      {seller && (
+        <p className="muted small">
+          Something wrong with this card? <Link to="/how-it-works#contact">Tell us</Link>
+        </p>
+      )}
     </>
   )
 }
@@ -203,6 +223,7 @@ function StatusLine({ orgId, cardId, offerFirst }: { orgId: string; cardId: stri
   const api = useApi()
   const { data } = useLoad(() => api<CardStatus>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}/status`), [api, orgId, cardId])
   if (!data) return null
+  const deadline = deadlineText(data)
   return (
     <div className="status-line">
       {data.identity && (
@@ -214,6 +235,11 @@ function StatusLine({ orgId, cardId, offerFirst }: { orgId: string; cardId: stri
       <p>
         <StageChip stage={data.stage} />
       </p>
+      {deadline && (
+        <p>
+          <strong>{deadline}</strong>
+        </p>
+      )}
       {!(offerFirst && SAID_BY_OFFER_PANEL.has(data.stage)) && <p className="muted small">{data.nextStep}</p>}
     </div>
   )
@@ -260,6 +286,18 @@ function CurrentPhoto({ side, photo }: { side: Side; photo: PhotoView }) {
   return (
     <div className="current-photo">
       {href ? <img src={href} alt={`${SIDE_LABEL[side]} photo you took`} className="thumb" /> : <div className="shot-empty">Passed</div>}
+    </div>
+  )
+}
+
+/** A photo that didn't pass, so the seller can see what the reasons are about. Some can't be shown, e.g. a file that isn't an image. */
+function RejectedPhoto({ side, photo }: { side: Side; photo: PhotoView }) {
+  const [broken, setBroken] = useState(false)
+  const href = safeHref(photo.url)
+  if (!href || broken) return <div className="shot-empty">Can't show this photo</div>
+  return (
+    <div className="current-photo">
+      <img src={href} alt={`${SIDE_LABEL[side]} photo that didn't pass`} className="thumb rejected" onError={() => setBroken(true)} />
     </div>
   )
 }
@@ -346,15 +384,19 @@ function GradedResult({ orgId, cardId, ready }: { orgId: string; cardId: string;
 }
 
 /** The newest attempt, when it didn't pass: why, and whether an earlier photo is still the one used. */
-function RetakeResult({ photo, keeping }: { photo: PhotoView; keeping: boolean }) {
+function RetakeResult({ side, photo, keeping }: { side: Side; photo: PhotoView; keeping: boolean }) {
   return (
     <div className="alert alert-warning">
       <p className="alert-title">{keeping ? 'Your last try needs a retake (the photo above is still the one used):' : 'Retake needed:'}</p>
-      <ul>
-        {photo.retakeReasons.map((r) => (
-          <li key={r.code}>{r.message}</li>
-        ))}
-      </ul>
+      {/* With no passing photo, the rejected one is already in the side's slot above. */}
+      <div className={keeping ? 'shot' : undefined}>
+        {keeping && <RejectedPhoto side={side} photo={photo} />}
+        <ul>
+          {photo.retakeReasons.map((r) => (
+            <li key={r.code}>{r.message}</li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }

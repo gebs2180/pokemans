@@ -231,6 +231,30 @@ describe('OfferPreviewPanel', () => {
 })
 
 describe('ReviewCardPage', () => {
+  it('makes the reviewer choose a variant for a hand-entered card', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/condition')) return respond(200, card)
+      if (url.endsWith('/provenance')) return respond(200, provenance('NOT_IDENTIFIED'))
+      if (url.endsWith('/prices')) return respond(200, { catalogCardId: 'cat1', comps: [], tables: [], skipped: [] })
+      if (url.endsWith('/offer-preview')) return respond(200, { offered: false, refusal: 'x', price: null, fmv: null, confidence: null, buyerMargin: null, why: [] })
+      return respond(200, { cardId: 'card1', current: null, recognition: false, reading: null, suggestions: [] })
+    }))
+    render(
+      <MemoryRouter initialEntries={['/admin/review/org1/card1']}>
+        <Routes>
+          <Route path="/admin/review/:orgId/:cardId" element={<ReviewCardPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await user.click(await screen.findByRole('button', { name: /enter by hand/i }))
+    const variant = screen.getByLabelText('Variant')
+    expect(variant).toHaveValue('')
+    expect(variant).toBeRequired()
+    await user.selectOptions(variant, 'NORMAL')
+    expect(screen.queryByRole('option', { name: 'Choose a variant' })).not.toBeInTheDocument()
+  })
+
   const identified: IdentifiedCard = {
     cardItemId: 'card1', catalogCardId: 'cat1', language: 'en', setName: 'Base Set', seriesName: 'Base', setReleaseDate: '1999-01-09',
     number: '4', name: 'Charizard', rarity: 'Rare Holo', edition: 'UNLIMITED', variant: 'HOLO', stamp: null, promo: false,

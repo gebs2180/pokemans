@@ -62,7 +62,7 @@ class PhotoService {
         }
         requireNotFrozen(card);
         if (!ACCEPTED_TYPES.contains(contentType)) {
-            throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Photos must be JPEG or PNG");
+            throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Photos must be JPEG or PNG. On an iPhone, set Settings, Camera, Formats to Most Compatible, then take it again.");
         }
         if (sizeBytes <= 0 || sizeBytes > storage.maxUploadBytes()) {
             throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE,

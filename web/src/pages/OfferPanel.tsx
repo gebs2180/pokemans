@@ -110,7 +110,7 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
 
   return (
     <section className="panel offer-panel">
-      <h2>Instant offer</h2>
+      <h2>Your offer</h2>
       {!offer && (
         <>
           <p className="muted">One firm price for this card, based on the grade it's likely to be. No listing, no haggling.</p>
@@ -209,7 +209,10 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
 
       {listing?.status === 'OPEN' && (
         <div className="alert alert-info">
-          <p>Waiting for a buyer, until {new Date(listing.expiresAt).toLocaleDateString()}.</p>
+          <p>
+            Waiting for a buyer, until {new Date(listing.expiresAt).toLocaleDateString()}. If one takes it, you have 3 days to ship. We
+            don't send notifications yet, so check back here.
+          </p>
           <div className="actions">
             {confirming === 'withdraw' ? (
               <>

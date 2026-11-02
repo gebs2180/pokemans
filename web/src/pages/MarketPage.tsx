@@ -17,7 +17,7 @@ import {
 } from '../api'
 import { MoneyInput } from '../inputs'
 import { safeHref } from '../safeHref'
-import { EmptyState, Field, Loading } from '../ui'
+import { EmptyState, Field, Loading, PageError } from '../ui'
 import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { HowPriced } from './OfferPanel'
@@ -106,7 +106,7 @@ export function MarketPage() {
     }
   }
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   return (
     <>
       <BuyerNav orgId={orgId} />
@@ -194,7 +194,7 @@ export function DealsPage() {
     }
   }
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   return (
     <>
       <BuyerNav orgId={orgId} />

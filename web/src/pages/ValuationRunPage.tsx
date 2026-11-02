@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { apiPath, money, percent, useApi, type CardLine, type ReportType, type ReportView, type RunDetail } from '../api'
 import { useLoad } from '../useLoad'
 import { ReportsList } from './ReportsPanel'
+import { PageError } from '../ui'
 
 const LABEL = (s: string) => s.replace(/_/g, ' ').toLowerCase()
 
@@ -12,7 +13,7 @@ export function ValuationRunPage() {
   const api = useApi()
   const { data, error } = useLoad(() => api<RunDetail>('GET', apiPath`/api/admin/valuation-runs/${runId}`), [api, runId])
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   if (!data) return <p>Loading…</p>
   const { run } = data
   const gradeFirst = data.cards.filter((c) => c.gradeFirstRank != null).sort((a, b) => a.gradeFirstRank! - b.gradeFirstRank!)

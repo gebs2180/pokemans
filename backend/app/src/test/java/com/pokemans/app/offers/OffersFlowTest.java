@@ -12,6 +12,7 @@ import com.pokemans.app.TestcontainersConfiguration;
 import com.pokemans.app.identity.Consents;
 import com.pokemans.app.identity.SecurityProperties;
 import com.pokemans.app.intake.TestImages;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -1002,6 +1003,106 @@ class OffersFlowTest {
     }
 
     /** How much a count in the track record grew; other tests share the database. */
+    @Test
+    void homeListsWhatIsWaitingOnTheSeller() throws Exception {
+        String needs = "/api/orgs/" + orgId + "/needs-you";
+        api.get(needs, seller).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+
+        // An offer the seller hasn't acted on, with when it ends.
+        String card = pricedCard("Waiting", 400);
+        api.postJson(offers(card), "", seller).andExpect(status().isCreated());
+        api.get(needs, seller).andExpect(jsonPath("$[0].cardId").value(card)).andExpect(jsonPath("$[0].label").value("Waiting"))
+                .andExpect(jsonPath("$[0].need").value("OFFER_READY")).andExpect(jsonPath("$[0].due").isNotEmpty());
+
+        // Posted: it's waiting on a buyer. Taken: the label's ready, and shipping is due 3 days after it.
+        String offerId = TestApi.read(api.get(sale(card), seller), "$.offer.id");
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        api.get(needs, seller).andExpect(jsonPath("$.length()").value(0));
+        String listing = TestApi.read(api.get(sale(card), seller), "$.listing.id");
+        JwtRequestPostProcessor buyer = buyer("Vendor " + UUID.randomUUID());
+        address(lastBuyerOrg, buyer, "Vendor");
+        api.postJson(accept(lastBuyerOrg, listing), "", buyer).andExpect(status().isOk());
+        api.get(needs, seller).andExpect(jsonPath("$[0].need").value("LABEL_READY"));
+        Instant due = Instant.parse(TestApi.read(api.get(needs, seller), "$[0].due"));
+        Instant bought = Instant.parse(TestApi.read(api.get(sale(card), seller), "$.listing.label.boughtAt"));
+        assertThat(Duration.between(bought, due)).isEqualTo(Duration.ofDays(3));
+        api.get("/api/orgs/" + orgId + "/cards/" + card + "/status", seller)
+                .andExpect(jsonPath("$.stage").value("SOLD")).andExpect(jsonPath("$.deadline").isNotEmpty());
+
+        // Once the seller says it shipped, nothing is left to do, and the date goes.
+        api.postJson("/api/orgs/" + orgId + "/listings/" + listing + "/shipped", "", seller).andExpect(status().is2xxSuccessful());
+        api.get(needs, seller).andExpect(jsonPath("$.length()").value(0));
+        api.get("/api/orgs/" + orgId + "/cards/" + card + "/status", seller).andExpect(jsonPath("$.deadline").doesNotExist());
+
+        // It arrived: the seller says when they've been paid, by the pay-by date.
+        String deal = "/api/orgs/" + lastBuyerOrg + "/deals/" + listing;
+        api.postJson(deal + "/received", "{}", buyer).andExpect(status().isCreated());
+        api.get(needs, seller).andExpect(jsonPath("$[0].need").value("PAYMENT_DUE"))
+                .andExpect(jsonPath("$[0].due").value(TestApi.read(api.get(sale(card), seller), "$.listing.progress.payBy")));
+
+        // Raised with us, it's off their list while we look.
+        String mine = "/api/orgs/" + orgId + "/listings/" + listing;
+        api.postJson(mine + "/dispute", "{\"note\":\"Nothing yet\"}", seller).andExpect(status().isOk());
+        api.get(needs, seller).andExpect(jsonPath("$.length()").value(0));
+        api.postJson("/api/admin/deals/" + listing + "/resolve", "{\"reason\":\"Spoke to the buyer\"}", api.admin()).andExpect(status().isOk());
+
+        // The buyer says they paid: only the seller's word closes it.
+        api.postJson(deal + "/paid", "{\"pricePaid\":1,\"note\":\"Agreed less\"}", buyer).andExpect(status().isCreated());
+        api.get(needs, seller).andExpect(jsonPath("$[0].need").value("PAYMENT_CHECK"));
+        api.postJson(mine + "/payment-confirmed", "", seller).andExpect(status().isOk());
+        api.get(needs, seller).andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void homeListsAReturnUntilTheCardIsBack() throws Exception {
+        String needs = "/api/orgs/" + orgId + "/needs-you";
+        String listing = postedCard("Coming back", 400);
+        JwtRequestPostProcessor buyer = buyer("Vendor " + UUID.randomUUID());
+        address(lastBuyerOrg, buyer, "Vendor");
+        api.postJson(accept(lastBuyerOrg, listing), "", buyer).andExpect(status().isOk());
+        api.postJson("/api/orgs/" + lastBuyerOrg + "/deals/" + listing + "/returned", "{\"reason\":\"DOES_NOT_MATCH_PHOTOS\",\"note\":\"crease\"}", buyer)
+                .andExpect(status().isCreated());
+        String mine = "$[?(@.label == 'Coming back')].need";
+        assertThat(JsonPath.<List<String>>read(api.get(needs, seller).andReturn().getResponse().getContentAsString(), mine)).containsExactly("CARD_RETURNING");
+        api.postJson("/api/orgs/" + orgId + "/listings/" + listing + "/card-back", "", seller).andExpect(status().isOk());
+        assertThat(JsonPath.<List<String>>read(api.get(needs, seller).andReturn().getResponse().getContentAsString(), mine)).doesNotContain("CARD_RETURNING");
+    }
+
+    @Test
+    void homeListsAFailedPhotoUntilItIsRetaken() throws Exception {
+        String card = card("Blurry");
+        api.uploadPhoto(orgId, card, "FRONT", new byte[] {1, 2, 3}, seller).andExpect(status().isOk());
+        api.get("/api/orgs/" + orgId + "/needs-you", seller).andExpect(jsonPath("$[0].need").value("RETAKE"))
+                .andExpect(jsonPath("$[0].sides[0]").value("FRONT")).andExpect(jsonPath("$[0].sides.length()").value(1));
+    }
+
+    @Test
+    void aLabelJustBoughtIsNotOverdue() throws Exception {
+        String overdue = "/api/admin/deals/overdue";
+        api.get(overdue, seller).andExpect(status().isForbidden());
+        String before = api.get(overdue, api.admin()).andReturn().getResponse().getContentAsString();
+
+        String late = postedCard("Late", 400);
+        JwtRequestPostProcessor buyer = buyer("Vendor " + UUID.randomUUID());
+        address(lastBuyerOrg, buyer, "Vendor");
+        api.postJson(accept(lastBuyerOrg, late), "", buyer).andExpect(status().isOk());
+        assertThat(delta(api.get(overdue, api.admin()).andReturn().getResponse().getContentAsString(), before, "$.labels")).isZero();
+    }
+
+    @Test
+    void aNewSellerStartsWithOneBinder() throws Exception {
+        String subject = "auth0|new-seller-" + UUID.randomUUID();
+        String org = api.collectorOrg("New seller", subject);
+        JwtRequestPostProcessor who = api.user(subject, List.of());
+        api.get("/api/orgs/" + org + "/collections", who).andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("My cards"));
+
+        // Agreeing again, as a new version of the terms would ask, doesn't add another.
+        api.postJson("/api/orgs/" + org + "/consent", "{\"version\":\"" + Consents.SELLER_TERMS_VERSION + "\"}", who).andExpect(status().isOk());
+        api.get("/api/orgs/" + org + "/collections", who).andExpect(jsonPath("$.length()").value(1));
+    }
+
     private static int delta(String after, String before, String path) {
         return JsonPath.<Integer>read(after, path) - JsonPath.<Integer>read(before, path);
     }

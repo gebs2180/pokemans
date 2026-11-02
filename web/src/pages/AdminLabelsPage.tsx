@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { apiPath, money, useApi, type AwaitingLabel } from '../api'
 import { useLoad } from '../useLoad'
 import { ArrivalForm, CardTitle, Photos } from './MarketPage'
+import { PageError } from '../ui'
 
 /**
  * Admin: deals a buyer took whose prepaid label didn't go through. Buy the label again (once shipping
@@ -28,7 +29,7 @@ export function AdminLabelsPage() {
     }
   }
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   return (
     <>
       <p>

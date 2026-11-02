@@ -1,5 +1,6 @@
 package com.pokemans.app.intake;
 
+import com.pokemans.app.identity.Consents;
 import com.pokemans.app.identity.CurrentUser;
 import com.pokemans.app.identity.Org;
 import com.pokemans.app.identity.OrgAccess;
@@ -15,6 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,9 @@ class IntakeService {
 
     /** Org types whose cards live in collections. */
     static final OrgType[] COLLECTION_ORGS = {OrgType.COLLECTOR, OrgType.CONTRIBUTOR};
+
+    /** What a seller's first collection is called: they never have to name one to add a card. */
+    static final String DEFAULT_COLLECTION = "My cards";
 
     private final OrgAccess access;
     private final CurrentUser currentUser;
@@ -91,6 +96,14 @@ class IntakeService {
         Org org = access.require(orgId, COLLECTION_ORGS);
         CardCollection collection = collections.save(new CardCollection(org.getId(), name, currentUser.id()));
         return new ContainerSummary(collection.getId(), collection.getName(), collection.getCreatedAt(), 0);
+    }
+
+    /** A seller who has just agreed to the terms goes straight to adding a card. */
+    @EventListener
+    void createDefaultCollection(Consents.TermsAccepted accepted) {
+        if (accepted.orgType() == OrgType.COLLECTOR && collections.findByOrgIdOrderByCreatedAtDesc(accepted.orgId()).isEmpty()) {
+            collections.save(new CardCollection(accepted.orgId(), DEFAULT_COLLECTION, accepted.userId()));
+        }
     }
 
     @Transactional(readOnly = true)

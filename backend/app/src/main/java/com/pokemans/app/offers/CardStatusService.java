@@ -3,9 +3,12 @@ package com.pokemans.app.offers;
 import com.pokemans.app.condition.Assessments;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.valuation.CardInputs;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,17 +29,45 @@ class CardStatusService {
      * @param canOffer  true when asking for an offer can work right now
      * @param condition the grades the card likely is, in our view, once we've assessed it, and our centering
      *                  measurement if there is one; else null
+     * @param deadline  when the stage runs out: the seller's last day to ship, the buyer's last day to pay, or when the
+     *                  offer or posting ends; else null
+     * @param sellersWord true after a sale while the deal waits on the seller saying something: paid, or the card's back
      */
-    record CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer, Assessments.Summary condition) {
+    record CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer, Assessments.Summary condition,
+                      Instant deadline, boolean sellersWord) {
 
         CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer) {
-            this(cardId, stage, identity, nextStep, canOffer, null);
+            this(cardId, stage, identity, nextStep, canOffer, null, null, false);
         }
 
         CardStatus withCondition(Assessments.Summary summary) {
-            return new CardStatus(cardId, stage, identity, nextStep, canOffer, summary);
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, summary, deadline, sellersWord);
+        }
+
+        CardStatus withDeadline(Instant at) {
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, at, sellersWord);
+        }
+
+        CardStatus withSellersWord(boolean waiting) {
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, deadline, waiting);
         }
     }
+
+    /** What's waiting on the seller, for the home page. Everything else on the way to a sale is waiting on us or a buyer. */
+    enum Need { LABEL_READY, PAYMENT_DUE, PAYMENT_CHECK, CARD_RETURNING, OFFER_EXPIRING, OFFER_READY, GET_OFFER, RETAKE }
+
+    /** Only a collector is nudged to sell. */
+    private static final Set<Need> OFFER_NUDGES = EnumSet.of(Need.OFFER_EXPIRING, Need.OFFER_READY, Need.GET_OFFER);
+
+    /**
+     * @param due   when it runs out, or null
+     * @param sides for a retake, the sides to take again
+     */
+    record NeedsYou(UUID cardId, String label, Need need, Instant due, List<String> sides) {
+    }
+
+    /** An offer this close to ending says so, on top of saying it's ready. */
+    static final Duration EXPIRING_SOON = Duration.ofHours(48);
 
     private static final String NO_NOTIFICATIONS = " We don't send notifications yet, so check back here.";
 
@@ -46,10 +77,12 @@ class CardStatusService {
     private final CardItems cardItems;
     private final CardOfferVoidRepository voids;
     private final Assessments assessments;
+    private final Shipping shipping;
 
     CardStatusService(OfferService offers, SaleListingRepository listings, ListingEventRepository events, CardItems cardItems,
-                      CardOfferVoidRepository voids, Assessments assessments) {
+                      CardOfferVoidRepository voids, Assessments assessments, Shipping shipping) {
         this.offers = offers;
+        this.shipping = shipping;
         this.assessments = assessments;
         this.voids = voids;
         this.listings = listings;
@@ -61,6 +94,36 @@ class CardStatusService {
     CardStatus status(UUID cardId) {
         CardStatus status = stage(cardId);
         return status.stage() == Stage.LOT ? status : status.withCondition(assessments.summary(cardId).orElse(null));
+    }
+
+    /**
+     * The org's cards that are waiting on the seller. Only a collector is nudged about offers: a contributor
+     * isn't there to sell, but still sees a sale through and retakes what failed.
+     */
+    @Transactional(readOnly = true)
+    List<NeedsYou> needsYou(UUID orgId, boolean selling) {
+        Instant now = Instant.now();
+        return cardItems.inCollectionsOf(orgId).stream().map(card -> {
+            CardStatus status = stage(card.id());
+            List<String> sides = status.stage() == Stage.PHOTOS ? cardItems.sidesToRetake(card.id()) : List.of();
+            Need need = need(status, !sides.isEmpty(), now);
+            boolean wanted = need != null && (selling || !OFFER_NUDGES.contains(need));
+            return wanted ? new NeedsYou(card.id(), card.label(), need, status.deadline(), sides) : null;
+        }).filter(java.util.Objects::nonNull).toList();
+    }
+
+    /** What a card in this state needs from its seller, or null. A sold card needs them until they say it shipped, or an arrival shows it did. */
+    static Need need(CardStatus status, boolean retake, Instant now) {
+        return switch (status.stage()) {
+            case SOLD -> status.deadline() == null ? null : Need.LABEL_READY;
+            case ARRIVED -> status.sellersWord() ? Need.PAYMENT_DUE : null;
+            case PAID -> status.sellersWord() ? Need.PAYMENT_CHECK : null;
+            case RETURNED -> status.sellersWord() ? Need.CARD_RETURNING : null;
+            case OFFERED -> status.deadline().isBefore(now.plus(EXPIRING_SOON)) ? Need.OFFER_EXPIRING : Need.OFFER_READY;
+            case READY -> Need.GET_OFFER;
+            case PHOTOS -> retake ? Need.RETAKE : null;
+            default -> null;
+        };
     }
 
     private CardStatus stage(UUID cardId) {
@@ -76,20 +139,22 @@ class CardStatusService {
         String identity = identity(in.identity());
         ListingService.Progress deal = ListingService.progress(history);
         if (listed == ListingService.Status.ACCEPTED) {
-            return afterTheSale(cardId, identity, deal);
+            return afterTheSale(cardId, identity, deal, listing.orElseThrow().getId());
         }
         if (listed == ListingService.Status.BACK && deal.held()) {
             return new CardStatus(cardId, Stage.RETURNED, identity, ListingService.HELD + NO_NOTIFICATIONS, false);
         }
         if (listed == ListingService.Status.OPEN) {
-            return new CardStatus(cardId, Stage.LISTED, identity, "Posted to buyers: the first to accept buys it at the price.", false);
+            return new CardStatus(cardId, Stage.LISTED, identity, "Posted to buyers: the first to accept buys it at the price.", false)
+                    .withDeadline(listing.orElseThrow().getExpiresAt());
         }
         // A card that came back can't go out again on the offer it sold at.
         UUID soldAt = listed == ListingService.Status.BACK ? listing.get().getOfferId() : null;
         Optional<CardOffer> latest = offers.latest(cardId).filter(o -> o.getExpiresAt().isAfter(Instant.now()))
                 .filter(o -> voids.findByOfferId(o.getId()).isEmpty()).filter(o -> !o.getId().equals(soldAt));
         if (latest.isPresent()) {
-            return new CardStatus(cardId, Stage.OFFERED, identity, "You have an offer: sell at it, or let it expire.", false);
+            return new CardStatus(cardId, Stage.OFFERED, identity, "You have an offer: sell at it, or let it expire.", false)
+                    .withDeadline(latest.orElseThrow().getExpiresAt());
         }
         List<CardItems.PhotoRef> photos = cardItems.passedPhotos(cardId);
         boolean captured = photos.stream().anyMatch(p -> p.side().equals("FRONT")) && photos.stream().anyMatch(p -> p.side().equals("BACK"));
@@ -116,17 +181,20 @@ class CardStatusService {
         return new CardStatus(cardId, Stage.READY, identity, "Ready for an instant offer.", true);
     }
 
-    private static CardStatus afterTheSale(UUID cardId, String identity, ListingService.Progress deal) {
+    private CardStatus afterTheSale(UUID cardId, String identity, ListingService.Progress deal, UUID listingId) {
         return switch (deal.stage()) {
             case SHIPPED -> new CardStatus(cardId, Stage.SHIPPED, identity,
                     "On its way to the buyer. They record it when it arrives, and then have 7 days to pay you." + NO_NOTIFICATIONS, false);
             case ARRIVED -> new CardStatus(cardId, Stage.ARRIVED, identity,
-                    "It arrived. The buyer pays you directly: tell us here when they have, or if they haven't by the date on this page.", false);
+                    "It arrived. The buyer pays you directly: tell us here when they have, or if they haven't by the date on this page.", false)
+                    .withDeadline(deal.payBy()).withSellersWord(deal.disputedAt() == null);
             case PAID -> new CardStatus(cardId, Stage.PAID, identity, deal.confirmedAt() != null ? "Paid. Nothing more to do."
-                    : "The buyer says they paid you. Tell us here whether you got it.", false);
+                    : "The buyer says they paid you. Tell us here whether you got it.", false)
+                    .withSellersWord(deal.confirmedAt() == null && deal.disputedAt() == null);
             case RETURNED -> new CardStatus(cardId, Stage.RETURNED, identity,
-                    "The buyer is sending it back. Tell us here once you have it.", false);
-            default -> new CardStatus(cardId, Stage.SOLD, identity, "A buyer took it: ship it with the prepaid label once it shows on this card's page.", false);
+                    "The buyer is sending it back. Tell us here once you have it.", false).withSellersWord(true);
+            default -> new CardStatus(cardId, Stage.SOLD, identity, "A buyer took it: ship it with the prepaid label once it shows on this card's page.", false)
+                    .withDeadline(shipping.label(listingId).map(l -> l.getCreatedAt().plus(ListingService.SHIP_WITHIN)).orElse(null));
         };
     }
 

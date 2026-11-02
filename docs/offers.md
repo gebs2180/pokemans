@@ -31,7 +31,7 @@ The lender and insurer side is paused while Zach clears his outside interest wit
 
    The seller can say either payment answer from Shipped on, so a buyer who never records the arrival can't leave them stuck. A card returned as **not genuine** gets no new offer until the admin closes the return, so a fake can't go straight out to the next buyer.
 
-   **What reaches the admin.** "Needs you" on `/admin/deals`, counted on `/admin`, lists every seller who says they weren't paid, every return, and every seller who disagrees with one, with both sides' contact details. The admin acts off the app, then closes the item with a note both sides see. A seller's own "I got paid" closes a payment item too.
+   **What reaches the admin.** "Needs you" on `/admin/deals`, counted on `/admin` beside labels past their ship-by date (`GET /api/admin/deals/overdue`), lists every seller who says they weren't paid, every return, and every seller who disagrees with one, with both sides' contact details. The admin acts off the app, then closes the item with a note both sides see. A seller's own "I got paid" closes a payment item too.
 
    Without a label nothing can have shipped, so the API refuses both. If a card shipped another way, the admin records it for the buyer from **Labels to buy**, with a note saying how; the note is kept as "Recorded by the admin: …".
 
@@ -168,7 +168,7 @@ The realized sales are the evidence for the later lender and insurer pitch: our 
 - **Undo, open (2026-10-21):** the seller sees a voided offer's reason as the admin typed it, so write it for them; a cancelled deal after the card shipped needs the card back by hand; a refund's later status (EasyPost moves `submitted` to `refunded` or `rejected`) isn't fetched yet.
 - **Invoices:** monthly postage bills are produced by hand from "Postage to bill". There is no invoicing or payment collection.
 - **Grade accuracy:** add a way for buyers to report a grader's result when they slab a card they bought, as calibration data from a grader.
-- **Notifications:** buyers aren't told when a card is posted, and sellers aren't emailed their label. Email waits for the notifier (M6).
+- **Notifications:** buyers aren't told when a card is posted, and sellers aren't emailed their label. Email waits for the notifier (M6). Until then a seller's home page lists what needs them across their orgs (`GET /api/orgs/{orgId}/needs-you`): a label to use with its ship-by date, an offer to get or take up with its end date, failed photos, and after a sale, a pay-by date to say they've been paid by, a payment the buyer recorded to confirm, and a returning card to say is back. A label stays listed until the seller says it shipped, or an arrival or return is recorded. A deal raised with the admin leaves the list until it's closed.
 - **"Instant" depends on the review queue.** An offer needs an identified, assessed card, and identification and condition review are still done by hand.
 - **Outside interest:** a marketplace for shops and collectors isn't "primarily to the financial services industry", but the employer's general outside-interest disclosure may still apply. Raise it in the lawyer hour.
 - **Not checked in the running app:** logging in needs Zach's Auth0 MFA.
