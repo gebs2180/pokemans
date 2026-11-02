@@ -17,6 +17,8 @@ const OfferTrackRecordPage = lazy(() => import('./pages/OfferTrackRecordPage').t
 const AdminLabelsPage = lazy(() => import('./pages/AdminLabelsPage').then((m) => ({ default: m.AdminLabelsPage })))
 const ShippingChargesPage = lazy(() => import('./pages/ShippingChargesPage').then((m) => ({ default: m.ShippingChargesPage })))
 const ReviewQueuePage = lazy(() => import('./pages/ReviewQueuePage').then((m) => ({ default: m.ReviewQueuePage })))
+const CenteringLabelsPage = lazy(() => import('./pages/CenteringLabelsPage').then((m) => ({ default: m.CenteringLabelsPage })))
+const CenteringLabelCardPage = lazy(() => import('./pages/CenteringLabelsPage').then((m) => ({ default: m.CenteringLabelCardPage })))
 const ReviewCardPage = lazy(() => import('./pages/ReviewCardPage').then((m) => ({ default: m.ReviewCardPage })))
 const ValuationPage = lazy(() => import('./pages/ValuationPage').then((m) => ({ default: m.ValuationPage })))
 const ValuationRunPage = lazy(() => import('./pages/ValuationRunPage').then((m) => ({ default: m.ValuationRunPage })))
@@ -29,7 +31,7 @@ function App() {
   const location = useLocation()
 
   return (
-    <div className={/^\/admin\/(review|valuation)/.test(location.pathname) ? 'shell wide' : 'shell'}>
+    <div className={/^\/admin\/(review|valuation|centering)/.test(location.pathname) ? 'shell wide' : 'shell'}>
       <header className="topbar">
         <Link to="/" className="brand">
           Rawmark
@@ -71,6 +73,8 @@ function App() {
               <Route path="/admin/deals" element={<AdminOffersPage />} />
               <Route path="/admin/shipping" element={<ShippingChargesPage />} />
               <Route path="/admin/labels" element={<AdminLabelsPage />} />
+              <Route path="/admin/centering" element={<CenteringLabelsPage />} />
+              <Route path="/admin/centering/:orgId/:cardId" element={<CenteringLabelCardPage />} />
               <Route path="/admin/review/:orgId/:cardId" element={<ReviewCardPage />} />
               {COLLATERAL && <Route path="/admin/valuation/:orgId/:collectionId" element={<ValuationPage />} />}
               {COLLATERAL && <Route path="/admin/valuation-runs/:runId" element={<ValuationRunPage />} />}

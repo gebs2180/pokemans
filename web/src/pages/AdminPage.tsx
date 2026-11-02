@@ -50,7 +50,7 @@ export function AdminPage() {
         <Link to="/admin/review">Review queue →</Link> · <Link to="/admin/outcomes">Graded results to check →</Link> ·{' '}
         <Link to="/admin/deals">Offers and deals →</Link> · <Link to="/admin/offers">Offer track record →</Link> ·{' '}
         <Link to="/admin/labels">Labels to buy →</Link> ·{' '}
-        <Link to="/admin/shipping">Postage to bill →</Link>
+        <Link to="/admin/shipping">Postage to bill →</Link> · <Link to="/admin/centering">Centering labels →</Link>
       </p>
       <h1>Orgs</h1>
       <form onSubmit={createOrg} className="row">
