@@ -11,7 +11,7 @@
 - **`GET /cards/{id}/prices/{tier}/history?period=7d|30d|90d|1y|all`:** **one row per day**, with `date`, `source`, `avg`, `low`, `high`, `saleCount` and rolling medians. This is the part that matters:
   - On a day with one sale, `avg = low = high` gives the exact sale price.
   - On a busier day we get the count, the range and the mean.
-  - That's close to sale-level. The count is exact, which is what confidence and liquidity depend on.
+  - That's close to sale-level. The count was assumed exact, but every eBay row turned out to be flagged approximate (see "Day-1 results").
 - **Not on Pro:** `/cards/{id}/listings` (individual sold eBay listings) is on the $98 Scale plan only.
 - **Limits:** 10,000 requests a day, 30 per 10 seconds, auth by `X-API-Key` header.
 
@@ -132,6 +132,17 @@ Weekly after that: `python poketrace.py snapshot`. On day 29: `python poketrace.
   - That's why the pull includes PSA 1–4: era ratios for the low grades are what let thin cards be priced at all.
   - It's worth Zach deciding whether one unpriceable low grade should sink the whole table.
 - **The engine has 4 eras for step-down ratios, not 6:** WOTC; EX_TO_BW (from 2003-06); XY_TO_SM (from 2014-02); SWSH_ON (from 2020-02). The six candidate groups fold into those, so each engine era gets 5–15 cards.
+
+## Day-1 results (2026-11-01, 27 cards, 61,293 rows)
+
+The pull covered 27 cards rather than 30. Several candidates didn't match, others are under $25, and the old $500 ceiling was lifted to take in the cross-check cards and Zach's and the second tester's cards.
+
+- **Prices check out.** 41 of 42 known sales fall inside PokeTrace's range for that day. The miss is a Heritage sale, and PokeTrace covers eBay and TCGplayer, not auction houses.
+- **Rows are daily.** 2% of consecutive sale days repeat the day before, against a 20% stop line.
+- **eBay counts are approximate.** Every eBay row (21,310 sale days) carries `approxSaleCount: true`, and graded data is eBay only. TCGplayer's 11,797 are exact. 1,257 of 13,474 one-sale rows show a price range, which one sale can't have, and known sales of two on a day show as 1. 47% of multi-sale rows have a single price. So `avg`, `low` and `high` are usable, but `saleCount` isn't a true count.
+- **Why that matters:** confidence, liquidity discounts and the row expansion all use the count. Don't treat graded confidence as comparable to sale-level comps until PokeTrace says what the flag means.
+- **History is shallow.** The earliest sale is 2020-12-29, but sale days by year are 50 (2021), 111 (2022), 179 (2023), 496 (2024), 6,715 (2025) and 25,555 (2026). So 12 months for σ works, while the 2021–2023 replay can't be done from this data.
+- **Grade coverage.** Vintage has PSA 5–7 sales on most cards. Modern cards often have few or none below 8, so they lean on derived prices.
 
 ## Timeline
 
