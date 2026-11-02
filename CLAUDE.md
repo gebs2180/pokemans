@@ -8,6 +8,17 @@ Collateral reports for raw-heavy Pokémon card collections: what a collection re
 
 **System design:** [docs/hld.md](docs/hld.md) covers the architecture, modules, data model, flows and milestones. Read it before adding modules or entities.
 
+## Working here
+
+- Windows. Write files with the Write tool: Bash heredocs fail here.
+- Backend: `cd backend; .\gradlew.bat test`. Web: `npm.cmd`, not `npm`. Docker must be running or the Testcontainers tests are skipped.
+- Before starting side sessions, check the 5-hour meter. Above 50%, start one. Run at most two heavy writers, and name the shared files and merge order in each brief.
+- Pick the model when a session starts, because switching later rebuilds the cache. Sonnet for recipe work; Opus for valuation math, money, auth and audits.
+
+## Compact instructions
+
+Keep PR numbers, open decisions, file paths and test status.
+
 ## Non-negotiable principles
 
 - **Condition is a distribution, not a grade.** Each raw card gets probabilities over 11 outcomes: Ungradable (U), 1…10. Uncertainty widens the haircut instead of being hidden.

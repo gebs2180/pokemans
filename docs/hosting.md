@@ -2,7 +2,7 @@
 
 Where the closed beta runs: 5–15 Discord testers for 4–6 weeks. It needs HTTPS, Postgres and photo backups, and an error log that someone reads. Everything goes on Zach's personal accounts and a personal card, never employer resources (see CLAUDE.md, Constraints).
 
-**Recommendation: one small Hetzner VPS running Docker Compose (Caddy, backend, Postgres, backup runner), with photos and backups in Cloudflare R2 and errors in Sentry's free plan. About $5–7 a month.** Nothing is deployed and no accounts exist yet. Prices were researched on 2026-10-20 from third-party summaries, so check each provider's pricing page when you sign up.
+**Recommendation: one small Hetzner VPS running Docker Compose (Caddy, backend, Postgres, backup runner), with photos and backups in Cloudflare R2 and errors in Sentry's free plan. About $5–7 a month.** The beta has been live at https://beta.rawmark.app since 2026-10-28. Prices were researched on 2026-10-20 from third-party summaries.
 
 ## Options compared
 
@@ -156,15 +156,19 @@ docker compose -f compose.prod.yml run --rm backup bash -c "backup.sh && restore
 
 ## Day to day
 
-**Deploy a new version** (back up first: Flyway migrations only run forward):
+**Deploy a new version.** `deploy/deploy.sh` pulls main, backs up, builds and restarts. Start it with `nohup` from the home directory, so a dropped SSH connection can't stop it:
 
 ```bash
-cd ~/pokemans && git pull
-cd deploy && docker compose -f compose.prod.yml exec backup backup.sh
-docker compose -f compose.prod.yml up -d --build
+nohup bash ~/pokemans/deploy/deploy.sh > ~/deploy.log 2>&1 & tail -f ~/deploy.log
 ```
 
 Logins and uploads fail for about 30–60 s while the backend restarts. Tell Discord before deploying.
+
+**Check prod without changing anything.** Run this from a checkout. It reports the commit, services, health and recent backend errors:
+
+```bash
+ssh deploy@beta.rawmark.app 'bash -s' < deploy/prod-check.sh
+```
 
 **Restore after a disaster** (lost server or a bad migration):
 
