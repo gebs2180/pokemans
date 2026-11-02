@@ -16,7 +16,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.springframework.modulith:spring-modulith-starter-core")
     implementation("software.amazon.awssdk:s3")
-    implementation("com.drewnoakes:metadata-extractor:2.21.0")
+    implementation("com.drewnoakes:metadata-extractor:2.22.0")
     implementation("org.openpnp:opencv:4.9.0-0")
     // Report PDFs, rendered in the JVM: Thymeleaf (Apache-2.0) fills XHTML templates and OpenHTMLtoPDF
     // (LGPL-2.1, used unmodified as a library; PDFBox underneath is Apache-2.0) lays them out.
