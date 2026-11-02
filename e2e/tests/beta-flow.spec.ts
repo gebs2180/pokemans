@@ -106,6 +106,11 @@ test('a raw card goes from photos to an offer, a sale and its arrival', async ({
   await admin.getByRole('button', { name: /save version/i }).click()
   await expect(admin.getByText(/offer \$[\d,]+\.\d{2} at confidence/i)).toBeVisible()
 
+  // Identified, reviewed and priced: nothing left to do on it in the queue.
+  await admin.goto('/admin/review')
+  await expect(admin.getByRole('heading', { name: 'Review queue' })).toBeVisible()
+  await expect(admin.getByText(/need comps/i)).toHaveCount(0)
+
   // 4. The collector gets the offer and posts it, after saying where it ships from.
   await collector.goto(cardUrl)
   await collector.getByRole('button', { name: /get an offer/i }).click()
@@ -138,9 +143,11 @@ test('a raw card goes from photos to an offer, a sale and its arrival', async ({
   await buyer.getByRole('link', { name: /your deals/i }).click()
   const deal = buyer.locator('section').filter({ has: buyer.getByRole('heading', { name: CARD.name }) })
   await expect(deal.getByText(/tracking 9400/)).toBeVisible()
+  await deal.getByLabel(/arrived as shown/i).check()
   expect(Number(await deal.getByLabel('Price paid').inputValue())).toBe(price)
   await deal.getByRole('button', { name: 'Record' }).click()
-  await expect(deal.getByText(/arrived/i)).toBeVisible()
+  await deal.getByRole('button', { name: /^confirm: record/i }).click()
+  await expect(deal.getByText(/you recorded paying/i)).toBeVisible()
   await expect(deal.getByRole('button', { name: 'Record' })).toHaveCount(0)
   await expectNoSideScroll(buyer)
 

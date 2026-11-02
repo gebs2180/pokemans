@@ -141,7 +141,10 @@ export function MarketPage() {
           </p>
           {confirming === item.listingId ? (
             <div className="confirm">
-              <p>You buy it at this price, whatever it grades.</p>
+              <p>
+                You buy it at this price, whatever it grades. You pay the seller directly, within 7 days of it arriving, and we bill you
+                the postage monthly.
+              </p>
               <div className="actions">
                 <button onClick={() => accept(item.listingId)} disabled={busy} aria-busy={busy}>
                   Confirm: buy for {money(item.offer.price)}
@@ -220,6 +223,7 @@ export function DealsPage() {
               </>
             )}
             .
+            {!deal.cancelled && !deal.outcome && ' Pay them directly, within 7 days of it arriving as shown.'}
           </p>
           {deal.cancelled ? (
             <p className="alert alert-danger">
@@ -276,20 +280,27 @@ export function ArrivalForm({
   noteRequired?: boolean
 }) {
   const api = useApi()
-  const [returning, setReturning] = useState(false)
+  // No default for either: nothing can be recorded by accident, and a preselected reason would skew the data.
+  const [choice, setChoice] = useState<'arrived' | 'returning' | null>(null)
+  const returning = choice === 'returning'
   const [paid, setPaid] = useState(String(price))
-  // No default: the reason is data, and a preselected one would skew it.
   const [reason, setReason] = useState<DeclinedReason | ''>('')
   const [note, setNote] = useState('')
-  const differs = !returning && parseMoney(paid) !== price
+  const differs = choice === 'arrived' && parseMoney(paid) !== price
   const needsNote = noteRequired || differs
   const [busy, setBusy] = useState(false)
+  // Recording can't be undone, and the seller sees it: it asks once more, and any change asks again.
+  const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const formError = useFormError(error)
 
   async function save(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    if (!confirming) {
+      setConfirming(true)
+      return
+    }
     setBusy(true)
     try {
       const [base, query] = path.split('?')
@@ -307,24 +318,33 @@ export function ArrivalForm({
     }
   }
 
+  /** Runs a field's change, and takes back the confirm step: what's being confirmed has changed. */
+  function changing<T>(set: (value: T) => void) {
+    return (value: T) => {
+      setConfirming(false)
+      set(value)
+    }
+  }
+
   return (
     <form onSubmit={save} className="form" aria-describedby={formError.describedBy}>
       <h3>When it arrives</h3>
+      <p className="muted small">Record this once the card is in your hands. It can't be changed afterwards, and the seller sees it.</p>
       <div className="choices">
         <label className="choice">
-          <input type="radio" checked={!returning} onChange={() => setReturning(false)} /> Arrived as shown, paid
+          <input type="radio" name="arrival" checked={choice === 'arrived'} onChange={() => changing(setChoice)('arrived')} /> Arrived as shown, paid
         </label>
         <label className="choice">
-          <input type="radio" checked={returning} onChange={() => setReturning(true)} /> Sending it back
+          <input type="radio" name="arrival" checked={returning} onChange={() => changing(setChoice)('returning')} /> Sending it back
         </label>
       </div>
-      {returning ? (
+      {returning && (
         <Field label="Return reason">
           {(control) => (
             <select
               {...control}
               value={reason}
-              onChange={(e) => setReason(e.target.value as DeclinedReason)}
+              onChange={(e) => changing(setReason)(e.target.value as DeclinedReason)}
               aria-label="Return reason"
               required
             >
@@ -339,29 +359,49 @@ export function ArrivalForm({
             </select>
           )}
         </Field>
-      ) : (
+      )}
+      {choice === 'arrived' && (
         <Field label="Price paid ($)" hint={differs ? `That's not the ${money(price)} offer: say why in the note.` : undefined}>
-          {(control) => <MoneyInput {...control} value={paid} onChange={setPaid} min={0} className="narrow" aria-label="Price paid" required />}
+          {(control) => <MoneyInput {...control} value={paid} onChange={changing(setPaid)} min={0} className="narrow" aria-label="Price paid" required />}
         </Field>
       )}
-      <Field label={needsNote ? 'Note' : 'Note (optional)'}>
-        {(control) => (
-          <input
-            {...control}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder={noteRequired ? 'How the card shipped, or why this is recorded by hand' : differs ? 'Why you paid a different amount' : 'Note (optional)'}
-            aria-label="Note"
-            maxLength={2000}
-            required={needsNote}
-          />
-        )}
-      </Field>
-      <div className="actions">
-        <button type="submit" disabled={busy} aria-busy={busy}>
-          Record
-        </button>
-      </div>
+      {choice && (
+        <Field label={needsNote ? 'Note' : 'Note (optional)'}>
+          {(control) => (
+            <input
+              {...control}
+              value={note}
+              onChange={(e) => changing(setNote)(e.target.value)}
+              placeholder={noteRequired ? 'How the card shipped, or why this is recorded by hand' : differs ? 'Why you paid a different amount' : 'Note (optional)'}
+              aria-label="Note"
+              maxLength={2000}
+              required={needsNote}
+            />
+          )}
+        </Field>
+      )}
+      {choice &&
+        (confirming ? (
+          <div className="confirm">
+            <p>
+              {returning
+                ? `Record that you're sending it back: ${RETURN_REASON[reason as DeclinedReason]}?`
+                : `Record that it arrived as shown and you paid ${money(parseMoney(paid))}?`}
+            </p>
+            <div className="actions">
+              <button type="submit" disabled={busy} aria-busy={busy}>
+                Confirm: record it
+              </button>
+              <button type="button" className="secondary" onClick={() => setConfirming(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="actions">
+            <button type="submit">Record</button>
+          </div>
+        ))}
       {formError.message}
     </form>
   )

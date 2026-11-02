@@ -101,7 +101,8 @@ class CardStatusService {
         }
         if (reason != null) {
             return new CardStatus(cardId, Stage.PRICING, identity,
-                    "We're gathering sold prices for this card before we can price it." + NO_NOTIFICATIONS, false);
+                    "We don't have enough sold prices for this card yet. We add them by hand, so it may take a while, "
+                            + "and some cards won't get an offer. You're free to sell it elsewhere." + NO_NOTIFICATIONS, false);
         }
         if (quote.refusal() != null) {
             return new CardStatus(cardId, Stage.NO_OFFER, identity, quote.refusal() + nextStep(quote.refusal()), false);
@@ -111,7 +112,7 @@ class CardStatusService {
 
     private static String nextStep(String refusal) {
         if (refusal.contains("sales data")) {
-            return " We add sold prices as they come in, and it may qualify then." + NO_NOTIFICATIONS;
+            return " We add sold prices by hand, and it may qualify then." + NO_NOTIFICATIONS;
         }
         if (refusal.contains("minimum")) {
             return " Instant offers are for cards worth $25 or more.";

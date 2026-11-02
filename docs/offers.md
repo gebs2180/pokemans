@@ -24,6 +24,8 @@ The lender and insurer side is paused while Zach clears his outside interest wit
    - the card arrived genuine and as shown, and what they paid the seller, by default the offer price; any other amount needs a note saying why;
    - it goes back, for one of the reasons the buyer terms allow: not genuine, not the listed card, or doesn't match its photos. No reason is preselected.
 
+   Neither choice is preselected, and **Record** asks once more, because a record can't be undone and the seller sees it (UX review, 2026-11-01).
+
    Without a label nothing can have shipped, so the API refuses both. If a card shipped another way, the admin records it for the buyer from **Labels to buy**, with a note saying how; the note is kept as "Recorded by the admin: …".
 
    No grade is judged: condition within the photos is the buyer's risk.

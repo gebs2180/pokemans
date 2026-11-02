@@ -4,6 +4,11 @@ import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
 
+/** The seller terms' deadline: 3 days from the label showing. */
+function shipBy(boughtAt: string) {
+  return new Date(new Date(boughtAt).getTime() + 3 * 86_400_000).toLocaleDateString()
+}
+
 /** How the firm price was reached: what a buyer could pay at each grade the card might be, and how likely each is. */
 export function HowPriced({ offer }: { offer: Offer }) {
   const { likely, lower } = likelyRungs(offer.ladder)
@@ -139,6 +144,10 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
                   Good until {new Date(offer.expiresAt).toLocaleDateString()}. Selling posts this price to our buyers: the first to
                   accept buys the card at it, and we send you a prepaid, insured shipping label. It isn't sold until a buyer accepts.
                 </p>
+                <p className="small">
+                  <strong>The buyer pays you directly, not us,</strong> within 7 days of the card arriving as shown. Rawmark doesn't
+                  handle the money.
+                </p>
                 {shipFrom && (address == null || editingAddress) ? (
                   <>
                     <h3>Where will you ship from?</h3>
@@ -166,7 +175,7 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
                         <div className="confirm">
                           <p>
                             If a buyer accepts, you're committing to ship them the card, as shown in your photos, for{' '}
-                            {money(offer.price)}.
+                            {money(offer.price)}. They pay you directly, within 7 days of it arriving.
                           </p>
                           <div className="actions">
                             <button
@@ -227,7 +236,8 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
           <p>
             Sold to {listing.buyer?.orgName ?? 'a buyer'}
             {listing.buyer?.email && ` (${listing.buyer.email})`} on {new Date(listing.closedAt!).toLocaleDateString()}. They pay
-            you {offer && money(offer.price)} once it arrives as shown.
+            you {offer && money(offer.price)} directly, within 7 days of it arriving as shown.
+            {listing.buyer?.email && ' Email them to agree how.'}
           </p>
           {listing.label && labelHref ? (
             <>
@@ -240,6 +250,16 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
                 {listing.label.carrier} {listing.label.service}
                 {listing.label.trackingCode && `, tracking ${listing.label.trackingCode}`}, insured for {money(listing.label.insuredValue)}
               </p>
+              {!listing.outcome && (
+                <>
+                  <p className="alert-title">How to ship it</p>
+                  <ul className="small">
+                    <li>Put the card in a sleeve, then a toploader, in a bubble mailer.</li>
+                    <li>Stick this label on the mailer. Use only this label: it's the insured one.</li>
+                    <li>Hand it to the carrier by {shipBy(listing.label.boughtAt)}.</li>
+                  </ul>
+                </>
+              )}
             </>
           ) : (
             !listing.outcome && (

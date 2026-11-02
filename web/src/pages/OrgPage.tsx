@@ -28,7 +28,7 @@ export function OrgPage() {
       </ConsentGate>
     )
   }
-  const containers = <Containers orgId={orgId} orgName={org.name} kind={containerKind(org.type)} />
+  const containers = <Containers orgId={orgId} orgName={org.name} kind={containerKind(org.type)} contributor={org.type === 'CONTRIBUTOR'} />
   if (org.type === 'COLLECTOR') {
     return (
       <ConsentGate orgId={orgId} title="Before you sell" intro="Please read what posting a card for sale commits you to." accepted="seller terms">
@@ -95,7 +95,17 @@ function ConsentGate({
   )
 }
 
-function Containers({ orgId, orgName, kind }: { orgId: string; orgName: string; kind: ReturnType<typeof containerKind> }) {
+function Containers({
+  orgId,
+  orgName,
+  kind,
+  contributor,
+}: {
+  orgId: string
+  orgName: string
+  kind: ReturnType<typeof containerKind>
+  contributor: boolean
+}) {
   const api = useApi()
   const { data, error, reload } = useLoad(
     () => api<ContainerSummary[]>('GET', apiPath`/api/orgs/${orgId}/${kind.path}`),
@@ -144,7 +154,19 @@ function Containers({ orgId, orgName, kind }: { orgId: string; orgName: string; 
       {error && <p className="error" role="alert">{error}</p>}
       {!data && !error && <Loading />}
       {data && data.length === 0 && <EmptyState title={`No ${kind.plural.toLowerCase()} yet.`} />}
-      {data && data.length === 0 && kind.path === 'collections' && (
+      {contributor && (
+        <section className="panel">
+          <h2>How contributing works</h2>
+          <ol className="small">
+            <li>Create a collection, e.g. "Graded cards".</li>
+            <li>Add each card you've had graded, with its name and number.</li>
+            <li>Add photos of its front and back from before it was graded: the raw card, out of the slab. Photos of the slab can't be used.</li>
+            <li>Enter the grader, cert number and grade. We check the cert.</li>
+          </ol>
+          <p className="muted small">Sending a card to be graded? Photograph it now, then add the grade when it comes back. You don't have to sell anything.</p>
+        </section>
+      )}
+      {data && data.length === 0 && !contributor && kind.path === 'collections' && (
         <section className="panel">
           <h2>How selling works</h2>
           <ol className="small">
@@ -153,6 +175,7 @@ function Containers({ orgId, orgName, kind }: { orgId: string; orgName: string; 
             <li>Photograph its front and back on the card's page.</li>
             <li>We identify it and review its condition by hand, usually within a couple of days. We don't send notifications yet, so check back.</li>
             <li>Get one firm instant offer, and sell at it if you like. A buyer who accepts sends you a prepaid label.</li>
+            <li>The buyer pays you directly, not us, within 7 days of the card arriving as shown.</li>
           </ol>
         </section>
       )}
