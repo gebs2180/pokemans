@@ -1,7 +1,6 @@
 package com.pokemans.app.identity;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -17,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Admin-only (enforced by path in SecurityConfig): orgs and invite links. */
+/** Admin-only (enforced by path in SecurityConfig): orgs, invite links and who's in an org. */
 @RestController
 @RequestMapping("/api/admin/orgs")
 class AdminOrgController {
@@ -28,10 +27,10 @@ class AdminOrgController {
     record OrgView(UUID id, String name, OrgType type, Instant createdAt, int members) {
     }
 
-    record CreateInvite(@Email String email) {
+    record InviteView(UUID id, String token, String acceptPath, Instant expiresAt) {
     }
 
-    record InviteView(UUID id, String token, String acceptPath, Instant expiresAt) {
+    record EndMembership(@NotBlank @Size(max = 2000) String reason) {
     }
 
     private final OrgRepository orgs;
@@ -58,9 +57,29 @@ class AdminOrgController {
     /** The token is returned once; the admin shares the accept link with the invitee. */
     @PostMapping("/{orgId}/invites")
     @ResponseStatus(HttpStatus.CREATED)
-    InviteView invite(@PathVariable UUID orgId, @Valid @RequestBody(required = false) CreateInvite request) {
-        var created = invites.create(orgId, request == null ? null : request.email());
+    InviteView invite(@PathVariable UUID orgId) {
+        var created = invites.create(orgId);
         return new InviteView(created.inviteId(), created.token(), "/invite/" + created.token(), created.expiresAt());
+    }
+
+    @GetMapping("/{orgId}/invites")
+    List<InviteService.OpenInvite> openInvites(@PathVariable UUID orgId) {
+        return invites.open(orgId);
+    }
+
+    @PostMapping("/{orgId}/invites/{inviteId}/revoke")
+    void revoke(@PathVariable UUID orgId, @PathVariable UUID inviteId) {
+        invites.revoke(orgId, inviteId);
+    }
+
+    @GetMapping("/{orgId}/members")
+    List<InviteService.Member> members(@PathVariable UUID orgId) {
+        return invites.members(orgId);
+    }
+
+    @PostMapping("/{orgId}/members/{membershipId}/end")
+    void endMembership(@PathVariable UUID orgId, @PathVariable UUID membershipId, @Valid @RequestBody EndMembership request) {
+        invites.endMembership(orgId, membershipId, request.reason().strip());
     }
 
     private OrgView view(Org org) {

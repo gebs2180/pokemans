@@ -12,6 +12,8 @@ interface CardOfferRepository extends JpaRepository<CardOffer, UUID> {
 
     Optional<CardOffer> findFirstByCardItemIdOrderByCreatedAtDesc(UUID cardItemId);
 
+    List<CardOffer> findByCardItemId(UUID cardItemId);
+
     /** The newest offers, for the admin. */
     List<CardOffer> findTop200ByOrderByCreatedAtDesc();
 }

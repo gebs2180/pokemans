@@ -19,29 +19,34 @@ public class Invite {
     @Enumerated(EnumType.STRING)
     private Role role;
     private String tokenHash;
-    private String email;
     private UUID createdBy;
     private Instant createdAt;
     private Instant expiresAt;
     private UUID acceptedBy;
     private Instant acceptedAt;
+    private Instant revokedAt;
+    private UUID revokedBy;
 
     protected Invite() {
     }
 
-    Invite(UUID orgId, Role role, String tokenHash, String email, UUID createdBy, Instant expiresAt) {
+    Invite(UUID orgId, Role role, String tokenHash, UUID createdBy, Instant expiresAt) {
         this.id = UUID.randomUUID();
         this.orgId = orgId;
         this.role = role;
         this.tokenHash = tokenHash;
-        this.email = email;
         this.createdBy = createdBy;
         this.createdAt = Instant.now();
         this.expiresAt = expiresAt;
     }
 
     boolean isUsable(Instant now) {
-        return acceptedAt == null && now.isBefore(expiresAt);
+        return acceptedAt == null && revokedAt == null && now.isBefore(expiresAt);
+    }
+
+    void revoke(UUID by, Instant now) {
+        this.revokedBy = by;
+        this.revokedAt = now;
     }
 
     void accept(UUID userId, Instant now) {
@@ -61,15 +66,19 @@ public class Invite {
         return role;
     }
 
-    public String getEmail() {
-        return email;
-    }
-
     public Instant getExpiresAt() {
         return expiresAt;
     }
 
     public Instant getAcceptedAt() {
         return acceptedAt;
+    }
+
+    public Instant getRevokedAt() {
+        return revokedAt;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
     }
 }
