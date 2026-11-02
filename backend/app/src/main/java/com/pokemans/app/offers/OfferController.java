@@ -35,8 +35,8 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * Instant offers. Sellers (members of a collector or contributor org) see our firm offer on a card and
  * post it to buyers; buyers (members of a buyer org who accepted the buyer terms) take one, get a
- * prepaid label sent to the seller, and record that the card arrived as shown and was paid for, or
- * return it. The admin buys labels that didn't go through and sees what to bill each buyer.
+ * prepaid label sent to the seller, and record that the card arrived as shown and that they paid, or
+ * return it, while the seller says whether they got paid. The admin buys labels that didn't go through and sees what to bill each buyer.
  */
 @RestController
 class OfferController {
@@ -47,21 +47,32 @@ class OfferController {
     record PostRequest(@NotNull UUID offerId) {
     }
 
-    /** US addresses only in v1. */
+    /**
+     * US addresses only in v1.
+     *
+     * @param paymentMethod with paymentHandle, how a seller gets paid; a seller's address needs both, a buyer's has neither
+     */
     record AddressBody(@NotBlank @Size(max = 100) String name, @Size(max = 100) String company,
                        @NotBlank @Size(max = 200) String street1, @Size(max = 200) String street2,
                        @NotBlank @Size(max = 100) String city,
                        @NotBlank @Pattern(regexp = "[A-Z]{2}", message = "use the two-letter state code") String state,
                        @NotBlank @Pattern(regexp = "\\d{5}(-\\d{4})?", message = "use a 5 or 9 digit ZIP code") String zip,
-                       @Size(max = 30) String phone) {
+                       @Size(max = 30) String phone, PaymentHandle.Method paymentMethod,
+                       @Size(max = 100) String paymentHandle) {
     }
 
     record AddressView(String name, String company, String street1, String street2, String city, String state, String zip,
-                       String country, String phone, Instant recordedAt) {
+                       String country, String phone, PaymentHandle.Method paymentMethod, String paymentHandle, Instant recordedAt) {
+    }
+
+    record ReceivedBody(@Size(max = 2000) String note) {
     }
 
     /** @param pricePaid what the buyer paid the seller: the firm price, unless they agreed otherwise between them (then say why in the note) */
-    record ReceivedBody(@NotNull @DecimalMin("0") @Digits(integer = 10, fraction = 2) BigDecimal pricePaid, @Size(max = 2000) String note) {
+    record PaidBody(@NotNull @DecimalMin("0") @Digits(integer = 10, fraction = 2) BigDecimal pricePaid, @Size(max = 2000) String note) {
+    }
+
+    record DisputeBody(@Size(max = 2000) String note) {
     }
 
     record ReturnedBody(@NotNull ListingEvent.DeclinedReason reason, @Size(max = 2000) String note) {
@@ -119,10 +130,17 @@ class OfferController {
     @PostMapping("/api/orgs/{orgId}/ship-address")
     @ResponseStatus(HttpStatus.CREATED)
     AddressView recordAddress(@PathVariable UUID orgId, @Valid @RequestBody AddressBody body) {
-        access.require(orgId, SHIPPING_ORGS);
+        boolean seller = access.require(orgId, SHIPPING_ORGS).getType() != OrgType.BUYER;
         return view(shipping.record(orgId, new ShippingProvider.Address(body.name().strip(), blankToNull(body.company()),
                 body.street1().strip(), blankToNull(body.street2()), body.city().strip(), body.state(), body.zip(), "US",
-                blankToNull(body.phone()))));
+                blankToNull(body.phone())), seller ? payment(body) : null));
+    }
+
+    private static PaymentHandle payment(AddressBody body) {
+        if (body.paymentMethod() == null || blankToNull(body.paymentHandle()) == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Say how you'd like to be paid: PayPal, Venmo or Zelle, and your details.");
+        }
+        return new PaymentHandle(body.paymentMethod(), body.paymentHandle().strip());
     }
 
     // Sellers
@@ -154,6 +172,7 @@ class OfferController {
     ListingService.OfferView price(@PathVariable UUID orgId, @PathVariable UUID cardId) {
         requireSellerCard(orgId, cardId);
         consents.requireAccepted(orgId);
+        listings.requireNotHeld(cardId);
         return ListingService.offerView(offers.price(orgId, cardId), null);
     }
 
@@ -171,6 +190,36 @@ class OfferController {
     void withdraw(@PathVariable UUID orgId, @PathVariable UUID listingId) {
         access.require(orgId, SELLER_ORGS);
         listings.withdraw(orgId, listingId);
+    }
+
+    // After the sale, the seller's word for each step. Terms aren't asked for again here: the sale was made under the old ones.
+
+    /** The card is with the carrier. */
+    @PostMapping("/api/orgs/{orgId}/listings/{listingId}/shipped")
+    void shipped(@PathVariable UUID orgId, @PathVariable UUID listingId) {
+        access.require(orgId, SELLER_ORGS);
+        listings.shipped(orgId, listingId);
+    }
+
+    /** "I got paid." */
+    @PostMapping("/api/orgs/{orgId}/listings/{listingId}/payment-confirmed")
+    void paymentConfirmed(@PathVariable UUID orgId, @PathVariable UUID listingId) {
+        access.require(orgId, SELLER_ORGS);
+        listings.paymentConfirmed(orgId, listingId);
+    }
+
+    /** "I haven't been paid", or "I disagree with this return": either goes to the admin. */
+    @PostMapping("/api/orgs/{orgId}/listings/{listingId}/dispute")
+    void dispute(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody DisputeBody body) {
+        access.require(orgId, SELLER_ORGS);
+        listings.disputed(orgId, listingId, body.note());
+    }
+
+    /** A returned card is back with the seller. */
+    @PostMapping("/api/orgs/{orgId}/listings/{listingId}/card-back")
+    void cardBack(@PathVariable UUID orgId, @PathVariable UUID listingId) {
+        access.require(orgId, SELLER_ORGS);
+        listings.cardBack(orgId, listingId);
     }
 
     // Buyers
@@ -213,7 +262,15 @@ class OfferController {
     @ResponseStatus(HttpStatus.CREATED)
     List<ListingService.DealView> received(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody ReceivedBody body) {
         requireBuyer(orgId);
-        listings.received(orgId, listingId, body.pricePaid(), body.note(), false);
+        listings.received(orgId, listingId, body.note(), false);
+        return listings.deals(orgId);
+    }
+
+    @PostMapping("/api/orgs/{orgId}/deals/{listingId}/paid")
+    @ResponseStatus(HttpStatus.CREATED)
+    List<ListingService.DealView> paid(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody PaidBody body) {
+        requireBuyer(orgId);
+        listings.paid(orgId, listingId, body.pricePaid(), body.note());
         return listings.deals(orgId);
     }
 
@@ -244,7 +301,7 @@ class OfferController {
     @PostMapping("/api/admin/deals/{listingId}/received")
     @ResponseStatus(HttpStatus.CREATED)
     void adminReceived(@PathVariable UUID listingId, @RequestParam UUID buyerOrgId, @Valid @RequestBody ReceivedBody body) {
-        listings.received(buyerOrgId, listingId, body.pricePaid(), body.note(), true);
+        listings.received(buyerOrgId, listingId, body.note(), true);
     }
 
     /** Records a return for the buyer when no label was bought. The note says how the card shipped. */
@@ -304,8 +361,9 @@ class OfferController {
 
     private static AddressView view(ShipAddress a) {
         ShippingProvider.Address x = a.toAddress();
+        PaymentHandle payment = a.payment();
         return new AddressView(x.name(), x.company(), x.street1(), x.street2(), x.city(), x.state(), x.zip(), x.country(), x.phone(),
-                a.getCreatedAt());
+                payment == null ? null : payment.method(), payment == null ? null : payment.handle(), a.getCreatedAt());
     }
 
     private static String blankToNull(String s) {

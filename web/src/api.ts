@@ -57,7 +57,21 @@ export type CardView = {
 }
 
 /** Where a seller's card is on the way to a sale. */
-export type CardStage = 'PHOTOS' | 'LOT' | 'IDENTIFYING' | 'ASSESSING' | 'PRICING' | 'NO_OFFER' | 'READY' | 'OFFERED' | 'LISTED' | 'SOLD'
+export type CardStage =
+  | 'PHOTOS'
+  | 'LOT'
+  | 'IDENTIFYING'
+  | 'ASSESSING'
+  | 'PRICING'
+  | 'NO_OFFER'
+  | 'READY'
+  | 'OFFERED'
+  | 'LISTED'
+  | 'SOLD'
+  | 'SHIPPED'
+  | 'ARRIVED'
+  | 'PAID'
+  | 'RETURNED'
 
 export const STAGE_LABEL: Record<CardStage, string> = {
   PHOTOS: 'Needs photos',
@@ -70,6 +84,10 @@ export const STAGE_LABEL: Record<CardStage, string> = {
   OFFERED: 'Offer ready',
   LISTED: 'Posted to buyers',
   SOLD: 'Sold',
+  SHIPPED: 'Shipped',
+  ARRIVED: 'Arrived',
+  PAID: 'Paid',
+  RETURNED: 'Returned',
 }
 
 /** @param identity the card as we identified it, or null; @param canOffer asking for an offer can work now */
@@ -737,8 +755,11 @@ export type Offer = {
 /** Something the admin undid (2026-10-21): a voided offer or listing, or a cancelled deal, and why. */
 export type Undo = { reason: string; at: string; byUserId?: string; by?: string | null }
 
-/** VOIDED: we took the listing down with its offer. CANCELLED: a buyer took it and we undid the deal. */
-export type ListingStatus = 'OPEN' | 'ACCEPTED' | 'WITHDRAWN' | 'EXPIRED' | 'VOIDED' | 'CANCELLED'
+/**
+ * VOIDED: we took the listing down with its offer. CANCELLED: a buyer took it and we undid the deal. BACK: a
+ * buyer took it and sent it back, and the seller has it again.
+ */
+export type ListingStatus = 'OPEN' | 'ACCEPTED' | 'WITHDRAWN' | 'EXPIRED' | 'VOIDED' | 'CANCELLED' | 'BACK'
 export type Party = { orgName: string | null; email: string | null }
 export type DeclinedReason = 'NOT_GENUINE' | 'NOT_THE_LISTED_CARD' | 'DOES_NOT_MATCH_PHOTOS'
 
@@ -748,11 +769,18 @@ export const RETURN_REASON: Record<DeclinedReason, string> = {
   DOES_NOT_MATCH_PHOTOS: "doesn't match its photos",
 }
 
+export type PaymentMethod = 'PAYPAL' | 'VENMO' | 'ZELLE'
+
+export const PAYMENT_METHOD: Record<PaymentMethod, string> = { PAYPAL: 'PayPal', VENMO: 'Venmo', ZELLE: 'Zelle' }
+
+/** How a seller gets paid, off the app. A buyer sees it only once they've accepted. */
+export type PaymentHandle = { method: PaymentMethod; handle: string }
+
 export type ShippingLabel = {
   carrier: string
   service: string
   trackingCode: string | null
-  /** The printable label, for the seller only: it shows the seller's address, which buyers never see. */
+  /** The printable label, for the seller only, until it's used: it shows the seller's address, which buyers never see. */
   labelUrl: string | null
   insuredValue: number
   boughtAt: string
@@ -761,11 +789,38 @@ export type ShippingLabel = {
 /** What happened once the card arrived. INSPECTED is a grade recorded under the per-grade offers that came before. */
 export type Outcome = {
   type: 'RECEIVED' | 'RETURNED' | 'INSPECTED'
+  /** Only on a RECEIVED from before payment became a step of its own: use progress.pricePaid. */
   pricePaid: number | null
   returnedReason: DeclinedReason | null
   inspectedGrade: number | null
   note: string | null
   recordedAt: string
+}
+
+export type DealStage = 'SOLD' | 'SHIPPED' | 'ARRIVED' | 'PAID' | 'RETURNED' | 'BACK'
+
+/** What each side has said about a deal. Rawmark doesn't handle the money, so this is their word, not a fact we checked. */
+export type DealProgress = {
+  stage: DealStage
+  shippedAt: string | null
+  arrivedAt: string | null
+  /** 7 days from the recorded arrival. */
+  payBy: string | null
+  /** When the buyer says they paid. */
+  paidAt: string | null
+  pricePaid: number | null
+  paidNote: string | null
+  /** When the seller said they got paid. */
+  confirmedAt: string | null
+  /** When the seller raised something that's still open. */
+  disputedAt: string | null
+  /** What they said: never sent to the buyer. */
+  disputeNote: string | null
+  /** How the admin last closed something on this deal, written for both sides. */
+  review: Undo | null
+  /** Returned as not genuine and not reviewed yet: no new offer. */
+  held: boolean
+  cardBackAt: string | null
 }
 
 export type Listing = {
@@ -780,6 +835,8 @@ export type Listing = {
   outcome: Outcome | null
   /** Why we took it down (VOIDED) or cancelled the deal (CANCELLED). */
   undone: Undo | null
+  /** Where the deal is, once a buyer took it; null otherwise or once cancelled. */
+  progress: DealProgress | null
 }
 
 export type Sale = { offer: Offer | null; listing: Listing | null }
@@ -811,6 +868,9 @@ export type Deal = {
   outcome: Outcome | null
   /** Set once we cancelled the deal: nothing more to record, and the label isn't used. */
   cancelled: Undo | null
+  /** How the seller gets paid. Null once nothing is owed, or if they gave none. */
+  payTo: PaymentHandle | null
+  progress: DealProgress | null
 }
 
 /** A deal whose label hasn't been bought, for the admin. */
@@ -850,6 +910,9 @@ export type ShipAddress = {
   zip: string
   country: string
   phone: string | null
+  /** How a seller gets paid; a buyer's address has neither. */
+  paymentMethod: PaymentMethod | null
+  paymentHandle: string | null
   recordedAt?: string
 }
 
@@ -945,6 +1008,26 @@ export type AdminListing = {
   labelRefund: LabelRefund | null
   outcome: Outcome['type'] | null
   undone: Undo | null
+}
+
+/** NOT_PAID: the seller says they weren't paid. RETURNED: a return to review. RETURN_DISPUTED: the seller disagrees with one. */
+export type AttentionKind = 'NOT_PAID' | 'RETURNED' | 'RETURN_DISPUTED'
+
+/** Something on a deal the admin has to act on. */
+export type DealAttention = {
+  listingId: string
+  kind: AttentionKind
+  since: string
+  note: string | null
+  sellerOrgId: string
+  cardItemId: string
+  card: OfferCard
+  price: number
+  buyer: Party
+  seller: Party
+  trackingCode: string | null
+  outcome: Outcome | null
+  progress: DealProgress | null
 }
 
 /** Admin: one offer with its latest listing, to void, cancel or refund (2026-10-21). */

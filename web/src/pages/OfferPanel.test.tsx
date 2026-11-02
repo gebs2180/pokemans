@@ -2,9 +2,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import { likelyRungs, type CardStatus, type Deal, type MarketItem, type Offer, type Sale, type ShipAddress } from '../api'
+import { likelyRungs, type CardStatus, type Deal, type MarketItem, type DealProgress, type Listing, type Offer, type Sale, type ShipAddress } from '../api'
 import { respond } from '../test/auth0'
-import { ArrivalForm, DealsPage, MarketPage } from './MarketPage'
+import { ArrivalForm, DealsPage, MarketPage, PaidForm } from './MarketPage'
 import { OfferPanel } from './OfferPanel'
 
 const rungs = [
@@ -32,7 +32,7 @@ const offer = (over: Partial<Offer> = {}): Offer => ({
   ...over,
 })
 
-const address: ShipAddress = { name: 'Sam', company: null, street1: '1 Main St', street2: null, city: 'Springfield', state: 'IL', zip: '62701', country: 'US', phone: null }
+const address: ShipAddress = { name: 'Sam', company: null, street1: '1 Main St', street2: null, city: 'Springfield', state: 'IL', zip: '62701', country: 'US', phone: null, paymentMethod: 'VENMO', paymentHandle: '@sam-cards' }
 
 const ready: CardStatus = { cardId: 'card1', stage: 'READY', identity: 'Umbreon VMAX · Evolving Skies 215 · EN', nextStep: 'Ready for an instant offer.', canOffer: true, condition: null }
 
@@ -83,7 +83,7 @@ describe('OfferPanel', () => {
     expect(screen.getByText(/Ships from Sam, 1 Main St, Springfield, IL 62701/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Sell for $419.98' }))
     // Posting commits the seller to ship: one more step, like the buyer's.
-    expect(screen.getByText(/committing to ship them the card/)).toHaveTextContent('They pay you directly, within 7 days of it arriving.')
+    expect(screen.getByText(/committing to ship them the card/)).toHaveTextContent('They pay you directly, by Venmo, within 7 days of it arriving.')
     expect(posts).toHaveLength(1)
     await user.click(screen.getByRole('button', { name: 'Confirm: post for $419.98' }))
 
@@ -99,6 +99,27 @@ describe('OfferPanel', () => {
     expect(await screen.findByText('Where will you ship from?')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Sell for/ })).not.toBeInTheDocument()
     expect(screen.getByLabelText('ZIP code')).toBeRequired()
+    expect(screen.getByLabelText('Pay me by')).toBeRequired()
+    expect(screen.getByLabelText('Your payment details')).toBeRequired()
+  })
+
+  it('says how the seller gets paid before they commit', async () => {
+    const user = userEvent.setup()
+    stubApi([{ offer: offer(), listing: null }], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText(/The buyer pays you directly, not us, by Venmo/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Sell for $419.98' }))
+    expect(screen.getByText(/committing to ship them the card/)).toHaveTextContent('They pay you directly, by Venmo, within 7 days of it arriving.')
+  })
+
+  it('asks for payment details an older address lacks, before the card can be sold', async () => {
+    stubApi([{ offer: offer(), listing: null }], { ...address, paymentMethod: null, paymentHandle: null })
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByLabelText('Your payment details')).toBeInTheDocument()
+    expect(screen.getByLabelText('Street address')).toHaveValue('1 Main St')
+    expect(screen.queryByRole('button', { name: /Sell for/ })).not.toBeInTheDocument()
   })
 
   it('says why a card gets no offer', async () => {
@@ -146,7 +167,7 @@ describe('OfferPanel', () => {
           offer: offer(),
           listing: {
             id: 'l1', offerId: 'offer1', status: 'OPEN', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2099-11-02T10:00:00Z',
-            closedAt: null, buyer: null, label: null, outcome: null, undone: null,
+            closedAt: null, buyer: null, label: null, outcome: null, undone: null, progress: null,
           },
         },
       ],
@@ -167,7 +188,7 @@ describe('OfferPanel', () => {
           offer: offer(),
           listing: {
             id: 'l1', offerId: 'offer1', status: 'ACCEPTED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
-            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null }, label: null, outcome: null, undone: null,
+            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null }, label: null, outcome: null, undone: null, progress: null,
           },
         },
       ],
@@ -190,6 +211,7 @@ describe('OfferPanel', () => {
             label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' },
             outcome: null,
             undone: null,
+            progress: null,
           },
         },
       ],
@@ -203,28 +225,6 @@ describe('OfferPanel', () => {
     expect(screen.queryByRole('button', { name: /Sell for/ })).not.toBeInTheDocument()
     expect(screen.getByText(/in a bubble mailer/)).toBeInTheDocument()
     expect(screen.getByText(`Hand it to the carrier by ${new Date('2026-10-23T10:00:00Z').toLocaleDateString()}.`)).toBeInTheDocument()
-  })
-
-  it('stops giving shipping steps once the card has arrived', async () => {
-    stubApi(
-      [
-        {
-          offer: offer(),
-          listing: {
-            id: 'l1', offerId: 'offer1', status: 'ACCEPTED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
-            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null },
-            label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' },
-            outcome: { type: 'RECEIVED', pricePaid: 419.98, note: null, returnedReason: null, inspectedGrade: null, recordedAt: '2026-10-24T10:00:00Z' },
-            undone: null,
-          },
-        },
-      ],
-      address,
-    )
-    render(<OfferPanel orgId="org1" cardId="card1" />)
-
-    expect(await screen.findByText(/Arrived\. They recorded paying/)).toBeInTheDocument()
-    expect(screen.queryByText('How to ship it')).not.toBeInTheDocument()
   })
 
   it('says why we withdrew an offer, and offers a new one instead of selling', async () => {
@@ -247,6 +247,7 @@ describe('OfferPanel', () => {
             label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' },
             outcome: null,
             undone: { reason: 'buyer closed', at: '2026-10-21T10:00:00Z' },
+            progress: null,
           },
         },
       ],
@@ -257,6 +258,149 @@ describe('OfferPanel', () => {
     expect(await screen.findByText(/We cancelled the sale to Card Shop on .*: buyer closed\. Don't ship the card/)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Print your prepaid label' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Get a new offer' })).toBeInTheDocument()
+  })
+})
+
+describe('OfferPanel after the sale', () => {
+  const printable = { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' }
+  const none: DealProgress = {
+    stage: 'SOLD', shippedAt: null, arrivedAt: null, payBy: null, paidAt: null, pricePaid: null, paidNote: null,
+    confirmedAt: null, disputedAt: null, disputeNote: null, review: null, held: false, cardBackAt: null,
+  }
+  const sold = (progress: Partial<DealProgress>, over: Partial<Listing> = {}): Sale => ({
+    offer: offer(),
+    listing: {
+      id: 'l1', offerId: 'offer1', status: 'ACCEPTED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
+      closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null }, label: { ...printable, labelUrl: null }, outcome: null, undone: null,
+      progress: { ...none, ...progress },
+      ...over,
+    },
+  })
+  const arrived = { stage: 'ARRIVED' as const, arrivedAt: '2026-10-24T10:00:00Z', payBy: '2099-10-31T10:00:00Z' }
+  const returned = {
+    type: 'RETURNED' as const, pricePaid: null, returnedReason: 'NOT_GENUINE' as const, note: 'wrong font', inspectedGrade: null, recordedAt: '2026-10-24T10:00:00Z',
+  }
+
+  it('says how the buyer pays before the card ships, and takes the label away once it is shipped', async () => {
+    const user = userEvent.setup()
+    const posts = stubApi([sold({}, { label: printable })], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText(/directly, by Venmo \(@sam-cards\), within 7 days/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Print your prepaid label' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: "I've shipped it" }))
+    expect(posts).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: "Confirm: it's shipped" }))
+    await waitFor(() => expect(posts).toEqual([{ url: '/api/orgs/org1/listings/l1/shipped', body: undefined }]))
+  })
+
+  it('has no label to print once it shipped', async () => {
+    stubApi([sold({ stage: 'SHIPPED', shippedAt: '2026-10-21T10:00:00Z' })], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText('Shipped')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Print your prepaid label' })).not.toBeInTheDocument()
+    expect(screen.queryByText('How to ship it')).not.toBeInTheDocument()
+    expect(screen.getByText(/tracking 9400111/)).toBeInTheDocument()
+  })
+
+  it('shows the pay-by date, and takes "I got paid" with a confirm', async () => {
+    const user = userEvent.setup()
+    const posts = stubApi([sold(arrived)], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText(new Date('2099-10-31T10:00:00Z').toLocaleDateString())).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'I got paid' }))
+    expect(posts).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Confirm: I got paid' }))
+    await waitFor(() => expect(posts).toEqual([{ url: '/api/orgs/org1/listings/l1/payment-confirmed', body: undefined }]))
+  })
+
+  it('takes "I haven\'t been paid", and says the date has not passed yet', async () => {
+    const user = userEvent.setup()
+    const posts = stubApi([sold(arrived)], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    await user.click(await screen.findByRole('button', { name: "I haven't been paid" }))
+    expect(screen.getByText(/They have until .* to pay/)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Anything we should know (optional)'), 'no reply to my emails')
+    await user.click(screen.getByRole('button', { name: "Confirm: I haven't been paid" }))
+    await waitFor(() => expect(posts).toEqual([{ url: '/api/orgs/org1/listings/l1/dispute', body: { note: 'no reply to my emails' } }]))
+  })
+
+  it('shows a dispute as raised, without offering it again', async () => {
+    stubApi([sold({ ...arrived, disputedAt: '2026-10-25T10:00:00Z', disputeNote: 'nothing yet' })], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText(/You told us about this on .*: "nothing yet"\. Zach will be in touch\./)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: "I haven't been paid" })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'I got paid' })).toBeInTheDocument()
+  })
+
+  it('asks whether the buyer\'s payment came, then has nothing more to do', async () => {
+    const paid = { ...arrived, stage: 'PAID' as const, paidAt: '2026-10-25T10:00:00Z', pricePaid: 419.98 }
+    stubApi([sold(paid)], address)
+    const { unmount } = render(<OfferPanel orgId="org1" cardId="card1" />)
+    expect(await screen.findByText(/They recorded paying \$419\.98 on .* Did you get it\?/)).toBeInTheDocument()
+    unmount()
+
+    stubApi([sold({ ...paid, confirmedAt: '2026-10-26T10:00:00Z' })], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+    expect(await screen.findByText(/Nothing more to do/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'I got paid' })).not.toBeInTheDocument()
+  })
+
+  it('on a return says what happens next, and asks when the card is back', async () => {
+    const user = userEvent.setup()
+    const posts = stubApi([sold({ stage: 'RETURNED', held: true }, { outcome: returned })], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText('Returned: not genuine')).toBeInTheDocument()
+    expect(screen.getByText('They said: "wrong font"')).toBeInTheDocument()
+    expect(screen.getByText(/they send it back to you, tracked and at their cost/)).toHaveTextContent("can't get a new offer until he has")
+    expect(screen.queryByRole('link', { name: 'Print your prepaid label' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/ship it/i)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: "The card's back with me" }))
+    await user.click(screen.getByRole('button', { name: "Confirm: it's back" }))
+    await waitFor(() => expect(posts).toEqual([{ url: '/api/orgs/org1/listings/l1/card-back', body: undefined }]))
+  })
+
+  it('lets the seller disagree with a return, and needs to hear why', async () => {
+    const user = userEvent.setup()
+    const posts = stubApi([sold({ stage: 'RETURNED' }, { outcome: returned })], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'I disagree' }))
+    expect(screen.getByRole('button', { name: 'Send it to Zach' })).toBeDisabled()
+    await user.type(screen.getByLabelText('Why you disagree'), 'it came from a sealed pack')
+    await user.click(screen.getByRole('button', { name: 'Send it to Zach' }))
+    await waitFor(() => expect(posts).toEqual([{ url: '/api/orgs/org1/listings/l1/dispute', body: { note: 'it came from a sealed pack' } }]))
+  })
+
+  it('offers a new offer once the card is back, and never the one it sold at', async () => {
+    stubApi([sold({ stage: 'BACK', cardBackAt: '2026-10-28T10:00:00Z' }, { status: 'BACK', outcome: { ...returned, returnedReason: 'DOES_NOT_MATCH_PHOTOS' } })], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByRole('button', { name: 'Get a new offer' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Sell for/ })).not.toBeInTheDocument()
+  })
+
+  it('keeps a held card from asking for an offer, and says why', async () => {
+    const held: CardStatus = { ...ready, stage: 'RETURNED', canOffer: false, nextStep: "A buyer said this card isn't genuine, so we review that before it can get a new offer." }
+    stubApi([sold({ stage: 'BACK', held: true, cardBackAt: '2026-10-28T10:00:00Z' }, { status: 'BACK', outcome: returned })], address, undefined, held)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText(/we review that before it can get a new offer/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Get a new offer' })).not.toBeInTheDocument()
+  })
+
+  it('asks a seller who gave no payment details for them, keeping their address', async () => {
+    stubApi([sold({ stage: 'SHIPPED' })], { ...address, paymentMethod: null, paymentHandle: null })
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText(/The buyer can't pay you until you say how/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Street address')).toHaveValue('1 Main St')
+    expect(screen.getByLabelText('Your payment details')).toBeRequired()
   })
 })
 
@@ -342,52 +486,53 @@ describe('MarketPage', () => {
   })
 })
 
-describe('ArrivalForm', () => {
-  const deal: Deal = {
-    listingId: 'l1',
-    card: { name: 'x', setName: 's', number: '1', language: 'en', edition: 'UNLIMITED', variant: 'NORMAL', label: 'x', distribution: {}, gradedAs: null },
-    offer: offer(),
-    photos: [],
-    seller: { orgName: 'Sam', email: null },
-    acceptedAt: '2026-10-20T10:00:00Z',
-    label: null,
-    outcome: null,
-    cancelled: null,
-  }
+/** The form as a buyer sees it after tapping "It arrived". */
+function OpenArrivalForm({ onSaved }: { onSaved: () => void }) {
+  return <ArrivalForm path="/api/orgs/b1/deals/l1" onSaved={onSaved} noteRequired={false} />
+}
 
-  it('records the price paid, prefilled with the offer', async () => {
+async function openArrival(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'It arrived' }))
+}
+
+describe('ArrivalForm', () => {
+  it('shows nothing to record until the buyer says it arrived', async () => {
+    const user = userEvent.setup()
+    stubApi([], null, () => respond(201, []))
+    render(<OpenArrivalForm onSaved={vi.fn()} />)
+
+    expect(screen.queryByLabelText('Arrived as shown')).not.toBeInTheDocument()
+    await openArrival(user)
+    expect(screen.getByLabelText('Arrived as shown')).not.toBeChecked()
+    expect(screen.getByLabelText('Sending it back')).not.toBeChecked()
+    expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument()
+  })
+
+  it('records the arrival alone, and asks once more', async () => {
     const user = userEvent.setup()
     const posts = stubApi([], null, () => respond(201, []))
     const onSaved = vi.fn()
-    render(<ArrivalForm path="/api/orgs/b1/deals/l1" price={deal.offer.price} onSaved={onSaved} />)
+    render(<OpenArrivalForm onSaved={onSaved} />)
 
-    await user.click(screen.getByLabelText('Arrived as shown, paid'))
-    expect(screen.getByLabelText('Price paid')).toHaveValue('419.98')
+    await openArrival(user)
+    await user.click(screen.getByLabelText('Arrived as shown'))
+    expect(screen.queryByLabelText('Price paid')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Record' }))
-    // Recording can't be undone: it says what it records and asks once more.
-    expect(screen.getByText('Record that it arrived as shown and you paid $419.98?')).toBeInTheDocument()
+    expect(screen.getByText('Record that it arrived as shown? The 7 days to pay start now.')).toBeInTheDocument()
     expect(posts).toHaveLength(0)
     await user.click(screen.getByRole('button', { name: 'Confirm: record it' }))
 
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
-    expect(posts[0]).toEqual({ url: '/api/orgs/b1/deals/l1/received', body: { pricePaid: 419.98, note: null } })
-  })
-
-  it('picks nothing for the buyer, so a stray tap records nothing', async () => {
-    stubApi([], null, () => respond(201, []))
-    render(<ArrivalForm path="/api/orgs/b1/deals/l1" price={deal.offer.price} onSaved={vi.fn()} />)
-
-    expect(screen.getByLabelText('Arrived as shown, paid')).not.toBeChecked()
-    expect(screen.getByLabelText('Sending it back')).not.toBeChecked()
-    expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument()
+    expect(posts[0]).toEqual({ url: '/api/orgs/b1/deals/l1/received', body: { note: null } })
   })
 
   it('asks again after a change, so what is confirmed is what is recorded', async () => {
     const user = userEvent.setup()
     const posts = stubApi([], null, () => respond(201, []))
-    render(<ArrivalForm path="/api/orgs/b1/deals/l1" price={deal.offer.price} onSaved={vi.fn()} />)
+    render(<OpenArrivalForm onSaved={vi.fn()} />)
 
-    await user.click(screen.getByLabelText('Arrived as shown, paid'))
+    await openArrival(user)
+    await user.click(screen.getByLabelText('Arrived as shown'))
     await user.click(screen.getByRole('button', { name: 'Record' }))
     await user.click(screen.getByLabelText('Sending it back'))
     expect(screen.queryByRole('button', { name: 'Confirm: record it' })).not.toBeInTheDocument()
@@ -397,54 +542,89 @@ describe('ArrivalForm', () => {
   it('sends a card back only for an allowed reason', async () => {
     const user = userEvent.setup()
     const posts = stubApi([], null, () => respond(201, []))
-    render(<ArrivalForm path="/api/orgs/b1/deals/l1" price={deal.offer.price} onSaved={vi.fn()} />)
+    render(<OpenArrivalForm onSaved={vi.fn()} />)
 
+    await openArrival(user)
     await user.click(screen.getByLabelText('Sending it back'))
-    expect(screen.queryByLabelText('Price paid')).not.toBeInTheDocument()
     // No reason is picked for the buyer: it's data, and a default would skew it.
     expect(screen.getByLabelText('Return reason')).toHaveValue('')
     expect(screen.getByLabelText('Return reason')).toBeRequired()
     await user.click(screen.getByRole('button', { name: 'Record' }))
     expect(posts).toHaveLength(0)
-    await user.selectOptions(screen.getByLabelText('Return reason'), 'NOT_GENUINE')
+    await user.selectOptions(screen.getByLabelText('Return reason'), 'DOES_NOT_MATCH_PHOTOS')
     await user.click(screen.getByRole('button', { name: 'Record' }))
     await user.click(screen.getByRole('button', { name: 'Confirm: record it' }))
 
     await waitFor(() => expect(posts).toHaveLength(1))
-    expect(posts[0]).toEqual({ url: '/api/orgs/b1/deals/l1/returned', body: { reason: 'NOT_GENUINE', note: null } })
+    expect(posts[0]).toEqual({ url: '/api/orgs/b1/deals/l1/returned', body: { reason: 'DOES_NOT_MATCH_PHOTOS', note: null } })
+  })
+
+  it('needs a note and a plain warning before calling a card not genuine', async () => {
+    const user = userEvent.setup()
+    const posts = stubApi([], null, () => respond(201, []))
+    render(<OpenArrivalForm onSaved={vi.fn()} />)
+
+    await openArrival(user)
+    await user.click(screen.getByLabelText('Sending it back'))
+    expect(screen.getByLabelText('Note')).not.toBeRequired()
+    await user.selectOptions(screen.getByLabelText('Return reason'), 'NOT_GENUINE')
+    expect(screen.getByLabelText('Note')).toBeRequired()
+    await user.click(screen.getByRole('button', { name: 'Record' }))
+    expect(screen.queryByRole('button', { name: /^Confirm/ })).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Note'), 'wrong font on the back')
+    await user.click(screen.getByRole('button', { name: 'Record' }))
+    expect(screen.getByText(/they see it with your note, and Zach reviews it/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: "Confirm: it isn't genuine" }))
+
+    await waitFor(() => expect(posts[0]).toEqual({ url: '/api/orgs/b1/deals/l1/returned', body: { reason: 'NOT_GENUINE', note: 'wrong font on the back' } }))
+  })
+
+  it('lets the admin record for the buyer, saying how it shipped', async () => {
+    const user = userEvent.setup()
+    const posts = stubApi([], null, () => respond(201, []))
+    render(<ArrivalForm path="/api/admin/deals/l1?buyerOrgId=b1" onSaved={vi.fn()} noteRequired />)
+
+    await user.click(screen.getByLabelText('Arrived as shown'))
+    expect(screen.getByLabelText('Note')).toBeRequired()
+    await user.type(screen.getByLabelText('Note'), 'own stamps')
+    await user.click(screen.getByRole('button', { name: 'Record' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm: record it' }))
+    await waitFor(() => expect(posts[0]).toEqual({ url: '/api/admin/deals/l1/received?buyerOrgId=b1', body: { note: 'own stamps' } }))
+  })
+})
+
+describe('PaidForm', () => {
+  it('records the price paid, prefilled with the offer, and asks once more', async () => {
+    const user = userEvent.setup()
+    const posts = stubApi([], null, () => respond(201, []))
+    const onSaved = vi.fn()
+    render(<PaidForm path="/api/orgs/b1/deals/l1" price={419.98} onSaved={onSaved} />)
+
+    expect(screen.getByLabelText('Price paid')).toHaveValue('419.98')
+    await user.click(screen.getByRole('button', { name: "I've paid" }))
+    expect(posts).toHaveLength(0)
+    expect(screen.getByText(/Record that you paid \$419\.98\?/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirm: record it' }))
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(posts[0]).toEqual({ url: '/api/orgs/b1/deals/l1/paid', body: { pricePaid: 419.98, note: null } })
   })
 
   it('needs a reason when the amount paid differs from the offer', async () => {
     const user = userEvent.setup()
     const posts = stubApi([], null, () => respond(201, []))
-    render(<ArrivalForm path="/api/orgs/b1/deals/l1" price={deal.offer.price} onSaved={vi.fn()} />)
+    render(<PaidForm path="/api/orgs/b1/deals/l1" price={419.98} onSaved={vi.fn()} />)
 
-    await user.click(screen.getByLabelText('Arrived as shown, paid'))
     expect(screen.getByLabelText('Note')).not.toBeRequired()
     await user.clear(screen.getByLabelText('Price paid'))
     await user.type(screen.getByLabelText('Price paid'), '95')
     expect(screen.getByLabelText('Note')).toBeRequired()
-    await user.click(screen.getByRole('button', { name: 'Record' }))
-    expect(posts).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: "I've paid" }))
+    expect(screen.queryByRole('button', { name: 'Confirm: record it' })).not.toBeInTheDocument()
     await user.type(screen.getByLabelText('Note'), 'agreed a discount')
-    await user.click(screen.getByRole('button', { name: 'Record' }))
+    await user.click(screen.getByRole('button', { name: "I've paid" }))
     await user.click(screen.getByRole('button', { name: 'Confirm: record it' }))
-    await waitFor(() => expect(posts[0]).toEqual({ url: '/api/orgs/b1/deals/l1/received', body: { pricePaid: 95, note: 'agreed a discount' } }))
-  })
-
-  it("lets the admin record for the buyer, saying how it shipped", async () => {
-    const user = userEvent.setup()
-    const posts = stubApi([], null, () => respond(201, []))
-    render(<ArrivalForm path="/api/admin/deals/l1?buyerOrgId=b1" price={deal.offer.price} onSaved={vi.fn()} noteRequired />)
-
-    await user.click(screen.getByLabelText('Arrived as shown, paid'))
-    expect(screen.getByLabelText('Note')).toBeRequired()
-    await user.type(screen.getByLabelText('Note'), 'own stamps')
-    await user.click(screen.getByRole('button', { name: 'Record' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm: record it' }))
-    await waitFor(() =>
-      expect(posts[0]).toEqual({ url: '/api/admin/deals/l1/received?buyerOrgId=b1', body: { pricePaid: 419.98, note: 'own stamps' } }),
-    )
+    await waitFor(() => expect(posts[0]).toEqual({ url: '/api/orgs/b1/deals/l1/paid', body: { pricePaid: 95, note: 'agreed a discount' } }))
   })
 })
 
@@ -459,6 +639,8 @@ describe('DealsPage', () => {
     label: null,
     outcome: null,
     cancelled: null,
+    payTo: null,
+    progress: null,
   }
 
   function renderDeals(deals: Deal[]) {
@@ -483,8 +665,50 @@ describe('DealsPage', () => {
     renderDeals([
       { ...deal, label: { carrier: 'USPS', service: 'Ground', trackingCode: '94', labelUrl: 'https://l', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' } },
     ])
-    expect(await screen.findByLabelText('Arrived as shown, paid')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'It arrived' })).toBeInTheDocument()
     expect(screen.getByText(/Pay them directly, within 7 days of it arriving as shown/)).toBeInTheDocument()
+  })
+
+  const progress: DealProgress = {
+    stage: 'ARRIVED', shippedAt: null, arrivedAt: '2026-10-24T10:00:00Z', payBy: '2026-10-31T10:00:00Z', paidAt: null, pricePaid: null, paidNote: null,
+    confirmedAt: null, disputedAt: null, disputeNote: null, review: null, held: false, cardBackAt: null,
+  }
+  const outcome = { type: 'RECEIVED' as const, pricePaid: null, note: null, returnedReason: null, inspectedGrade: null, recordedAt: '2026-10-24T10:00:00Z' }
+
+  it('shows where to pay and by when, once the card arrived', async () => {
+    renderDeals([{ ...deal, outcome, progress, payTo: { method: 'VENMO', handle: '@sam-cards' } }])
+    expect(await screen.findByText('@sam-cards')).toBeInTheDocument()
+    expect(screen.getByText('Venmo')).toBeInTheDocument()
+    expect(screen.getByText(new Date('2026-10-31T10:00:00Z').toLocaleDateString())).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: "I've paid" })).toBeInTheDocument()
+  })
+
+  it('stops asking once the buyer has paid, and shows what the seller said', async () => {
+    renderDeals([
+      {
+        ...deal,
+        outcome,
+        progress: { ...progress, stage: 'PAID', paidAt: '2026-10-25T10:00:00Z', pricePaid: 419.98, disputedAt: '2026-10-26T10:00:00Z' },
+        payTo: { method: 'VENMO', handle: '@sam-cards' },
+      },
+    ])
+    expect(await screen.findByText(/You recorded paying \$419\.98/)).toBeInTheDocument()
+    expect(screen.getByText(/saying they haven't been paid/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: "I've paid" })).not.toBeInTheDocument()
+    expect(screen.queryByText('@sam-cards')).not.toBeInTheDocument()
+  })
+
+  it('says what to do with a card going back, as a warning', async () => {
+    renderDeals([
+      {
+        ...deal,
+        outcome: { ...outcome, type: 'RETURNED', returnedReason: 'DOES_NOT_MATCH_PHOTOS', note: 'crease' },
+        progress: { ...progress, stage: 'RETURNED', arrivedAt: null, payBy: null },
+      },
+    ])
+    expect(await screen.findByText("Returned: doesn't match its photos.")).toBeInTheDocument()
+    expect(screen.getByText(/Send it back tracked, at your cost/).closest('.alert')).toHaveClass('alert-warning')
+    expect(screen.queryByText(/hasn't said how to pay/)).not.toBeInTheDocument()
   })
 })
 
@@ -500,6 +724,8 @@ describe('DealsPage', () => {
       label: null,
       outcome: null,
       cancelled: { reason: 'seller sold it elsewhere', at: '2026-10-21T10:00:00Z' },
+      payTo: null,
+      progress: null,
     }
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(respond(200, [cancelled]))))
     render(

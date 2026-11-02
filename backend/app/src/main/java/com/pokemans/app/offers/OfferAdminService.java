@@ -22,8 +22,9 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * The admin's undo for instant offers (Zach, 2026-10-21), by appending, never editing: void an offer
  * (taking it off the market if it's posted), cancel a deal a buyer took, and mark a cancelled deal's
- * label to be refunded. Each is a new row with who, when and why. No access checks: /api/admin/**
- * needs the admin role after an MFA login (SecurityConfig).
+ * label to be refunded. Each is a new row with who, when and why. Also what's waiting for the admin
+ * after a sale: a seller who says they weren't paid, and returns to review. No access checks:
+ * /api/admin/** needs the admin role after an MFA login (SecurityConfig).
  */
 @Service
 class OfferAdminService {
@@ -46,6 +47,21 @@ class OfferAdminService {
 
     record Offer(UUID offerId, UUID orgId, String sellerName, UUID cardItemId, ListingService.CardView card, BigDecimal price,
                  BigDecimal fmv, String confidence, Instant createdAt, Instant expiresAt, boolean expired, Undo voided, Listing listing) {
+    }
+
+    /** NOT_PAID: the seller says they weren't paid. RETURNED: a return to review. RETURN_DISPUTED: the seller disagrees with one. */
+    enum AttentionKind { NOT_PAID, RETURNED, RETURN_DISPUTED }
+
+    /**
+     * Something on a deal the admin has to act on.
+     *
+     * @param note     what the seller or buyer said, if anything
+     * @param outcome  the return, or the arrival, if recorded
+     * @param progress what each side has said so far
+     */
+    record Attention(UUID listingId, AttentionKind kind, Instant since, String note, UUID sellerOrgId, UUID cardItemId,
+                     ListingService.CardView card, BigDecimal price, ListingService.Party buyer, ListingService.Party seller,
+                     String trackingCode, ListingService.OutcomeView outcome, ListingService.Progress progress) {
     }
 
     private final CardOfferRepository offers;
@@ -76,6 +92,50 @@ class OfferAdminService {
     @Transactional(readOnly = true)
     List<Offer> recent() {
         return views(offers.findTop200ByOrderByCreatedAtDesc());
+    }
+
+    /** Deals waiting for the admin, longest-waiting first. */
+    @Transactional(readOnly = true)
+    List<Attention> attention() {
+        List<SaleListing> taken = listings.findAllAccepted();
+        Map<UUID, List<ListingEvent>> history = listingService.history(taken);
+        List<Attention> waiting = new ArrayList<>();
+        for (SaleListing l : taken) {
+            List<ListingEvent> h = history.getOrDefault(l.getId(), List.of());
+            ListingEvent raised = ListingService.awaitingAdmin(h);
+            if (raised == null) {
+                continue;
+            }
+            ListingService.OutcomeView outcome = ListingService.outcome(h);
+            boolean returned = outcome != null && outcome.type().equals("RETURNED");
+            AttentionKind kind = raised.getType() == ListingEvent.Type.RETURNED ? AttentionKind.RETURNED
+                    : returned ? AttentionKind.RETURN_DISPUTED : AttentionKind.NOT_PAID;
+            ListingEvent accepted = h.stream().filter(e -> e.getType() == ListingEvent.Type.ACCEPTED).findFirst().orElseThrow();
+            CardOffer offer = offers.findById(l.getOfferId()).orElseThrow();
+            var buyer = directory.contact(accepted.getActorOrgId(), accepted.getActorUserId());
+            var seller = directory.contact(l.getOrgId(), l.getListedBy());
+            waiting.add(new Attention(l.getId(), kind, raised.getCreatedAt(), raised.getNote(), l.getOrgId(), l.getCardItemId(),
+                    ListingService.card(OfferService.inputs(offer)), offer.getPrice(),
+                    new ListingService.Party(buyer.orgName(), buyer.email()), new ListingService.Party(seller.orgName(), seller.email()),
+                    shipping.label(l.getId()).map(ShippingLabel::getTrackingCode).orElse(null), outcome, ListingService.progress(h)));
+        }
+        waiting.sort(Comparator.comparing(Attention::since));
+        return waiting;
+    }
+
+    /**
+     * Closes what's waiting on a deal, saying how: both sides see the note. For a "not genuine" return
+     * it also lifts the hold on a new offer, so a card that looks fake gets its counterfeit finding first.
+     */
+    @Transactional
+    void resolve(UUID listingId, String how) {
+        SaleListing listing = listings.findById(listingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Deal not found"));
+        lockCard(listing.getCardItemId());
+        if (ListingService.awaitingAdmin(listingService.history(List.of(listing)).getOrDefault(listingId, List.of())) == null) {
+            throw conflict("Nothing is waiting on this deal.");
+        }
+        events.saveAndFlush(ListingEvent.resolved(listingId, currentUser.id(), how));
     }
 
     /**
@@ -118,6 +178,7 @@ class OfferAdminService {
         switch (ListingService.status(listing, history, Instant.now())) {
             case ACCEPTED -> { }
             case CANCELLED -> throw conflict("This deal is already cancelled.");
+            case BACK -> throw conflict("This card already came back to the seller.");
             default -> throw conflict("No buyer has taken this card, so there's no deal to cancel: void the offer instead.");
         }
         ListingService.OutcomeView outcome = ListingService.outcome(history);
