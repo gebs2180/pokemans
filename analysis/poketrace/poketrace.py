@@ -327,15 +327,17 @@ def check(root, comps_csv=None, today=None):
         rows = history_rows(root, card["poketrace_id"])
         by_card[card["poketrace_id"]] = rows
         for tier in sorted({t for t, _, _ in rows}, key=tier_order):
-            days = sorted((d, r) for (t, s, d), r in rows.items() if t == tier and d)
-            sold = [(d, r) for d, r in days if (r.get("saleCount") or 0) > 0]
-            recent = sum(r.get("saleCount") or 0 for d, r in sold if d >= since)
+            days = sorted(((d, str(s), r) for (t, s, d), r in rows.items() if t == tier and d), key=lambda x: x[:2])
+            sold = [(d, s, r) for d, s, r in days if (r.get("saleCount") or 0) > 0]
+            recent = sum(r.get("saleCount") or 0 for d, _, r in sold if d >= since)
             lines.append(f"| {card['name']} ({card['set']}) | {tier} | {days[0][0] if days else ''} | "
-                         f"{days[-1][0] if days else ''} | {len(sold)} | {recent} |")
-            for (d0, a), (d1, b) in zip(sold, sold[1:]):
-                total += 1
-                if a.get("saleCount") == b.get("saleCount") and a.get("avg") == b.get("avg"):
-                    repeats += 1
+                         f"{days[-1][0] if days else ''} | {len({d for d, _, _ in sold})} | {recent} |")
+            for source in {s for _, s, _ in sold}:
+                series = [r for _, s, r in sold if s == source]
+                for a, b in zip(series, series[1:]):
+                    total += 1
+                    if a.get("saleCount") == b.get("saleCount") and a.get("avg") == b.get("avg"):
+                        repeats += 1
     share = repeats / total if total else 0
     lines += ["", f"**Daily sales or rolling windows?** {repeats} of {total} consecutive sale days repeat the previous "
                   f"day's count and average exactly ({share:.0%}). "

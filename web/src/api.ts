@@ -337,6 +337,7 @@ export type CardCondition = {
   requests: PredictionRequestView[]
   predictions: Prediction[]
   assessments: Assessment[]
+  centeringCap: number | null
 }
 
 export const OUTCOMES = ['U', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const

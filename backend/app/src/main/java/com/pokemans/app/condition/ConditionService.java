@@ -235,15 +235,35 @@ class ConditionService {
                 null, reason, basis));
     }
 
-    /** The reviewer's own distribution: a new current version, with the change from the previous one recorded. */
+    /**
+     * The reviewer's own distribution: a new current version, with the change from the previous one
+     * recorded. It isn't capped for them, since that would rewrite what they entered, but going above the
+     * measured centering takes {@code overrideCenteringCap}: a measurement can be wrong, and the override
+     * is on the record with the reason.
+     */
     @Transactional
-    ConditionAssessment reviewerAssessment(UUID orgId, UUID cardId, GradeDistribution distribution, Confidence confidence, String reason) {
+    ConditionAssessment reviewerAssessment(UUID orgId, UUID cardId, GradeDistribution distribution, Confidence confidence, String reason,
+                                           boolean overrideCenteringCap) {
         CardItems.CardItemRef card = requireCard(orgId, cardId);
         ConditionAssessment current = assessments.findByCardItemIdAndIsCurrentTrue(cardId).orElse(null);
+        List<ProviderPrediction> all = predictions.findByCardItemIdOrderByCreatedAtDesc(cardId);
+        Integer cap = ProviderPrediction.centeringCap(all);
+        boolean aboveCap = cap != null && distribution.asMap().entrySet().stream().anyMatch(e -> e.getKey().number() > cap && e.getValue().signum() > 0);
+        if (aboveCap && !overrideCenteringCap) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Measured centering allows PSA " + cap + " at best");
+        }
         Map<String, Object> basis = new LinkedHashMap<>();
         basis.put("previousVersion", current == null ? null : current.getVersion());
-        basis.put("predictionIds", latestSuccessful(cardId).values().stream().map(p -> p.getId().toString()).toList());
+        basis.put("predictionIds", ProviderPrediction.latestSucceeded(all).values().stream().map(p -> p.getId().toString()).toList());
+        basis.put("centeringCap", cap);
+        basis.put("centeringCapOverridden", aboveCap);
         return save(card, current, distribution, confidence, ConditionAssessment.AuthorType.REVIEWER, currentUser.id(), reason, basis);
+    }
+
+    /** The best grade the measured centering allows, or null with nothing measured. */
+    @Transactional(readOnly = true)
+    Integer centeringCap(UUID cardId) {
+        return ProviderPrediction.centeringCap(predictions.findByCardItemIdOrderByCreatedAtDesc(cardId));
     }
 
     private ConditionAssessment save(CardItems.CardItemRef card, ConditionAssessment current, GradeDistribution distribution,
@@ -278,10 +298,6 @@ class ConditionService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Card not found");
         }
         return card;
-    }
-
-    private Map<String, ProviderPrediction> latestSuccessful(UUID cardId) {
-        return ProviderPrediction.latestSucceeded(predictions.findByCardItemIdOrderByCreatedAtDesc(cardId));
     }
 
     static Optional<CardItems.PhotoRef> latest(List<CardItems.PhotoRef> photos, String side) {
