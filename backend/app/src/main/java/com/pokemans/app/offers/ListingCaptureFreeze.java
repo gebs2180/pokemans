@@ -8,8 +8,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
- * A card's photos stay as buyers saw them once it is posted, and for good once it is sold: the buyer
- * terms let a card go back when it doesn't match its photos, so neither side may change them.
+ * A card's photos stay as buyers saw them once it is posted, and once it is sold until it's back with
+ * the seller after a return: the buyer terms let a card go back when it doesn't match its photos, so
+ * neither side may change them while that can still happen.
  */
 @Component
 class ListingCaptureFreeze implements CaptureFreeze {

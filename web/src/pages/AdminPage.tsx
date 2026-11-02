@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type Org, type OrgType } from '../api'
+import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention, type Org, type OrgType } from '../api'
 import { useLoad } from '../useLoad'
 
 export function AdminPage() {
   const api = useApi()
   const { data: orgs, error, reload } = useLoad(() => api<Org[]>('GET', '/api/admin/orgs'), [api])
+  const { data: attention } = useLoad(() => api<DealAttention[]>('GET', '/api/admin/deals/attention'), [api])
   const [name, setName] = useState('')
   // The offers beta needs collector and buyer orgs; partner orgs are for the paused collateral side.
   const [type, setType] = useState<OrgType>('COLLECTOR')
@@ -48,7 +49,7 @@ export function AdminPage() {
     <>
       <p>
         <Link to="/admin/review">Review queue →</Link> · <Link to="/admin/outcomes">Graded results to check →</Link> ·{' '}
-        <Link to="/admin/deals">Offers and deals →</Link> · <Link to="/admin/offers">Offer track record →</Link> ·{' '}
+        <Link to="/admin/deals">Offers and deals{attention && attention.length > 0 && ` (${attention.length} need you)`} →</Link> · <Link to="/admin/offers">Offer track record →</Link> ·{' '}
         <Link to="/admin/labels">Labels to buy →</Link> ·{' '}
         <Link to="/admin/shipping">Postage to bill →</Link> · <Link to="/admin/centering">Centering labels →</Link>
       </p>

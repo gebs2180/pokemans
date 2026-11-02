@@ -4,6 +4,7 @@ import {
   apiPath,
   money,
   parseMoney,
+  PAYMENT_METHOD,
   RETURN_REASON,
   SIDE_LABEL,
   useApi,
@@ -223,8 +224,19 @@ export function DealsPage() {
               </>
             )}
             .
-            {!deal.cancelled && !deal.outcome && ' Pay them directly, within 7 days of it arriving as shown.'}
+            {!deal.cancelled && !deal.outcome && ' Pay them directly, within 7 days of it arriving as shown. Rawmark doesn\'t handle the money.'}
           </p>
+          {deal.payTo ? (
+            !deal.progress?.paidAt && (
+              <p className="small">
+                Pay them by <strong>{PAYMENT_METHOD[deal.payTo.method]}</strong>: <strong>{deal.payTo.handle}</strong>
+              </p>
+            )
+          ) : (
+            !deal.cancelled &&
+            !deal.progress?.paidAt &&
+            deal.outcome?.type !== 'RETURNED' && <p className="muted small">The seller hasn't said how to pay them yet: email them, or check back here.</p>
+          )}
           {deal.cancelled ? (
             <p className="alert alert-danger">
               We cancelled this deal on {new Date(deal.cancelled.at).toLocaleDateString()}: {deal.cancelled.reason}. You don't pay for
@@ -246,13 +258,9 @@ export function DealsPage() {
             </div>
           )}
           {deal.outcome ? (
-            <p className="alert alert-success">
-              {deal.outcome.type === 'RECEIVED' && `Arrived; you recorded paying ${money(deal.outcome.pricePaid)}.`}
-              {deal.outcome.type === 'RETURNED' && deal.outcome.returnedReason && `Returned: ${RETURN_REASON[deal.outcome.returnedReason]}.`}
-              {deal.outcome.type === 'INSPECTED' && `Inspected at PSA ${deal.outcome.inspectedGrade}.`}
-            </p>
+            <DealOutcome deal={deal} path={apiPath`/api/orgs/${orgId}/deals/${deal.listingId}`} onSaved={reload} />
           ) : deal.cancelled ? null : deal.label ? (
-            <ArrivalForm path={apiPath`/api/orgs/${orgId}/deals/${deal.listingId}`} price={deal.offer.price} onSaved={reload} />
+            <ArrivalForm path={apiPath`/api/orgs/${orgId}/deals/${deal.listingId}`} onSaved={reload} />
           ) : (
             <p className="muted small">Once the label is bought and the card ships, record here how it arrived.</p>
           )}
@@ -262,32 +270,165 @@ export function DealsPage() {
   )
 }
 
+/** What's been recorded on a deal, and what the buyer does next: pay by the date, or send it back. */
+function DealOutcome({ deal, path, onSaved }: { deal: Deal; path: string; onSaved: () => void }) {
+  const { outcome, progress } = deal
+  const date = (at: string) => new Date(at).toLocaleDateString()
+  return (
+    <>
+      {outcome?.type === 'RECEIVED' && (
+        <div className={progress?.paidAt ? 'alert alert-success' : 'alert alert-info'}>
+          <p>Arrived on {date(outcome.recordedAt)}.</p>
+          {progress?.paidAt ? (
+            <p>
+              You recorded paying {money(progress.pricePaid)} on {date(progress.paidAt)}.
+            </p>
+          ) : (
+            progress?.payBy && (
+              <p>
+                Pay {money(deal.offer.price)} by <strong>{date(progress.payBy)}</strong>.
+              </p>
+            )
+          )}
+          {progress?.confirmedAt && <p>The seller confirmed they got paid.</p>}
+        </div>
+      )}
+      {outcome?.type === 'RETURNED' && outcome.returnedReason && (
+        <div className="alert alert-warning">
+          <p>Returned: {RETURN_REASON[outcome.returnedReason]}.</p>
+          {outcome.note && <p>You said: "{outcome.note}"</p>}
+          {progress?.stage === 'BACK' ? (
+            <p className="small">The seller has it back.</p>
+          ) : (
+            <p className="small">Send it back tracked, at your cost, within 7 days of it arriving. You don't pay for it. Zach looks at every return.</p>
+          )}
+        </div>
+      )}
+      {outcome?.type === 'INSPECTED' && <p className="alert alert-success">Inspected at PSA {outcome.inspectedGrade}.</p>}
+      {progress?.disputedAt && (
+        <p className="alert alert-warning small">
+          The seller told us about this deal on {date(progress.disputedAt)}
+          {outcome?.type !== 'RETURNED' && ", saying they haven't been paid"}. Zach will be in touch.
+        </p>
+      )}
+      {progress?.review && (
+        <p className="small">
+          From Zach, {date(progress.review.at)}: {progress.review.reason}
+        </p>
+      )}
+      {outcome?.type === 'RECEIVED' && !progress?.paidAt && <PaidForm path={path} price={deal.offer.price} onSaved={onSaved} />}
+    </>
+  )
+}
+
 /**
- * Once the card is in hand: it came as shown and you paid, or it goes back for one of the allowed reasons.
+ * Once you've paid the seller, off the app. Only a record of what you did: Rawmark doesn't handle the money.
  *
- * @param path the deal's API path: the buyer's, or the admin's (which adds ?buyerOrgId and needs a note)
+ * @param path the deal's API path
  * @param price the firm price: paying anything else needs a reason
  */
-export function ArrivalForm({
-  path,
-  price,
-  onSaved,
-  noteRequired = false,
-}: {
-  path: string
-  price: number
-  onSaved: () => void
-  noteRequired?: boolean
-}) {
+export function PaidForm({ path, price, onSaved }: { path: string; price: number; onSaved: () => void }) {
   const api = useApi()
+  const [paid, setPaid] = useState(String(price))
+  const [note, setNote] = useState('')
+  const differs = parseMoney(paid) !== price
+  const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const formError = useFormError(error)
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (!confirming) {
+      setConfirming(true)
+      return
+    }
+    setBusy(true)
+    try {
+      await api('POST', `${path}/paid`, { pricePaid: parseMoney(paid), note: note || null })
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="form" aria-describedby={formError.describedBy}>
+      <h3>Once you've paid</h3>
+      <Field label="Price paid ($)" hint={differs ? `That's not the ${money(price)} offer: say why in the note.` : undefined}>
+        {(control) => (
+          <MoneyInput
+            {...control}
+            value={paid}
+            onChange={(v) => {
+              setConfirming(false)
+              setPaid(v)
+            }}
+            min={0}
+            className="narrow"
+            aria-label="Price paid"
+            required
+          />
+        )}
+      </Field>
+      <Field label={differs ? 'Note' : 'Note (optional)'}>
+        {(control) => (
+          <input
+            {...control}
+            value={note}
+            onChange={(e) => {
+              setConfirming(false)
+              setNote(e.target.value)
+            }}
+            placeholder={differs ? 'Why you paid a different amount' : 'Note (optional)'}
+            aria-label="Note"
+            maxLength={2000}
+            required={differs}
+          />
+        )}
+      </Field>
+      {confirming ? (
+        <div className="confirm">
+          <p>Record that you paid {money(parseMoney(paid))}? It can't be changed afterwards, and the seller sees it.</p>
+          <div className="actions">
+            <button type="submit" disabled={busy} aria-busy={busy}>
+              Confirm: record it
+            </button>
+            <button type="button" className="secondary" onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="actions">
+          <button type="submit">I've paid</button>
+        </div>
+      )}
+      {formError.message}
+    </form>
+  )
+}
+
+/**
+ * Once the card is in hand: it came as shown, or it goes back for one of the allowed reasons. Paying is a
+ * step of its own, since the buyer has 7 days.
+ *
+ * @param path the deal's API path: the buyer's, or the admin's (which adds ?buyerOrgId and needs a note)
+ */
+export function ArrivalForm({ path, onSaved, noteRequired = false }: { path: string; onSaved: () => void; noteRequired?: boolean }) {
+  const api = useApi()
+  // Hidden behind "It arrived", so nothing can be recorded the minute a card is bought. The admin came here to record one.
+  const [open, setOpen] = useState(noteRequired)
   // No default for either: nothing can be recorded by accident, and a preselected reason would skew the data.
   const [choice, setChoice] = useState<'arrived' | 'returning' | null>(null)
   const returning = choice === 'returning'
-  const [paid, setPaid] = useState(String(price))
   const [reason, setReason] = useState<DeclinedReason | ''>('')
   const [note, setNote] = useState('')
-  const differs = choice === 'arrived' && parseMoney(paid) !== price
-  const needsNote = noteRequired || differs
+  const notGenuine = returning && reason === 'NOT_GENUINE'
+  const needsNote = noteRequired || notGenuine
   const [busy, setBusy] = useState(false)
   // Recording can't be undone, and the seller sees it: it asks once more, and any change asks again.
   const [confirming, setConfirming] = useState(false)
@@ -308,7 +449,7 @@ export function ArrivalForm({
       if (returning) {
         await api('POST', `${base}/returned${suffix}`, { reason, note: note || null })
       } else {
-        await api('POST', `${base}/received${suffix}`, { pricePaid: parseMoney(paid), note: note || null })
+        await api('POST', `${base}/received${suffix}`, { note: note || null })
       }
       onSaved()
     } catch (err) {
@@ -326,13 +467,22 @@ export function ArrivalForm({
     }
   }
 
+  if (!open) {
+    return (
+      <div className="actions">
+        <button className="secondary" onClick={() => setOpen(true)}>
+          It arrived
+        </button>
+      </div>
+    )
+  }
   return (
     <form onSubmit={save} className="form" aria-describedby={formError.describedBy}>
       <h3>When it arrives</h3>
       <p className="muted small">Record this once the card is in your hands. It can't be changed afterwards, and the seller sees it.</p>
       <div className="choices">
         <label className="choice">
-          <input type="radio" name="arrival" checked={choice === 'arrived'} onChange={() => changing(setChoice)('arrived')} /> Arrived as shown, paid
+          <input type="radio" name="arrival" checked={choice === 'arrived'} onChange={() => changing(setChoice)('arrived')} /> Arrived as shown
         </label>
         <label className="choice">
           <input type="radio" name="arrival" checked={returning} onChange={() => changing(setChoice)('returning')} /> Sending it back
@@ -360,11 +510,6 @@ export function ArrivalForm({
           )}
         </Field>
       )}
-      {choice === 'arrived' && (
-        <Field label="Price paid ($)" hint={differs ? `That's not the ${money(price)} offer: say why in the note.` : undefined}>
-          {(control) => <MoneyInput {...control} value={paid} onChange={changing(setPaid)} min={0} className="narrow" aria-label="Price paid" required />}
-        </Field>
-      )}
       {choice && (
         <Field label={needsNote ? 'Note' : 'Note (optional)'}>
           {(control) => (
@@ -372,7 +517,7 @@ export function ArrivalForm({
               {...control}
               value={note}
               onChange={(e) => changing(setNote)(e.target.value)}
-              placeholder={noteRequired ? 'How the card shipped, or why this is recorded by hand' : differs ? 'Why you paid a different amount' : 'Note (optional)'}
+              placeholder={noteRequired ? 'How the card shipped, or why this is recorded by hand' : notGenuine ? "Why you think it isn't genuine" : 'Note (optional)'}
               aria-label="Note"
               maxLength={2000}
               required={needsNote}
@@ -384,13 +529,15 @@ export function ArrivalForm({
         (confirming ? (
           <div className="confirm">
             <p>
-              {returning
-                ? `Record that you're sending it back: ${RETURN_REASON[reason as DeclinedReason]}?`
-                : `Record that it arrived as shown and you paid ${money(parseMoney(paid))}?`}
+              {notGenuine
+                ? "Say this card isn't genuine? That's a serious thing to tell a seller: they see it with your note, and Zach reviews it."
+                : returning
+                  ? `Record that you're sending it back: ${RETURN_REASON[reason as DeclinedReason]}?`
+                  : 'Record that it arrived as shown? The 7 days to pay start now.'}
             </p>
             <div className="actions">
-              <button type="submit" disabled={busy} aria-busy={busy}>
-                Confirm: record it
+              <button type="submit" className={notGenuine ? 'danger' : undefined} disabled={busy} aria-busy={busy}>
+                {notGenuine ? "Confirm: it isn't genuine" : 'Confirm: record it'}
               </button>
               <button type="button" className="secondary" onClick={() => setConfirming(false)}>
                 Cancel

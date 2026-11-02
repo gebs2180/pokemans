@@ -183,12 +183,18 @@ class SaleListing {
 class ListingEvent {
 
     /**
-     * RECEIVED: arrived genuine and as shown, and the buyer paid. RETURNED: sent back for an allowed
-     * reason. INSPECTED: a grade recorded under the per-grade offers that came before firm prices.
-     * VOIDED: we took an open listing down, with its offer. CANCELLED: we undid a taken deal. Both are
-     * the admin's, with no actor org and the reason in the note (Zach, 2026-10-21).
+     * RECEIVED: arrived genuine and as shown; with a price, it's from before PAID split off (UX review,
+     * 2026-11-01). RETURNED: sent back for an allowed reason. INSPECTED: a grade recorded under the
+     * per-grade offers that came before firm prices. VOIDED: we took an open listing down, with its
+     * offer. CANCELLED: we undid a taken deal. Both are the admin's, with no actor org and the reason in
+     * the note (Zach, 2026-10-21).
+     *
+     * <p>SHIPPED, PAYMENT_CONFIRMED, DISPUTED and CARD_BACK are what the seller says, PAID what the
+     * buyer says: a record of their word, since the money never passes through us. RESOLVED: the admin
+     * closed what was raised, with no actor org and how in the note.
      */
-    enum Type { ACCEPTED, WITHDRAWN, INSPECTED, RECEIVED, RETURNED, VOIDED, CANCELLED }
+    enum Type { ACCEPTED, WITHDRAWN, INSPECTED, RECEIVED, RETURNED, VOIDED, CANCELLED, SHIPPED, PAID, PAYMENT_CONFIRMED, DISPUTED,
+        CARD_BACK, RESOLVED }
 
     /** Why a buyer returns a card: the only reasons the buyer terms allow. */
     enum DeclinedReason { NOT_GENUINE, NOT_THE_LISTED_CARD, DOES_NOT_MATCH_PHOTOS }
@@ -228,11 +234,41 @@ class ListingEvent {
         return new ListingEvent(listingId, Type.WITHDRAWN, sellerOrgId, userId);
     }
 
-    static ListingEvent received(UUID listingId, UUID buyerOrgId, UUID userId, BigDecimal pricePaid, String note) {
+    static ListingEvent received(UUID listingId, UUID buyerOrgId, UUID userId, String note) {
         ListingEvent e = new ListingEvent(listingId, Type.RECEIVED, buyerOrgId, userId);
         e.authentic = true;
+        e.note = note;
+        return e;
+    }
+
+    static ListingEvent paid(UUID listingId, UUID buyerOrgId, UUID userId, BigDecimal pricePaid, String note) {
+        ListingEvent e = new ListingEvent(listingId, Type.PAID, buyerOrgId, userId);
         e.pricePaid = pricePaid;
         e.note = note;
+        return e;
+    }
+
+    static ListingEvent shipped(UUID listingId, UUID sellerOrgId, UUID userId) {
+        return new ListingEvent(listingId, Type.SHIPPED, sellerOrgId, userId);
+    }
+
+    static ListingEvent paymentConfirmed(UUID listingId, UUID sellerOrgId, UUID userId) {
+        return new ListingEvent(listingId, Type.PAYMENT_CONFIRMED, sellerOrgId, userId);
+    }
+
+    static ListingEvent disputed(UUID listingId, UUID sellerOrgId, UUID userId, String note) {
+        ListingEvent e = new ListingEvent(listingId, Type.DISPUTED, sellerOrgId, userId);
+        e.note = note;
+        return e;
+    }
+
+    static ListingEvent cardBack(UUID listingId, UUID sellerOrgId, UUID userId) {
+        return new ListingEvent(listingId, Type.CARD_BACK, sellerOrgId, userId);
+    }
+
+    static ListingEvent resolved(UUID listingId, UUID adminUserId, String how) {
+        ListingEvent e = new ListingEvent(listingId, Type.RESOLVED, null, adminUserId);
+        e.note = how;
         return e;
     }
 
