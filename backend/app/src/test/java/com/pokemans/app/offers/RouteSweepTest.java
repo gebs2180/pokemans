@@ -65,6 +65,8 @@ class RouteSweepTest {
             Map.entry("/api/orgs/{orgId}/cards/{cardId}/listings", "{\"offerId\":\"%OFFER%\"}"),
             Map.entry("/api/orgs/{orgId}/ship-address", TestMarket.ADDRESS.formatted("Thief")),
             Map.entry("/api/orgs/{orgId}/deals/{listingId}/received", "{\"pricePaid\":1}"),
+            Map.entry("/api/orgs/{orgId}/deals/{listingId}/paid", "{\"pricePaid\":1}"),
+            Map.entry("/api/orgs/{orgId}/listings/{listingId}/dispute", "{\"note\":\"x\"}"),
             Map.entry("/api/orgs/{orgId}/deals/{listingId}/returned", "{\"reason\":\"NOT_GENUINE\"}"));
 
     @Autowired

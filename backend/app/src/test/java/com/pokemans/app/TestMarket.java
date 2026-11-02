@@ -13,7 +13,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 /** Sellers, buyers and posted cards for tests that need a real market, built through the API. */
 public class TestMarket {
 
-    public static final String ADDRESS = "{\"name\":\"%s\",\"street1\":\"1 Main St\",\"city\":\"Springfield\",\"state\":\"IL\",\"zip\":\"62701\"}";
+    public static final String ADDRESS = "{\"name\":\"%s\",\"street1\":\"1 Main St\",\"city\":\"Springfield\",\"state\":\"IL\",\"zip\":\"62701\",\"paymentMethod\":\"PAYPAL\",\"paymentHandle\":\"paid@example.com\"}";
     private static final String NEAR_MINT = "{\"distribution\":{\"9\":0.5,\"10\":0.5},\"confidence\":\"A\",\"reason\":\"reviewed\"}";
     private static final LocalDate TODAY = LocalDate.now(ZoneOffset.UTC);
 
