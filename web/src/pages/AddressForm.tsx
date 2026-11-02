@@ -1,15 +1,52 @@
 import { useState, type FormEvent } from 'react'
-import { apiPath, useApi, type ShipAddress } from '../api'
+import { apiPath, PAYMENT_METHOD, useApi, type PaymentMethod, type ShipAddress } from '../api'
 import { Field } from '../ui'
 import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 
 const EMPTY = { name: '', company: '', street1: '', street2: '', city: '', state: '', zip: '', phone: '' }
 
-/** A US shipping address for the org: where a seller ships from, or a buyer's cards go to. */
-export function AddressForm({ orgId, onSaved }: { orgId: string; onSaved: () => void }) {
+const HANDLE_HINT: Record<PaymentMethod, string> = {
+  PAYPAL: 'The email on your PayPal account',
+  VENMO: 'Your Venmo username, e.g. @sam-cards',
+  ZELLE: 'The email or phone number on your Zelle',
+}
+
+/**
+ * A US shipping address for the org: where a seller ships from, or a buyer's cards go to.
+ *
+ * @param payment a seller's form: also asks how they get paid, which the buyer sees once they accept
+ * @param initial what's on file, so changing one line doesn't mean typing all of it again
+ */
+export function AddressForm({
+  orgId,
+  onSaved,
+  payment = false,
+  initial,
+}: {
+  orgId: string
+  onSaved: () => void
+  payment?: boolean
+  initial?: ShipAddress | null
+}) {
   const api = useApi()
-  const [a, setA] = useState(EMPTY)
+  const [a, setA] = useState(
+    initial
+      ? {
+          ...EMPTY,
+          name: initial.name,
+          company: initial.company ?? '',
+          street1: initial.street1,
+          street2: initial.street2 ?? '',
+          city: initial.city,
+          state: initial.state,
+          zip: initial.zip,
+          phone: initial.phone ?? '',
+        }
+      : EMPTY,
+  )
+  const [method, setMethod] = useState<PaymentMethod | ''>(initial?.paymentMethod ?? '')
+  const [handle, setHandle] = useState(initial?.paymentHandle ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const formError = useFormError(error)
@@ -24,6 +61,7 @@ export function AddressForm({ orgId, onSaved }: { orgId: string; onSaved: () => 
         company: a.company || null,
         street2: a.street2 || null,
         phone: a.phone || null,
+        ...(payment ? { paymentMethod: method, paymentHandle: handle } : {}),
       })
       onSaved()
     } catch (err) {
@@ -72,9 +110,34 @@ export function AddressForm({ orgId, onSaved }: { orgId: string; onSaved: () => 
         })}
       </div>
       {field('phone', 'Phone (optional, for the carrier)', { maxLength: 30, autoComplete: 'tel', type: 'tel' })}
+      {payment && (
+        <>
+          <h3>How do you want to be paid?</h3>
+          <p className="muted small">
+            The buyer pays you directly. We show them this only once they've bought your card. Rawmark doesn't handle the money.
+          </p>
+          <Field label="Pay me by">
+            {(control) => (
+              <select {...control} value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} required>
+                <option value="" disabled>
+                  choose one
+                </option>
+                {(Object.keys(PAYMENT_METHOD) as PaymentMethod[]).map((m) => (
+                  <option key={m} value={m}>
+                    {PAYMENT_METHOD[m]}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          <Field label="Your payment details" hint={method ? HANDLE_HINT[method] : undefined}>
+            {(control) => <input {...control} value={handle} onChange={(e) => setHandle(e.target.value)} required maxLength={100} />}
+          </Field>
+        </>
+      )}
       <div className="actions">
         <button type="submit" disabled={busy} aria-busy={busy}>
-          Save address
+          {payment ? 'Save' : 'Save address'}
         </button>
       </div>
       {formError.message}

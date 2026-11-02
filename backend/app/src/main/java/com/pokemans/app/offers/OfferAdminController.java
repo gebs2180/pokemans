@@ -33,6 +33,19 @@ class OfferAdminController {
         return admin.recent();
     }
 
+    /** Deals waiting for the admin: sellers who say they weren't paid, and returns to review. */
+    @GetMapping("/api/admin/deals/attention")
+    List<OfferAdminService.Attention> attention() {
+        return admin.attention();
+    }
+
+    /** Closes what's waiting on a deal. Both sides see the reason, and it lifts the hold on a "not genuine" return. */
+    @PostMapping("/api/admin/deals/{listingId}/resolve")
+    List<OfferAdminService.Attention> resolve(@PathVariable UUID listingId, @Valid @RequestBody ReasonBody body) {
+        admin.resolve(listingId, body.reason().strip());
+        return admin.attention();
+    }
+
     /** Voids an offer, and takes it off the market if it's posted. 409 once a buyer has taken it. */
     @PostMapping("/api/admin/offers/{offerId}/void")
     OfferAdminService.Offer voidOffer(@PathVariable UUID offerId, @Valid @RequestBody ReasonBody body) {

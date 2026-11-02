@@ -37,8 +37,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Firm instant offers end to end: a collector gets one price and posts it, two buyers race for it, the
- * winner's label is bought at once, and the buyer records the arrival or a return. Withdrawn and
- * ineligible cards get nowhere, and the track record counts all of it.
+ * winner's label is bought at once, the buyer records the arrival and the payment or a return, and the
+ * seller says what they got. Withdrawn and ineligible cards get nowhere, and the track record counts it.
  */
 @SpringBootTest(properties = "pokemans.condition.worker.enabled=false")
 @AutoConfigureMockMvc
@@ -49,6 +49,8 @@ class OffersFlowTest {
     private static final LocalDate TODAY = LocalDate.now(ZoneOffset.UTC);
     private static final String NEAR_MINT = "{\"distribution\":{\"9\":0.5,\"10\":0.5},\"confidence\":\"A\",\"reason\":\"reviewed\"}";
     private static final String ADDRESS = "{\"name\":\"%s\",\"street1\":\"1 Main St\",\"city\":\"Springfield\",\"state\":\"IL\",\"zip\":\"62701\"}";
+    private static final String SELLER_ADDRESS = "{\"name\":\"Sam\",\"street1\":\"1 Main St\",\"city\":\"Springfield\",\"state\":\"IL\",\"zip\":\"62701\","
+            + "\"paymentMethod\":\"VENMO\",\"paymentHandle\":\" @sam-sells \"}";
 
     @Autowired
     private MockMvc mvc;
@@ -104,9 +106,9 @@ class OffersFlowTest {
         // The seller needs an address before posting, since the label is bought on accept.
         api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail", containsString("address")));
-        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam").replace("62701", "627"), seller)
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS.replace("62701", "627"), seller)
                 .andExpect(status().isBadRequest());
-        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
         api.get("/api/orgs/" + orgId + "/ship-address", seller).andExpect(jsonPath("$.zip").value("62701"));
         api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.listing.status").value("OPEN"));
@@ -149,14 +151,21 @@ class OffersFlowTest {
 
         // On arrival: received and paid, once, by the buyer who took it.
         String received = "/api/orgs/" + firstOrg + "/deals/" + listingId + "/received";
-        api.postJson("/api/orgs/" + secondOrg + "/deals/" + listingId + "/received", "{\"pricePaid\":" + price + "}", second)
-                .andExpect(status().isNotFound());
-        api.postJson(received, "{}", first).andExpect(status().isBadRequest());
-        api.postJson(received, "{\"pricePaid\":" + price + "}", first).andExpect(status().isCreated())
-                .andExpect(jsonPath("$[0].outcome.type").value("RECEIVED"));
-        api.postJson("/api/orgs/" + firstOrg + "/deals/" + listingId + "/returned", "{\"reason\":\"NOT_GENUINE\"}", first)
+        String paid = "/api/orgs/" + firstOrg + "/deals/" + listingId + "/paid";
+        api.postJson("/api/orgs/" + secondOrg + "/deals/" + listingId + "/received", "{}", second).andExpect(status().isNotFound());
+        api.postJson(paid, "{\"pricePaid\":" + price + "}", first).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("arrived first")));
+        api.postJson(received, "{}", first).andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].outcome.type").value("RECEIVED"))
+                .andExpect(jsonPath("$[0].progress.stage").value("ARRIVED"))
+                .andExpect(jsonPath("$[0].progress.payBy").isNotEmpty());
+        api.postJson("/api/orgs/" + firstOrg + "/deals/" + listingId + "/returned", "{\"reason\":\"NOT_GENUINE\",\"note\":\"x\"}", first)
                 .andExpect(status().isConflict());
-        api.get(sale(card), seller).andExpect(jsonPath("$.listing.outcome.pricePaid").value(price));
+        api.postJson(paid, "{}", first).andExpect(status().isBadRequest());
+        api.postJson(paid, "{\"pricePaid\":" + price + "}", first).andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].progress.stage").value("PAID"));
+        api.postJson(paid, "{\"pricePaid\":" + price + "}", first).andExpect(status().isConflict());
+        api.get(sale(card), seller).andExpect(jsonPath("$.listing.progress.pricePaid").value(price));
 
         // The month's postage, per buyer, for billing.
         String charges = api.get("/api/admin/shipping/charges", api.admin()).andExpect(status().isOk()).andReturn().getResponse()
@@ -242,7 +251,7 @@ class OffersFlowTest {
         priceLadder(identify(card, "Lugia " + UUID.randomUUID().toString().substring(0, 4), "2015-05-06", "NORMAL", "Rare"), 300);
         assess(card);
         String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
-        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
         api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
         String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
 
@@ -301,6 +310,247 @@ class OffersFlowTest {
     }
 
     @Test
+    void theSellerFollowsTheDealFromSoldToPaid() throws Exception {
+        String card = pricedCard("Stage Umbreon", 300);
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+
+        // A seller says how they get paid along with where they ship from, and can't post without it.
+        String shipAddress = "/api/orgs/" + orgId + "/ship-address";
+        api.postJson(shipAddress, ADDRESS.formatted("Sam"), seller).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("how you'd like to be paid")));
+        // An address from before handles existed.
+        jdbc.update("insert into ship_address (id, org_id, name, street1, city, state, zip, country, recorded_by, created_at) "
+                + "select gen_random_uuid(), org_id, 'Sam', '1 Main St', 'Springfield', 'IL', '62701', 'US', created_by, now() "
+                + "from card_offer where id = ?::uuid", UUID.fromString(offerId));
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("how you'd like to be paid")));
+        api.postJson(shipAddress, SELLER_ADDRESS, seller).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.paymentMethod").value("VENMO"))
+                .andExpect(jsonPath("$.paymentHandle").value("@sam-sells"));
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
+
+        // Nobody learns the handle before they've bought, and a buyer gives none.
+        JwtRequestPostProcessor buyer = buyer("Stage Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Stage Buyer");
+        api.get("/api/orgs/" + buyerOrg + "/ship-address", buyer).andExpect(jsonPath("$.paymentHandle").isEmpty());
+        assertThat(api.get("/api/orgs/" + buyerOrg + "/market", buyer).andReturn().getResponse().getContentAsString())
+                .doesNotContain("sam-sells").doesNotContain("VENMO");
+        String deals = "/api/orgs/" + buyerOrg + "/deals";
+        String mine = "$[?(@.listingId == '" + listingId + "')]";
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
+        api.get(deals, buyer).andExpect(jsonPath(mine + ".payTo.method").value("VENMO"))
+                .andExpect(jsonPath(mine + ".payTo.handle").value("@sam-sells"));
+        assertThat(shipper.bought.stream().filter(b -> b.reference().equals(listingId)).findFirst().orElseThrow().from().toString())
+                .doesNotContain("sam-sells"); // the shipping provider never gets it
+
+        // Sold: the label is the next step, and there's nothing to say about money yet.
+        String status = "/api/orgs/" + orgId + "/cards/" + card + "/status";
+        String listing = "/api/orgs/" + orgId + "/listings/" + listingId;
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("SOLD"));
+        api.postJson(listing + "/payment-confirmed", "", seller).andExpect(status().isConflict());
+        api.postJson(listing + "/dispute", "{}", seller).andExpect(status().isConflict());
+
+        // Shipped: the label is used, so it's gone; tracking stays.
+        api.get(sale(card), seller).andExpect(jsonPath("$.listing.label.labelUrl").isNotEmpty());
+        api.postJson(listing + "/shipped", "", seller).andExpect(status().isOk());
+        api.postJson(listing + "/shipped", "", seller).andExpect(status().isConflict());
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("SHIPPED"));
+        api.get(sale(card), seller).andExpect(jsonPath("$.listing.progress.stage").value("SHIPPED"))
+                .andExpect(jsonPath("$.listing.label.labelUrl").isEmpty())
+                .andExpect(jsonPath("$.listing.label.trackingCode").isNotEmpty());
+
+        // Arrived, not paid: the buyer has 7 days, and both sides see the date.
+        api.postJson(deals + "/" + listingId + "/received", "{}", buyer).andExpect(status().isCreated());
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("ARRIVED"));
+        String payBy = TestApi.read(api.get(sale(card), seller), "$.listing.progress.payBy");
+        String arrivedAt = TestApi.read(api.get(sale(card), seller), "$.listing.progress.arrivedAt");
+        assertThat(java.time.Duration.between(Instant.parse(arrivedAt), Instant.parse(payBy))).isEqualTo(java.time.Duration.ofDays(7));
+        api.get(deals, buyer).andExpect(jsonPath(mine + ".progress.payBy").value(payBy));
+
+        // The buyer says they paid; only the seller's word closes it.
+        double price = ((Number) JsonPath.<List<Number>>read(api.get(deals, buyer).andReturn().getResponse().getContentAsString(),
+                mine + ".offer.price").getFirst()).doubleValue();
+        api.postJson(deals + "/" + listingId + "/paid", "{\"pricePaid\":" + price + "}", buyer).andExpect(status().isCreated());
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("PAID"))
+                .andExpect(jsonPath("$.nextStep", containsString("whether you got it")));
+        api.postJson(listing + "/payment-confirmed", "", seller).andExpect(status().isOk());
+        api.postJson(listing + "/payment-confirmed", "", seller).andExpect(status().isConflict());
+        api.postJson(listing + "/dispute", "{}", seller).andExpect(status().isConflict());
+        api.get(status, seller).andExpect(jsonPath("$.nextStep", containsString("Nothing more to do")));
+        api.get(deals, buyer).andExpect(jsonPath(mine + ".progress.confirmedAt").isNotEmpty());
+
+        // Someone else's listing is nobody's to speak for.
+        JwtRequestPostProcessor other = buyer("Nosy Buyer");
+        api.postJson("/api/orgs/" + lastBuyerOrg + "/listings/" + listingId + "/shipped", "", other).andExpect(status().isNotFound());
+
+        // Still only rows added: nothing to update.
+        assertThat(jdbc.queryForList("select type from listing_event where listing_id = ?::uuid order by created_at", String.class,
+                UUID.fromString(listingId))).containsExactly("ACCEPTED", "SHIPPED", "RECEIVED", "PAID", "PAYMENT_CONFIRMED");
+    }
+
+    @Test
+    void aSellerWhoWasntPaidReachesTheAdmin() throws Exception {
+        String card = pricedCard("Unpaid Mew", 300);
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
+        JwtRequestPostProcessor buyer = buyer("Slow Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Slow Buyer");
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
+        api.postJson("/api/orgs/" + orgId + "/listings/" + listingId + "/shipped", "", seller).andExpect(status().isOk());
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received", "{}", buyer).andExpect(status().isCreated());
+
+        String dispute = "/api/orgs/" + orgId + "/listings/" + listingId + "/dispute";
+        api.postJson(dispute, "{\"note\":\"nothing in my Venmo\"}", seller).andExpect(status().isOk());
+        api.postJson(dispute, "{}", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("already have this")));
+
+        // It reaches the admin as something to do, with who to chase, and only the admin.
+        api.get("/api/admin/deals/attention", buyer).andExpect(status().isForbidden());
+        String mine = "$[?(@.listingId == '" + listingId + "')]";
+        String attention = api.get("/api/admin/deals/attention", api.admin()).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(attention, mine + ".kind")).containsExactly("NOT_PAID");
+        assertThat(JsonPath.<List<String>>read(attention, mine + ".note")).containsExactly("nothing in my Venmo");
+        assertThat(JsonPath.<List<String>>read(attention, mine + ".buyer.orgName")).containsExactly("Slow Buyer");
+        api.get(sale(card), seller).andExpect(jsonPath("$.listing.progress.disputeNote").value("nothing in my Venmo"));
+        // The buyer sees that it was raised, not the seller's words to us.
+        String deals = "/api/orgs/" + buyerOrg + "/deals";
+        api.get(deals, buyer).andExpect(jsonPath("$[0].progress.disputedAt").isNotEmpty()).andExpect(jsonPath("$[0].progress.disputeNote").isEmpty());
+
+        // Closing it needs a reason, both sides see it, and it can be raised again.
+        String resolve = "/api/admin/deals/" + listingId + "/resolve";
+        api.postJson(resolve, "{}", api.admin()).andExpect(status().isBadRequest());
+        api.postJson(resolve, "{\"reason\":\"x\"}", buyer).andExpect(status().isForbidden());
+        api.postJson(resolve, "{\"reason\":\"Spoke to both: paying Friday\"}", api.admin()).andExpect(status().isOk());
+        api.postJson(resolve, "{\"reason\":\"again\"}", api.admin()).andExpect(status().isConflict());
+        assertThat(api.get("/api/admin/deals/attention", api.admin()).andReturn().getResponse().getContentAsString()).doesNotContain(listingId);
+        api.get(sale(card), seller).andExpect(jsonPath("$.listing.progress.review.reason").value("Spoke to both: paying Friday"))
+                .andExpect(jsonPath("$.listing.progress.disputedAt").isEmpty());
+        api.get(deals, buyer).andExpect(jsonPath("$[0].progress.review.reason").value("Spoke to both: paying Friday"));
+        api.postJson(dispute, "{\"note\":\"Friday came and went\"}", seller).andExpect(status().isOk());
+
+        // The seller's own "I got paid" closes it too.
+        api.postJson("/api/orgs/" + orgId + "/listings/" + listingId + "/payment-confirmed", "", seller).andExpect(status().isOk());
+        assertThat(api.get("/api/admin/deals/attention", api.admin()).andReturn().getResponse().getContentAsString()).doesNotContain(listingId);
+        api.get("/api/admin/deals/attention", api.admin()).andExpect(status().isOk());
+    }
+
+    @Test
+    void aReturnedCardGetsANewOfferOnceItsBack() throws Exception {
+        String card = pricedCard("Returned Lapras", 300);
+        api.uploadPhoto(orgId, card, "FRONT", TestImages.goodFront(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, card, "BACK", TestImages.goodBack(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
+        JwtRequestPostProcessor buyer = buyer("Returning Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Returning Buyer");
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
+
+        String listing = "/api/orgs/" + orgId + "/listings/" + listingId;
+        api.postJson(listing + "/card-back", "", seller).andExpect(status().isConflict());
+        String returned = "/api/orgs/" + buyerOrg + "/deals/" + listingId + "/returned";
+        api.postJson(returned, "{\"reason\":\"DOES_NOT_MATCH_PHOTOS\",\"note\":\"crease not in the photos\"}", buyer).andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].payTo").isEmpty()) // nothing is owed any more
+                .andExpect(jsonPath("$[0].progress.stage").value("RETURNED"));
+        String status = "/api/orgs/" + orgId + "/cards/" + card + "/status";
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("RETURNED"));
+        api.get(sale(card), seller).andExpect(jsonPath("$.listing.outcome.note").value("crease not in the photos"))
+                .andExpect(jsonPath("$.listing.label.labelUrl").isEmpty());
+        // Nothing can be paid on it, every return reaches the admin, and a seller who disagrees has to say why.
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/paid", "{\"pricePaid\":1,\"note\":\"x\"}", buyer)
+                .andExpect(status().isConflict());
+        api.postJson(listing + "/payment-confirmed", "", seller).andExpect(status().isConflict());
+        String attention = api.get("/api/admin/deals/attention", api.admin()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(attention, "$[?(@.listingId == '" + listingId + "')].kind")).containsExactly("RETURNED");
+        api.postJson(listing + "/dispute", "{}", seller).andExpect(status().isBadRequest());
+        api.postJson(listing + "/dispute", "{\"note\":\"that crease is in the back photo\"}", seller).andExpect(status().isOk());
+        attention = api.get("/api/admin/deals/attention", api.admin()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(attention, "$[?(@.listingId == '" + listingId + "')].kind")).containsExactly("RETURN_DISPUTED");
+
+        // Until it's back it stays sold.
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isConflict());
+        String upload = "/api/orgs/" + orgId + "/cards/" + card + "/photos";
+        String slot = "{\"side\":\"FRONT\",\"contentType\":\"image/png\",\"sizeBytes\":100}";
+        api.postJson(upload, slot, seller).andExpect(status().isConflict());
+
+        // Back: free for a new offer, not the one it sold at, and its photos can change again.
+        api.postJson(listing + "/card-back", "", seller).andExpect(status().isOk());
+        api.postJson(listing + "/card-back", "", seller).andExpect(status().isConflict());
+        api.get(sale(card), seller).andExpect(jsonPath("$.listing.status").value("BACK"))
+                .andExpect(jsonPath("$.listing.progress.stage").value("BACK"));
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("READY")).andExpect(jsonPath("$.canOffer").value(true));
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("already been sold")));
+        api.postJson(upload, slot, seller).andExpect(status().is2xxSuccessful());
+        String fresh = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson(listings(card), "{\"offerId\":\"" + fresh + "\"}", seller).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.listing.status").value("OPEN"));
+
+        // The deal stays a returned deal in the track record.
+        Map<String, Object> row = jdbc.queryForMap("select status, outcome from v_offer_outcomes where listing_id = ?::uuid", UUID.fromString(listingId));
+        assertThat(row).containsEntry("status", "ACCEPTED").containsEntry("outcome", "RETURNED");
+    }
+
+    @Test
+    void aNotGenuineReturnNeedsANoteAndWaitsForOurReview() throws Exception {
+        String card = pricedCard("Doubtful Ditto", 300);
+        api.uploadPhoto(orgId, card, "FRONT", TestImages.goodFront(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, card, "BACK", TestImages.goodBack(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
+        JwtRequestPostProcessor buyer = buyer("Suspicious Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Suspicious Buyer");
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
+
+        String returned = "/api/orgs/" + buyerOrg + "/deals/" + listingId + "/returned";
+        api.postJson(returned, "{\"reason\":\"NOT_GENUINE\"}", buyer).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("isn't genuine")));
+        api.postJson(returned, "{\"reason\":\"NOT_GENUINE\",\"note\":\" \"}", buyer).andExpect(status().isBadRequest());
+        api.postJson(returned, "{\"reason\":\"NOT_GENUINE\",\"note\":\"wrong font on the back\"}", buyer).andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].progress.held").value(true));
+
+        // Back with the seller, but no new offer until the admin has looked: a fake must not go straight out to the next buyer.
+        String listing = "/api/orgs/" + orgId + "/listings/" + listingId;
+        String status = "/api/orgs/" + orgId + "/cards/" + card + "/status";
+        api.postJson(listing + "/card-back", "", seller).andExpect(status().isOk());
+        api.get(status, seller).andExpect(jsonPath("$.stage").value("RETURNED")).andExpect(jsonPath("$.canOffer").value(false))
+                .andExpect(jsonPath("$.nextStep", containsString("review")));
+        api.postJson(offers(card), "", seller).andExpect(status().isConflict()).andExpect(jsonPath("$.detail", containsString("review")));
+        api.postJson("/api/admin/deals/" + listingId + "/resolve", "{\"reason\":\"Looks genuine from the photos; the font matches\"}", api.admin())
+                .andExpect(status().isOk());
+        api.get(status, seller).andExpect(jsonPath("$.canOffer").value(true));
+        api.postJson(offers(card), "", seller).andExpect(status().isCreated());
+    }
+
+    @Test
+    void aDealFromBeforeTheSplitCountsAsArrivedAndPaid() {
+        ListingEvent taken = ListingEvent.accepted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        ListingEvent old = legacyReceived(taken.getListingId());
+        ListingService.Progress progress = ListingService.progress(List.of(taken, old));
+        assertThat(progress.stage()).isEqualTo(ListingService.DealStage.PAID);
+        assertThat(progress.pricePaid()).isEqualByComparingTo("99.50");
+        assertThat(progress.arrivedAt()).isEqualTo(progress.paidAt());
+        assertThat(ListingService.progress(List.of(taken, ListingEvent.cancelled(taken.getListingId(), UUID.randomUUID(), "x")))).isNull();
+    }
+
+    /** A RECEIVED row as it was written before arrival and payment were split. */
+    private static ListingEvent legacyReceived(UUID listingId) {
+        ListingEvent received = ListingEvent.received(listingId, UUID.randomUUID(), UUID.randomUUID(), null);
+        org.springframework.test.util.ReflectionTestUtils.setField(received, "pricePaid", new java.math.BigDecimal("99.50"));
+        return received;
+    }
+
+    @Test
     void aWithdrawnListingCantBeTaken() throws Exception {
         String listingId = postedCard("Gengar", 200);
         JwtRequestPostProcessor buyer = buyer("Late Buyer");
@@ -348,7 +598,7 @@ class OffersFlowTest {
     void aVoidedOfferComesOffTheMarketAndCantBeSold() throws Exception {
         String card = pricedCard("Flareon", 300);
         String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
-        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
         api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
         String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
         JwtRequestPostProcessor buyer = buyer("Void Buyer");
@@ -396,7 +646,7 @@ class OffersFlowTest {
     void aCancelledDealFreesTheCardAndItsLabelIsRefunded() throws Exception {
         String card = pricedCard("Leafeon", 300);
         String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
-        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
         api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
         String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
         JwtRequestPostProcessor buyer = buyer("Cancelled Buyer");
@@ -422,7 +672,7 @@ class OffersFlowTest {
         // The buyer sees it cancelled and can't record anything more on it.
         api.get("/api/orgs/" + buyerOrg + "/deals", buyer)
                 .andExpect(jsonPath("$[?(@.listingId == '" + listingId + "')].cancelled.reason").value("seller sold it elsewhere"));
-        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received", "{\"pricePaid\":1}", buyer)
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received", "{}", buyer)
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.detail", containsString("cancelled")));
         api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/label", "", buyer).andExpect(status().isConflict());
 
@@ -470,8 +720,7 @@ class OffersFlowTest {
         api.postJson(cancel, "{\"reason\":\"x\"}", api.admin()).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail", containsString("void the offer")));
         api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
-        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received", "{\"pricePaid\":10,\"note\":\"agreed a lower price\"}", buyer)
-                .andExpect(status().isCreated());
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received", "{}", buyer).andExpect(status().isCreated());
         api.postJson(cancel, "{\"reason\":\"x\"}", api.admin()).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail", containsString("received")));
         api.postJson("/api/admin/deals/" + UUID.randomUUID() + "/cancel", "{\"reason\":\"x\"}", api.admin())
@@ -490,11 +739,12 @@ class OffersFlowTest {
         api.postJson(accept(buyerOrg, kept), "", buyer).andExpect(status().isOk());
         List<Number> prices = JsonPath.read(api.get("/api/orgs/" + buyerOrg + "/deals", buyer).andReturn().getResponse()
                 .getContentAsString(), "$[?(@.listingId == '" + kept + "')].offer.price");
-        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + kept + "/received", "{\"pricePaid\":" + prices.getFirst() + "}", buyer)
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + kept + "/received", "{}", buyer).andExpect(status().isCreated());
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + kept + "/paid", "{\"pricePaid\":" + prices.getFirst() + "}", buyer)
                 .andExpect(status().isCreated());
         String sentBack = postedCard("Vaporeon", 300);
         api.postJson(accept(buyerOrg, sentBack), "", buyer).andExpect(status().isOk());
-        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + sentBack + "/returned", "{\"reason\":\"NOT_GENUINE\"}", buyer)
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + sentBack + "/returned", "{\"reason\":\"NOT_GENUINE\",\"note\":\"fails the light test\"}", buyer)
                 .andExpect(status().isCreated());
         String pulled = postedCard("Jolteon", 300);
         api.postJson("/api/orgs/" + orgId + "/listings/" + pulled + "/withdraw", "", seller).andExpect(status().isOk());
@@ -514,6 +764,8 @@ class OffersFlowTest {
         Map<String, Object> row = jdbc.queryForMap("select * from v_offer_outcomes where listing_id = ?::uuid", UUID.fromString(kept));
         assertThat(row.get("outcome")).isEqualTo("RECEIVED");
         assertThat(row.get("carrier")).isEqualTo("USPS");
+        assertThat(row.get("price_paid")).isNotNull();
+        assertThat(row.get("paid_at")).isNotNull();
     }
 
     @Test
@@ -530,10 +782,12 @@ class OffersFlowTest {
 
         // Nothing can have shipped without a label, so nothing can have arrived or gone back.
         String received = "/api/orgs/" + buyerOrg + "/deals/" + listingId + "/received";
-        api.postJson(received, "{\"pricePaid\":" + price + "}", buyer).andExpect(status().isConflict())
+        api.postJson(received, "{}", buyer).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail", containsString("no label")));
-        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/returned", "{\"reason\":\"NOT_GENUINE\"}", buyer)
+        api.postJson("/api/orgs/" + buyerOrg + "/deals/" + listingId + "/returned", "{\"reason\":\"NOT_GENUINE\",\"note\":\"x\"}", buyer)
                 .andExpect(status().isConflict());
+        api.postJson("/api/orgs/" + orgId + "/listings/" + listingId + "/shipped", "", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("until its label shows")));
 
         // The admin sees the deal waiting for its label and buys it once shipping works.
         String waiting = api.get("/api/admin/deals/awaiting-label", api.admin()).andExpect(status().isOk()).andReturn().getResponse()
@@ -546,11 +800,13 @@ class OffersFlowTest {
                 .doesNotContain(listingId);
 
         // Paying less than the firm price needs a reason.
-        api.postJson(received, "{\"pricePaid\":" + (price - 5) + "}", buyer).andExpect(status().isBadRequest())
+        api.postJson(received, "{}", buyer).andExpect(status().isCreated());
+        String paid = "/api/orgs/" + buyerOrg + "/deals/" + listingId + "/paid";
+        api.postJson(paid, "{\"pricePaid\":" + (price - 5) + "}", buyer).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail", containsString("why the amount paid differs")));
-        api.postJson(received, "{\"pricePaid\":" + (price - 5) + ",\"note\":\"seller agreed a discount for a soft corner\"}", buyer)
+        api.postJson(paid, "{\"pricePaid\":" + (price - 5) + ",\"note\":\"seller agreed a discount for a soft corner\"}", buyer)
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$[0].outcome.note").value("seller agreed a discount for a soft corner"));
+                .andExpect(jsonPath("$[0].progress.paidNote").value("seller agreed a discount for a soft corner"));
     }
 
     @Test
@@ -567,12 +823,12 @@ class OffersFlowTest {
         assertThat(delta(during, before, "$.deliveries.inTransit")).isZero();
 
         String byHand = "/api/admin/deals/" + listingId + "/received?buyerOrgId=" + buyerOrg;
-        api.postJson(byHand, "{\"pricePaid\":10}", api.admin()).andExpect(status().isBadRequest())
+        api.postJson(byHand, "{}", api.admin()).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail", containsString("how the card was shipped")));
-        api.postJson(byHand, "{\"pricePaid\":10,\"note\":\"shipped with the seller's own stamps\"}", buyer).andExpect(status().isForbidden());
+        api.postJson(byHand, "{\"note\":\"shipped with the seller's own stamps\"}", buyer).andExpect(status().isForbidden());
         api.postJson("/api/admin/deals/" + listingId + "/received?buyerOrgId=" + UUID.randomUUID(),
-                "{\"pricePaid\":10,\"note\":\"x\"}", api.admin()).andExpect(status().isNotFound());
-        api.postJson(byHand, "{\"pricePaid\":10,\"note\":\"shipped with the seller's own stamps\"}", api.admin()).andExpect(status().isCreated());
+                "{\"note\":\"x\"}", api.admin()).andExpect(status().isNotFound());
+        api.postJson(byHand, "{\"note\":\"shipped with the seller's own stamps\"}", api.admin()).andExpect(status().isCreated());
         api.get("/api/orgs/" + buyerOrg + "/deals", buyer)
                 .andExpect(jsonPath("$[0].outcome.type").value("RECEIVED"))
                 .andExpect(jsonPath("$[0].outcome.note").value("Recorded by the admin: shipped with the seller's own stamps"));
@@ -598,7 +854,7 @@ class OffersFlowTest {
         // A photo taken after the offer means buyers would see photos it wasn't priced on.
         String stale = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
         api.uploadPhoto(orgId, card, "DETAIL", TestImages.goodRetake(1), seller).andExpect(jsonPath("$.status").value("PASSED"));
-        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
         api.postJson(listings(card), "{\"offerId\":\"" + stale + "\"}", seller).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail", containsString("photos changed")));
         String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
@@ -633,7 +889,7 @@ class OffersFlowTest {
         priceLadder(identify(card, "Espeon " + UUID.randomUUID().toString().substring(0, 4), "2015-05-06", "NORMAL", "Rare"), 300);
         assess(card);
         String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
-        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
         api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
         String listingId = TestApi.read(api.get(sale(card), seller), "$.listing.id");
         api.postJson("/api/orgs/" + orgId + "/listings/" + listingId + "/withdraw", "", seller).andExpect(status().isOk());
@@ -717,7 +973,7 @@ class OffersFlowTest {
         api.get(status, seller).andExpect(jsonPath("$.stage").value("READY")).andExpect(jsonPath("$.canOffer").value(true));
         String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
         api.get(status, seller).andExpect(jsonPath("$.stage").value("OFFERED"));
-        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
         api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
         api.get(status, seller).andExpect(jsonPath("$.stage").value("LISTED"));
 
@@ -754,7 +1010,7 @@ class OffersFlowTest {
     private String postedCard(String name, int top) throws Exception {
         String card = pricedCard(name, top);
         String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
-        api.postJson("/api/orgs/" + orgId + "/ship-address", ADDRESS.formatted("Sam"), seller).andExpect(status().isCreated());
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
         api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
         return TestApi.read(api.get(sale(card), seller), "$.listing.id");
     }
