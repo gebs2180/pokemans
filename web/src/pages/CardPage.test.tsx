@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -54,19 +54,21 @@ const status: CardStatus = {
   condition: null,
 }
 
-function renderCard(view: CardView, cardStatus: CardStatus = status) {
+function renderCard(view: CardView, cardStatus: CardStatus = status, orgType = 'COLLECTOR') {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) => {
       if (url === '/api/me') {
         return Promise.resolve(
-          respond(200, { subject: 's', issuer: null, roles: [], claimedRoles: [], mfa: false, memberships: [{ orgId: 'org1', orgName: 'Zach', orgType: 'COLLECTOR', role: 'COLLECTOR' }] }),
+          respond(200, { subject: 's', issuer: null, roles: [], claimedRoles: [], mfa: false, memberships: [{ orgId: 'org1', orgName: 'Zach', orgType, role: orgType }] }),
         )
       }
       if (url.endsWith('/status')) return Promise.resolve(respond(200, cardStatus))
       if (url.endsWith('/sale')) return Promise.resolve(respond(200, { offer: null, listing: null }))
       if (url.endsWith('/ship-address')) return Promise.resolve(new Response(null, { status: 200 }))
       if (url.endsWith('/provenance')) return Promise.resolve(respond(404, { detail: 'x' }))
+      if (url.endsWith('/outcomes')) return Promise.resolve(respond(200, []))
+      if (url.endsWith('/photos')) return Promise.resolve(respond(400, { detail: 'Photos must be JPEG or PNG' }))
       return Promise.resolve(respond(200, view))
     }),
   )
@@ -134,6 +136,38 @@ describe('CardPage', () => {
     expect(line).toHaveTextContent('front 52/48 left-right, 46/54 top-bottom · back 52/48 left-right, 46/54 top-bottom')
     expect(screen.queryByText(/Likely grade/)).not.toBeInTheDocument()
     expect(screen.queryByText(/not a grade/)).not.toBeInTheDocument()
+  })
+
+  it('shows a failed upload in the panel of the photo it was for', async () => {
+    const user = userEvent.setup({ applyAccept: false })
+    renderCard(card())
+    const input = await screen.findByLabelText('Choose a back photo')
+    await user.upload(input, new File(['x'], 'back.heic', { type: 'image/heic' }))
+
+    const back = screen.getByRole('region', { name: 'Back photo' })
+    expect(await within(back).findByRole('alert')).toHaveTextContent('Photos must be JPEG or PNG')
+  })
+
+  it("doesn't count attempts when no photo has passed", async () => {
+    renderCard(card({ captureComplete: false, missingSides: ['FRONT'], photos: [photo({ status: 'RETAKE', current: false }), photo({ id: 'p2', status: 'RETAKE', current: false })] }))
+    expect(await screen.findByText('Retake needed:')).toBeInTheDocument()
+    expect(screen.queryByText(/attempts, all kept/)).not.toBeInTheDocument()
+  })
+
+  it('says the next step once, in the offer panel', async () => {
+    renderCard(card(), { ...status, stage: 'PRICING', nextStep: "We don't have enough sold prices for this card yet." })
+    expect(await screen.findByText('Waiting for prices')).toBeInTheDocument()
+    expect(await screen.findAllByText("We don't have enough sold prices for this card yet.")).toHaveLength(1)
+  })
+
+  it('asks contributors for raw photos first, and keeps selling out of the way', async () => {
+    renderCard(card({ captureComplete: false, missingSides: ['FRONT', 'BACK'], photos: [] }), status, 'CONTRIBUTOR')
+    expect(await screen.findByText(/from before it was graded: the raw card, out of the slab/)).toBeInTheDocument()
+    expect(screen.getByText('Selling this card instead?')).toBeInTheDocument()
+    expect(screen.queryByText('Waiting for us to identify it')).not.toBeInTheDocument()
+    // Choosing an old photo is their main button; a seller's is the camera.
+    expect(screen.getByLabelText('Choose a front photo').closest('label')).not.toHaveClass('secondary')
+    expect(screen.getByLabelText('Take front photo').closest('label')).toHaveClass('secondary')
   })
 
   it('hides Retake once the card is posted or sold', async () => {

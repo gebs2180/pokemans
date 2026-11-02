@@ -227,6 +227,8 @@ export type QueueItem = {
   assessment: 'NONE' | 'SYSTEM' | 'REVIEWER'
   confidence: Confidence | null
   openRequests: number
+  /** Its catalog card has a PSA price table: without one the seller is stuck on "Waiting for prices". */
+  priced: boolean
   /** Whose card it is. */
   orgName: string | null
 }

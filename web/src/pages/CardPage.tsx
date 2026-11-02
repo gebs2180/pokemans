@@ -5,6 +5,7 @@ import {
   SIDE_LABEL,
   uploadToStorage,
   useApi,
+  type CardStage,
   type CardStatus,
   type CardView,
   type ConditionSummary,
@@ -29,6 +30,9 @@ const SIDE_HINT: Record<Side, string> = {
   DETAIL: 'A close-up of anything worth a closer look, e.g. the holo surface or a corner.',
 }
 
+/** Stages whose next step the offer panel says, right below the status line, in place of its button. */
+const SAID_BY_OFFER_PANEL = new Set<CardStage>(['IDENTIFYING', 'ASSESSING', 'PRICING', 'NO_OFFER', 'READY'])
+
 /** Capture screen for one card: take each required side, see pass or retake right away. */
 export function CardPage() {
   const { orgId = '', cardId = '' } = useParams()
@@ -36,9 +40,11 @@ export function CardPage() {
   const navigate = useNavigate()
   const { data: card, error, reload } = useLoad(() => api<CardView>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}`), [api, orgId, cardId])
   const [busy, setBusy] = useState<Side | null>(null)
-  const [uploadError, setUploadError] = useState<string | null>(null)
+  // Shown in the side's own panel: on a phone the top of the page is off-screen.
+  const [uploadError, setUploadError] = useState<{ side: Side; message: string } | null>(null)
   const { data: org } = useOrg(orgId)
   const seller = org != null && (org.type === 'COLLECTOR' || org.type === 'CONTRIBUTOR')
+  const contributor = org?.type === 'CONTRIBUTOR'
   // Bumped after each upload, so the card's status (and offer panel) catch up with the photos.
   const [photoVersion, setPhotoVersion] = useState(0)
   // Bumped when the offer panel posts or withdraws: photos freeze or thaw, and the stage moves on.
@@ -61,7 +67,7 @@ export function CardPage() {
       reload()
       setPhotoVersion((v) => v + 1)
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : String(err))
+      setUploadError({ side, message: err instanceof Error ? err.message : String(err) })
     } finally {
       setBusy(null)
     }
@@ -83,7 +89,7 @@ export function CardPage() {
     />
   )
   // Once the photos pass, the offer is the next thing to do: it comes first, above the photos.
-  const offerFirst = card.captureComplete
+  const offerFirst = card.captureComplete && !contributor
   return (
     <>
       <p className="back">
@@ -92,7 +98,14 @@ export function CardPage() {
         </button>
       </p>
       <h1>{card.label}</h1>
-      {seller && !card.lot && <StatusLine key={`${photoVersion}:${saleVersion}`} orgId={orgId} cardId={cardId} />}
+      {seller && !contributor && !card.lot && (
+        <StatusLine key={`${photoVersion}:${saleVersion}`} orgId={orgId} cardId={cardId} offerFirst={offerFirst} />
+      )}
+      {contributor && !card.lot && (
+        <p className="alert alert-info">
+          We need photos of this card from before it was graded: the raw card, out of the slab. Photos of the slab can't be used.
+        </p>
+      )}
       <p className={`capture-summary alert ${card.captureComplete ? 'alert-success' : 'alert-warning'}`}>
         {card.captureComplete
           ? 'All required photos passed.'
@@ -100,7 +113,6 @@ export function CardPage() {
       </p>
       {card.photosFrozen && <p className="muted small">{card.photosFrozen}</p>}
       {card.lot && <p className="muted">Lot of {card.quantity}: one photo of the whole lot, laid out flat, is enough. Lots don't get offers.</p>}
-      {uploadError && <p className="error" role="alert">{uploadError}</p>}
       {offerFirst && offerPanel}
 
       {sides.map((side) => {
@@ -132,17 +144,18 @@ export function CardPage() {
                     {current.width}×{current.height}
                   </p>
                 )}
-                {attempts.length > 1 && <p className="muted small">{attempts.length} attempts, all kept; the one shown is used.</p>}
+                {current && attempts.length > 1 && <p className="muted small">{attempts.length} attempts, all kept; the one shown is used.</p>}
               </div>
             </div>
             {retake && <RetakeResult photo={retake} keeping={current !== null} />}
+            {uploadError?.side === side && <p className="error" role="alert">{uploadError.message}</p>}
             {!card.photosFrozen &&
               (busy === side ? (
                 <Loading>Uploading and checking…</Loading>
               ) : (
                 <div className="actions">
                   {/* The camera straight away, or a photo already taken (e.g. from a lightbox setup): Android opens only the camera with capture set. */}
-                  <label className={current ? 'capture secondary' : 'capture'}>
+                  <label className={current || contributor ? 'capture secondary' : 'capture'}>
                     <input
                       type="file"
                       accept="image/jpeg,image/png"
@@ -153,7 +166,8 @@ export function CardPage() {
                     />
                     {latest ? 'Retake' : 'Take photo'}
                   </label>
-                  <label className="capture secondary">
+                  {/* Contributors are looking for photos from before grading, so choosing one is their main button. */}
+                  <label className={contributor && !current ? 'capture' : 'capture secondary'}>
                     <input
                       type="file"
                       accept="image/jpeg,image/png"
@@ -169,7 +183,15 @@ export function CardPage() {
         )
       })}
       {org?.type === 'CONTRIBUTOR' && !card.lot && <GradedResult orgId={orgId} cardId={cardId} ready={card.captureComplete} />}
-      {!offerFirst && offerPanel}
+      {!offerFirst &&
+        (contributor && offerPanel ? (
+          <details className="disclosure">
+            <summary>Selling this card instead?</summary>
+            {offerPanel}
+          </details>
+        ) : (
+          offerPanel
+        ))}
       {/* Authenticity, and who holds the card (needed before it can back an advance; hidden while collateral is off). */}
       {org && org.type !== 'CONTRIBUTOR' && <ProvenancePanel orgId={orgId} cardId={cardId} admin={false} />}
     </>
@@ -177,7 +199,7 @@ export function CardPage() {
 }
 
 /** Where the card is on the way to a sale, the card as we identified it, and what happens next. */
-function StatusLine({ orgId, cardId }: { orgId: string; cardId: string }) {
+function StatusLine({ orgId, cardId, offerFirst }: { orgId: string; cardId: string; offerFirst: boolean }) {
   const api = useApi()
   const { data } = useLoad(() => api<CardStatus>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}/status`), [api, orgId, cardId])
   if (!data) return null
@@ -192,7 +214,7 @@ function StatusLine({ orgId, cardId }: { orgId: string; cardId: string }) {
       <p>
         <StageChip stage={data.stage} />
       </p>
-      <p className="muted small">{data.nextStep}</p>
+      {!(offerFirst && SAID_BY_OFFER_PANEL.has(data.stage)) && <p className="muted small">{data.nextStep}</p>}
     </div>
   )
 }

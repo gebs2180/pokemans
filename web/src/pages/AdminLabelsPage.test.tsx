@@ -66,8 +66,10 @@ describe('AdminLabelsPage', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: 'It shipped another way: record the arrival' }))
+    await user.click(screen.getByLabelText('Arrived as shown, paid'))
     await user.type(screen.getByLabelText('Note'), "seller's own stamps")
     await user.click(screen.getByRole('button', { name: 'Record' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm: record it' }))
     await waitFor(() =>
       expect(posts).toEqual([{ url: '/api/admin/deals/l1/received?buyerOrgId=b1', body: { pricePaid: 100.54, note: "seller's own stamps" } }]),
     )

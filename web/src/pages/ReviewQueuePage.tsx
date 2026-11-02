@@ -16,8 +16,11 @@ export function ReviewQueuePage() {
   if (error) return <p className="error" role="alert">{error}</p>
   if (!items) return <p>Loading…</p>
 
-  const todo = items.filter((i) => !i.identified || i.assessment !== 'REVIEWER')
-  const done = items.filter((i) => i.identified && i.assessment === 'REVIEWER')
+  // A card isn't done until it can be priced: without comps its seller is left waiting.
+  const finished = (i: QueueItem) => i.identified && i.assessment === 'REVIEWER' && i.priced
+  const todo = items.filter((i) => !finished(i))
+  const done = items.filter(finished)
+  const needComps = todo.filter((i) => i.identified && !i.priced).length
   return (
     <>
       <p>
@@ -25,7 +28,7 @@ export function ReviewQueuePage() {
       </p>
       <h1>Review queue</h1>
       <p className="muted">
-        Cards with a passing front and back. {todo.length} to review, {done.length} done.{' '}
+        Cards with a passing front and back. {todo.length} to review{needComps > 0 && ` (${needComps} need comps)`}, {done.length} done.{' '}
         <button className="link" onClick={reload}>
           Refresh
         </button>
@@ -61,7 +64,10 @@ function QueueTable({ items }: { items: QueueItem[] }) {
                 {i.orgName ?? 'Unknown org'} · {new Date(i.createdAt).toLocaleDateString()}
               </div>
             </td>
-            <td className={i.identified ? '' : 'warn'}>{i.identifiedAs ?? 'Not identified'}</td>
+            <td className={i.identified ? '' : 'warn'}>
+              {i.identifiedAs ?? 'Not identified'}
+              {i.identified && !i.priced && <div className="warn small">Needs comps: no PSA prices yet</div>}
+            </td>
             <td className={i.assessment === 'REVIEWER' ? 'ok' : 'warn'}>
               {ASSESSMENT_LABEL[i.assessment]}
               {i.confidence && ` · ${i.confidence}`}

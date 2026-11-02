@@ -3,6 +3,7 @@ package com.pokemans.app.condition;
 import com.pokemans.app.catalog.Catalog;
 import com.pokemans.app.identity.Directory;
 import com.pokemans.app.intake.CardItems;
+import com.pokemans.app.pricing.Prices;
 import com.pokemans.app.storage.BlobStore;
 import com.pokemans.app.storage.StorageProperties;
 import com.pokemans.valuation.Confidence;
@@ -47,9 +48,12 @@ class ConditionController {
                          @NotBlank @Size(max = 2000) String reason, Boolean overrideCenteringCap) {
     }
 
-    /** @param orgName whose card it is, so the reviewer can tell collectors apart */
+    /**
+     * @param orgName whose card it is, so the reviewer can tell collectors apart
+     * @param priced  true once its catalog card has a PSA price table: raw cards are valued on PSA's table only
+     */
     record QueueItem(UUID cardId, UUID orgId, String label, Instant createdAt, boolean identified, String identifiedAs,
-                     String assessment, Confidence confidence, int openRequests, String orgName) {
+                     String assessment, Confidence confidence, int openRequests, String orgName, boolean priced) {
     }
 
     record PhotoLink(UUID id, String side, URI url, URI cropUrl, Instant capturedAt) {
@@ -82,10 +86,11 @@ class ConditionController {
     private final BlobStore blobs;
     private final StorageProperties storage;
     private final Directory directory;
+    private final Prices prices;
 
     ConditionController(ConditionService condition, ConditionAssessmentRepository assessmentRepository,
                         PredictionRequestRepository requestRepository, CardItems cardItems, Catalog catalog, BlobStore blobs,
-                        StorageProperties storage, Directory directory) {
+                        StorageProperties storage, Directory directory, Prices prices) {
         this.condition = condition;
         this.assessmentRepository = assessmentRepository;
         this.requestRepository = requestRepository;
@@ -94,11 +99,12 @@ class ConditionController {
         this.blobs = blobs;
         this.storage = storage;
         this.directory = directory;
+        this.prices = prices;
     }
 
     /**
      * Single cards whose capture is complete, oldest first, with what each still needs: an
-     * identification, and a reviewer's look at the system's distribution.
+     * identification, a reviewer's look at the system's distribution, and sold comps.
      */
     @GetMapping("/review-queue")
     List<QueueItem> reviewQueue() {
@@ -119,7 +125,8 @@ class ConditionController {
             return new QueueItem(c.id(), c.orgId(), c.label(), c.createdAt(), id != null,
                     id == null ? null : id.name() + " · " + id.setName() + " " + id.number(),
                     a == null ? "NONE" : a.getAuthorType().name(), a == null ? null : a.getConfidence(),
-                    open.getOrDefault(c.id(), 0L).intValue(), orgNames.get(c.orgId()));
+                    open.getOrDefault(c.id(), 0L).intValue(), orgNames.get(c.orgId()),
+                    id != null && prices.latest(id.catalogCardId(), "PSA").isPresent());
         }).toList();
     }
 

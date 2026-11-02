@@ -852,7 +852,7 @@ p.error[role='status'] {
   border-color: var(--color-danger);
 }
 
-.alert a,
+.alert a:not(.button),
 .alert button.link {
   color: inherit;
   font-weight: 600;

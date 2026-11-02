@@ -139,7 +139,8 @@ class ConditionFlowTest {
         api.get("/api/admin/review-queue", collector).andExpect(status().isForbidden());
         api.get("/api/admin/review-queue", api.admin())
                 .andExpect(jsonPath("$[?(@.cardId == '" + cardId + "')].assessment").value("SYSTEM"))
-                .andExpect(jsonPath("$[?(@.cardId == '" + cardId + "')].identified").value(false));
+                .andExpect(jsonPath("$[?(@.cardId == '" + cardId + "')].identified").value(false))
+                .andExpect(jsonPath("$[?(@.cardId == '" + cardId + "')].priced").value(false));
 
         // The reviewer's distribution: version 2, with the change recorded.
         String reviewed = "{\"distribution\":{\"U\":0,\"6\":0.1,\"7\":0.3,\"8\":0.5,\"9\":0.1},\"confidence\":\"B\","
