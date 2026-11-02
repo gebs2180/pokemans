@@ -42,6 +42,13 @@ interface PredictionRequestRepository extends JpaRepository<PredictionRequest, U
 interface ProviderPredictionRepository extends JpaRepository<ProviderPrediction, UUID> {
 
     List<ProviderPrediction> findByCardItemIdOrderByCreatedAtDesc(UUID cardItemId);
+
+    List<ProviderPrediction> findByCardItemIdInAndProviderOrderByCreatedAtDesc(Collection<UUID> cardItemIds, String provider);
+}
+
+interface CenteringLabelRepository extends JpaRepository<CenteringLabel, UUID> {
+
+    List<CenteringLabel> findByCardItemIdInOrderByCreatedAtDesc(Collection<UUID> cardItemIds);
 }
 
 interface ConditionAssessmentRepository extends JpaRepository<ConditionAssessment, UUID> {
