@@ -1,6 +1,7 @@
 package com.pokemans.app.condition;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -8,6 +9,10 @@ import static org.mockito.Mockito.when;
 import com.pokemans.app.catalog.Catalog;
 import com.pokemans.app.identity.CurrentUser;
 import com.pokemans.app.intake.CardItems;
+import com.pokemans.valuation.Confidence;
+import com.pokemans.valuation.Grade;
+import com.pokemans.valuation.GradeDistribution;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -15,11 +20,13 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Which of a card's stored answers a system assessment is built from. */
 class ConditionRebuildTest {
 
     private static final UUID CARD = UUID.randomUUID();
+    private static final UUID ORG = UUID.randomUUID();
 
     private static PredictionRequest request(String provider) {
         return new PredictionRequest(UUID.randomUUID(), CARD, provider, List.of(UUID.randomUUID()), null);
@@ -51,20 +58,33 @@ class ConditionRebuildTest {
         return ProviderPrediction.rejected(request(CenteringPreGradeProvider.NAME), "Centering not measured", Map.of(), 1);
     }
 
-    private static Optional<ConditionAssessment> rebuild(ProviderPrediction... newestFirst) {
+    private static ConditionService service(ProviderPrediction... newestFirst) {
         ProviderPredictionRepository predictions = mock(ProviderPredictionRepository.class);
         when(predictions.findByCardItemIdOrderByCreatedAtDesc(CARD)).thenReturn(List.of(newestFirst));
         ConditionAssessmentRepository assessments = mock(ConditionAssessmentRepository.class);
         when(assessments.findByCardItemIdAndIsCurrentTrue(CARD)).thenReturn(Optional.empty());
         when(assessments.save(any())).thenAnswer(call -> call.getArgument(0));
         CardItems cardItems = mock(CardItems.class);
-        when(cardItems.get(CARD)).thenReturn(new CardItems.CardItemRef(CARD, UUID.randomUUID(), "A card", false, 1, Instant.now()));
+        when(cardItems.get(CARD)).thenReturn(new CardItems.CardItemRef(CARD, ORG, "A card", false, 1, Instant.now()));
         when(cardItems.passedPhotos(CARD)).thenReturn(List.of());
         Catalog catalog = mock(Catalog.class);
         when(catalog.current(CARD)).thenReturn(Optional.empty());
+        CurrentUser currentUser = mock(CurrentUser.class);
+        when(currentUser.id()).thenReturn(UUID.randomUUID());
         return new ConditionService(List.of(), mock(PredictionRequestRepository.class), predictions, assessments, cardItems, catalog,
-                mock(CurrentUser.class), DistributionBuilderTest.defaults(), mock(ApplicationEventPublisher.class))
-                .rebuildSystemAssessment(CARD);
+                currentUser, DistributionBuilderTest.defaults(), mock(ApplicationEventPublisher.class));
+    }
+
+    private static Optional<ConditionAssessment> rebuild(ProviderPrediction... newestFirst) {
+        return service(newestFirst).rebuildSystemAssessment(CARD);
+    }
+
+    private static GradeDistribution even(Grade first, Grade second) {
+        return GradeDistribution.of(Map.of(first, new BigDecimal("0.5"), second, new BigDecimal("0.5")));
+    }
+
+    private static ConditionAssessment byHand(GradeDistribution distribution, boolean override, ProviderPrediction... newestFirst) {
+        return service(newestFirst).reviewerAssessment(ORG, CARD, distribution, Confidence.B, "Checked by hand", override);
     }
 
     @Test
@@ -106,5 +126,46 @@ class ConditionRebuildTest {
     @Test
     void centeringAloneBuildsNothing() {
         assertThat(rebuild(measured(8))).isEmpty();
+    }
+
+    @Test
+    void aHandDistributionAboveTheCapIsRefused() {
+        assertThatThrownBy(() -> byHand(even(Grade.of(8), Grade.of(9)), false, measured(8)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("allows PSA 8 at best");
+    }
+
+    @Test
+    void aHandDistributionAboveTheCapIsStillRefusedAfterARefusal() {
+        assertThatThrownBy(() -> byHand(even(Grade.of(8), Grade.of(9)), false, refused(), measured(8)))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void aHandDistributionAtTheCapIsSaved() {
+        ConditionAssessment saved = byHand(even(Grade.of(7), Grade.of(8)), false, measured(8));
+
+        assertThat(saved.getBasis()).containsEntry("centeringCap", 8).containsEntry("centeringCapOverridden", false);
+    }
+
+    @Test
+    void anOverrideIsSavedOnTheRecord() {
+        ConditionAssessment saved = byHand(even(Grade.of(8), Grade.of(9)), true, measured(8));
+
+        assertThat(saved.getBasis()).containsEntry("centeringCap", 8).containsEntry("centeringCapOverridden", true);
+    }
+
+    @Test
+    void ungradableProbabilityDoesNotCountAsAboveTheCap() {
+        ConditionAssessment saved = byHand(even(Grade.U, Grade.of(1)), false, measured(1));
+
+        assertThat(saved.getBasis()).containsEntry("centeringCapOverridden", false);
+    }
+
+    @Test
+    void withNothingMeasuredThereIsNoCap() {
+        ConditionAssessment saved = byHand(even(Grade.of(9), Grade.of(10)), false);
+
+        assertThat(saved.getBasis().get("centeringCap")).isNull();
     }
 }

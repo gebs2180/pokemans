@@ -39,9 +39,12 @@ import org.springframework.web.server.ResponseStatusException;
 @EnableConfigurationProperties(ConditionProperties.class)
 class ConditionController {
 
-    /** @param distribution outcome ("U", "1" … "10") to probability; must sum to 1 */
+    /**
+     * @param distribution outcome ("U", "1" … "10") to probability; must sum to 1
+     * @param overrideCenteringCap true to save a distribution above the measured centering; optional
+     */
     record AssessRequest(@NotEmpty Map<String, BigDecimal> distribution, @NotNull Confidence confidence,
-                         @NotBlank @Size(max = 2000) String reason) {
+                         @NotBlank @Size(max = 2000) String reason, Boolean overrideCenteringCap) {
     }
 
     /** @param orgName whose card it is, so the reviewer can tell collectors apart */
@@ -68,7 +71,7 @@ class ConditionController {
 
     record CardConditionView(UUID cardId, UUID orgId, String label, List<String> enabledProviders, List<PhotoLink> photos,
                              Catalog.IdentifiedCard identification, List<RequestView> requests,
-                             List<PredictionView> predictions, List<AssessmentView> assessments) {
+                             List<PredictionView> predictions, List<AssessmentView> assessments, Integer centeringCap) {
     }
 
     private final ConditionService condition;
@@ -131,7 +134,7 @@ class ConditionController {
                 catalog.current(cardId).orElse(null),
                 condition.requests(cardId).stream().map(ConditionController::view).toList(),
                 condition.predictions(cardId).stream().map(ConditionController::view).toList(),
-                condition.assessments(cardId).stream().map(ConditionController::view).toList());
+                condition.assessments(cardId).stream().map(ConditionController::view).toList(), condition.centeringCap(cardId));
     }
 
     /** Asks every enabled provider (again) about this card. */
@@ -145,7 +148,7 @@ class ConditionController {
     @ResponseStatus(HttpStatus.CREATED)
     AssessmentView assess(@PathVariable UUID orgId, @PathVariable UUID cardId, @Valid @RequestBody AssessRequest request) {
         return view(condition.reviewerAssessment(orgId, cardId, distribution(request.distribution()), request.confidence(),
-                request.reason().trim()));
+                request.reason().trim(), Boolean.TRUE.equals(request.overrideCenteringCap())));
     }
 
     /** Replaces the current assessment with a fresh one built from the latest predictions. */

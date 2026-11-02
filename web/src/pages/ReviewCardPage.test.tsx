@@ -17,6 +17,7 @@ const card: CardCondition = {
   requests: [],
   predictions: [],
   assessments: [],
+  centeringCap: null,
 }
 
 describe('AssessmentPanel', () => {
@@ -64,28 +65,29 @@ describe('AssessmentPanel with no grading provider', () => {
     expect(screen.getByRole('button', { name: /Rebuild/ })).toBeInTheDocument()
   })
 
-  async function enterNine(predictions: Prediction[]) {
+  async function enterNine(centeringCap: number) {
     const user = userEvent.setup()
-    render(<AssessmentPanel data={{ ...card, predictions }} current={null} base="/b" onChange={() => {}} />)
+    render(<AssessmentPanel data={{ ...card, centeringCap }} current={null} base="/b" onChange={() => {}} />)
     await user.click(screen.getByText('Adjust (saves a new version)'))
     const nine = screen.getByLabelText('Grade 9, percent')
     await user.clear(nine)
-    await user.type(nine, '25')
+    await user.type(nine, '100')
+    return user
   }
 
-  it('warns when a hand distribution sits above the measured centering', async () => {
-    await enterNine([measured(8)])
-    expect(screen.getByRole('note')).toHaveTextContent('allows PSA 8 at best, and this puts 25% above it')
-  })
+  it('warns when a hand distribution sits above the measured centering and needs an override to save', async () => {
+    const user = await enterNine(8)
+    expect(screen.getByRole('note')).toHaveTextContent('allows PSA 8 at best, and this puts 100% above it')
+    expect(screen.getByRole('button', { name: 'Save version' })).toBeDisabled()
 
-  it('keeps warning after a later refusal, which leaves the cap in place', async () => {
-    await enterNine([measured(8, { id: 'r', succeeded: false, centering: null, error: 'Centering not measured' }), measured(8)])
-    expect(screen.getByRole('note')).toHaveTextContent('allows PSA 8 at best')
+    await user.click(screen.getByRole('checkbox'))
+    expect(screen.getByRole('button', { name: 'Save version' })).toBeEnabled()
   })
 
   it("doesn't warn when the distribution stays within the cap", async () => {
-    await enterNine([measured(9)])
+    await enterNine(9)
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save version' })).toBeEnabled()
   })
 })
 

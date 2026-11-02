@@ -644,11 +644,12 @@ export function AssessmentPanel({
   const [reason, setReason] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [overrideCap, setOverrideCap] = useState(false)
 
   const total = OUTCOMES.reduce((sum, o) => sum + (Number(values[o]) || 0), 0)
   const totalOk = Math.abs(total - 100) < 0.001
   const noCloseUp = modernHoloWithoutCloseUp(data)
-  const cap = centeringCap(data)
+  const cap = data.centeringCap
   const overCap = cap == null ? 0 : OUTCOMES.reduce((sum, o) => sum + (Number(o) > cap ? Number(values[o]) || 0 : 0), 0)
 
   async function save(e: FormEvent) {
@@ -657,7 +658,7 @@ export function AssessmentPanel({
     setBusy(true)
     try {
       const distribution: Distribution = Object.fromEntries(OUTCOMES.map((o) => [o, (Number(values[o]) || 0) / 100]))
-      await api('POST', `${base}/assessments`, { distribution, confidence, reason })
+      await api('POST', `${base}/assessments`, { distribution, confidence, reason, overrideCenteringCap: overCap > 0 && overrideCap })
       onChange()
     } catch (e) {
       setErr(message(e))
@@ -726,13 +727,18 @@ export function AssessmentPanel({
             </p>
           )}
           {overCap > 0 && (
-            <p className="warn small" role="note">
-              Measured centering allows PSA {cap} at best, and this puts {Math.round(overCap * 10) / 10}% above it. A saved distribution
-              isn't capped for you.
-            </p>
+            <div className="warn small" role="note">
+              <p>
+                Measured centering allows PSA {cap} at best, and this puts {Math.round(overCap * 10) / 10}% above it.
+              </p>
+              <label>
+                <input type="checkbox" checked={overrideCap} onChange={(e) => setOverrideCap(e.target.checked)} /> The measurement is wrong:
+                save above it, with the reason above
+              </label>
+            </div>
           )}
           <div className="row">
-            <button type="submit" disabled={busy || !totalOk}>
+            <button type="submit" disabled={busy || !totalOk || (overCap > 0 && !overrideCap)}>
               Save version
             </button>
             {data.predictions.some((p) => p.succeeded && (p.overallGrade ?? p.psaGrade) != null) && (
@@ -761,12 +767,6 @@ export function AssessmentPanel({
       )}
     </section>
   )
-}
-
-/** The cap a rebuild would use: our latest successful measurement. A later refusal doesn't lift it. Predictions come newest first. */
-function centeringCap(data: CardCondition) {
-  const measured = data.predictions.find((p) => p.provider === OWN_CENTERING && p.succeeded)
-  return measured?.centering ?? null
 }
 
 /** End of the WotC era (AuthenticityRisk.END_OF_WOTC_ERA): holos after it get the default surface shift. */
