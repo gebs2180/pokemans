@@ -76,13 +76,13 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
 
 ### 2. Server
 
-1. Hetzner → Servers → Add server: **CX23**, Ubuntu 24.04, location Nuremberg/Falkenstein/Helsinki (the CX line is the cheapest; US locations cost about 20% more), your SSH key, IPv4 on. Optionally tick **Backups** (+20%, weekly whole-disk snapshots on top of our nightly ones).
+1. Hetzner → Servers → Add server: **CX23**, Ubuntu 24.04 or 26.04 (the beta server runs 26.04), location Nuremberg/Falkenstein/Helsinki (the CX line is the cheapest and isn't sold in the US: there, Ashburn and Hillsboro offer CPX only, and the 4 GB CPX22 was $22.99/mo on 2026-10-26; the 2 GB CPX12 is too small. The beta runs in the EU: photos go from the phone straight to R2, so only short API calls cross the Atlantic, and moving later is the restore procedure below plus a DNS change), your SSH key, IPv4 on. Optionally tick **Backups** (+20%, weekly whole-disk snapshots on top of our nightly ones).
 2. Firewalls → Create: allow inbound TCP 22 (ideally from your IP only), TCP 80, TCP 443 and UDP 443, then apply it to the server.
-3. Pick the site address. The product is called Rawmark, and Zach bought `rawmark.app` on 2026-10-25. The site is either `https://rawmark.app` or `https://beta.rawmark.app`; Zach picks which when setting up DNS:
-   - add an A record for `rawmark.app` (the bare domain) or `beta` (for `beta.rawmark.app`) → the server's IPv4, at the registrar or wherever the domain's DNS is hosted;
+3. Pick the site address. The product is called Rawmark, and Zach bought `rawmark.app` on 2026-10-25. The beta runs at `https://beta.rawmark.app` (set up 2026-10-26):
+   - add an A record for `beta` → the server's IPv4 in Cloudflare DNS, set to **DNS only** (grey cloud) so Caddy can get the certificate itself;
    - set `SITE_ADDRESS` in `.env` (step 5) to that host name, without `https://`. `.app` domains only work over HTTPS, which Caddy provides.
    - Before DNS is ready you can test on `<ip-with-dashes>.sslip.io` (e.g. `203-0-113-7.sslip.io`), which resolves to that IP and gets a certificate too.
-4. SSH in and set up the box:
+4. SSH in and set up the box. Paste one line at a time: `dpkg-reconfigure` opens a dialog that swallows any lines pasted after it.
    ```bash
    ssh root@<server-ip>
    apt update && apt -y upgrade && apt -y install unattended-upgrades git
@@ -90,8 +90,10 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
    curl -fsSL https://get.docker.com | sh            # Docker Engine + compose plugin
    adduser --disabled-password --gecos "" deploy && usermod -aG docker deploy
    mkdir -p /home/deploy/.ssh && cp ~/.ssh/authorized_keys /home/deploy/.ssh/ && chown -R deploy:deploy /home/deploy/.ssh
-   sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && systemctl reload ssh
+   echo 'PasswordAuthentication no' > /etc/ssh/sshd_config.d/00-no-password.conf && systemctl reload ssh
+   sshd -T | grep -i passwordauthentication          # must print "passwordauthentication no"
    ```
+   The setting goes in `sshd_config.d`, not the main file: sshd keeps the first value it reads, and it reads that folder first. On the first server (2026-10-26) editing `sshd_config` left password logins on.
    Add 2 GB of swap: the first build compiles Java and the web app on the box.
    ```bash
    fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
