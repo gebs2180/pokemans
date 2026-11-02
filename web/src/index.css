@@ -1484,3 +1484,43 @@ button.link:active:not(:disabled) {
     transform: none;
   }
 }
+
+/* ---------- Centering labels ---------- */
+
+.frame-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.frame-card {
+  flex: 1 1 22rem;
+  max-width: 44rem;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.frame-controls {
+  flex: 1 1 20rem;
+}
+
+.frame-zoom {
+  display: block;
+  width: 100%;
+  max-width: 24rem;
+  background: var(--color-border);
+}
+
+.frame-line {
+  stroke: #00e5ff;
+  stroke-width: 1;
+}
+
+.frame-line-chosen {
+  stroke: #00ff66;
+}
+
+.frame-chosen td {
+  font-weight: 600;
+}

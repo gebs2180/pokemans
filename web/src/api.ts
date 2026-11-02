@@ -284,6 +284,58 @@ export type IdentifiedCard = {
 
 export type ReviewPhoto = { id: string; side: Side; url: string; cropUrl: string | null; capturedAt: string | null }
 
+// Centering labels (admin): the printed frame read by hand
+
+export type CenteringFace = 'FRONT' | 'BACK'
+
+/** Borders in mm from the card's edge; null is "can't see it". */
+export type CenteringLabel = {
+  id: string
+  face: CenteringFace
+  photoId: string
+  left: number | null
+  right: number | null
+  top: number | null
+  bottom: number | null
+  hardCard: boolean
+  labelledBy: string
+  createdAt: string
+}
+
+/** @param refused the latest measurement refused this face; null if none ran. Its numbers aren't shown, so they can't bias a label. */
+export type CenteringFaceView = { label: CenteringLabel | null; refused: boolean | null; photos: number }
+
+export type CenteringQueueItem = {
+  cardId: string
+  orgId: string
+  label: string
+  orgName: string | null
+  identifiedAs: string | null
+  front: CenteringFaceView
+  back: CenteringFaceView
+}
+
+export type CenteringCard = {
+  cardId: string
+  orgId: string
+  label: string
+  identifiedAs: string | null
+  front: CenteringLabel | null
+  back: CenteringLabel | null
+  photos: { id: string; face: CenteringFace; uploadedAt: string }[]
+}
+
+/** One photo straightened as the measurer straightens it; refused says why not, and the images are null then. */
+export type StraightenedCard = {
+  photoId: string
+  pxPerMm: number
+  width: number
+  height: number
+  image: string | null
+  contrast: string | null
+  refused: string | null
+}
+
 export type PredictionRequestView = {
   id: string
   provider: string

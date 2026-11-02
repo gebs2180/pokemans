@@ -2,7 +2,7 @@
 
 Goal: measure front centering on foil, gold and full-art cards, where it matters most and where we refuse most, without ever reporting a number we can't stand behind.
 
-Written 2026-11-01. Nothing here is built yet, and the effort figures are estimates.
+Written 2026-11-01. The labelling page and scoreboard from step 1 are built, and the rest isn't. The effort figures are estimates.
 
 ## What's going wrong today
 
@@ -40,6 +40,56 @@ Everything else is judged by this.
 - **Baseline.** Score today's measurer first, so every later change has a number to beat.
 
 Splits are by card and by set, never by photo. Otherwise the model is tested on cards it has already seen.
+
+### Labelling and scoring
+
+Labels are made at `/admin/centering`, linked from the admin page. Cards the measurer refused come first.
+
+1. Open a card. The lines start at a fixed 2.5 mm, never at the measurer's answer, which would pull the label towards it. The queue shows only whether it refused.
+2. Drag each line onto the inside edge of the printed frame. The zoom shows the chosen line, the arrow keys move it 0.05 mm, and "Raise contrast" brings up faint frames.
+3. Tick "Can't see it" for a side you can't read, and "Hard card" for gold, foil or full art. Don't guess a side: a guess becomes the truth the measurer is scored against.
+
+Labelling a card again adds a row and the newest counts, so two passes can be compared. A photo that fails at the card's outer edge can't be straightened, so the page says why and offers the card's other photos. If it has none, it needs a retake, usually on a dark surface.
+
+To score, press "Download scoreboard file" and run this straight away, because the file's photo links expire. Each photo is then kept beside the file, so later runs don't need the links. The file and that folder hold real photos' links and uploads with their EXIF, so keep them out of the repo.
+
+```powershell
+cd backend; $env:POKEMANS_CENTERING_SCOREBOARD = "C:\Users\you\centering\centering-scoreboard-2026-11-02.json"; .\gradlew.bat :app:test --tests "*RealPhotoScoreboardTest" --rerun
+```
+
+It writes `<file>.board.md` with the table below, and `<file>.photos.csv` with every photo's outcome. Diff the CSV between two runs to see exactly which photos changed.
+
+How to read the columns:
+
+- **Error:** the worse of left/right and top/bottom, in percentage points, for each measured photo against its label.
+- **False:** photos with an error over 2 points.
+- **Seen by nobody:** photos measured although the label says a side can't be seen, so nothing backs the number.
+- **Same cap:** the PSA cap matches the true borders' cap at the same 1-point margin.
+- **Cap too high:** the cap is above what the true borders allow with no margin. This is the failure that would raise a card, so it should stay at 0.
+- **Spread:** on a face measured on two or more photos, the most those photos differ. It needs no labels.
+
+### Baseline (2026-11-01, `centering-3`)
+
+Six cards and 12 distinct photos from the 2026-11-01 checks, none labelled yet, so only the columns that need no labels mean anything. Six cards is far too few to set a gate, and this only records where we started.
+
+| Group | Photos measured | Faces measured | Faces with 2+ photos | Spread median |
+|---|---|---|---|---|
+| all | 5/12 (42%) | 4/9 (44%) | 1 | 0.9 |
+| hard fronts | 2/5 (40%) | 1/4 (25%) | 1 | 0.9 |
+| other fronts | 0/1 (0%) | 0/1 (0%) | 0 | – |
+| backs | 3/6 (50%) | 3/4 (75%) | 0 | – |
+
+Why the seven photos were refused:
+
+| Photos | Refused because |
+|---|---|
+| Victini front, Giratina front | Inner edge: the bottom border's pieces disagree (3 and 4 of 8 agree) |
+| Rainbow full art front, one Metagross back | Outer edge: the card doesn't stand out along one side |
+| Two sleeved backs, one card far from the camera | No whole card found |
+
+So only two of the seven are the inner-edge failures the rectangle fit is meant to fix. The fit can't help the other five, because they never reach the inner edge.
+
+The error, false measurement and cap columns have no baseline until cards are labelled. **Step 3 waits for that:** the first run over the labelled set is the real baseline, and the fit has to beat it.
 
 ## Step 2: a controlled set of cards (about 2 sessions)
 
