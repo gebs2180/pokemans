@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import { useApi, type QueueItem } from '../api'
 import { useLoad } from '../useLoad'
+import { PageError } from '../ui'
 
 const ASSESSMENT_LABEL: Record<QueueItem['assessment'], string> = {
   NONE: 'No distribution yet',
@@ -13,7 +14,7 @@ export function ReviewQueuePage() {
   const api = useApi()
   const { data: items, error, reload } = useLoad(() => api<QueueItem[]>('GET', '/api/admin/review-queue'), [api])
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   if (!items) return <p>Loading…</p>
 
   // A card isn't done until it can be priced: without comps its seller is left waiting.

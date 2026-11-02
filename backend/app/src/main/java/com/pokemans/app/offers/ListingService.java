@@ -156,6 +156,13 @@ class ListingService {
                          List<PhotoLink> photos, Instant acceptedAt) {
     }
 
+    /** The seller terms' deadline, from the label showing. */
+    static final Duration SHIP_WITHIN = Duration.ofDays(3);
+
+    /** @param labels sold cards past their ship-by date that nobody has said shipped */
+    record Overdue(int labels) {
+    }
+
     private final CardOfferRepository offers;
     private final CardOfferVoidRepository voids;
     private final SaleListingRepository listings;
@@ -447,6 +454,27 @@ class ListingService {
                     new Party(seller.orgName(), seller.email()), card(in), offerView(offer), photos(in), acceptedEvent.getCreatedAt()));
         }
         return waiting;
+    }
+
+    @Transactional(readOnly = true)
+    Overdue overdue() {
+        Instant now = Instant.now();
+        List<SaleListing> accepted = listings.findAllAccepted();
+        Map<UUID, List<ListingEvent>> history = history(accepted);
+        int overdue = 0;
+        for (SaleListing l : accepted) {
+            List<ListingEvent> h = history.getOrDefault(l.getId(), List.of());
+            if (status(l, h, now) == Status.ACCEPTED
+                    && shipping.label(l.getId()).filter(x -> overdue(x.getCreatedAt(), progress(h).stage(), now)).isPresent()) {
+                overdue++;
+            }
+        }
+        return new Overdue(overdue);
+    }
+
+    /** A label is overdue past its ship-by date, until the seller says it shipped or the card is shown to have. */
+    static boolean overdue(Instant labelledAt, DealStage stage, Instant now) {
+        return stage == DealStage.SOLD && labelledAt.plus(SHIP_WITHIN).isBefore(now);
     }
 
     private void recordOutcome(ListingEvent event) {

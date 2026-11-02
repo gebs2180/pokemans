@@ -3,6 +3,7 @@ package com.pokemans.app.intake;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,6 +76,12 @@ public class CardItems {
         return cards.findByCollectionIdOrderByCreatedAtAsc(collectionId).stream().map(CardItems::ref).toList();
     }
 
+    /** The cards in all of the org's collections, oldest first. No access check. */
+    @Transactional(readOnly = true)
+    public List<CardItemRef> inCollectionsOf(UUID orgId) {
+        return cards.findByOrgIdAndCollectionIdNotNullOrderByCreatedAtAsc(orgId).stream().map(CardItems::ref).toList();
+    }
+
     /** The card if the caller may see its org, else 404. */
     @Transactional(readOnly = true)
     public CardItemRef requireAccessible(UUID orgId, UUID cardId) {
@@ -93,6 +100,17 @@ public class CardItems {
         return photos.findByCardItemIdOrderByCreatedAtAsc(cardId).stream()
                 .filter(p -> p.getStatus() == Photo.Status.PASSED)
                 .map(CardItems::ref)
+                .toList();
+    }
+
+    /** Front and back, if every try so far failed the checks: the seller has to take them again. No access check. */
+    @Transactional(readOnly = true)
+    public List<String> sidesToRetake(UUID cardId) {
+        List<Photo> attempts = photos.findByCardItemIdOrderByCreatedAtAsc(cardId);
+        return Stream.of(Photo.Side.FRONT, Photo.Side.BACK)
+                .filter(side -> attempts.stream().noneMatch(p -> p.getSide() == side && p.getStatus() == Photo.Status.PASSED))
+                .filter(side -> attempts.stream().anyMatch(p -> p.getSide() == side && p.getStatus() == Photo.Status.RETAKE))
+                .map(Photo.Side::name)
                 .toList();
     }
 

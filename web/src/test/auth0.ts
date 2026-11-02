@@ -2,11 +2,13 @@ import { vi } from 'vitest'
 
 /** What the mocked useAuth0() returns; reset before every test. */
 export const auth0 = {
+  isAuthenticated: false,
   getAccessTokenSilently: vi.fn<() => Promise<string>>(),
   loginWithRedirect: vi.fn<(options?: unknown) => Promise<void>>(),
 }
 
 export function resetAuth0() {
+  auth0.isAuthenticated = false
   auth0.getAccessTokenSilently.mockReset().mockResolvedValue('test-token')
   auth0.loginWithRedirect.mockReset().mockResolvedValue()
 }

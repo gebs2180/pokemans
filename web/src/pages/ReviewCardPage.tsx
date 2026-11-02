@@ -24,6 +24,7 @@ import { useLoad, usePoll } from '../useLoad'
 import { searchFromLabel } from '../searchFromLabel'
 import { PricesPanel } from './PricesPanel'
 import { ProvenancePanel } from './ProvenancePanel'
+import { PageError } from '../ui'
 
 const EDITIONS: Edition[] = ['UNLIMITED', 'FIRST_EDITION', 'SHADOWLESS']
 const VARIANTS: Variant[] = ['NORMAL', 'HOLO', 'REVERSE_HOLO']
@@ -50,7 +51,7 @@ export function ReviewCardPage() {
   const base = apiPath`/api/admin/orgs/${orgId}/cards/${cardId}`
   const { data, error, reload } = useLoad(() => api<CardCondition>('GET', `${base}/condition`), [api, base])
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   if (!data) return <p>Loading…</p>
 
   const current = data.assessments.find((a) => a.current) ?? null
@@ -167,7 +168,8 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
   const [hits, setHits] = useState<CatalogHit[] | null>(null)
   const [picked, setPicked] = useState<ProviderCard | null>(null)
   const [edition, setEdition] = useState<Edition>('UNLIMITED')
-  const [variant, setVariant] = useState<Variant>('HOLO')
+  // No default on purpose: a missed dropdown would attach the card to the wrong comps.
+  const [variant, setVariant] = useState<Variant | ''>('')
   const [stamp, setStamp] = useState('')
   const [promo, setPromo] = useState(false)
   const [manual, setManual] = useState(false)
@@ -221,6 +223,7 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
       setHits(null)
       setPicked(null)
       setManual(false)
+      setVariant('')
       setNote('')
       onChange()
     } catch (e) {
@@ -265,7 +268,14 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
               Search
             </button>
           )}
-          <button type="button" className="link" onClick={() => setManual((m) => !m)}>
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              setManual((m) => !m)
+              setVariant('')
+            }}
+          >
             {manual ? 'Search the catalog instead' : 'Not listed? Enter by hand'}
           </button>
         </form>
@@ -312,7 +322,8 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
                   </option>
                 ))}
               </select>
-              <select value={variant} onChange={(e) => setVariant(e.target.value as Variant)} aria-label="Variant">
+              <select value={variant} onChange={(e) => setVariant(e.target.value as Variant)} aria-label="Variant" required>
+                {variant === '' && <option value="">Choose a variant</option>}
                 {VARIANTS.map((v) => (
                   <option key={v} value={v}>
                     {v.replace('_', ' ').toLowerCase()}

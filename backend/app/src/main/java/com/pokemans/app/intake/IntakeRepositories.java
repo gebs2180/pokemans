@@ -30,6 +30,8 @@ interface CardItemRepository extends JpaRepository<CardItem, UUID> {
 
     List<CardItem> findByCollectionIdOrderByCreatedAtAsc(UUID collectionId);
 
+    List<CardItem> findByOrgIdAndCollectionIdNotNullOrderByCreatedAtAsc(UUID orgId);
+
     Optional<CardItem> findByIdAndOrgId(UUID id, UUID orgId);
 
     /** Row-locked: serialises photo confirms on one card, so finishing its capture is seen exactly once. */

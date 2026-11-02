@@ -11,6 +11,7 @@ import {
   type StraightenedCard,
 } from '../api'
 import { useLoad } from '../useLoad'
+import { PageError } from '../ui'
 
 type FrameSide = 'left' | 'right' | 'top' | 'bottom'
 const SIDES: FrameSide[] = ['left', 'right', 'top', 'bottom']
@@ -61,7 +62,7 @@ export function CenteringLabelsPage() {
     }
   }
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   return (
     <>
       <p>
@@ -121,7 +122,7 @@ export function CenteringLabelCardPage() {
   const { data, error } = useLoad(() => api<CenteringCard>('GET', `${base}/centering-labels`), [api, base])
   const [face, setFace] = useState<CenteringFace>('FRONT')
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   if (!data) return <p>Loading…</p>
   return (
     <>

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { apiPath, money, useApi, type GradingCost, type RunSummary, type ValuationDefaults } from '../api'
 import { useLoad } from '../useLoad'
+import { PageError } from '../ui'
 
 /** Admin: value a collection (one run per click, kept forever) and list its runs. */
 export function ValuationPage() {
@@ -12,7 +13,7 @@ export function ValuationPage() {
   const { data: runs, error } = useLoad(() => api<RunSummary[]>('GET', runsPath), [api, runsPath])
   const { data: defaults } = useLoad(() => api<ValuationDefaults>('GET', '/api/admin/valuation/defaults'), [api])
 
-  if (error) return <p className="error" role="alert">{error}</p>
+  if (error) return <PageError message={error} />
   return (
     <>
       <p>

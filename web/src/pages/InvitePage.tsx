@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { apiPath, useApi, type InvitePreview } from '../api'
-import { Loading } from '../ui'
+import { apiPath, useApi, type InvitePreview, type OrgType } from '../api'
+import { Loading, PageError } from '../ui'
 import { useLoad } from '../useLoad'
 
-const ROLE_LABEL: Record<string, string> = { PARTNER: 'submission partner', COLLECTOR: 'collector', CONTRIBUTOR: 'contributor' }
+/** What a person is invited to do: the org's own name is an internal one, chosen by the admin. */
+const INVITED_TO: Partial<Record<OrgType, string>> = {
+  COLLECTOR: 'sell your cards on Rawmark',
+  BUYER: 'buy cards on Rawmark',
+  CONTRIBUTOR: 'share graded cards with Rawmark',
+}
 
 export function InvitePage() {
   const { token = '' } = useParams()
@@ -27,15 +32,22 @@ export function InvitePage() {
     }
   }
 
-  if (error) return <p className="error" role="alert">This invite link is not valid. {error}</p>
+  if (error) return <PageError message={`This invite link is not valid. ${error}`} />
   if (!invite) return <Loading />
 
   return (
     <>
-      <h1>Join {invite.orgName}</h1>
-      <p>
-        You have been invited as a {ROLE_LABEL[invite.role] ?? invite.role.toLowerCase()}.
-      </p>
+      {INVITED_TO[invite.orgType] ? (
+        <>
+          <h1>You're invited to {INVITED_TO[invite.orgType]}</h1>
+          <p>Next you'll see how it works and read the terms. Nothing's agreed until you accept them.</p>
+        </>
+      ) : (
+        <>
+          <h1>Join {invite.orgName}</h1>
+          <p>You have been invited as a submission partner.</p>
+        </>
+      )}
       {invite.usable ? (
         <div className="actions">
           <button onClick={accept} disabled={busy} aria-busy={busy}>
