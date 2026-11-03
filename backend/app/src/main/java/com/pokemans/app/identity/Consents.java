@@ -155,10 +155,6 @@ public class Consents {
         this.events = events;
     }
 
-    public Terms contributorTerms() {
-        return CONTRIBUTOR_TERMS;
-    }
-
     /** The terms members of this kind of org accept, if it has any. */
     public static Optional<Terms> termsFor(OrgType type) {
         return switch (type) {
