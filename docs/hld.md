@@ -4,7 +4,7 @@ Status: draft v1 · 2026-10-16 · Zach
 Product name: Rawmark (`rawmark.app`, 2026-10-25). "pokemans" remains the internal name in code and infrastructure identifiers.
 Shareable copy: [Raw Collection Collateral Reports: HLD](https://claude.ai/artifact/NH4ParzZyrmGe87Nh7m3Zy) (Claude Doc). This file is the source of truth; update the doc when this changes.
 
-Related: [CLAUDE.md](../CLAUDE.md) (methodology summary) · [Valuation Methodology](https://claude.ai/artifact/1XVmPmLtueJk37u2hXgDmL) · [Leave Project Checklist](https://claude.ai/artifact/2CHCuUTTKJicxmLFNvD1qn)
+Related: [CLAUDE.md](../CLAUDE.md) (methodology summary) · [Valuation Methodology](https://claude.ai/artifact/1XVmPmLtueJk37u2hXgDmL) · [Leave Project Checklist](https://claude.ai/artifact/2CHCuUTTKJicxmLFNvD1qn) · [Diagrams of the system as built](architecture/README.md) (they note where it differs from this plan)
 
 ## 1. Goals and non-goals
 
