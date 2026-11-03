@@ -10,12 +10,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -169,23 +167,15 @@ public class Assessments {
     }
 
     /**
-     * What centering holds back. Other providers give a condition score, of which the lowest counts.
+     * What centering holds back: only our own measurement counts, never another provider's centering
+     * score (CLAUDE.md, pipeline step 2). An allowlist, so a provider added later can't slip in: Ximilar
+     * read 42/58 on real cards where the borders are nearly even, and nobody has checked the others.
      * Our measurement gives a cap, the best grade the centering allows, so it only counts when it reaches
-     * the likely range: a cap of 8 doesn't hold back a card that is likely a 5. When the front was
-     * measured, the measurement replaces the scores, so the seller is never told centering holds the
-     * card back beside ratios that say otherwise. The back alone can't: the front limits most grades.
-     * Ximilar's centering never counts: on real cards it read 42/58 where the borders are nearly even.
+     * the likely range: a cap of 8 doesn't hold back a card that is likely a 5.
      */
     private static Double centeringLimit(List<ProviderPrediction> latest, int high) {
-        Optional<ProviderPrediction> own = latest.stream().filter(ProviderPrediction::isOwnMeasurement).findFirst();
-        Double cap = own.map(ProviderPrediction::getCentering).filter(c -> c <= high).orElse(null);
-        if (own.isPresent() && side(own.get().getDetails(), "frontCentering") != null) {
-            return cap;
-        }
-        Double score = latest.stream().filter(p -> !p.isOwnMeasurement() && !p.getProvider().equals(XimilarPreGradeProvider.NAME))
-                .map(ProviderPrediction::getCentering)
-                .filter(Objects::nonNull).min(Double::compare).orElse(null);
-        return Stream.of(cap, score).filter(Objects::nonNull).min(Double::compare).orElse(null);
+        return latest.stream().filter(ProviderPrediction::isOwnMeasurement).findFirst()
+                .map(ProviderPrediction::getCentering).filter(c -> c <= high).orElse(null);
     }
 
     private static List<String> holdingBack(List<ProviderPrediction> latest, int high) {

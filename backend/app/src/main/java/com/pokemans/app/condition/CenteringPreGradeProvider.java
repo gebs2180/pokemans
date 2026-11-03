@@ -25,6 +25,8 @@ class CenteringPreGradeProvider implements PreGradeProvider.Local {
     static final String NAME = "RAWMARK_CENTERING";
     /** Bump when the method changes, so stored measurements can be told apart. */
     static final String VERSION = "centering-3";
+    /** The key, in each measured side's details, of the best grade that side allows on its own. */
+    static final String SIDE_CAP = "psaCap";
 
     private final CenteringMeasurer measurer;
     private final double margin;
@@ -50,8 +52,8 @@ class CenteringPreGradeProvider implements PreGradeProvider.Local {
         CenteringMeasurer.Result back = photos.back() == null
                 ? new CenteringMeasurer.Unmeasured("no back photo") : measurer.measure(photos.back().bytes());
         Map<String, Object> details = new LinkedHashMap<>();
-        details.put("frontCentering", describe(front));
-        details.put("backCentering", describe(back));
+        details.put("frontCentering", withSideCap(describe(front), PsaCentering.cap(worstShare(front), null, margin)));
+        details.put("backCentering", withSideCap(describe(back), PsaCentering.cap(null, worstShare(back), margin)));
         details.put("measurementMargin", margin);
         if (front instanceof CenteringMeasurer.Unmeasured(String frontReason)
                 && back instanceof CenteringMeasurer.Unmeasured(String backReason)) {
@@ -60,6 +62,19 @@ class CenteringPreGradeProvider implements PreGradeProvider.Local {
         Integer cap = PsaCentering.cap(worstShare(front), worstShare(back), margin);
         details.put("psaCenteringCap", cap);
         return Poll.done(new Reading(VERSION, null, null, cap.doubleValue(), null, null, null, details), details);
+    }
+
+    /**
+     * What this side allows on its own, from the unrounded share: stored so a later retake that can't
+     * measure this side keeps its limit exactly ({@link ProviderPrediction#centeringCap(java.util.List)}),
+     * rather than recomputing it from the rounded {@code worstShare}, which could loosen it (review of
+     * 2026-11, finding 5). Null for a side that wasn't measured.
+     */
+    private static Map<String, Object> withSideCap(Map<String, Object> side, Integer cap) {
+        if (cap != null) {
+            side.put(SIDE_CAP, cap);
+        }
+        return side;
     }
 
     private static Double worstShare(CenteringMeasurer.Result result) {

@@ -72,8 +72,8 @@ class ConditionSummaryTest {
 
         Assessments.Summary s = Assessments.summarize(dist(Grade.G8, "1"), latest);
 
-        // surface 7, centering 8, corners 8.5: the two lowest, lowest first.
-        assertThat(s.holdingBack()).containsExactly("surface", "centering");
+        // surface 7, corners 8.5: the two lowest, lowest first. CardGrade's centering 8 doesn't count.
+        assertThat(s.holdingBack()).containsExactly("surface", "corners");
     }
 
     @Test
@@ -155,18 +155,33 @@ class ConditionSummaryTest {
     }
 
     @Test
-    void withoutAFrontMeasurementOtherProvidersScoresStillCount() {
-        List<ProviderPrediction> latest = List.of(prediction("CARDGRADE", 7.0, 9.0, 9.0, 9.0), measured(10, UNMEASURED, EVEN));
-
-        assertThat(Assessments.summarize(dist(Grade.G8, "1"), latest).holdingBack()).containsExactly("centering");
-    }
-
-    @Test
-    void ximilarsCenteringNeverHoldsTheCardBack() {
-        List<ProviderPrediction> latest = List.of(prediction("XIMILAR", 7.0, 9.0, 9.0, 9.0), measured(10, UNMEASURED, EVEN));
+    void withoutAFrontMeasurementOtherProvidersScoresStillDoNotCount() {
+        List<ProviderPrediction> latest = List.of(prediction(CardGradePreGradeProvider.NAME, 7.0, 9.0, 9.0, 9.0),
+                measured(10, UNMEASURED, EVEN));
 
         assertThat(Assessments.summarize(dist(Grade.G8, "1"), latest).holdingBack()).isEmpty();
-        assertThat(Assessments.summarize(dist(Grade.G8, "1"), List.of(latest.getFirst())).holdingBack()).isEmpty();
+    }
+
+    /** An allowlist: no provider's centering counts but our own, including one nobody has named yet. */
+    @Test
+    void noOtherProvidersCenteringEverHoldsTheCardBack() {
+        for (String provider : List.of(XimilarPreGradeProvider.NAME, CardGradePreGradeProvider.NAME, "SOME_NEW_PROVIDER")) {
+            List<ProviderPrediction> latest = List.of(prediction(provider, 7.0, 9.0, 9.0, 9.0), measured(10, UNMEASURED, EVEN));
+
+            assertThat(Assessments.summarize(dist(Grade.G8, "1"), latest).holdingBack()).as(provider).isEmpty();
+            assertThat(Assessments.summarize(dist(Grade.G8, "1"), List.of(latest.getFirst())).holdingBack()).as(provider).isEmpty();
+        }
+    }
+
+    /** Nor does any other provider's centering cap the distribution: only our measurement gives a cap. */
+    @Test
+    void noOtherProvidersCenteringCapsTheDistribution() {
+        for (String provider : List.of(XimilarPreGradeProvider.NAME, CardGradePreGradeProvider.NAME, "SOME_NEW_PROVIDER")) {
+            ProviderPrediction theirs = prediction(provider, 3.0, 9.0, 9.0, 9.0);
+
+            assertThat(theirs.centeringCap()).as(provider).isNull();
+            assertThat(ProviderPrediction.centeringCap(List.of(theirs))).as(provider).isNull();
+        }
     }
 
     @Test
