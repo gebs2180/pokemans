@@ -1,6 +1,6 @@
 # High-level design: raw collection collateral reports
 
-Status: draft v1 · 2026-10-16 · Zach
+Status: draft v1 · 2026-10-16 · Zach. Corrected to the system as built on 2026-11-03 (review finding 15); where this plan was not built it says so. The as-built reference is [architecture/](architecture/README.md).
 Product name: Rawmark (`rawmark.app`, 2026-10-25). "pokemans" remains the internal name in code and infrastructure identifiers.
 Shareable copy: [Raw Collection Collateral Reports: HLD](https://claude.ai/artifact/NH4ParzZyrmGe87Nh7m3Zy) (Claude Doc). This file is the source of truth; update the doc when this changes.
 
@@ -32,10 +32,10 @@ Not in v1: a native mobile app, a custom photo model, lender/insurer portals, pa
 |---|---|---|
 | Card catalog (e.g. Pokémon TCG API) | Canonical card identities | `CatalogProvider` |
 | Pre-grading APIs (two, compared) | Per-photo condition predictions | `PreGradeProvider` |
-| Licensed price data | Sold comps per grade | `PriceDataProvider` |
+| Licensed price data | Sold comps per grade | `PriceDataProvider` (built as `PriceSource`, with no production implementation; comps are entered by hand) |
 | S3-compatible storage (R2/S3) | Photos, derivatives, report PDFs | `BlobStore` |
 | OIDC provider (Auth0/Clerk-type) | Login, MFA | Spring Security resource server |
-| Email (transactional) | Invites, report-ready notices | `Notifier` |
+| Email (transactional) | Invites, report-ready notices | `Notifier` (planned, **not built**: there is no email; invites are links and each side sees its next step on its home page) |
 
 Every provider port has a **manual implementation** (the reviewer enters the identity, distribution or comps by hand), so the system never blocks on a vendor.
 
@@ -58,7 +58,7 @@ flowchart LR
     RE[reporting]
     OU[outcomes]
     AD[admin]
-    JB[jobs - JobRunr]
+    JB[scheduled pollers - Spring @Scheduled]
   end
   VC[[valuation-core<br/>pure Java library]]
   DB[(Postgres)]
@@ -108,9 +108,9 @@ The methodology's worked example (FMV $411 → RV $481 → QSV $314 → stressed
 | `reporting` | HTML templates, PDF rendering (OpenHTMLtoPDF), report storage and hashing |
 | `outcomes` | Grader submissions, returned grades (manual + CSV import), linking outcomes to predictions |
 | `offers` | Instant offers on raw cards, listings posted to buyer orgs, first-come acceptance, buyers' inspection records |
-| `admin` | Parameter set versions, review queues, comp overrides, user and org management |
+| `admin` | Parameter set versions, review queues, comp overrides, user and org management (planned as a module; as built there is no `admin` package: its work lives in each module's admin controllers, parameter sets are classpath files, and the review queue is in `condition`) |
 
-Modules talk through published interfaces and application events (e.g. `PhotosAccepted`, `CardIdentified`, `AssessmentFinalized`, `GradeReturned`), not each other's repositories.
+Modules talk through published interfaces, not each other's repositories. The application events built are `CaptureCompleted` and `PhotoRetaken` (both from `intake`). The events first planned here (`PhotosAccepted`, `CardIdentified`, `AssessmentFinalized`, `GradeReturned`) were not built; modules call each other's published API instead.
 
 **Built so far (M3 skeleton, 2026-10-16; M4 2026-10-18):** `identity`, `storage`, `intake`, `catalog`, `condition`, `outcomes`, `pricing`, `provenance`, `valuation` and `reporting`.
 - **Published APIs:** each module exposes a small public API: `intake.CardItems` (cards, passing photos, the `CaptureCompleted` and `PhotoRetaken` events), `catalog.Catalog` (current identity per card, and the identified catalog cards), `identity.Consents` and `pricing.Prices` (a card's latest snapshot set). `provenance.Provenance` gives each card's two eligibility gates: `authFlagUnresolved` with its reason, and `custodyVerified`.
@@ -129,7 +129,7 @@ Installable as a PWA. The upload API is client-agnostic so a future Expo capture
 
 ### 3.4 Analysis workspace
 
-`analysis/` (Python, pandas, scikit-learn, Jupyter) reads from a read-only Postgres role and stable SQL views (`v_prediction_outcomes`, `v_flv_followup_prices`, `v_provider_comparison`; built so far: `v_offer_outcomes` and `v_offer_grade_calibration`, V15). Outputs: calibration curves, ±1-grade hit rate, below-stressed-median rate, the 2021–2023 liquidation replay, and the week 1–2 provider comparison.
+`analysis/` (Python, pandas, scikit-learn, Jupyter) reads from a read-only Postgres role and stable SQL views (`v_prediction_outcomes`, `v_flv_followup_prices`, `v_provider_comparison`; none built, and no read-only role yet. Built so far: only `v_offer_outcomes`, V15, rewritten in V16, V18 and V20). Outputs: calibration curves, ±1-grade hit rate, below-stressed-median rate, the 2021–2023 liquidation replay, and the week 1–2 provider comparison.
 
 ## 4. Key flows
 
@@ -163,7 +163,9 @@ sequenceDiagram
 
 Create collection → capture (cards above $25 individually, cheaper cards as photographed lots) → same quality / identify / predict / review pipeline → admin starts a valuation run against current price snapshots and a chosen parameter set → report PDF generated, hashed and stored → collector notified.
 
-### 4.3 Scheduled jobs (JobRunr, Postgres-backed)
+### 4.3 Scheduled jobs
+
+Planned as JobRunr (Postgres-backed). **As built, JobRunr is not a dependency:** `@Scheduled` pollers in `catalog` (`RecognitionScheduler`), `condition` (`PredictionScheduler`) and `pricing` (`PricingScheduler`) do the retries and the nightly ingestion. The rest of this list is the plan; the weekly step-down recompute, the backup check and the orphan cleanup are not built (era ratios are computed on the fly; backups are `deploy/backup`).
 
 - Nightly comp ingestion per tracked catalog card, then per-grade price snapshots, volatility (12-month σ of 30-day changes), monthly sales counts.
 - Weekly step-down ratio recompute per era.
@@ -171,6 +173,8 @@ Create collection → capture (cards above $25 individually, cheaper cards as ph
 - Nightly DB backup check and orphaned-upload cleanup (uploads not confirmed within 24 h, never confirmed photos).
 
 ## 5. Data model (core entities)
+
+This is the plan. The schema as built differs in several places (35 tables after V21): see [architecture/03-data-model.md](architecture/03-data-model.md#differences-from-docshldmd-5). In short: `DATA_SHARING_AGREEMENT` is `consent_record`; `AUTH_FLAG` is derived, not a table; there is no `GRADER_SUBMISSION` (`grade_outcome` hangs off `card_item`); `PARAMETER_SET` and the step-down ratio tables are classpath files and on-the-fly computation; a card has many `card_identification` rows; users reach orgs through `membership`; one run has many reports; and the offers tables are not in the diagram.
 
 ```mermaid
 erDiagram
@@ -198,41 +202,41 @@ erDiagram
 
 Notes on key entities:
 - **CardItem** is the physical card; **CatalogCard** is the canonical identity (set, number, language, edition, variant, promo). Lots are a CardItem with a quantity and `is_lot`.
-- **Photo:** content hash (SHA-256), storage key, side, `captured_at` (EXIF) and `uploaded_at`, quality metrics, training-consent flag inherited from the org's agreement. Immutable; derivatives (thumbnails, crops) are separate keys.
+- **Photo:** content hash (SHA-256), storage key, side, `captured_at` (EXIF) and `uploaded_at`, quality metrics. The stored image is immutable and is never overwritten; derivatives (crops) are separate keys. The row is not immutable: the photo check updates its status and metrics. A per-photo training-consent flag was planned and **not built**: consent is a versioned `consent_record` per user and org, and exports must be filtered through it.
 - **ProviderPrediction:** provider, model/version, request id, raw JSONB, normalized 11-outcome distribution, latency. Append-only.
 - **ConditionAssessment:** version, distribution, confidence, author (system or reviewer), the adjustments as a diff, reason. A new version for every change, and one is marked current.
 - **CenteringLabel:** a person's reading of one face of a card's printed frame: four border widths in mm (null is "can't see it"), hard-card flag, who, when, and the photo it was drawn on. Applies to every photo of that face. Append-only, and the newest counts. It scores the centering measurer and never touches a cap.
-- **Comp:** source, external id, sold date, price + currency, grader, grade (half grades kept as-is and folded in pricing), raw/damaged flag, listing type. Asking prices are never stored as comps.
-- **GradePriceSnapshot** (`price_snapshot`): per catalog card × grade × date: gross price, method (`OBSERVED`, `INTERPOLATED`, `STEP_DOWN`, `CARRIED_DOWN`, `FLOOR`), comp ids used, n, window, basis grades, step-down ratio, confidence, parameter set and trace. The 11 rows computed together share a `snapshot_set_id`, which a valuation run references. Per-card σ and sales per month sit beside it in `price_stats`.
-- **ParameterSet:** semantic version + JSON body; immutable once any valuation run references it.
+- **Comp** (`sold_comp`): source, external id, sold date, price + currency, grader, grade (half grades kept as-is and folded in pricing), raw/damaged flag, listing type. Asking prices are never stored as comps.
+- **GradePriceSnapshot** (`price_snapshot`): per catalog card × grade × date: gross price, method (`OBSERVED`, `INTERPOLATED`, `STEP_DOWN`, `CARD_STEP_DOWN`, `CARRIED_DOWN`, `NO_SALES`; `FLOOR` was removed in V9), comp ids used, n, window, basis grades, step-down ratio, confidence, parameter set and trace. The 11 rows computed together share a `snapshot_set_id`, which a valuation run references. Per-card σ and sales per month sit beside it in `price_stats`.
+- **ParameterSet:** semantic version + JSON body; immutable once any valuation run references it. Built as versioned classpath files, not a table; a run stores the full body as jsonb.
 - **ValuationRun / CardValuation:** inputs snapshot (assessment version, price snapshot ids, parameter set), the four values, confidence, eligibility, cap adjustments, trace JSON. Re-running with the same inputs must give the same output.
 - **Report:** type (lender, insurer), run id, PDF key, SHA-256, issued_at.
 
 ## 6. Cross-cutting rules
 
-- **Append-only evidence:** predictions, outcomes, photos and issued reports are never updated or deleted in place. Corrections are new rows.
+- **Append-only evidence:** predictions, outcomes, stored photo objects and issued reports are never overwritten or deleted in place. Corrections are new rows. A `refuse_update()` trigger enforces this on 21 tables; the `photo` row itself is updated by the photo check, and `centering_label`, `condition_assessment` (only `is_current` changes) and `card_reading` aren't covered.
 - **Reproducible reports:** every report ties to exact assessment versions, price snapshots and a parameter set version.
 - **Traceability:** every value in a report can be traced back to comps (with dates and counts) and to the rule that produced it.
-- **Tenancy:** every org-owned row carries `org_id`. Queries are scoped by a request-level org context, with Postgres row-level security as a second line of defense. Admin is cross-org.
-- **Consent:** photos may feed model training only when the uploading org's data-sharing agreement allows it. Exports carry the flag.
-- **Money:** `BigDecimal` in Java, `numeric` in Postgres, with currency stored. USD only in v1.
+- **Tenancy:** every org-owned row carries `org_id`. Queries are scoped by the org checks in the controllers, services and `CardItems`. Postgres row-level security as a second line of defense was planned and **not built**: tenancy is enforced in the app only. Admin is cross-org.
+- **Consent:** photos may feed model training only when the uploading org's consent allows it. As built, consent is a versioned `consent_record` (user and org), and there is no flag on the photo or in exports, so any training export has to be filtered through `consent_record`. (Planned: a flag carried on the photo and exports.)
+- **Money:** `BigDecimal` in Java, `numeric` in Postgres. Currency is stored only on comps and price snapshots; other money columns have none, which is fine while the product is USD only.
 - **Time:** UTC everywhere; sold dates as dates.
 
 ## 7. Security
 
 - Managed OIDC (free tier) with Spring Security as a resource server. Roles ADMIN, PARTNER, COLLECTOR. MFA required for ADMIN. ADMIN comes from the token; PARTNER and COLLECTOR come from org membership in Postgres, created by accepting an invite link (decided 2026-10-16). See [auth.md](auth.md).
 - Invite-only onboarding for partners in v1. Collectors self-register behind an allowlist until pilots end.
-- Presigned upload URLs scoped to one key, short expiry, content-type and size limits. The photo bucket is private with versioning/object lock; reports are served through short-lived signed links.
-- Secrets live in the host's environment config, never in the repo.
-- Daily managed-Postgres backups with a quarterly restore test. The bucket is versioned.
-- Dependency and container scanning in CI.
+- Presigned upload URLs scoped to one key, short expiry, content-type and size limits. The photo bucket is private. R2 has no bucket versioning, so the app never overwrites a photo and the nightly backup copies the bucket to a second bucket it never deletes from ([hosting.md](hosting.md)). Reports are served through short-lived signed links.
+- Secrets live in the host's environment config (a `.env` on the server), never in the repo.
+- Nightly `pg_dump` and photo-bucket copy to R2 by our own backup container, with a restore test ([hosting.md](hosting.md)). Planned as managed-Postgres backups; not used.
+- Dependency and container scanning in CI (planned; check the workflows before relying on it).
 
 ## 8. Deployment and operations
 
 - **Local:** docker-compose with Postgres and MinIO (Chainguard's build, since MinIO left Docker Hub); seed data includes the worked-example card and a small fake collection. See [local-dev.md](local-dev.md).
-- **Prod:** one container (Spring Boot serving the built SPA) on a managed platform, plus managed Postgres and R2/S3. A single environment plus local in v1; add staging only when there are paying users.
-- **CI/CD:** GitHub Actions running backend tests (unit, `valuation-core` golden tests, Testcontainers integration), web build and lint, then deploy on merge to `main`.
-- **Observability:** structured JSON logs, error tracking (Sentry-type), JobRunr dashboard, and a simple admin health page (queue depth, failed jobs, last comp refresh).
+- **Prod:** as built, four containers on one self-managed Hetzner VPS under Docker Compose: Caddy (TLS, and serves the built SPA), the Spring Boot backend, Postgres and a backup runner, with photos and backups in Cloudflare R2. Live at beta.rawmark.app since 2026-10-28; see [hosting.md](hosting.md). Planned here: one container serving the SPA on a managed platform with managed Postgres; revisit if the beta becomes a product. A single environment plus local in v1; add staging only when there are paying users.
+- **CI/CD:** GitHub Actions running backend tests (unit, `valuation-core` golden tests, Testcontainers integration), web build and lint. Deploys are manual: `deploy/deploy.sh` on the server. Deploy on merge to `main` was planned and not built.
+- **Observability:** built: logs from `docker compose logs`, Sentry error tracking, an outside uptime check on `/actuator/health` and a healthchecks ping from the backup job. Not built: structured JSON logs, a JobRunr dashboard and the admin health page (queue depth, failed jobs, last comp refresh).
 - **Ops budget:** a target under 5 h/week after leave: no self-managed infra, alert only on failed jobs and errors.
 
 ## 9. Repo layout
