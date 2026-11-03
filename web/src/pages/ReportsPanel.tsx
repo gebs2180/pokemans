@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApi, type DownloadLink, type ReportView } from '../api'
 import { safeHref } from '../safeHref'
+import { message } from '../format'
 
 const TYPE_LABEL = { LENDER: 'Lender collateral report', INSURER: 'Insurer replacement value report' } as const
 
@@ -26,7 +27,7 @@ export function ReportsList({ reports, downloadPath }: { reports: ReportView[]; 
       else window.location.assign(href)
     } catch (e) {
       tab?.close()
-      setError(e instanceof Error ? e.message : String(e))
+      setError(message(e))
     } finally {
       setBusy(null)
     }

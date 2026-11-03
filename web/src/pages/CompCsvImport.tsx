@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent } from 'react'
 import { ApiError, useApi } from '../api'
 import { compsFromCsv, type CsvRow } from '../compsCsv'
+import { message } from '../format'
 
 /** Admin: many sold comps at once from a CSV, each saved exactly as one entered by hand would be. */
 export function CompCsvImport({ base, number, onAdded }: { base: string; number: string | null; onAdded: () => void }) {
@@ -31,7 +32,7 @@ export function CompCsvImport({ base, number, onAdded }: { base: string; number:
       } catch (e) {
         // A listing URL already entered is the same sale: the server keys sales by URL.
         if (e instanceof ApiError && e.status === 409) duplicates++
-        else failed.push(`Line ${r.line}: ${e instanceof Error ? e.message : String(e)}`)
+        else failed.push(`Line ${r.line}: ${message(e)}`)
       }
     }
     setBusy(false)

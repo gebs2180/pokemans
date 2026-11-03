@@ -9,6 +9,7 @@ import { focusHeading } from '../useRouteFocus'
 import { AddressPanel } from './AddressForm'
 import { ContainerView } from './ContainerPage'
 import { HowItWorksGuide, type GuideFor } from './HowItWorksPage'
+import { message } from '../format'
 
 export function OrgPage() {
   const { orgId = '' } = useParams()
@@ -100,7 +101,7 @@ function ConsentGate({
       window.scrollTo(0, 0)
       reload()
     } catch (err) {
-      setAcceptError(err instanceof Error ? err.message : String(err))
+      setAcceptError(message(err))
     }
   }
 
@@ -175,7 +176,7 @@ function Containers({
       const created = await api<ContainerSummary>('POST', apiPath`/api/orgs/${orgId}/${kind.path}`, { name })
       navigate(`/orgs/${encodeURIComponent(orgId)}/${kind.path}/${encodeURIComponent(created.id)}`)
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : String(err))
+      setCreateError(message(err))
     } finally {
       setCreating(false)
     }

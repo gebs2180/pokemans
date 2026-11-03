@@ -2,7 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { apiPath, money, useApi, type GradingCost, type RunSummary, type ValuationDefaults } from '../api'
 import { useLoad } from '../useLoad'
-import { PageError } from '../ui'
+import { Loading, PageError } from '../ui'
+import { message } from '../format'
 
 /** Admin: value a collection (one run per click, kept forever) and list its runs. */
 export function ValuationPage() {
@@ -26,7 +27,7 @@ export function ValuationPage() {
       </p>
       {defaults && <StartRun defaults={defaults} onStarted={(id) => navigate(`/admin/valuation-runs/${id}`)} path={runsPath} />}
       <h2>Runs</h2>
-      {!runs && <p>Loading…</p>}
+      {!runs && <Loading />}
       {runs?.length === 0 && <p className="muted">No runs yet.</p>}
       <ul className="list">
         {runs?.map((r) => (
@@ -66,7 +67,7 @@ export function StartRun({
       const run = await api<RunSummary>('POST', path, { gradingCost: cost, note: note || null })
       onStarted(run.id)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(message(err))
     } finally {
       setBusy(false)
     }

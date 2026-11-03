@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { apiPath, money, useApi, type AwaitingLabel } from '../api'
 import { useLoad } from '../useLoad'
 import { ArrivalForm, CardTitle, Photos } from './MarketPage'
-import { PageError } from '../ui'
+import { Loading, PageError } from '../ui'
 
 /**
  * Admin: deals a buyer took whose prepaid label didn't go through. Buy the label again (once shipping
@@ -40,7 +40,7 @@ export function AdminLabelsPage() {
         Cards a buyer took whose prepaid label didn't go through. The seller is told not to ship until the label shows on their card's
         page.
       </p>
-      {!data && <p>Loading…</p>}
+      {!data && <Loading />}
       {data?.length === 0 && <p className="muted">No deals are waiting for a label.</p>}
       {data?.map((deal) => (
         <section key={deal.listingId} className="panel">

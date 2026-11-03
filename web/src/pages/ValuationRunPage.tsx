@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router'
 import { apiPath, money, percent, useApi, type CardLine, type ReportType, type ReportView, type RunDetail } from '../api'
 import { useLoad } from '../useLoad'
 import { ReportsList } from './ReportsPanel'
-import { PageError } from '../ui'
+import { Loading, PageError } from '../ui'
+import { message } from '../format'
 
 const LABEL = (s: string) => s.replace(/_/g, ' ').toLowerCase()
 
@@ -14,7 +15,7 @@ export function ValuationRunPage() {
   const { data, error } = useLoad(() => api<RunDetail>('GET', apiPath`/api/admin/valuation-runs/${runId}`), [api, runId])
 
   if (error) return <PageError message={error} />
-  if (!data) return <p>Loading…</p>
+  if (!data) return <Loading />
   const { run } = data
   const gradeFirst = data.cards.filter((c) => c.gradeFirstRank != null).sort((a, b) => a.gradeFirstRank! - b.gradeFirstRank!)
   const adjustments = data.portfolioTrace.filter((s) => s.subject.startsWith('capped[') || s.subject.startsWith('correlation['))
@@ -230,7 +231,7 @@ function Reports({ runId }: { runId: string }) {
       await api('POST', path, { type, lenderAlpha })
       reload()
     } catch (e) {
-      setIssueError(e instanceof Error ? e.message : String(e))
+      setIssueError(message(e))
     } finally {
       setBusy(false)
     }

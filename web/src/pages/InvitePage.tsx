@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { apiPath, useApi, type InvitePreview, type OrgType } from '../api'
 import { Loading, PageError } from '../ui'
 import { useLoad } from '../useLoad'
+import { message } from '../format'
 
 /** What a person is invited to do: the org's own name is an internal one, chosen by the admin. */
 const INVITED_TO: Partial<Record<OrgType, string>> = {
@@ -26,7 +27,7 @@ export function InvitePage() {
       const accepted = await api<{ orgId: string }>('POST', apiPath`/api/invites/${token}/accept`)
       navigate(`/orgs/${encodeURIComponent(accepted.orgId)}`, { replace: true })
     } catch (err) {
-      setAcceptError(err instanceof Error ? err.message : String(err))
+      setAcceptError(message(err))
     } finally {
       setBusy(false)
     }

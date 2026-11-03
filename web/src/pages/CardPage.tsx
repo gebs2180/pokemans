@@ -23,6 +23,7 @@ import { useOrg } from '../useOrg'
 import { Chip, Loading, PageError, StageChip } from '../ui'
 import { OfferPanel } from './OfferPanel'
 import { ProvenancePanel } from './ProvenancePanel'
+import { message } from '../format'
 
 /** What each side should show, so a back in the Front slot is caught before it's sent. */
 const SIDE_HINT: Record<Side, string> = {
@@ -69,7 +70,7 @@ export function CardPage() {
       reload()
       setPhotoVersion((v) => v + 1)
     } catch (err) {
-      setUploadError({ side, message: err instanceof Error ? err.message : String(err) })
+      setUploadError({ side, message: message(err) })
     } finally {
       setBusy(null)
     }
@@ -337,7 +338,7 @@ function GradedResult({ orgId, cardId, ready }: { orgId: string; cardId: string;
       setGradeLabel('')
       reload()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(message(e))
     } finally {
       setBusy(false)
     }
