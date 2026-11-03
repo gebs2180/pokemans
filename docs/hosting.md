@@ -58,9 +58,9 @@ Compose sets these from `deploy/.env`; another host would set them directly.
 | `STORAGE_PUBLIC_ENDPOINT` | no | Only if browsers must use a different endpoint than the app. Then set the Caddy container's `PHOTO_ORIGIN` to it too, or the Content-Security-Policy blocks photos |
 | `STORAGE_REGION` | no | Default `auto` (R2) |
 | `SENTRY_DSN`, `SENTRY_ENVIRONMENT` | no | Without a DSN, Sentry is off |
-| `CARD_READER_ENABLED` + `ANTHROPIC_API_KEY`, `EASYPOST_ENABLED` + `EASYPOST_API_KEY`, `XIMILAR_*`, `CARDGRADE_*`, `CENTERING_ENABLED`, `PRICING_INGESTION_ENABLED`, `COLLATERAL_ENABLED` | no | Feature switches, all off by default (`docs/local-dev.md`) |
+| `CARD_READER_ENABLED` + `ANTHROPIC_API_KEY`, `EASYPOST_ENABLED` + `EASYPOST_API_KEY`, `XIMILAR_*`, `CARDGRADE_*`, `CENTERING_ENABLED` | no | Feature switches, all off by default (`docs/local-dev.md`). `deploy/compose.prod.yml` passes only these to the backend. `PRICING_INGESTION_ENABLED` and `COLLATERAL_ENABLED` exist in the app but compose doesn't forward them, so they stay off on prod until it does |
 
-Web build args (baked into the bundle, not secrets): `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, `VITE_COLLATERAL_ENABLED`.
+Web build args (baked into the bundle, not secrets): `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`. Compose sets `VITE_COLLATERAL_ENABLED` to `false`.
 
 ## First deploy, step by step
 
@@ -78,8 +78,8 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
 
 1. Hetzner → Servers → Add server: **CX23**, Ubuntu 24.04, location Nuremberg/Falkenstein/Helsinki (the CX line is the cheapest; US locations cost about 20% more), your SSH key, IPv4 on. Optionally tick **Backups** (+20%, weekly whole-disk snapshots on top of our nightly ones).
 2. Firewalls → Create: allow inbound TCP 22 (ideally from your IP only), TCP 80, TCP 443 and UDP 443, then apply it to the server.
-3. Pick the site address. The product is called Rawmark, and Zach bought `rawmark.app` on 2026-10-25. The site is either `https://rawmark.app` or `https://beta.rawmark.app`; Zach picks which when setting up DNS:
-   - add an A record for `rawmark.app` (the bare domain) or `beta` (for `beta.rawmark.app`) → the server's IPv4, at the registrar or wherever the domain's DNS is hosted;
+3. Pick the site address. The product is called Rawmark, and Zach bought `rawmark.app` on 2026-10-25. The beta site is `https://beta.rawmark.app` (live since 2026-10-28); the bare `rawmark.app` is kept for the product site. For a new server:
+   - add an A record for `beta` (for `beta.rawmark.app`) → the server's IPv4, at the registrar or wherever the domain's DNS is hosted;
    - set `SITE_ADDRESS` in `.env` (step 5) to that host name, without `https://`. `.app` domains only work over HTTPS, which Caddy provides.
    - Before DNS is ready you can test on `<ip-with-dashes>.sslip.io` (e.g. `203-0-113-7.sslip.io`), which resolves to that IP and gets a certificate too.
 4. SSH in and set up the box:

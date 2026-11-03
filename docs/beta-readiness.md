@@ -11,7 +11,7 @@ Status 2026-10-26 (first drafted 2026-10-19) · for the closed test of Rawmark w
 Built and tested: the whole offer flow, the E2E audit fixes, the offer maximum, admin undo, the terms, and the clearer upload error. Decided: the brand (Rawmark) and going ahead without employer clearance.
 
 Not yet done, in rough order:
-1. **Deploy** the planned hosting ([hosting.md](hosting.md)).
+1. **Deploy**: done. The beta has been live at https://beta.rawmark.app since 2026-10-28 ([hosting.md](hosting.md)). Left: a second non-admin account tried as collector and buyer before testers are invited.
 2. **EasyPost test key**, then one real card shipped between two test orgs.
 3. **Comps entered** for the cards testers will bring.
 4. **Vendor spot check** of about 20 offers.
@@ -29,7 +29,7 @@ Not yet done, in rough order:
 - [ ] **iOS camera.** Same check on an iPhone (Safari, added to the home screen).
 - [ ] **EasyPost test key.** Create the account, set the test key, buy a test label for a deal. The audit had no key, so every label failed (finding 2; the copy is fixed and the admin has a Labels to buy page).
 - [ ] **One real card ships** between two of Zach's own test orgs on the test key, then on the production key.
-- [ ] **Deployed** somewhere the testers can reach, on Zach's personal infrastructure: HTTPS, backups of Postgres and the photo bucket, and an error log someone reads. *Planned, not deployed:* [hosting.md](hosting.md) (PR #23) picks a Hetzner VPS with Compose and Caddy, R2 for photos and backups, and Sentry, at about $5–7 a month. The prod stack, backups and restore test ran locally with MinIO standing in for R2. No accounts exist yet. Still to test on the real host: R2, Auth0 login on the deployed origin, Let's Encrypt (hosting.md, smoke test step 6).
+- [x] **Deployed** somewhere the testers can reach, on Zach's personal infrastructure: HTTPS, backups of Postgres and the photo bucket, and an error log someone reads. *Checked:* live at https://beta.rawmark.app since 2026-10-28 on a Hetzner VPS with Compose and Caddy ([hosting.md](hosting.md)), R2 for photos and backups, and Sentry, at about $5–7 a month. The smoke test passed (an iPhone upload), and a backup and restore test ran on the real host. Uptime is watched from outside, and Sentry emails on a new issue.
 - [ ] **Auth0 sign-up for invited testers** works without Zach's MFA setup getting in the way: invites, roles, and a password reset. The invite page now says "you've been invited" when logged out (audit finding 29), but nobody has signed up through the real tenant yet. Callback and origin changes for the deployed host are in hosting.md, step 4.
 
 ### The prices are defensible
