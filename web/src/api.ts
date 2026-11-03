@@ -92,8 +92,6 @@ export const STAGE_LABEL: Record<CardStage, string> = {
   RETURNED: 'Returned',
 }
 
-/** @param identity the card as we identified it, or null; @param canOffer asking for an offer can work now */
-/** Our view of a card's condition, for its seller: the grades it likely is, and what holds it back. */
 /** One side's measured ratios in whole percent, left or top border first, e.g. "49/51". */
 export type SideCentering = { leftRight: string; topBottom: string }
 
@@ -748,19 +746,13 @@ export type ReportView = {
 
 export type DownloadLink = { url: string }
 
-export function money(amount: number | null | undefined) {
-  return amount == null ? '–' : amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
-
 /** A dollar amount as typed, e.g. "1,234.50" or "$1234": NaN unless it is a plain number once "$" and commas are dropped. */
 export function parseMoney(text: string): number {
   const plain = text.replace(/[$,\s]/g, '')
   return /^\d+(\.\d{1,2})?$/.test(plain) ? Number(plain) : NaN
 }
 
-export function percent(share: number) {
-  return `${Math.round(share * 1000) / 10}%`
-}
+export { money, percent } from './format'
 
 // Instant offers (2026-10-19): one firm price, a prepaid label on accept
 

@@ -24,14 +24,15 @@ import { useLoad, usePoll } from '../useLoad'
 import { searchFromLabel } from '../searchFromLabel'
 import { PricesPanel } from './PricesPanel'
 import { ProvenancePanel } from './ProvenancePanel'
-import { PageError } from '../ui'
+import { Loading, PageError } from '../ui'
+import { message, percent } from '../format'
+import { COLLATERAL } from '../flags'
 
 const EDITIONS: Edition[] = ['UNLIMITED', 'FIRST_EDITION', 'SHADOWLESS']
 const VARIANTS: Variant[] = ['NORMAL', 'HOLO', 'REVERSE_HOLO']
 /** Our own centering measurement: it caps the distribution, but gives no grade to build one from. */
 const OWN_CENTERING = 'RAWMARK_CENTERING'
 /** Lender and insurer features are paused unless the build turns them on. */
-const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
 const RISK_EFFECT = COLLATERAL ? 'zero collateral until verified' : 'its offer is subject to authentication in hand'
 const RISK_LABEL = {
   NONE: null,
@@ -39,10 +40,6 @@ const RISK_LABEL = {
   JAPANESE_PROMO: `Japanese promo: authenticity risk, ${RISK_EFFECT}`,
   RECENT_CHASE: `Recent chase card: authenticity risk, ${RISK_EFFECT}`,
 } as const
-
-function message(err: unknown) {
-  return err instanceof Error ? err.message : String(err)
-}
 
 /** Admin: identify one card and review its condition distribution. */
 export function ReviewCardPage() {
@@ -52,7 +49,7 @@ export function ReviewCardPage() {
   const { data, error, reload } = useLoad(() => api<CardCondition>('GET', `${base}/condition`), [api, base])
 
   if (error) return <PageError message={error} />
-  if (!data) return <p>Loading…</p>
+  if (!data) return <Loading />
 
   const current = data.assessments.find((a) => a.current) ?? null
   return (
@@ -79,7 +76,7 @@ export function ReviewCardPage() {
       </section>
 
       <Identification data={data} base={base} onChange={reload} />
-      {/* Keys are prefixed per panel: two siblings both keyed "none" made React duplicate a panel (audit finding 10). */}
+      {/* Keys are prefixed per panel: two siblings both keyed "none" made React duplicate a panel. */}
       {data.identification ? (
         <PricesPanel
           key={`prices:${data.identification.catalogCardId}`}
@@ -630,10 +627,6 @@ function PredictionRows({ p }: { p: Prediction }) {
       )}
     </>
   )
-}
-
-function percent(p: number) {
-  return `${Math.round(p * 1000) / 10}%`
 }
 
 export function AssessmentPanel({

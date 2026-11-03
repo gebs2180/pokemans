@@ -3,6 +3,7 @@ import { apiPath, PAYMENT_METHOD, useApi, type PaymentMethod, type ShipAddress }
 import { Field } from '../ui'
 import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
+import { message } from '../format'
 
 const EMPTY = { name: '', company: '', street1: '', street2: '', city: '', state: '', zip: '', phone: '' }
 
@@ -65,7 +66,7 @@ export function AddressForm({
       })
       onSaved()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(message(err))
     } finally {
       setBusy(false)
     }

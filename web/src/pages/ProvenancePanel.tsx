@@ -15,6 +15,8 @@ import {
 } from '../api'
 import { DateInput } from '../inputs'
 import { useLoad } from '../useLoad'
+import { label, message, today } from '../format'
+import { COLLATERAL } from '../flags'
 
 const FINDINGS: Finding[] = ['VERIFIED_AUTHENTIC', 'SUSPECTED_COUNTERFEIT', 'COUNTERFEIT']
 const AUTH_METHODS: AuthMethod[] = ['IN_HAND_INSPECTION', 'GRADER_SLAB', 'THIRD_PARTY_AUTHENTICATION', 'PHOTO_REVIEW']
@@ -22,7 +24,6 @@ const HOLDER_TYPES: HolderType[] = ['OWNER', 'PARTNER', 'VAULT', 'GRADER', 'LEND
 const CUSTODY_METHODS: CustodyMethod[] = ['IN_PERSON', 'VAULT_STATEMENT', 'GRADER_RECEIPT', 'VIDEO_CALL']
 
 /** Collateral (lender and insurer) features; off while that side is paused. */
-const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
 
 const AUTH_LABEL: Record<AuthState, { text: string; className: string }> = {
   NOT_FLAGGED: { text: 'Not in an authenticity-risk category.', className: 'ok' },
@@ -51,19 +52,6 @@ const CUSTODY_LABEL: Record<CustodyState, { text: string; className: string }> =
   UNVERIFIED: { text: 'Custody not verified: no advance.', className: 'warn' },
   VERIFIED: { text: 'Custody verified.', className: 'ok' },
   LAPSED: { text: 'Custody check lapsed: no advance until it is checked again.', className: 'warn' },
-}
-
-function message(err: unknown) {
-  return err instanceof Error ? err.message : String(err)
-}
-
-function label(value: string) {
-  return value.replaceAll('_', ' ').toLowerCase()
-}
-
-/** Today as YYYY-MM-DD in the reviewer's own time zone. */
-function today() {
-  return new Date().toLocaleDateString('en-CA')
 }
 
 /**

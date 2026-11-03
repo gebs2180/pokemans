@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { apiPath, useApi, type OpenInvite, type OrgMember } from '../api'
 import { useLoad } from '../useLoad'
+import { message } from '../format'
+import { Loading } from '../ui'
 
 /** Who's in an org and which invite links still work, with the admin's way to end either. */
 export function OrgPeople({ orgId, invitesMade }: { orgId: string; invitesMade: number }) {
@@ -24,7 +26,7 @@ export function OrgPeople({ orgId, invitesMade }: { orgId: string; invitesMade: 
       setRemoving(null)
       setReason('')
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err))
+      setActionError(message(err))
     } finally {
       setBusy(false)
     }
@@ -39,7 +41,7 @@ export function OrgPeople({ orgId, invitesMade }: { orgId: string; invitesMade: 
   return (
     <div className="invite">
       {error && <p className="error" role="alert">{error}</p>}
-      {!members && !membersError && <p>Loading…</p>}
+      {!members && !membersError && <Loading />}
       {members?.length === 0 && <p className="muted small">No members.</p>}
       <ul className="list">
         {members?.map((member) => (

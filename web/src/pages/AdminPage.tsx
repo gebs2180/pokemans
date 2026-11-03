@@ -2,8 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention, type Org, type OrgType, type OverdueDeals, type QueueItem } from '../api'
 import { useLoad } from '../useLoad'
-import { PageError } from '../ui'
+import { Loading, PageError } from '../ui'
 import { OrgPeople } from './OrgPeople'
+import { message } from '../format'
 
 /** How much is waiting on the admin, with the way to each. A failed count says so: zero would read as all clear. */
 function NeedsAttention({ deals, dealsError }: { deals: DealAttention[] | null; dealsError: string | null }) {
@@ -59,7 +60,7 @@ export function AdminPage() {
       setName('')
       reload()
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err))
+      setActionError(message(err))
     } finally {
       setCreating(false)
     }
@@ -72,7 +73,7 @@ export function AdminPage() {
       setInvites((current) => ({ ...current, [orgId]: invite }))
       setInvitesMade((made) => made + 1)
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err))
+      setActionError(message(err))
     }
   }
 
@@ -106,7 +107,7 @@ export function AdminPage() {
       </form>
       {actionError && <p className="error" role="alert">{actionError}</p>}
 
-      {!orgs && <p>Loading…</p>}
+      {!orgs && <Loading />}
       <ul className="list">
         {orgs?.map((org) => {
           const invite = invites[org.id]

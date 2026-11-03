@@ -116,6 +116,40 @@ class ConditionRebuildTest {
         assertThat(built.getBasis()).containsEntry("centeringCap", 10);
     }
 
+    /**
+     * Front measured at 54.04, stored as the provider does now: the share rounded to 54.0 beside the
+     * side's own cap from the unrounded share. With the 1.0 margin that is 55.04, past 55: PSA 9.
+     */
+    private static ProviderPrediction frontAt5404(boolean withSideCap) {
+        Map<String, Object> front = withSideCap
+                ? Map.of("worstShare", 54.0, CenteringPreGradeProvider.SIDE_CAP, PsaCentering.cap(54.04, null, 1.0))
+                : Map.of("worstShare", 54.0);
+        Map<String, Object> details = Map.of("frontCentering", front, "backCentering", side(null), "measurementMargin", 1.0);
+        return ProviderPrediction.succeeded(request(CenteringPreGradeProvider.NAME), new PreGradeProvider.Reading(
+                CenteringPreGradeProvider.VERSION, null, null, (double) PsaCentering.cap(54.04, null, 1.0), null, null, null, details),
+                Map.of(), 1);
+    }
+
+    /** Review of 2026-11, finding 5: the rounded share must not loosen the front's cap from 9 to 10. */
+    @Test
+    void aRoundedFrontShareKeepsItsCapThroughARetakeOfTheBack() {
+        assertThat(PsaCentering.cap(54.04, null, 1.0)).isEqualTo(9);
+        assertThat(PsaCentering.cap(54.0, null, 1.0)).as("the rounded share alone would allow a 10").isEqualTo(10);
+
+        // The retake measures only the back, which alone allows a 10.
+        ConditionAssessment built = rebuild(measuredSides(null, 52.0), frontAt5404(true), graded("A", 9.0, null)).orElseThrow();
+
+        assertThat(built.getBasis()).containsEntry("centeringCap", 9);
+    }
+
+    /** Rows stored before the side's cap was kept: read the rounded share at the highest it could have been. */
+    @Test
+    void anOlderRowWithOnlyTheRoundedShareStaysConservative() {
+        ConditionAssessment built = rebuild(measuredSides(null, 52.0), frontAt5404(false), graded("A", 9.0, null)).orElseThrow();
+
+        assertThat(built.getBasis()).containsEntry("centeringCap", 9);
+    }
+
     @Test
     void aProvidersCenteringNeverCaps() {
         ConditionAssessment built = rebuild(graded("B", null, 5.0), graded("A", 9.0, 5.0)).orElseThrow();

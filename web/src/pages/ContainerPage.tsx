@@ -5,9 +5,10 @@ import { Chip, EmptyState, Field, Loading, NotFound, PageError, StageChip } from
 import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { ReportsList } from './ReportsPanel'
+import { COLLATERAL } from '../flags'
+import { message } from '../format'
 
 /** Lender and insurer reports are paused unless the build turns them on. */
-const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
 
 /** A batch or binder on its own page. */
 export function ContainerPage() {
@@ -73,7 +74,7 @@ export function ContainerView({
       // Straight to its photos: that's the next step for a new card.
       navigate(`/orgs/${encodeURIComponent(orgId)}/cards/${encodeURIComponent(card.id)}`)
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : String(err))
+      setAddError(message(err))
     } finally {
       setAdding(false)
     }

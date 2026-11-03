@@ -48,6 +48,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class RouteSweepTest {
 
+    private static final String UNSEEDED = "00000000-0000-0000-0000-00000000dead";
+
     /** The routes open to any signed-in user, each with its own check. */
     private static final List<String> NOT_ORG_SCOPED = List.of("/api/me", "/api/invites/{token}", "/api/invites/{token}/accept");
 
@@ -88,6 +90,7 @@ class RouteSweepTest {
     private Buyer victimBuyer;
     private Posted sold;
     private String photoId;
+    private String batchId;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -101,6 +104,10 @@ class RouteSweepTest {
         String unsold = api.card(victimSeller.orgId(), "Unsold", victimSeller.who());
         photoId = TestApi.read(api.postJson("/api/orgs/" + victimSeller.orgId() + "/cards/" + unsold + "/photos",
                 "{\"side\":\"FRONT\",\"contentType\":\"image/png\",\"sizeBytes\":100}", victimSeller.who()), "$.photoId");
+        // Only partner orgs may open batches through the API, so the victim's batch is written straight to the table.
+        batchId = UUID.randomUUID().toString();
+        jdbc.update("insert into submission_batch (id, org_id, name, created_by, created_at) "
+                + "values (?::uuid, ?::uuid, 'Victim batch', (select id from app_user limit 1), now())", batchId, victimSeller.orgId());
     }
 
     @Test
@@ -214,14 +221,26 @@ class RouteSweepTest {
     private String fill(String path, String org) {
         Map<String, String> ids = Map.ofEntries(Map.entry("orgId", org), Map.entry("cardId", sold.cardId()),
                 Map.entry("collectionId", victimSeller.collectionId()), Map.entry("listingId", sold.listingId()),
-                Map.entry("offerId", sold.offerId()), Map.entry("photoId", photoId));
+                Map.entry("offerId", sold.offerId()), Map.entry("photoId", photoId),
+                Map.entry("batchId", batchId),
+                // No fixture seeds these yet (valuation runs, reports, memberships, ...), so each is named here on purpose:
+                // a new path variable fails the sweep until someone adds it, instead of silently getting a random id.
+                Map.entry("reportId", UNSEEDED), Map.entry("runId", UNSEEDED), Map.entry("outcomeId", UNSEEDED),
+                Map.entry("membershipId", UNSEEDED), Map.entry("inviteId", UNSEEDED), Map.entry("catalogCardId", UNSEEDED),
+                Map.entry("externalId", "base1-4"), Map.entry("token", "unseeded-token"));
         Matcher m = Pattern.compile("\\{(\\w+)}").matcher(path);
         StringBuilder url = new StringBuilder();
         while (m.find()) {
-            m.appendReplacement(url, ids.getOrDefault(m.group(1), UUID.randomUUID().toString()));
+            m.appendReplacement(url, requireId(ids, m.group(1), path));
         }
         m.appendTail(url);
         return url.toString();
+    }
+
+    private static String requireId(Map<String, String> ids, String name, String path) {
+        String id = ids.get(name);
+        assertThat(id).as("{" + name + "} in " + path + " has no real id: seed one rather than attacking a random UUID").isNotNull();
+        return id;
     }
 
     private List<Route> orgRoutes() {

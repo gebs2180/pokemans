@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { apiPath, money, RETURN_REASON, useApi, type AdminListing, type AdminOffer, type AttentionKind, type DealAttention, type Undo } from '../api'
 import { useLoad } from '../useLoad'
+import { Loading } from '../ui'
 
 const STATUS: Record<AdminListing['status'], string> = {
   OPEN: 'On the market',
@@ -169,7 +170,7 @@ export function AdminOffersPage() {
         new offer; then mark its label to be refunded.
       </p>
       {error && <p className="error" role="alert">{error}</p>}
-      {!data && !error && <p>Loading…</p>}
+      {!data && !error && <Loading />}
       {data?.length === 0 && <p className="muted">No offers yet.</p>}
       {data?.map((o) => {
         const l = o.listing

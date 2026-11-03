@@ -7,6 +7,7 @@ import com.pokemans.app.identity.OrgType;
 import com.pokemans.app.intake.IntakeViews.PhotoView;
 import com.pokemans.app.intake.IntakeViews.UploadSlot;
 import com.pokemans.app.storage.BlobStore;
+import com.pokemans.app.storage.PhotoDecodes;
 import com.pokemans.app.storage.StorageProperties;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -17,8 +18,6 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -37,7 +36,7 @@ class PhotoService {
     static final Set<String> ACCEPTED_TYPES = Set.of("image/jpeg", "image/png");
 
     /** How long a photo waits its turn to be checked before the seller is asked to try again. */
-    private static final long CHECK_WAIT_SECONDS = 60;
+    private static final Duration CHECK_WAIT = Duration.ofSeconds(60);
 
     private final IntakeService intake;
     private final CurrentUser currentUser;
@@ -48,12 +47,12 @@ class PhotoService {
     private final ApplicationEventPublisher events;
     private final OrgAccess access;
     private final Consents consents;
-    private final Semaphore checks;
+    private final PhotoDecodes decodes;
     private final TransactionTemplate transaction;
 
     PhotoService(IntakeService intake, CurrentUser currentUser, PhotoRepository photos, BlobStore blobs,
                  StorageProperties storage, QualityProperties qualityProperties, ApplicationEventPublisher events,
-                 OrgAccess access, Consents consents, PlatformTransactionManager transactions) {
+                 OrgAccess access, Consents consents, PhotoDecodes decodes, PlatformTransactionManager transactions) {
         this.intake = intake;
         this.currentUser = currentUser;
         this.photos = photos;
@@ -63,7 +62,7 @@ class PhotoService {
         this.events = events;
         this.access = access;
         this.consents = consents;
-        this.checks = new Semaphore(storage.photoChecksAtOnce(), true);
+        this.decodes = decodes;
         this.transaction = new TransactionTemplate(transactions);
     }
 
@@ -100,23 +99,14 @@ class PhotoService {
 
     /**
      * Waits its turn outside the transaction, so a burst of photos holds no database connections and
-     * only a few decode at once: phone photos at full size could otherwise exhaust the server.
+     * only a few decode at once: phone photos at full size could otherwise exhaust the server. The
+     * turns are shared with our centering measurement ({@link PhotoDecodes}).
      */
     PhotoView confirm(UUID orgId, UUID photoId) {
-        boolean turn;
         try {
-            turn = checks.tryAcquire(CHECK_WAIT_SECONDS, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            turn = false;
-        }
-        if (!turn) {
+            return decodes.withTurn(CHECK_WAIT, () -> transaction.execute(status -> check(orgId, photoId)));
+        } catch (PhotoDecodes.Busy e) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "We're checking a lot of photos right now. Try again in a minute.");
-        }
-        try {
-            return transaction.execute(status -> check(orgId, photoId));
-        } finally {
-            checks.release();
         }
     }
 

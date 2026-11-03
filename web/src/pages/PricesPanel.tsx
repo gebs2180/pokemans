@@ -15,6 +15,7 @@ import { DateInput, MoneyInput } from '../inputs'
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { CompCsvImport } from './CompCsvImport'
+import { label, message, money, today } from '../format'
 
 const COMPANIES: GradingCompany[] = ['PSA', 'CGC', 'BGS', 'SGC', 'TAG', 'ACE']
 const RAW_CONDITIONS: RawCondition[] = ['NEAR_MINT', 'LIGHTLY_PLAYED', 'MODERATELY_PLAYED', 'HEAVILY_PLAYED', 'DAMAGED', 'ALTERED']
@@ -27,23 +28,6 @@ const METHOD_LABEL = {
   CARRIED_DOWN: 'lower grade, never stepped up',
   NO_SALES: 'no sales, $0',
 } as const
-
-function message(err: unknown) {
-  return err instanceof Error ? err.message : String(err)
-}
-
-function label(value: string) {
-  return value.replaceAll('_', ' ').toLowerCase()
-}
-
-function money(value: number) {
-  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
-/** Today as YYYY-MM-DD in the reviewer's own time zone. */
-function today() {
-  return new Date().toLocaleDateString('en-CA')
-}
 
 /** Admin: sold comps for the identified catalog card, entered by hand, and its price table per grader. */
 export function PricesPanel({ catalogCardId, number = null }: { catalogCardId: string; number?: string | null }) {

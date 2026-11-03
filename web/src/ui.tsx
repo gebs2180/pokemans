@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { Component, useId, type ErrorInfo, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { STAGE_LABEL, type CardStage } from './api'
 
@@ -111,4 +111,33 @@ export function Field({
       )}
     </div>
   )
+}
+
+/**
+ * Catches a render error or a failed lazy chunk (a deploy renames chunks under open tabs) so one page can't
+ * blank the whole app. Key it by route so moving to another page tries again.
+ */
+export class RouteErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Page failed to render', error, info.componentStack)
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <>
+        <h1>Something went wrong</h1>
+        <p className="error" role="alert">This page couldn't be shown. Reloading usually fixes it.</p>
+        <p>
+          <button onClick={() => window.location.reload()}>Reload</button>
+        </p>
+      </>
+    )
+  }
 }
