@@ -116,12 +116,29 @@ class ProviderPrediction {
         return newestFirst.stream().map(p -> p.sideCap(side)).filter(Objects::nonNull).findFirst().orElse(null);
     }
 
-    /** What one side of this measurement allows on its own, null if it wasn't measured. */
+    /**
+     * Most a stored {@code worstShare} can sit below the measured share: it is rounded to 0.1. Added back
+     * when a side's cap has to be recomputed, so rounding can only tighten a cap, never loosen it.
+     */
+    static final double STORED_SHARE_ROUNDING = 0.05;
+
+    /**
+     * What one side of this measurement allows on its own, null if it wasn't measured: the cap stored
+     * with the side. Measurements stored before that only have the share rounded to 0.1, so the cap is
+     * recomputed from the highest share that could have rounded to it (54.0 is read as 54.05): never
+     * looser than the measurement, at worst a grade tighter right at a boundary.
+     */
     private Integer sideCap(String side) {
-        if (details != null && details.get(side) instanceof Map<?, ?> measured && measured.get("worstShare") instanceof Number share
-                && details.get("measurementMargin") instanceof Number margin) {
-            return side.equals("frontCentering") ? PsaCentering.cap(share.doubleValue(), null, margin.doubleValue())
-                    : PsaCentering.cap(null, share.doubleValue(), margin.doubleValue());
+        if (details == null || !(details.get(side) instanceof Map<?, ?> measured)) {
+            return null;
+        }
+        if (measured.get(CenteringPreGradeProvider.SIDE_CAP) instanceof Number cap) {
+            return cap.intValue();
+        }
+        if (measured.get("worstShare") instanceof Number rounded && details.get("measurementMargin") instanceof Number margin) {
+            double share = rounded.doubleValue() + STORED_SHARE_ROUNDING;
+            return side.equals("frontCentering") ? PsaCentering.cap(share, null, margin.doubleValue())
+                    : PsaCentering.cap(null, share, margin.doubleValue());
         }
         return null;
     }

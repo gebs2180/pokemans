@@ -40,6 +40,11 @@ class CenteringPreGradeProviderTest {
         Map<String, Object> front = (Map<String, Object>) reading.details().get("frontCentering");
         assertThat(Double.parseDouble(((String) front.get("leftRight")).split("/")[0])).isCloseTo(40, within(1.0));
         assertThat(front).containsKeys("topBottom", "bordersMm", "worstShare");
+        // Each side keeps its own cap, from the unrounded share (review of 2026-11, finding 5).
+        assertThat(front).containsEntry(CenteringPreGradeProvider.SIDE_CAP, 8);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> back = (Map<String, Object>) reading.details().get("backCentering");
+        assertThat(back).containsEntry(CenteringPreGradeProvider.SIDE_CAP, 10);
     }
 
     @Test
@@ -50,7 +55,7 @@ class CenteringPreGradeProviderTest {
         assertThat(reading.centering()).isEqualTo(10.0);
         @SuppressWarnings("unchecked")
         Map<String, Object> back = (Map<String, Object>) reading.details().get("backCentering");
-        assertThat(back).containsKey("unmeasured");
+        assertThat(back).containsKey("unmeasured").doesNotContainKey(CenteringPreGradeProvider.SIDE_CAP);
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.pokemans.app.condition;
 
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.storage.BlobStore;
+import com.pokemans.app.storage.PhotoDecodes;
 import com.pokemans.app.storage.StorageProperties;
 import java.time.Duration;
 import java.time.Instant;
@@ -75,11 +76,13 @@ class PredictionWorker {
     private final ConditionProperties properties;
     private final TransactionTemplate transactions;
     private final TaskExecutor executor;
+    private final PhotoDecodes decodes;
 
     PredictionWorker(List<PreGradeProvider> providers, PredictionRequestRepository requests, ProviderPredictionRepository predictions,
                      ConditionService condition, CardItems cardItems, BlobStore blobs, StorageProperties storage,
                      ConditionProperties properties, TransactionTemplate transactions,
-                     @Qualifier("applicationTaskExecutor") TaskExecutor executor) {
+                     @Qualifier("applicationTaskExecutor") TaskExecutor executor, PhotoDecodes decodes) {
+        this.decodes = decodes;
         this.providers = providers.stream().collect(Collectors.toMap(PreGradeProvider::name, Function.identity()));
         this.requests = requests;
         this.predictions = predictions;
@@ -172,7 +175,11 @@ class PredictionWorker {
         long started = System.nanoTime();
         try {
             if (provider instanceof PreGradeProvider.Local local) {
-                return new Answered(local.grade(photos(request)), elapsedMs(started));
+                // Decodes full-size photos here: takes a turn shared with the photo checks, however the
+                // pass was started (the scheduled poll or the kick after commit, on the 8-thread executor).
+                PreGradeProvider.Poll poll = decodes.withTurn(properties.worker().lease().dividedBy(2),
+                        () -> local.grade(photos(request)));
+                return new Answered(poll, elapsedMs(started));
             }
             if (request.getStatus() == PredictionRequest.Status.PENDING) {
                 return new Submitted(provider.submit(photos(request), request.getId().toString()));
