@@ -9,8 +9,9 @@ import { HowItWorksPage } from './pages/HowItWorksPage'
 import { DealsPage, MarketPage } from './pages/MarketPage'
 import { OrgPage } from './pages/OrgPage'
 import { TermsPage } from './pages/TermsPage'
-import { Loading, NotFound } from './ui'
+import { Loading, NotFound, RouteErrorBoundary } from './ui'
 import { useRouteFocus } from './useRouteFocus'
+import { COLLATERAL } from './flags'
 
 // Admin and review screens are only for us, so partners' phones don't download them.
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })))
@@ -25,9 +26,6 @@ const CenteringLabelCardPage = lazy(() => import('./pages/CenteringLabelsPage').
 const ReviewCardPage = lazy(() => import('./pages/ReviewCardPage').then((m) => ({ default: m.ReviewCardPage })))
 const ValuationPage = lazy(() => import('./pages/ValuationPage').then((m) => ({ default: m.ValuationPage })))
 const ValuationRunPage = lazy(() => import('./pages/ValuationRunPage').then((m) => ({ default: m.ValuationRunPage })))
-
-/** Lender and insurer screens are paused unless the build turns them on. */
-export const COLLATERAL = import.meta.env.VITE_COLLATERAL_ENABLED === 'true'
 
 function App() {
   const { isLoading, isAuthenticated, user, error, loginWithRedirect, logout } = useAuth0()
@@ -77,6 +75,7 @@ function App() {
 
       {isAuthenticated && (
         <main>
+          <RouteErrorBoundary key={location.pathname}>
           <Suspense fallback={<Loading />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
@@ -103,6 +102,7 @@ function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          </RouteErrorBoundary>
         </main>
       )}
     </div>

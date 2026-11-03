@@ -11,7 +11,8 @@ import {
   type StraightenedCard,
 } from '../api'
 import { useLoad } from '../useLoad'
-import { PageError } from '../ui'
+import { Loading, PageError } from '../ui'
+import { message } from '../format'
 
 type FrameSide = 'left' | 'right' | 'top' | 'bottom'
 const SIDES: FrameSide[] = ['left', 'right', 'top', 'bottom']
@@ -20,10 +21,6 @@ const FACES: CenteringFace[] = ['FRONT', 'BACK']
 const START_PX = 50
 /** How much of the card the zoom shows, in pixels of the straightened card (20 px/mm). */
 const ZOOM_PX = 100
-
-function message(err: unknown) {
-  return err instanceof Error ? err.message : String(err)
-}
 
 function bordersText(label: CenteringLabel) {
   return SIDES.map((s) => label[s]?.toFixed(2) ?? '–').join(' / ')
@@ -77,7 +74,7 @@ export function CenteringLabelsPage() {
         <button onClick={download}>Download scoreboard file</button>
       </p>
       {downloadError && <p className="error" role="alert">{downloadError}</p>}
-      {!data && <p>Loading…</p>}
+      {!data && <Loading />}
       {data?.length === 0 && <p className="muted">No cards have a complete capture yet.</p>}
       {data && data.length > 0 && (
         <table className="table">
@@ -123,7 +120,7 @@ export function CenteringLabelCardPage() {
   const [face, setFace] = useState<CenteringFace>('FRONT')
 
   if (error) return <PageError message={error} />
-  if (!data) return <p>Loading…</p>
+  if (!data) return <Loading />
   return (
     <>
       <p>

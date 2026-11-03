@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { money, percent, RETURN_REASON, useApi, type Acceptance, type DeclinedReason, type TrackRecord } from '../api'
 import { useLoad } from '../useLoad'
-import { PageError } from '../ui'
+import { Loading, PageError } from '../ui'
 
 /** Below this many, a rate is shown but called out as too few to read anything into. */
 const FEW = 30
@@ -42,7 +42,7 @@ export function OfferTrackRecordPage() {
   const { data, error } = useLoad(() => api<TrackRecord>('GET', '/api/admin/offers/track-record'), [api])
 
   if (error) return <PageError message={error} />
-  if (!data) return <p>Loading…</p>
+  if (!data) return <Loading />
   const { overall, deliveries, prices, shipping } = data
 
   return (

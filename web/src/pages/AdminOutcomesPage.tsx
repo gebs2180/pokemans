@@ -3,7 +3,8 @@ import { Link } from 'react-router'
 import { apiPath, useApi, type OutcomeView } from '../api'
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
-import { PageError } from '../ui'
+import { Loading, PageError } from '../ui'
+import { message } from '../format'
 
 type Filter = 'UNVERIFIED' | 'VERIFIED' | 'MISMATCH' | 'ALL'
 
@@ -31,7 +32,7 @@ export function AdminOutcomesPage() {
           </button>
         ))}
       </div>
-      {!data && <p>Loading…</p>}
+      {!data && <Loading />}
       {data && data.length === 0 && <p className="muted">Nothing here.</p>}
       {data?.map((o) => <OutcomeRow key={o.id} outcome={o} onChange={reload} />)}
     </>
@@ -52,7 +53,7 @@ function OutcomeRow({ outcome: o, onChange }: { outcome: OutcomeView; onChange: 
       await api('POST', apiPath`/api/admin/outcomes/${o.id}/verifications`, { status, note })
       onChange()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(message(e))
     } finally {
       setBusy(false)
     }
