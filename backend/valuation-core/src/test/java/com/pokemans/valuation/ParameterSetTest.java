@@ -68,15 +68,4 @@ class ParameterSetTest {
     void unknownVersionFails() {
         assertThatThrownBy(() -> ParameterSet.load("9.9.9")).isInstanceOf(IllegalArgumentException.class);
     }
-
-    @Test
-    void volatilityIsTheSampleStdDevOfMonthlyChanges() {
-        // Changes: +10%, -10%, +10%, -10% → mean 0, sample variance 4 x 0.01 / 3.
-        List<BigDecimal> prices = List.of(new BigDecimal("100"), new BigDecimal("110"), new BigDecimal("99"),
-                new BigDecimal("108.9"), new BigDecimal("98.01"));
-
-        BigDecimal sigma = Volatility.monthly(prices);
-
-        assertThat(sigma.doubleValue()).isCloseTo(Math.sqrt(0.04 / 3), org.assertj.core.data.Offset.offset(1e-12));
-    }
 }

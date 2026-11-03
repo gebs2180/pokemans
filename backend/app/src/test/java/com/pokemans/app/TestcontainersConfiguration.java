@@ -1,7 +1,6 @@
 package com.pokemans.app;
 
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.MinIOContainer;
@@ -18,24 +17,52 @@ public class TestcontainersConfiguration {
 
     public static final String BUCKET = "photos";
 
-    @Bean
-    @ServiceConnection
-    PostgreSQLContainer postgres() {
-        return new PostgreSQLContainer("postgres:18");
-    }
+    /**
+     * One pair of containers for the whole test JVM. They were beans, so every distinct Spring context started its
+     * own pair (about 18 in a full run). They are not beans now: Spring must not stop them when a context closes,
+     * and Ryuk removes them when the JVM exits. The properties come from the registrar below.
+     */
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:18")
+            .withCommand("postgres", "-c", "max_connections=500");
 
     /** MinIO no longer publishes images to Docker Hub; Chainguard's free build is a drop-in. */
-    @Bean
-    MinIOContainer minio() {
-        return new MinIOContainer(DockerImageName.parse("cgr.dev/chainguard/minio:latest").asCompatibleSubstituteFor("minio/minio"));
+    private static final MinIOContainer MINIO =
+            new MinIOContainer(DockerImageName.parse("cgr.dev/chainguard/minio:latest").asCompatibleSubstituteFor("minio/minio"));
+
+    private static synchronized void startOnce() {
+        if (!POSTGRES.isRunning()) {
+            POSTGRES.start();
+        }
+        if (!MINIO.isRunning()) {
+            MINIO.start();
+        }
+    }
+
+    private static final java.util.concurrent.atomic.AtomicInteger DATABASES = new java.util.concurrent.atomic.AtomicInteger();
+
+    private static String newDatabase() {
+        String name = "ctx_" + DATABASES.incrementAndGet();
+        try (java.sql.Connection c = java.sql.DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                java.sql.Statement s = c.createStatement()) {
+            s.execute("create database " + name);
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException("Could not create test database " + name, e);
+        }
+        return name;
     }
 
     @Bean
-    DynamicPropertyRegistrar storageProperties(MinIOContainer minio) {
+    DynamicPropertyRegistrar containerProperties() {
         return registry -> {
-            registry.add("pokemans.storage.endpoint", minio::getS3URL);
-            registry.add("pokemans.storage.access-key", minio::getUserName);
-            registry.add("pokemans.storage.secret-key", minio::getPassword);
+            startOnce();
+            // Each Spring context gets its own database in the shared server, so tests still start from empty tables.
+            String database = newDatabase();
+            registry.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl().replace("/" + POSTGRES.getDatabaseName(), "/" + database));
+            registry.add("spring.datasource.username", POSTGRES::getUsername);
+            registry.add("spring.datasource.password", POSTGRES::getPassword);
+            registry.add("pokemans.storage.endpoint", MINIO::getS3URL);
+            registry.add("pokemans.storage.access-key", MINIO::getUserName);
+            registry.add("pokemans.storage.secret-key", MINIO::getPassword);
             registry.add("pokemans.storage.photo-bucket", () -> BUCKET);
             registry.add("pokemans.storage.auto-create-buckets", () -> "true");
         };
