@@ -106,6 +106,9 @@ pokemans:
     # No offer above this firm price: EasyPost's $5,000 insurance limit, so every label is insured for
     # the full price. The $500 beta maximum was lifted on 2026-10-26 (Zach); set this lower to cap again.
     max-price: 5000
+    # Offers show sellers what each grade recently sold for, from the comps stored with the offer (UX
+    # review finding 11). A kill switch in case the price data's licence doesn't allow showing them.
+    show-sold-prices: ${SHOW_SOLD_PRICES:true}
   shipping:
     # Prepaid, insured labels for taken cards, bought on our account and billed to buyers monthly
     # (Zach, 2026-10-19). Off until a key is set in the environment; a test key buys test labels.
@@ -119,6 +122,12 @@ pokemans:
       width: 5
       height: 1
       weight-oz: 3
+    # What a buyer sees before accepting (UX review finding 8): a live EasyPost rate for the cheapest
+    # service, with no label bought, else this postage; insurance estimated at 1% of the price, $1 minimum.
+    estimate:
+      postage: 6.00
+      insurance-rate: 0.01
+      insurance-minimum: 1.00
   collateral:
     # Lender and insurer collateral reports (valuation runs and report PDFs). Paused while Zach's outside
     # interest is cleared with his employer (2026-10-19): the APIs aren't registered unless this is on.

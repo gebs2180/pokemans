@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link, NavLink, useParams } from 'react-router'
 import {
   apiPath,
@@ -12,14 +12,18 @@ import {
   type Deal,
   type DeclinedReason,
   type MarketItem,
+  type Offer,
   type OfferCard,
   type PhotoLink,
+  type PostageEstimate,
+  type ShipAddress,
 } from '../api'
 import { MoneyInput } from '../inputs'
 import { safeHref } from '../safeHref'
-import { EmptyState, Field, Loading, PageError } from '../ui'
+import { Chip, EmptyState, Field, Loading, PageError } from '../ui'
 import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
+import { AddressForm } from './AddressForm'
 import { HowPriced } from './OfferPanel'
 
 export function CardTitle({ card }: { card: OfferCard }) {
@@ -36,20 +40,119 @@ export function CardTitle({ card }: { card: OfferCard }) {
   )
 }
 
-/** The photos the offer was priced on, one per side, labelled: what "matches its photos" is checked against. */
+/**
+ * The photos the offer was priced on, one per side, labelled: what "matches its photos" is checked against. Tapping one
+ * opens them full screen, as taken (UX review finding 8): buyers commit on these, so they get every pixel the seller sent.
+ */
 export function Photos({ photos }: { photos: PhotoLink[] }) {
+  const shown = photos.flatMap((p) => {
+    const thumb = safeHref(p.url)
+    const full = safeHref(p.fullUrl) ?? thumb
+    return thumb && full ? [{ side: p.side, thumb, full }] : []
+  })
+  const [open, setOpen] = useState<number | null>(null)
   return (
-    <div className="photos">
-      {photos.map((p) => {
-        const href = safeHref(p.url)
-        return href ? (
-          <a key={href} href={href} target="_blank" rel="noreferrer" className="photo compact">
-            <img src={href} alt={`${SIDE_LABEL[p.side]} photo`} className="thumb" />
+    <>
+      <div className="photos">
+        {shown.map((p, i) => (
+          <button key={p.thumb} type="button" className="photo compact photo-button" onClick={() => setOpen(i)}>
+            <img src={p.thumb} alt={`${SIDE_LABEL[p.side]} photo`} className="thumb" />
             <span className="muted small">{SIDE_LABEL[p.side]}</span>
-          </a>
-        ) : null
-      })}
+          </button>
+        ))}
+      </div>
+      {open != null && <PhotoViewer photos={shown} start={open} onClose={() => setOpen(null)} />}
+    </>
+  )
+}
+
+/**
+ * Full screen, one photo at a time: swipe or use the arrows to move, tap the photo for its actual size and drag (or pinch)
+ * to look closer. Nothing is cropped or scaled up.
+ */
+function PhotoViewer({ photos, start, onClose }: { photos: { side: PhotoLink['side']; full: string }[]; start: number; onClose: () => void }) {
+  const [index, setIndex] = useState(start)
+  const [actualSize, setActualSize] = useState(false)
+  const track = useRef<HTMLDivElement>(null)
+  const close = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    close.current?.focus()
+    track.current?.scrollTo?.({ left: start * track.current.clientWidth })
+  }, [start])
+
+  function go(to: number) {
+    const next = Math.max(0, Math.min(photos.length - 1, to))
+    setActualSize(false)
+    setIndex(next)
+    track.current?.scrollTo?.({ left: next * track.current.clientWidth, behavior: 'smooth' })
+  }
+
+  function onKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') onClose()
+    else if (e.key === 'ArrowRight') go(index + 1)
+    else if (e.key === 'ArrowLeft') go(index - 1)
+  }
+
+  return (
+    <div className="viewer" role="dialog" aria-modal="true" aria-label="Photos" onKeyDown={onKey}>
+      <div className="viewer-bar">
+        <span>
+          {SIDE_LABEL[photos[index].side]} ({index + 1} of {photos.length})
+        </span>
+        <button type="button" className="secondary" onClick={() => setActualSize((a) => !a)}>
+          {actualSize ? 'Fit to screen' : 'Actual size'}
+        </button>
+        <button ref={close} type="button" className="secondary" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <div
+        ref={track}
+        className={actualSize ? 'viewer-track locked' : 'viewer-track'}
+        onScroll={(e) => {
+          const t = e.currentTarget
+          if (t.clientWidth) setIndex(Math.round(t.scrollLeft / t.clientWidth))
+        }}
+      >
+        {photos.map((p, i) => (
+          <figure key={p.full} className={actualSize && i === index ? 'viewer-slide actual' : 'viewer-slide'}>
+            <img src={p.full} alt={`${SIDE_LABEL[p.side]} photo, full size`} onClick={() => i === index && setActualSize((a) => !a)} />
+          </figure>
+        ))}
+      </div>
+      {photos.length > 1 && (
+        <div className="viewer-bar viewer-nav">
+          <button type="button" className="secondary" onClick={() => go(index - 1)} disabled={index === 0}>
+            ← Previous
+          </button>
+          <button type="button" className="secondary" onClick={() => go(index + 1)} disabled={index === photos.length - 1}>
+            Next →
+          </button>
+        </div>
+      )}
     </div>
+  )
+}
+
+/** The grade the card is most likely to be and its chance; a tie goes to the lower grade. */
+function mostLikely(offer: Offer) {
+  let best = null as Offer['ladder'][number] | null
+  for (const r of offer.ladder) if (r.probability > 0 && (!best || r.probability >= best.probability)) best = r
+  if (!best) return null
+  return `${best.grade === 'U' ? 'Ungradable' : `PSA ${best.grade}`} (${Math.round(best.probability * 100)}%)`
+}
+
+/** What the buyer is billed monthly for the label, as an estimate: nothing is bought until they accept. */
+function PostageLine({ estimate, price }: { estimate: PostageEstimate; price: number }) {
+  const how = estimate.quoted
+    ? `${estimate.carrier} ${estimate.service} ${money(estimate.postage)}`
+    : `our usual postage of ${money(estimate.postage)}; the label may cost a little more or less`
+  return (
+    <p>
+      Postage and insurance: about <strong>{money(estimate.total)}</strong> ({how}, plus {money(estimate.insurance)} to insure it for{' '}
+      {money(price)}), billed to you monthly.
+    </p>
   )
 }
 
@@ -80,7 +183,13 @@ export function MarketPage() {
   const { orgId = '' } = useParams()
   const api = useApi()
   const { data, error, reload } = useLoad(() => api<MarketItem[]>('GET', apiPath`/api/orgs/${orgId}/market`), [api, orgId])
+  // Wrapped, so "no address on file" (an empty response) is told apart from "still loading".
+  const { data: shipTo, reload: reloadAddress } = useLoad(
+    () => api<ShipAddress | null>('GET', apiPath`/api/orgs/${orgId}/ship-address`).then((address) => ({ address })),
+    [api, orgId],
+  )
   const [confirming, setConfirming] = useState<string | null>(null)
+  const [postage, setPostage] = useState<{ listingId: string; estimate?: PostageEstimate; error?: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   // A refusal shows by the card it's about: on a phone the top of the list is off-screen.
@@ -106,7 +215,33 @@ export function MarketPage() {
     }
   }
 
+  async function confirm(listingId: string) {
+    setConfirming(listingId)
+    setPostage({ listingId })
+    try {
+      const estimate = await api<PostageEstimate>('GET', apiPath`/api/orgs/${orgId}/market/${listingId}/postage`)
+      setPostage((p) => (p?.listingId === listingId ? { listingId, estimate } : p))
+    } catch (e) {
+      setPostage((p) => (p?.listingId === listingId ? { listingId, error: e instanceof Error ? e.message : String(e) } : p))
+    }
+  }
+
   if (error) return <PageError message={error} />
+  // The label goes to the buyer's address, and the postage depends on it: ask for it before showing anything to buy.
+  if (shipTo && shipTo.address == null) {
+    return (
+      <>
+        <BuyerNav orgId={orgId} />
+        <h1>Where should cards ship to?</h1>
+        <p className="muted">
+          Before you see what's for sale: the seller gets a prepaid label to this address, and we use it to estimate your postage.
+        </p>
+        <section className="panel">
+          <AddressForm orgId={orgId} onSaved={reloadAddress} />
+        </section>
+      </>
+    )
+  }
   return (
     <>
       <BuyerNav orgId={orgId} />
@@ -120,59 +255,78 @@ export function MarketPage() {
           {message}
         </p>
       )}
-      {!data && <Loading />}
-      {data?.length === 0 && (
+      {(!data || !shipTo) && <Loading />}
+      {shipTo && data?.length === 0 && (
         <EmptyState title="Nothing posted right now.">
           <p>New cards show here as collectors post them.</p>
         </EmptyState>
       )}
-      {data?.map((item) => (
-        <section key={item.listingId} className="panel">
-          <div className="listing-top">
-            <div>
-              <CardTitle card={item.card} />
-            </div>
-            <p className="offer-price">{money(item.offer.price)}</p>
-          </div>
-          <Photos photos={item.photos} />
-          {item.offer.subjectToAuthentication && <p className="alert alert-warning small">Not yet authenticated: check it in hand.</p>}
-          <HowPriced offer={item.offer} />
-          <p className="meta">
-            Posted {new Date(item.listedAt).toLocaleDateString()}, open until {new Date(item.expiresAt).toLocaleDateString()}.
-          </p>
-          {confirming === item.listingId ? (
-            <div className="confirm">
-              <p>
-                You buy it at this price, whatever it grades. You pay the seller directly, within 7 days of it arriving, and we bill you
-                the postage monthly.
-              </p>
-              <div className="actions">
-                <button onClick={() => accept(item.listingId)} disabled={busy} aria-busy={busy}>
-                  Confirm: buy for {money(item.offer.price)}
-                </button>
-                <button className="secondary" onClick={() => setConfirming(null)}>
-                  Cancel
-                </button>
+      {shipTo &&
+        data?.map((item) => {
+          const likely = item.offer.graded ? null : mostLikely(item.offer)
+          const closeUp = item.photos.some((p) => p.side === 'DETAIL')
+          const quote = postage?.listingId === item.listingId ? postage : null
+          return (
+            <section key={item.listingId} className="panel">
+              <div className="listing-top">
+                <div>
+                  <CardTitle card={item.card} />
+                </div>
+                <p className="offer-price">{money(item.offer.price)}</p>
               </div>
-            </div>
-          ) : (
-            <div className="actions">
-              <button onClick={() => setConfirming(item.listingId)}>Buy</button>
-            </div>
-          )}
-          {failed?.listingId === item.listingId && (
-            <p className="error" role="alert">
-              {failed.message}
-              {failed.message === NO_ADDRESS && (
-                <>
-                  {' '}
-                  <Link to={`/orgs/${orgId}`}>Add your address</Link>
-                </>
+              {(likely || closeUp) && (
+                <p className="chips">
+                  {likely && <Chip tone="info">Most likely {likely}</Chip>}
+                  {closeUp && <Chip tone="success">Close-up included</Chip>}
+                </p>
               )}
-            </p>
-          )}
-        </section>
-      ))}
+              <Photos photos={item.photos} />
+              {item.offer.subjectToAuthentication && <p className="alert alert-warning small">Not yet authenticated: check it in hand.</p>}
+              <HowPriced offer={item.offer} />
+              <p className="meta">
+                Posted {new Date(item.listedAt).toLocaleDateString()}, open until {new Date(item.expiresAt).toLocaleDateString()}.
+              </p>
+              {confirming === item.listingId ? (
+                <div className="confirm">
+                  <p>You buy it at this price, whatever it grades.</p>
+                  {quote?.estimate ? (
+                    <PostageLine estimate={quote.estimate} price={item.offer.price} />
+                  ) : quote?.error ? (
+                    <p>We couldn't estimate the postage ({quote.error.replace(/\.$/, '')}). It's billed to you monthly.</p>
+                  ) : (
+                    <p className="muted">Estimating postage and insurance…</p>
+                  )}
+                  <p>
+                    You pay the seller {money(item.offer.price)} directly, <strong>within 7 days of it arriving</strong>.
+                  </p>
+                  <div className="actions">
+                    <button onClick={() => accept(item.listingId)} disabled={busy} aria-busy={busy}>
+                      Confirm: buy for {money(item.offer.price)}
+                    </button>
+                    <button className="secondary" onClick={() => setConfirming(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="actions">
+                  <button onClick={() => confirm(item.listingId)}>Buy</button>
+                </div>
+              )}
+              {failed?.listingId === item.listingId && (
+                <p className="error" role="alert">
+                  {failed.message}
+                  {failed.message === NO_ADDRESS && (
+                    <>
+                      {' '}
+                      <Link to={`/orgs/${orgId}`}>Add your address</Link>
+                    </>
+                  )}
+                </p>
+              )}
+            </section>
+          )
+        })}
     </>
   )
 }

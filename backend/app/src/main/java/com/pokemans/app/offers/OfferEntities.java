@@ -92,6 +92,10 @@ class CardOffer {
         return ladder;
     }
 
+    String getTrace() {
+        return trace;
+    }
+
     BigDecimal getPrice() {
         return price;
     }

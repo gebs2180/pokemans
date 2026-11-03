@@ -7,6 +7,7 @@ import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.storage.BlobStore;
 import com.pokemans.app.storage.StorageProperties;
 import com.pokemans.app.valuation.CardInputs;
+import com.pokemans.valuation.GradePrice;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,6 +22,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -28,6 +31,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Posting firm offers to buyers and what happens next: the first buyer to accept takes the card at
@@ -89,10 +93,31 @@ class ListingService {
      * @param expired     true once the offer is past its validity: price it again before posting
      * @param voided      set once we voided the offer: it can't be posted, get a new one
      */
+    /**
+     * @param sold            what each grade recently sold for, or null when showing sold prices is switched off
+     * @param lessSureBecause why the confidence is below A ({@link LessSure}), empty at A
+     */
     record OfferView(UUID id, BigDecimal price, BigDecimal fmv, String confidence, BigDecimal buyerMargin, boolean graded,
                      boolean subjectToAuthentication, List<RungView> ladder, Instant createdAt, Instant expiresAt, boolean expired,
-                     UndoView voided) {
+                     UndoView voided, List<SoldView> sold, List<String> lessSureBecause) {
     }
+
+    /**
+     * What a grade of the card recently sold for: the recency-weighted median of its own sold comps (before grading costs),
+     * as the offer's valuation used them (UX review finding 11). Grades priced from other grades have none.
+     *
+     * @param sales      sales in the window
+     * @param windowDays the window the sales are from, 90 days or 180 when there were fewer than 2
+     */
+    record SoldView(String gradingCompany, String grade, BigDecimal price, int sales, Integer windowDays) {
+    }
+
+    /**
+     * Why an offer's confidence is below A, for the seller in words (UX review finding 11), read from the offer's stored
+     * trace: PHOTOS (the photos left the condition less certain), FEW_SALES (few sold comps), OLD_SALES (the price table
+     * hasn't been refreshed lately), ESTIMATED_GRADES (a grade the card is likely to be has no sales of its own).
+     */
+    enum LessSure { PHOTOS, FEW_SALES, OLD_SALES, ESTIMATED_GRADES }
 
     record Party(String orgName, String email) {
     }
@@ -135,8 +160,12 @@ class ListingService {
         }
     }
 
-    /** @param side FRONT, BACK or DETAIL (the close-up) */
-    record PhotoLink(String side, String url) {
+    /**
+     * @param side    FRONT, BACK or DETAIL (the close-up)
+     * @param url     the card crop, for thumbnails
+     * @param fullUrl the photo exactly as taken, without its metadata: what the card must match on arrival
+     */
+    record PhotoLink(String side, String url, String fullUrl) {
     }
 
     record MarketItem(UUID listingId, CardView card, OfferView offer, List<PhotoLink> photos, Instant listedAt, Instant expiresAt) {
@@ -236,6 +265,8 @@ class ListingService {
         if (cardItems.passedPhotos(cardItemId).stream().anyMatch(p -> !priced.contains(p.id()))) {
             throw conflict("Your photos changed after this offer. Get a new offer, so buyers see the photos it's based on.");
         }
+        // Photos that passed before exact copies were kept get theirs now, before any buyer can open them.
+        current(OfferService.inputs(offer).photos()).forEach(p -> cardItems.ensureExactCopy(p.storageKey(), p.contentType()));
         Optional<SaleListing> latest = listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardItemId);
         if (latest.isPresent()) {
             Status status = status(latest.get(), history(List.of(latest.get())).getOrDefault(latest.get().getId(), List.of()), now);
@@ -276,6 +307,19 @@ class ListingService {
             items.add(new MarketItem(l.getId(), card(in).forBuyer(), offerView(offer, null), photos(in), l.getCreatedAt(), l.getExpiresAt()));
         }
         return items;
+    }
+
+    /**
+     * What the label for an open listing would cost this buyer, before they accept. Buys nothing. Outside a transaction,
+     * since the quote is a call out to the provider.
+     */
+    Shipping.Estimate postage(UUID buyerOrgId, UUID listingId) {
+        SaleListing listing = listings.findById(listingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
+        if (status(listing, history(List.of(listing)).getOrDefault(listingId, List.of()), Instant.now()) != Status.OPEN) {
+            throw conflict("This card is no longer for sale.");
+        }
+        return shipping.estimate(listing.getOrgId(), buyerOrgId, offers.findById(listing.getOfferId()).orElseThrow().getPrice());
     }
 
     /**
@@ -781,12 +825,52 @@ class ListingService {
         return offerView(o, voids.findByOfferId(o.getId()).orElse(null));
     }
 
-    static OfferView offerView(CardOffer o, CardOfferVoid voided) {
+    OfferView offerView(CardOffer o, CardOfferVoid voided) {
         List<RungView> ladder = OfferService.ladder(o).stream()
                 .map(r -> new RungView(r.grade().toString(), r.probability(), r.price())).toList();
         return new OfferView(o.getId(), o.getPrice(), o.getFmv(), o.getConfidence(), o.getBuyerMargin(), o.isGraded(),
                 o.isSubjectToAuthentication(), ladder, o.getCreatedAt(), o.getExpiresAt(), !o.getExpiresAt().isAfter(Instant.now()),
-                voided == null ? null : new UndoView(voided.getReason(), voided.getCreatedAt()));
+                voided == null ? null : new UndoView(voided.getReason(), voided.getCreatedAt()),
+                properties.showSoldPrices() ? sold(OfferService.inputs(o)) : null, lessSureBecause(o));
+    }
+
+    /** The grades with sold comps of their own, from the prices stored with the offer: never a fresh query. */
+    static List<SoldView> sold(CardInputs in) {
+        if (in.prices() == null || in.prices().grades() == null) {
+            return List.of();
+        }
+        return in.prices().grades().stream()
+                .filter(r -> r.method() == GradePrice.Method.OBSERVED && r.n() > 0 && r.gross() != null)
+                .map(r -> new SoldView(in.prices().gradingCompany(), r.grade().toString(), r.gross(), r.n(), r.windowDays()))
+                .toList();
+    }
+
+    /** CardValuator's confidence_base detail, e.g. "photo B, comps C (weighted sales 3.20)". */
+    private static final Pattern BASE_DETAIL = Pattern.compile("photo ([A-D]), comps ([A-D])");
+
+    /** Why the offer's confidence is below A, from the steps its stored trace took to reach it. */
+    static List<String> lessSureBecause(CardOffer o) {
+        List<String> reasons = new ArrayList<>();
+        for (JsonNode step : OfferService.JSON.readTree(o.getTrace())) {
+            String subject = step.path("subject").asString("");
+            String rule = step.path("rule").asString("");
+            if (subject.equals("confidence_base")) {
+                Matcher m = BASE_DETAIL.matcher(step.path("detail").asString(""));
+                if (m.find()) {
+                    if (!m.group(1).equals("A")) {
+                        reasons.add(LessSure.PHOTOS.name());
+                    }
+                    if (!m.group(2).equals("A")) {
+                        reasons.add(LessSure.FEW_SALES.name());
+                    }
+                }
+            } else if (subject.equals("offer_confidence_penalty") && rule.startsWith("price table")) {
+                reasons.add(LessSure.OLD_SALES.name());
+            } else if (subject.equals("offer_confidence") && rule.startsWith("derived price")) {
+                reasons.add(LessSure.ESTIMATED_GRADES.name());
+            }
+        }
+        return reasons;
     }
 
     static CardView card(CardInputs in) {
@@ -806,7 +890,7 @@ class ListingService {
     private List<PhotoLink> photos(CardInputs in) {
         return current(in.photos()).stream()
                 .map(p -> new PhotoLink(p.side(), blobs.presignDownload(storage.photoBucket(), CardItems.shownKey(p.storageKey(), p.cropKey()))
-                        .toString()))
+                        .toString(), blobs.presignDownload(storage.photoBucket(), CardItems.exactKey(p.storageKey())).toString()))
                 .toList();
     }
 

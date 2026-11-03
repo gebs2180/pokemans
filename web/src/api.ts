@@ -775,6 +775,55 @@ export type Offer = {
   expired: boolean
   /** Set once we voided the offer: it can't be posted, the seller gets a new one. */
   voided: Undo | null
+  /** What each grade recently sold for, from the comps stored with the offer; null when that's switched off. */
+  sold: SoldPrice[] | null
+  /** Why the confidence isn't an A, in the order they weigh; empty at an A. */
+  lessSureBecause: LessSure[]
+}
+
+/** One grade's sold price as the offer used it: the recency-weighted median of so many sales over the window. */
+export type SoldPrice = { gradingCompany: string; grade: string; price: number; sales: number; windowDays: number }
+
+export type LessSure = 'PHOTOS' | 'FEW_SALES' | 'OLD_SALES' | 'ESTIMATED_GRADES'
+
+/** The confidence in words, for sellers and buyers who don't know what a B means. */
+export const LESS_SURE: Record<LessSure, string> = {
+  PHOTOS: 'the photos leave its condition less certain',
+  FEW_SALES: 'there are only a few recent sales',
+  OLD_SALES: "the sales haven't been refreshed lately",
+  ESTIMATED_GRADES: "a grade it's likely to be has no sales of its own, so we estimated it",
+}
+
+export const CONFIDENCE_WORDS: Record<Confidence, string> = {
+  A: 'very sure',
+  B: 'fairly sure',
+  C: 'less sure',
+  D: 'not sure enough to offer',
+}
+
+/** "Fairly sure (B): there are only a few recent sales." */
+export function confidenceInWords(offer: Pick<Offer, 'confidence' | 'lessSureBecause'>) {
+  const head = `${CONFIDENCE_WORDS[offer.confidence]} (${offer.confidence})`
+  const why = (offer.lessSureBecause ?? []).map((r) => LESS_SURE[r])
+  const text = why.length ? `${head}, because ${joinAnd(why)}` : head
+  return text.charAt(0).toUpperCase() + text.slice(1) + '.'
+}
+
+function joinAnd(parts: string[]) {
+  return parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+}
+
+/**
+ * What the label would cost the buyer, stored nowhere and with no label bought. quoted: a live rate for this
+ * buyer's address; otherwise our usual postage, because there's no address or the quote failed.
+ */
+export type PostageEstimate = {
+  postage: number
+  insurance: number
+  total: number
+  carrier: string | null
+  service: string | null
+  quoted: boolean
 }
 
 /** Something the admin undid (2026-10-21): a voided offer or listing, or a cancelled deal, and why. */
@@ -878,7 +927,8 @@ export type OfferCard = {
   gradedAs: string | null
 }
 
-export type PhotoLink = { side: Side; url: string }
+/** url: the small copy for lists. fullUrl: the photo as taken, with no crop or re-encode, for a close look. */
+export type PhotoLink = { side: Side; url: string; fullUrl: string }
 
 export type MarketItem = { listingId: string; card: OfferCard; offer: Offer; photos: PhotoLink[]; listedAt: string; expiresAt: string }
 

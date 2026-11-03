@@ -153,6 +153,10 @@ class PhotoService {
                 blobs.putIfAbsent(storage.photoBucket(), photo.viewStorageKey(), clean, "image/jpeg");
             }
         }
+        if (photo.getStatus() == Photo.Status.PASSED) {
+            // Buyers open this one full size: the photos are what the card must match on arrival.
+            CardItems.storeExactCopy(blobs, storage.photoBucket(), photo.getStorageKey(), photo.getContentType(), bytes);
+        }
         photos.flush();
         if (!wasComplete && IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId())).captureComplete()) {
             events.publishEvent(new CardItems.CaptureCompleted(orgId, card.getId()));

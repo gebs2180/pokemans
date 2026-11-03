@@ -85,6 +85,24 @@ class EasyPostShippingProviderTest {
     }
 
     @Test
+    void quotesTheCheapestRateOnThePreferredCarrierWithoutBuyingOrAReference() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://ep.test/v2/shipments")).andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.shipment.from_address.name").value("Sam"))
+                .andExpect(jsonPath("$.shipment.reference").doesNotExist())
+                .andRespond(withSuccess(CREATED, MediaType.APPLICATION_JSON));
+
+        ShippingProvider.Rate rate = new EasyPostShippingProvider(CONFIG, builder).quote(FROM, TO, PARCEL);
+
+        // Nothing else was asked: no buy.
+        server.verify();
+        assertThat(rate.carrier()).isEqualTo("USPS");
+        assertThat(rate.service()).isEqualTo("GroundAdvantage");
+        assertThat(rate.postage()).isEqualByComparingTo("5.10");
+    }
+
+    @Test
     void aRetryAfterALostAnswerGetsTheLabelAlreadyBoughtNotASecondOne() {
         // Audit 2026-11-02: EasyPost sold the label and the answer timed out, so we recorded nothing. The retry must find
         // that shipment by its reference (the listing id) instead of paying again.
@@ -145,7 +163,7 @@ class EasyPostShippingProviderTest {
         try {
             URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v2");
             ShippingProperties properties = new ShippingProperties(new ShippingProperties.EasyPost(true, "EZTK_test", base, "USPS",
-                    Duration.ofSeconds(5)), new ShippingProperties.Parcel(new BigDecimal("7"), new BigDecimal("5"), BigDecimal.ONE, new BigDecimal("3")));
+                    Duration.ofSeconds(5)), new ShippingProperties.Parcel(new BigDecimal("7"), new BigDecimal("5"), BigDecimal.ONE, new BigDecimal("3")), null);
 
             assertThatThrownBy(() -> new EasyPostShippingProvider(properties).buy(FROM, TO, PARCEL, BigDecimal.TEN, "listing-1"))
                     .isInstanceOf(RuntimeException.class);

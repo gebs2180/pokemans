@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import { likelyRungs, type CardStatus, type Deal, type MarketItem, type DealProgress, type Listing, type Offer, type Sale, type ShipAddress } from '../api'
+import { likelyRungs, type CardStatus, type Deal, type MarketItem, type DealProgress, type Listing, type Offer, type PostageEstimate, type Sale, type ShipAddress } from '../api'
 import { respond } from '../test/auth0'
 import { ArrivalForm, DealsPage, MarketPage, PaidForm } from './MarketPage'
 import { OfferPanel } from './OfferPanel'
@@ -29,6 +29,11 @@ const offer = (over: Partial<Offer> = {}): Offer => ({
   expiresAt: '2099-10-26T10:00:00Z',
   expired: false,
   voided: null,
+  sold: [
+    { gradingCompany: 'PSA', grade: '10', price: 900, sales: 3, windowDays: 90 },
+    { gradingCompany: 'PSA', grade: '9', price: 450, sales: 1, windowDays: 180 },
+  ],
+  lessSureBecause: ['FEW_SALES'],
   ...over,
 })
 
@@ -410,9 +415,27 @@ describe('MarketPage', () => {
     listingId: 'l1',
     card: { name: 'Umbreon VMAX', setName: 'Evolving Skies', number: '215', language: 'en', edition: 'UNLIMITED', variant: 'HOLO', label: 'x', distribution: {}, gradedAs: null },
     offer: offer({ subjectToAuthentication: true }),
-    photos: [{ side: 'FRONT', url: 'javascript:alert(1)' }],
+    photos: [{ side: 'FRONT', url: 'javascript:alert(1)', fullUrl: 'javascript:alert(2)' }],
     listedAt: '2026-10-19T10:00:00Z',
     expiresAt: '2026-11-02T10:00:00Z',
+  }
+
+  const estimate: PostageEstimate = { postage: 5.1, insurance: 4.2, total: 9.3, carrier: 'USPS', service: 'GroundAdvantage', quoted: true }
+
+  /** The market, the buyer's address and the postage by path; POSTs get {@code post}. */
+  function stubMarket(
+    items: MarketItem[],
+    post: () => Response,
+    { shipTo = address as ShipAddress | null, postage = () => respond(200, estimate) } = {},
+  ) {
+    const fetch = vi.fn((url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return Promise.resolve(post())
+      if (url.endsWith('/ship-address')) return Promise.resolve(shipTo ? respond(200, shipTo) : new Response(null, { status: 200 }))
+      if (url.endsWith('/postage')) return Promise.resolve(postage())
+      return Promise.resolve(respond(200, items))
+    })
+    vi.stubGlobal('fetch', fetch)
+    return fetch
   }
 
   function renderMarket() {
@@ -427,10 +450,7 @@ describe('MarketPage', () => {
 
   it('asks the buyer to confirm, and says when another buyer was first', async () => {
     const user = userEvent.setup()
-    const fetch = vi.fn((_url: string, init?: RequestInit) =>
-      Promise.resolve(init?.method === 'POST' ? respond(409, { detail: 'Another buyer took this card first.' }) : respond(200, [item])),
-    )
-    vi.stubGlobal('fetch', fetch)
+    const fetch = stubMarket([item], () => respond(409, { detail: 'Another buyer took this card first.' }))
     renderMarket()
 
     expect(await screen.findByText('Umbreon VMAX')).toBeInTheDocument()
@@ -446,12 +466,7 @@ describe('MarketPage', () => {
 
   it('says when the label is still to come', async () => {
     const user = userEvent.setup()
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((_url: string, init?: RequestInit) =>
-        Promise.resolve(init?.method === 'POST' ? respond(200, { deals: [], labelPending: 'No shipping account is set up yet' }) : respond(200, [item])),
-      ),
-    )
+    stubMarket([item], () => respond(200, { deals: [], labelPending: 'No shipping account is set up yet' }))
     renderMarket()
 
     await user.click(await screen.findByRole('button', { name: 'Buy' }))
@@ -466,16 +481,11 @@ describe('MarketPage', () => {
     const photographed = {
       ...item,
       photos: [
-        { side: 'FRONT' as const, url: 'https://photos.example/f.jpg' },
-        { side: 'BACK' as const, url: 'https://photos.example/b.jpg' },
+        { side: 'FRONT' as const, url: 'https://photos.example/f.jpg', fullUrl: 'https://photos.example/f-full.jpg' },
+        { side: 'BACK' as const, url: 'https://photos.example/b.jpg', fullUrl: 'https://photos.example/b-full.jpg' },
       ],
     }
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((_url: string, init?: RequestInit) =>
-        Promise.resolve(init?.method === 'POST' ? respond(409, { detail: 'Add the address cards should ship to first.' }) : respond(200, [photographed])),
-      ),
-    )
+    stubMarket([photographed], () => respond(409, { detail: 'Add the address cards should ship to first.' }))
     renderMarket()
 
     expect(await screen.findByRole('img', { name: 'Front photo' })).toBeInTheDocument()
@@ -484,6 +494,123 @@ describe('MarketPage', () => {
     await user.click(screen.getByRole('button', { name: 'Buy' }))
     await user.click(screen.getByRole('button', { name: 'Confirm: buy for $419.98' }))
     expect(await screen.findByRole('link', { name: 'Add your address' })).toHaveAttribute('href', '/orgs/b1')
+  })
+
+  it('opens the photos full screen, as taken, and moves between them', async () => {
+    const user = userEvent.setup()
+    const photographed = {
+      ...item,
+      photos: [
+        { side: 'FRONT' as const, url: 'https://photos.example/f.jpg', fullUrl: 'https://photos.example/f-full.jpg' },
+        { side: 'BACK' as const, url: 'https://photos.example/b.jpg', fullUrl: 'https://photos.example/b-full.jpg' },
+        { side: 'DETAIL' as const, url: 'https://photos.example/d.jpg', fullUrl: 'https://photos.example/d-full.jpg' },
+      ],
+    }
+    stubMarket([photographed], () => respond(500, {}))
+    renderMarket()
+
+    await user.click(await screen.findByRole('button', { name: /Back photo/ }))
+    const viewer = screen.getByRole('dialog', { name: 'Photos' })
+    expect(viewer).toHaveTextContent('Back (2 of 3)')
+    expect(screen.getByRole('img', { name: 'Close-up photo, full size' })).toHaveAttribute('src', 'https://photos.example/d-full.jpg')
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
+
+    await user.click(screen.getByRole('button', { name: 'Next →' }))
+    expect(viewer).toHaveTextContent('Close-up (3 of 3)')
+    expect(screen.getByRole('button', { name: 'Next →' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Actual size' }))
+    expect(screen.getByRole('button', { name: 'Fit to screen' })).toBeInTheDocument()
+    await user.keyboard('{ArrowLeft}')
+    expect(viewer).toHaveTextContent('Back (2 of 3)')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows the likely grade and that a close-up is included', async () => {
+    stubMarket([{ ...item, photos: [{ side: 'DETAIL', url: 'https://photos.example/d.jpg', fullUrl: 'https://photos.example/d-full.jpg' }] }], () => respond(500, {}))
+    renderMarket()
+
+    expect(await screen.findByText('Most likely PSA 9 (50%)')).toBeInTheDocument()
+    expect(screen.getByText('Close-up included')).toBeInTheDocument()
+  })
+
+  it('leaves out the close-up chip without one, and a tie goes to the lower grade', async () => {
+    const tied = rungs.map((r) => ({ ...r, probability: r.grade === '10' || r.grade === '9' ? 0.5 : 0 }))
+    stubMarket([{ ...item, offer: offer({ ladder: tied }) }], () => respond(500, {}))
+    renderMarket()
+
+    expect(await screen.findByText('Most likely PSA 9 (50%)')).toBeInTheDocument()
+    expect(screen.queryByText('Close-up included')).not.toBeInTheDocument()
+  })
+
+  it('shows the postage and insurance, and the 7 days to pay, before the buyer confirms', async () => {
+    const user = userEvent.setup()
+    const fetch = stubMarket([item], () => respond(500, {}))
+    renderMarket()
+
+    await user.click(await screen.findByRole('button', { name: 'Buy' }))
+
+    expect(await screen.findByText(/Postage and insurance: about/)).toHaveTextContent(
+      'Postage and insurance: about $9.30 (USPS GroundAdvantage $5.10, plus $4.20 to insure it for $419.98), billed to you monthly.',
+    )
+    expect(screen.getByText(/within 7 days of it arriving/)).toBeInTheDocument()
+    expect(fetch.mock.calls.some(([url]) => url === '/api/orgs/b1/market/l1/postage')).toBe(true)
+    expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false) // nothing bought for an estimate
+  })
+
+  it('says when the postage is our usual rate rather than a quote', async () => {
+    const user = userEvent.setup()
+    stubMarket([item], () => respond(500, {}), {
+      postage: () => respond(200, { postage: 6, insurance: 4.2, total: 10.2, carrier: null, service: null, quoted: false }),
+    })
+    renderMarket()
+
+    await user.click(await screen.findByRole('button', { name: 'Buy' }))
+    expect(await screen.findByText(/our usual postage of \$6.00/)).toBeInTheDocument()
+  })
+
+  it("still lets the buyer confirm when the postage can't be estimated", async () => {
+    const user = userEvent.setup()
+    stubMarket([item], () => respond(500, {}), { postage: () => respond(409, { detail: 'This card is no longer for sale.' }) })
+    renderMarket()
+
+    await user.click(await screen.findByRole('button', { name: 'Buy' }))
+    expect(await screen.findByText(/We couldn't estimate the postage \(This card is no longer for sale\)/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm: buy for $419.98' })).toBeInTheDocument()
+  })
+
+  it('asks for the shipping address before showing anything for sale', async () => {
+    stubMarket([item], () => respond(500, {}), { shipTo: null })
+    renderMarket()
+
+    expect(await screen.findByRole('heading', { name: 'Where should cards ship to?' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Street address')).toBeInTheDocument()
+    expect(screen.queryByText('Umbreon VMAX')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Buy' })).not.toBeInTheDocument()
+  })
+})
+
+describe('HowPriced', () => {
+  function renderOffer(o: Offer) {
+    stubApi([{ offer: o, listing: null }], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+  }
+
+  it('shows what each likely grade recently sold for, and the confidence in words', async () => {
+    renderOffer(offer())
+
+    expect(await screen.findByText('Fairly sure (B), because there are only a few recent sales.')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Recently sold for' })).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: /PSA 10/ })).toHaveTextContent('$900.00 (3 sales, 90 days)')
+    expect(screen.getByRole('row', { name: /PSA 9/ })).toHaveTextContent('$450.00 (1 sale, 180 days)')
+    expect(screen.getByRole('row', { name: /^PSA 8 / })).toHaveTextContent('no sales of its own')
+  })
+
+  it('leaves the sold prices out when they are switched off, and needs no reason at an A', async () => {
+    renderOffer(offer({ sold: null, confidence: 'A', lessSureBecause: [] }))
+
+    expect(await screen.findByText('Very sure (A).')).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Recently sold for' })).not.toBeInTheDocument()
   })
 })
 
@@ -634,7 +761,7 @@ describe('DealsPage', () => {
     listingId: 'l1',
     card: { name: 'Umbreon VMAX', setName: 's', number: '1', language: 'en', edition: 'UNLIMITED', variant: 'NORMAL', label: 'x', distribution: {}, gradedAs: null },
     offer: offer(),
-    photos: [{ side: 'FRONT', url: 'https://photos.example/f.jpg' }],
+    photos: [{ side: 'FRONT', url: 'https://photos.example/f.jpg', fullUrl: 'https://photos.example/f-full.jpg' }],
     seller: { orgName: 'Sam', email: null },
     acceptedAt: '2026-10-20T10:00:00Z',
     label: null,
