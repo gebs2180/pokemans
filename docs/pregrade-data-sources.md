@@ -8,9 +8,71 @@ Written 2026-11-02. A plan, not code. Volumes, times and costs marked *est.* are
 
 ## The main finding
 
-Zach's experience, that few collectors photograph before grading and keep the photos, is the market telling us that **retrospective pairs barely exist in licensable form**. The raw photos that do exist sit on eBay, Reddit, Discord and YouTube, all of which ban scraping or AI training without permission, and the grader images belong to the graders. So the plan should be **prospective**: get photos taken to our standard *before* a card ships to a grader, and collect the grade when it comes back. Rawmark already has the pieces for that: the capture standard, consent records, the contributor org type and cert check, and an offers market where buyer orgs receive raw cards we photographed.
+Zach's experience, that few collectors photograph before grading and keep the photos, holds online too: **there's no public, licensable archive of raw photo plus later grade.** The largest existing pools (eBay raw listings later relisted slabbed, Reddit and Discord "guess the grade" posts, YouTube grading reveals) can only be collected by scraping against the sites' terms. Grader images belong to the graders. No licensable Pokémon dataset turned up on GitHub, Kaggle, Hugging Face or Roboflow.
 
-## Ranked shortlist: pursue these first
+So up-front data has to be **bought or licensed from whoever already holds an archive**, or **made quickly from cards we buy**. The up-front shortlist below is about that. The prospective sources (data that accumulates from now on) follow it, since they're cheaper per pair but slower.
+
+## Up-front: data that exists today
+
+Ranked by how likely each is to give us a usable batch within weeks.
+
+### U1. Buy the archives of raw-to-slab flippers, group submitters and shops
+
+**Who:** people whose business is buying raw, grading and reselling, or submitting for others. Many photograph every raw card at intake (to list it, to prove condition for insurance, or to settle disputes with customers) and keep the cert when it returns. That's exactly a raw-photo-plus-grade archive, sitting on hard drives.
+
+- **Volume:** *est.* hundreds to several thousand pairs per active operation; the first deal could deliver 1,000 at once.
+- **Photos:** mixed, often decent (flippers photograph to sell). Front and back varies; filter with our quality checks.
+- **Labels:** exact grade, matched by their own records. Verify a sample against PSA's cert lookup (data only, not images).
+- **Cost:** *est.* $1–5 per pair or a revenue share, plus free Rawmark pre-grades and offers.
+- **Time:** weeks once one says yes.
+- **Licensing:** low *for photos they took of cards they owned*. Photos of a customer's card (group submitters) are fine to license as the photographer's copyright, but tell customers in a privacy note. Get a written licence: commercial use, training, perpetual, no exclusivity needed.
+- **Next step:** find 10–20 high-volume Pokémon raw-to-slab eBay sellers and group submitters by hand (eBay store pages, submission-service sites, Elite Fourum vendors). Email: "Do you keep photos of raw cards you've graded, with the cert? We'd license the archive for training a grading model: $X per pair with front and back, and we never republish the images."
+
+### U2. Photograph PSA slabs we buy (1,000 PSA-labelled images in weeks, no licence needed)
+
+**Why:** the fastest licensable 1,000. Buy cheap PSA-graded Pokémon slabs across grades 1–10, photograph them through the plastic on our capture standard, front and back, and resell. The grade is on the label; the photos are ours.
+
+- **Volume:** as many as we buy. 1,000 is realistic.
+- **Photos:** ours, but through the slab (see "How good a proxy" below: good for centering, fair for corners and edges, poor for surface). Crop out the label.
+- **Labels:** exact PSA grade, and the grade mix is ours to choose, including the low grades nobody submits.
+- **Cost:** *est.* $10–30 a slab for cheap modern and low-grade vintage, so $15–25k for 1,000, mostly recovered by reselling (about 10–20% lost to fees and spread, so *est.* $2–5k net). Start with 200.
+- **Time:** 2–4 weeks to buy and photograph 200.
+- **Licensing:** none.
+- **Use:** pretraining and centering; it can't replace raw pairs for calibration. It also tells us how much the slab costs in accuracy, which settles whether U3/U4 are worth paying for.
+
+### U3. License TAG's archive (raw out-of-slab images plus per-defect reports)
+
+TAG photographs every card raw during grading and publishes each defect. It's the one existing *raw* image archive with labels at scale (*est.* tens of thousands of Pokémon cards). Labels are TAG grades, not PSA, so it's for pretraining and sub-scores. Send the drafted info@taggrading.com email, now asking first for a licence to a de-identified bulk set and its price, and second whether members may share their own reports. Details in shortlist #3 below.
+
+### U4. License slab photos from auction houses and marketplaces
+
+Auction houses and vaults photograph PSA slabs themselves, so the copyright in *their* photos is theirs to license (unlike PSA's cert scans). Heritage Auctions' terms, as quoted on a collectors forum, allow only non-commercial single-image use without consent, so it would be a licence deal. Candidates: Heritage, Goldin, Fanatics Collect (PWCC), Alt (which also scans *raw* cards at vault intake for $5 each, the one raw source here), Courtyard (off limits for now, see below), and PSA's own eBay storefront.
+
+- **Volume:** tens to hundreds of thousands of PSA-labelled slab images.
+- **Quality:** high and uniform, studio-lit.
+- **Cost:** unknown; likely a data deal they've not done before.
+- **Time:** months.
+- **Licensing:** clean if signed; check that the deal covers the card art (The Pokémon Company's) as it appears in the photo.
+- **Next step:** one email each to Alt (raw intake scans plus later grades, the best fit) and Heritage, asking whether they license image archives for model training.
+
+### U5. Ask PSA (Collectors) and CGC for their cert images
+
+The biggest PSA-labelled image sets that exist: most PSA certs since about 2023 have front and back scans. PSA owns them (submission terms §23) and CGC's terms (§8) license CGC's images to CGC. Only a licence makes them usable. Ask once through PSA's API and business-development contacts and CGC's: expect no, but a research or data partnership is the only route to PSA-labelled images at millions.
+
+### U6. Pre-grade vendors holding returns
+
+SnapGradeAI reportedly publishes 412 predictions logged before PSA submission with the returned grade (secondhand, from a competitor). CardGrade.io trains on uploads unless users opt out, so it may hold returns. Both are small or unknown; ask whether they'd license photos plus returned grades *and* whether their users' terms allow it. A user-photo set they can't legally pass on is no use.
+
+### Up-front sources that aren't usable
+
+- **eBay raw-to-slab matching:** the largest pool, but scraping breaches the User Agreement §3. The only official sold-data API, Marketplace Insights, is a limited release for approved partners, covers 90 days, and was not shown to return images. Not a route without an eBay data deal.
+- **Reddit, Discord, Facebook, forums, YouTube and TikTok:** scraping or training breaches their terms; posters own their photos. Use them only to find people for U1 and the bounty.
+- **Public datasets:** PSA-Baseball-Grades (scraped, no licence, 150×200 px, baseball). Roboflow's card-grader sets are small (50–150 images), mostly CC BY 4.0 but without grade labels. Fine for detector experiments under CC BY with credit; nothing for grade calibration.
+- **Patent to check:** US 12,106,334 B2 (granted 2024-10-01) claims training a model on pre-graded trading-card images. I couldn't read it (the gazette page 404'd); look up the assignee and claims before training commercially.
+
+## Prospective: data that accumulates from now on
+
+These are slower but cheaper per pair, and they're where the long-run volume comes from. Rawmark already has the pieces: the capture standard, consent records, the contributor org type and cert check, and an offers market where buyer orgs receive raw cards we photographed.
 
 ### 1. Our own offers flow: buyers report the grade of cards they bought
 
@@ -171,10 +233,10 @@ The proxy question is moot for now, since no slab source is licensable today.
 
 ## Suggested order
 
-1. **This week:** read and extend the seller, buyer and contributor terms (#1, #4); send or follow up the TAG email (#3); add the licensing question to the pending CardGrade.io email.
-2. **Next 2–3 weeks:** buy and photograph the first 100-card stratified set, plus 20–30 cheap PSA slabs photographed through the plastic; submit the 100 in batches (#2).
-3. **In parallel:** contact 5–10 group submitters (#5) and 3–5 Discord and Reddit moderators (#4) by hand.
-4. **When the first grades return:** run the condition validation on whatever pairs exist, by source, and decide whether a second paid batch is worth it.
+1. **This week (up-front):** email 10–20 flippers and group submitters about their archives (U1); buy the first 200 PSA slabs across grades 1–10 (U2); send the TAG email with the licence question first (U3); one email each to Alt and Heritage (U4).
+2. **Also this week (prospective):** read and extend the seller, buyer and contributor terms (#1, #4); add the licensing question to the pending CardGrade.io email.
+3. **Next 2–3 weeks:** photograph the slabs; buy and photograph the first 100-card raw stratified set and submit it in batches (#2).
+4. **When the first archive or grades arrive:** run the condition validation on whatever pairs exist, by source, and decide whether to buy more.
 
 Don't pursue: scraping eBay, Reddit, Discord, Facebook, YouTube, PSA or CGC cert pages; CardGrader.AI outputs; unlicensed public datasets.
 
@@ -200,6 +262,10 @@ Don't pursue: scraping eBay, Reddit, Discord, Facebook, YouTube, PSA or CGC cert
 - PSA-Baseball-Grades dataset: https://github.com/samsilverman/PSA-Baseball-Grades
 - DeepCornerNet: https://ogma.newcastle.edu.au/vital/access/manager/Repository/uon:55212 ; TCG-AI preprint: https://www.researchsquare.com/article/rs-8098898/latest.pdf
 - Ximilar on building its own dataset: https://www.ximilar.com/ai-card-grading-automate-sports-cards-pre-grading
+- Heritage Auctions image terms (quoted secondhand on a forum): https://forums.collectors.com/discussion/comment/12521682/
+- eBay Marketplace Insights API (limited release, 90 days of sales): https://developer.ebay.com/api-docs/buy/marketplace-insights/overview.html
+- Roboflow card datasets: https://universe.roboflow.com/cardsdata/card-grader-tvoab-yrch1 , https://universe.roboflow.com/jaspers-workspace-hsomq/pokemon-grading ; Roboflow's 150-image Pokémon prototype: https://blog.roboflow.com/using-computer-vision-to-make-card-grading-faster-and-cheaper/
+- Patent US 12,106,334 B2 (gazette page 404'd): https://patentsgazette.uspto.gov/week40/OG/html/1527-1/US12106334-20241001.html
 - Practitioner notes on training a pre-grader: https://dev.to/alex_newsome_c51e56ce7eb7/i-trained-an-ai-to-pre-grade-trading-cards-heres-what-i-learned-k5i
 
 Not checked: Discord's and Meta's current terms (stated from general knowledge, re-read before any contact plan relies on them), Courtyard, Fanatics Collect and Goldin intake imaging, CardGrade.io's and SnapGradeAI's terms on user uploads.
