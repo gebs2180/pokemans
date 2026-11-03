@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -51,11 +53,15 @@ class EasyPostShippingProvider implements ShippingProvider {
         this.carrier = config.carrier();
     }
 
-    private static JdkClientHttpRequestFactory requests(ShippingProperties.EasyPost config) {
+    /**
+     * Buffered, so each body goes with its length. Streamed, it goes chunked, and EasyPost reads a chunked body as none:
+     * 422 "shipment cannot be blank" (live check with the test key, 2026-11-02).
+     */
+    private static ClientHttpRequestFactory requests(ShippingProperties.EasyPost config) {
         JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(config.timeout()).build());
         requests.setReadTimeout(config.timeout());
-        return requests;
+        return new BufferingClientHttpRequestFactory(requests);
     }
 
     @Override

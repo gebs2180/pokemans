@@ -10,10 +10,15 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.sun.net.httpserver.HttpServer;
 import java.math.BigDecimal;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -120,6 +125,35 @@ class EasyPostShippingProviderTest {
         assertThatThrownBy(() -> new EasyPostShippingProvider(CONFIG, builder).buy(FROM, TO, PARCEL, BigDecimal.TEN, "listing-1"))
                 .isInstanceOf(RuntimeException.class);
         server.verify();
+    }
+
+    @Test
+    void sendsBodiesWithTheirLengthNotChunked() throws Exception {
+        // EasyPost reads a chunked body as none and answers 422 "shipment cannot be blank" (live check, 2026-11-02).
+        // The mock server never sees the wire, so this goes through the real client to a local server.
+        List<String> posts = new CopyOnWriteArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/", exchange -> {
+            if (exchange.getRequestMethod().equals("POST")) {
+                posts.add(exchange.getRequestHeaders().getFirst("Content-Length") + " " + exchange.getRequestHeaders().getFirst("Transfer-Encoding"));
+            }
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v2");
+            ShippingProperties properties = new ShippingProperties(new ShippingProperties.EasyPost(true, "EZTK_test", base, "USPS",
+                    Duration.ofSeconds(5)), new ShippingProperties.Parcel(new BigDecimal("7"), new BigDecimal("5"), BigDecimal.ONE, new BigDecimal("3")));
+
+            assertThatThrownBy(() -> new EasyPostShippingProvider(properties).buy(FROM, TO, PARCEL, BigDecimal.TEN, "listing-1"))
+                    .isInstanceOf(RuntimeException.class);
+        } finally {
+            server.stop(0);
+        }
+        assertThat(posts).hasSize(1);
+        assertThat(posts.getFirst()).matches("\\d+ null");
     }
 
     @Test
