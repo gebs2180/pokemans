@@ -71,6 +71,36 @@ class Shipping {
     }
 
     /**
+     * What a label from the seller to the buyer would cost, estimated before the buyer accepts. Nothing is bought.
+     *
+     * @param quoted true when the postage is the provider's live quote, false when it is the configured estimate
+     */
+    record Estimate(BigDecimal postage, BigDecimal insurance, BigDecimal total, String carrier, String service, boolean quoted) {
+    }
+
+    /**
+     * The postage the provider quotes for this seller and buyer, or the configured estimate with no provider, no address
+     * or a failed quote; insurance at the configured rate on the price. Outside a transaction: the quote is a call out.
+     */
+    Estimate estimate(UUID sellerOrgId, UUID buyerOrgId, BigDecimal insuredValue) {
+        ShippingProperties.Estimate e = properties.estimate();
+        BigDecimal insurance = insuredValue.multiply(e.insuranceRate()).max(e.insuranceMinimum()).setScale(2, java.math.RoundingMode.UP);
+        Optional<ShipAddress> from = address(sellerOrgId);
+        Optional<ShipAddress> to = address(buyerOrgId);
+        if (provider.isPresent() && from.isPresent() && to.isPresent()) {
+            ShippingProperties.Parcel p = properties.parcel();
+            try {
+                ShippingProvider.Rate rate = provider.get().quote(from.get().toAddress(), to.get().toAddress(),
+                        new ShippingProvider.Parcel(p.length(), p.width(), p.height(), p.weightOz()));
+                return new Estimate(rate.postage(), insurance, rate.postage().add(insurance), rate.carrier(), rate.service(), true);
+            } catch (RuntimeException ex) {
+                log.warn("Couldn't quote postage, so the estimate stands in: {}", failure(ex));
+            }
+        }
+        return new Estimate(e.postage(), insurance, e.postage().add(insurance), null, null, false);
+    }
+
+    /**
      * Buys the label for a taken card, once. Runs in its own transaction after the accept has
      * committed, so a provider failure never undoes the sale: the label can be bought again.
      *

@@ -29,6 +29,17 @@ class FakeShippingProvider implements ShippingProvider {
         return "FAKE";
     }
 
+    final AtomicInteger quoted = new AtomicInteger();
+
+    @Override
+    public Rate quote(Address from, Address to, Parcel parcel) {
+        if (failing) {
+            throw new IllegalStateException(failure);
+        }
+        quoted.incrementAndGet();
+        return new Rate("USPS", "GroundAdvantage", new BigDecimal("5.10"));
+    }
+
     @Override
     public Label buy(Address from, Address to, Parcel parcel, BigDecimal insuredValue, String reference) {
         if (failing) {

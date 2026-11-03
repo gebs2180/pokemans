@@ -179,7 +179,7 @@ class OfferController {
         requireSellerCard(orgId, cardId);
         consents.requireAccepted(orgId);
         listings.requireNotHeld(cardId);
-        return ListingService.offerView(offers.price(orgId, cardId), null);
+        return listings.offerView(offers.price(orgId, cardId), null);
     }
 
     /** Posts the offer to every buyer. Not a sale yet: a buyer has to take it. */
@@ -234,6 +234,13 @@ class OfferController {
     List<ListingService.MarketItem> market(@PathVariable UUID orgId) {
         requireBuyer(orgId);
         return listings.market();
+    }
+
+    /** What the label would cost, shown in the confirm step before accepting (UX review finding 8). Buys nothing. */
+    @GetMapping("/api/orgs/{orgId}/market/{listingId}/postage")
+    Shipping.Estimate postage(@PathVariable UUID orgId, @PathVariable UUID listingId) {
+        requireBuyer(orgId);
+        return listings.postage(orgId, listingId);
     }
 
     /** Takes the card at the offer price, then buys the label. A label failure doesn't undo the take. */

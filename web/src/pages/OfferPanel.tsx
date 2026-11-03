@@ -1,50 +1,86 @@
 import { useState } from 'react'
-import { apiPath, likelyRungs, money, PAYMENT_METHOD, useApi, type CardStatus, type Offer, type Sale, type ShipAddress } from '../api'
+import {
+  apiPath,
+  confidenceInWords,
+  likelyRungs,
+  money,
+  PAYMENT_METHOD,
+  useApi,
+  type CardStatus,
+  type Offer,
+  type Sale,
+  type ShipAddress,
+  type SoldPrice,
+} from '../api'
 import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
 import { SoldPanel } from './SoldPanel'
 
-/** How the firm price was reached: what a buyer could pay at each grade the card might be, and how likely each is. */
+/** "$300 (3 sales, 90 days)": the sold price a grade's worth starts from, with what it rests on. */
+function soldFor(sold: SoldPrice | undefined) {
+  if (!sold) return 'no sales of its own'
+  return `${money(sold.price)} (${sold.sales} ${sold.sales === 1 ? 'sale' : 'sales'}, ${sold.windowDays} days)`
+}
+
+/**
+ * How the firm price was reached: what a buyer could pay at each grade the card might be, how likely each is, and what
+ * that grade recently sold for (UX review finding 11). The sold prices are the comps stored with the offer, not today's.
+ */
 export function HowPriced({ offer }: { offer: Offer }) {
   const { likely, lower } = likelyRungs(offer.ladder)
+  const sold = offer.sold
   return (
-    <details className="disclosure">
-      <summary>How we priced it</summary>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>If it's a</th>
-            <th>Chance</th>
-            <th>Worth to a buyer</th>
-          </tr>
-        </thead>
-        <tbody>
-          {likely.map((r) => (
-            <tr key={r.grade}>
-              <td>PSA {r.grade}</td>
-              <td>{Math.round(r.probability * 100)}%</td>
-              <td>{money(r.price)}</td>
-            </tr>
-          ))}
-          {lower && (
-            <tr>
-              <td>PSA {lower.grade} or lower</td>
-              <td className="muted">unlikely</td>
-              <td>up to {money(lower.price)}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-      <p className="muted small">The offer is the chance-weighted total, and it doesn't change with the grade the card turns out to be.</p>
-      <p className="muted small">
-        Each grade's worth is what the card sells for at that grade, less what it costs a buyer to get it graded (fee, shipping
-        and insurance) and to sell it. That's why a PSA 10's worth is well under what PSA 10s sell for.
-      </p>
-      <p className="muted small">
-        Each grade's worth leaves the buyer a {Math.round(offer.buyerMargin * 100)}% margin, set by how sure we are of the card's
-        condition (confidence {offer.confidence}): the less certain, the more room the buyer gets for the risk.
-      </p>
-    </details>
+    <>
+      <p className="small">{confidenceInWords(offer)}</p>
+      <details className="disclosure">
+        <summary>How we priced it</summary>
+        <div className="scroll">
+          <table className="table ladder">
+            <thead>
+              <tr>
+                <th>If it's a</th>
+                <th>Chance</th>
+                {sold && <th>Recently sold for</th>}
+                <th>Worth to a buyer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {likely.map((r) => (
+                <tr key={r.grade}>
+                  <td>PSA {r.grade}</td>
+                  <td>{Math.round(r.probability * 100)}%</td>
+                  {sold && <td>{soldFor(sold.find((s) => s.grade === r.grade))}</td>}
+                  <td>{money(r.price)}</td>
+                </tr>
+              ))}
+              {lower && (
+                <tr>
+                  <td>PSA {lower.grade} or lower</td>
+                  <td className="muted">unlikely</td>
+                  {sold && <td />}
+                  <td>up to {money(lower.price)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {sold && (
+          <p className="muted small">
+            Recently sold for: the typical PSA-graded sale at that grade, recent sales counting most, from the sales we priced this
+            offer on.
+          </p>
+        )}
+        <p className="muted small">The offer is the chance-weighted total, and it doesn't change with the grade the card turns out to be.</p>
+        <p className="muted small">
+          Each grade's worth is what the card sells for at that grade, less what it costs a buyer to get it graded (fee, shipping
+          and insurance) and to sell it. That's why a PSA 10's worth is well under what PSA 10s sell for.
+        </p>
+        <p className="muted small">
+          Each grade's worth leaves the buyer a {Math.round(offer.buyerMargin * 100)}% margin, set by how sure we are of the card's
+          condition (confidence {offer.confidence}): the less certain, the more room the buyer gets for the risk.
+        </p>
+      </details>
+    </>
   )
 }
 

@@ -15,9 +15,14 @@ The lender and insurer side is paused while Zach clears his outside interest wit
    - its PSA price table, net of the default grading cost;
    - its provenance.
 
-   The offer is **one firm price**. "How we priced it" shows the per-grade ladder behind it.
+   The offer is **one firm price**. "How we priced it" shows the per-grade ladder behind it, with what each likely grade recently sold for, e.g. "$300 (3 sales, 90 days)" (UX review finding 11, 2026-11-02). That's the PSA price the offer used: the recency-weighted median, its sale count and window, read from the comps stored with the offer, never a fresh query. `pokemans.offers.show-sold-prices` (`SHOW_SOLD_PRICES`, default on) hides the column if the price data's licence turns out not to allow showing sold prices.
+   - The confidence is worded for people beside its letter, with why it isn't an A, from the offer's stored trace: "Fairly sure (B), because there are only a few recent sales." The reasons are the photos, few sales, sales not refreshed lately, and a likely grade with no sales of its own.
 2. **Selling.** "Sell" posts the price to every buyer org, after one confirm step. The seller needs a ship-from address on file first. Posting isn't a sale: the first buyer to accept buys the card at the price, and the page says so. A listing nobody accepts expires.
    - Buyers see the photos the offer was priced on: each side's current photo (front, back, close-up), labelled, never superseded attempts. An offer whose photos were retaken since can't be posted: the seller gets a new one.
+   - Tapping a photo opens all of them full screen in the app, to swipe between and see at actual size (UX review finding 8, 2026-11-02). These are the photos as taken: a copy of the upload's own image data, byte for byte, with its metadata (location, camera, comments) cut out and only the EXIF orientation kept. No crop, no re-encode. The copy is made when a photo passes, and at posting for photos that passed before this; thumbnails stay the smaller cropped copy.
+   - Each listing shows the most likely grade with its chance ("Most likely PSA 9 (50%)", a tie going to the lower grade) and "Close-up included" when there is one.
+   - A buyer gives their ship-to address before the market shows anything to buy.
+   - "Buy" shows the estimated postage and insurance, billed monthly, and the 7 days to pay the seller from arrival, before the confirm. The estimate is a live EasyPost rate for the cheapest service from the seller's address to the buyer's: a shipment is created to read its rates and no label is bought. Without an address, or if the quote fails, it's our usual $6.00 postage (`pokemans.shipping.estimate.postage`). Insurance is estimated at 1% of the price, $1 minimum. Nothing is stored.
    - From posting on, the card's photos can't change (E2E audit, 2026-10-21): the API refuses uploads while it's posted, and once it's sold until a returned card is back with the seller. Withdrawing frees them again.
 3. **The label.** Accepting buys a prepaid, insured label at once, on our EasyPost account, from the seller's address to the buyer's. The seller prints it from the card page. If the purchase fails (no shipping account yet, or the carrier is down), the sale still stands: the buyer retries from Your deals, or the admin from **Labels to buy** (`/admin/labels`). Meanwhile the seller is told not to ship until the label shows.
 4. **After the sale** (UX review, 2026-11-01). **Rawmark never handles the money:** everything here records what each side says, one appended row at a time. The seller's card page and the buyer's Your deals both follow the deal through these stages:
@@ -104,7 +109,8 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
     - `GET /api/orgs/{org}/cards/{card}/status` and `GET /api/orgs/{org}/collections/{collection}/status`: where each card is (photos, our identification, condition review, prices, offer, posted, sold), its identity once confirmed, and what happens next
   - Both sides: `GET`/`POST /api/orgs/{org}/ship-address`.
   - Buyer (buyer org, terms accepted):
-    - `GET /api/orgs/{org}/market`
+    - `GET /api/orgs/{org}/market`: each photo has `url` (the thumbnail) and `fullUrl` (as taken)
+    - `GET .../market/{id}/postage`: the estimate, stored nowhere and with no label bought; 409 once the card is taken
     - `POST .../market/{id}/accept`, which returns the deals and `labelPending` if the label didn't go through
     - `GET .../deals`
     - `POST .../deals/{id}/label` (retry)
@@ -124,7 +130,7 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
 - **Web:**
   - the "Instant offer" panel on the card page: the price, how it was priced, the ship-from address, "Sell for $X", and the label to print;
   - the buyer org page, behind the buyer terms, with its ship-to address;
-  - "Cards for sale", with a two-step "Buy";
+  - "Cards for sale", behind the ship-to address: full-screen photos, the likely grade, and a two-step "Buy" that shows the postage estimate;
   - "Your deals": the label and tracking, retrying the label, and recording the arrival or return;
   - admin "Postage to bill";
   - admin "Offers and deals" (`/admin/deals`): void, cancel and refund, each asking for a reason, and the voided, cancelled and refund states with who and when. The seller's offer panel and the buyer's deals show a voided offer or a cancelled deal with its reason.

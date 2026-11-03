@@ -109,6 +109,7 @@ class CrossOrgAccessTest {
                 post(p + "/listings/" + UUID.randomUUID() + "/card-back"),
                 get(p + "/market"),
                 post(p + "/market/" + UUID.randomUUID() + "/accept"),
+                get(p + "/market/" + UUID.randomUUID() + "/postage"),
                 get(p + "/deals"),
                 post(p + "/deals/" + UUID.randomUUID() + "/label"),
                 postJson(p + "/deals/" + UUID.randomUUID() + "/received", "{}"),

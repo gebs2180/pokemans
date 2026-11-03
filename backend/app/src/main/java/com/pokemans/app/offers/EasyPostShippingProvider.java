@@ -69,17 +69,25 @@ class EasyPostShippingProvider implements ShippingProvider {
         return NAME;
     }
 
+    /**
+     * Creates a shipment to read its rates and buys none. No reference, so {@link #buy}'s look-up by listing id never finds
+     * it. Creating a shipment costs nothing; the unbought one is left on the account.
+     */
+    @Override
+    public Rate quote(Address from, Address to, Parcel parcel) {
+        Map<String, Object> created = http.post().uri("/shipments").contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("shipment", shipment(from, to, parcel))).retrieve().body(OBJECT);
+        Map<String, Object> rate = cheapest(list(created, "rates"));
+        return new Rate(string(rate, "carrier"), string(rate, "service"), new BigDecimal(string(rate, "rate")));
+    }
+
     @Override
     public Label buy(Address from, Address to, Parcel parcel, BigDecimal insuredValue, String reference) {
         Map<String, Object> earlier = shipmentBy(reference);
         if (!map(earlier, "postage_label").isEmpty()) {
             return label(earlier);
         }
-        Map<String, Object> shipment = new LinkedHashMap<>();
-        shipment.put("from_address", address(from));
-        shipment.put("to_address", address(to));
-        shipment.put("parcel", Map.of("length", parcel.length(), "width", parcel.width(), "height", parcel.height(),
-                "weight", parcel.weightOz()));
+        Map<String, Object> shipment = shipment(from, to, parcel);
         shipment.put("reference", reference);
         shipment.put("options", Map.of("label_format", "PDF"));
         Map<String, Object> created = http.post().uri("/shipments").contentType(MediaType.APPLICATION_JSON)
@@ -91,6 +99,15 @@ class EasyPostShippingProvider implements ShippingProvider {
                 .body(Map.of("rate", Map.of("id", string(rate, "id")), "insurance", insuredValue.toPlainString()))
                 .retrieve().body(OBJECT);
         return label(bought);
+    }
+
+    private static Map<String, Object> shipment(Address from, Address to, Parcel parcel) {
+        Map<String, Object> shipment = new LinkedHashMap<>();
+        shipment.put("from_address", address(from));
+        shipment.put("to_address", address(to));
+        shipment.put("parcel", Map.of("length", parcel.length(), "width", parcel.width(), "height", parcel.height(),
+                "weight", parcel.weightOz()));
+        return shipment;
     }
 
     /**

@@ -956,6 +956,13 @@ p.error[role='status'] {
   color: var(--color-muted);
 }
 
+/* The offer's per-grade table: four columns on a phone, so words wrap whole instead of breaking mid-word. */
+.table.ladder th,
+.table.ladder td {
+  padding: var(--space-2) var(--space-1);
+  overflow-wrap: normal;
+}
+
 /* Wide tables scroll inside their own box instead of the page. */
 .scroll {
   overflow-x: auto;
@@ -1053,6 +1060,101 @@ p.error[role='status'] {
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-surface-sunken);
+}
+
+/* A thumbnail that opens the photos full screen. */
+button.photo-button {
+  padding: 0;
+  margin: 0;
+  min-height: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: zoom-in;
+}
+
+button.photo-button:hover {
+  background: none;
+}
+
+/* The likely grade and "close-up included" on a listing. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+/* Full-screen photos: swipe between them, tap for actual size. Dark whatever the theme, so the photo's colours read true. */
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: #0d0a16;
+  color: #ffffff;
+}
+
+.viewer-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+}
+
+.viewer-bar > span {
+  flex: 1;
+}
+
+.viewer-nav > button {
+  flex: 1;
+}
+
+.viewer-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
+
+/* At actual size the photo pans instead of swiping to the next. */
+.viewer-track.locked {
+  overflow-x: hidden;
+}
+
+.viewer-slide {
+  flex: 0 0 100%;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  scroll-snap-align: center;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.viewer-slide img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  touch-action: pinch-zoom;
+  cursor: zoom-in;
+}
+
+.viewer-slide.actual {
+  overflow: auto;
+  place-items: start;
+}
+
+.viewer-slide.actual img {
+  max-width: none;
+  max-height: none;
+  cursor: zoom-out;
+  touch-action: pan-x pan-y pinch-zoom;
 }
 
 .status-line {

@@ -1,5 +1,7 @@
 package com.pokemans.app.intake;
 
+import com.pokemans.app.storage.BlobStore;
+import com.pokemans.app.storage.StorageProperties;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -38,6 +40,14 @@ public class CardItems {
         return cropKey != null ? cropKey : Photo.viewStorageKey(storageKey);
     }
 
+    /**
+     * The stored object a buyer opens full size: the photo exactly as uploaded, without its metadata. Written when a photo
+     * passes, and by {@link #ensureExactCopy} for photos that passed before these copies were kept.
+     */
+    public static String exactKey(String storageKey) {
+        return Photo.exactStorageKey(storageKey);
+    }
+
     /** A collection as other modules see it. */
     public record CollectionRef(UUID id, UUID orgId, String name) {
     }
@@ -54,12 +64,40 @@ public class CardItems {
     private final CardItemRepository cards;
     private final PhotoRepository photos;
     private final CardCollectionRepository collections;
+    private final BlobStore blobs;
+    private final StorageProperties storage;
 
-    CardItems(IntakeService intake, CardItemRepository cards, PhotoRepository photos, CardCollectionRepository collections) {
+    CardItems(IntakeService intake, CardItemRepository cards, PhotoRepository photos, CardCollectionRepository collections,
+              BlobStore blobs, StorageProperties storage) {
         this.intake = intake;
         this.cards = cards;
         this.photos = photos;
         this.collections = collections;
+        this.blobs = blobs;
+        this.storage = storage;
+    }
+
+    /** Writes the photo's {@link #exactKey exact copy} if it isn't stored yet. */
+    public void ensureExactCopy(String storageKey, String contentType) {
+        if (blobs.head(storage.photoBucket(), exactKey(storageKey)).isEmpty()) {
+            storeExactCopy(blobs, storage.photoBucket(), storageKey, contentType, blobs.read(storage.photoBucket(), storageKey));
+        }
+    }
+
+    /**
+     * Stores the exact copy of an upload. One that can't be copied as is (it never should, past the image guard) gets a
+     * re-encoded copy instead, so the key always holds a photo without the upload's metadata.
+     */
+    static void storeExactCopy(BlobStore blobs, String bucket, String storageKey, String contentType, byte[] upload) {
+        byte[] exact = ExactCopy.of(upload);
+        if (exact != null) {
+            blobs.putIfAbsent(bucket, exactKey(storageKey), exact, contentType);
+            return;
+        }
+        byte[] reencoded = CardDetector.withoutMetadata(upload);
+        if (reencoded != null) {
+            blobs.putIfAbsent(bucket, exactKey(storageKey), reencoded, "image/jpeg");
+        }
     }
 
     /** The org's collection, else 404. No membership check: the caller has done it (or is admin). */

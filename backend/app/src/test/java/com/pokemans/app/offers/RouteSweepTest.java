@@ -150,8 +150,9 @@ class RouteSweepTest {
                 continue;
             }
             assertThat(call(route, fill(route.path(), outsider.orgId()), outsider.who())).as("a seller on " + route).isIn(403, 404);
-            // Any buyer may try for a listing, and this one is taken: the only route where a stranger's id is not a 404.
-            boolean market = route.path().endsWith("/market/{listingId}/accept");
+            // Any buyer may try for a listing or ask its postage, and this one is taken: the only routes where a stranger's id
+            // is not a 404.
+            boolean market = route.path().endsWith("/market/{listingId}/accept") || route.path().endsWith("/market/{listingId}/postage");
             assertThat(call(route, fill(route.path(), outsiderBuyer.orgId()), outsiderBuyer.who())).as("a buyer on " + route)
                     .isIn(market ? List.of(409) : List.of(403, 404));
         }

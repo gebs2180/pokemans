@@ -25,7 +25,17 @@ interface ShippingProvider {
                  BigDecimal postage, BigDecimal insuranceCost) {
     }
 
+    /** A rate the provider would sell, without buying it. */
+    record Rate(String carrier, String service, BigDecimal postage) {
+    }
+
     String name();
+
+    /**
+     * The postage {@link #buy} would pay for this parcel on the preferred carrier, without buying anything: the buyer sees
+     * it before accepting (UX review finding 8).
+     */
+    Rate quote(Address from, Address to, Parcel parcel);
 
     /**
      * Buys the cheapest label on the preferred carrier, insured for {@code insuredValue}.

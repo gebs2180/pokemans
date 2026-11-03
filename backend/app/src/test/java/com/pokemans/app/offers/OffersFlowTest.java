@@ -266,6 +266,75 @@ class OffersFlowTest {
             assertThat(javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(served))).as("an image").isNotNull();
             assertThat(new String(served, java.nio.charset.StandardCharsets.ISO_8859_1)).doesNotContain("Exif").doesNotContain(GPS_SECRET);
         }
+
+        // The full-size photos are the upload's own image data, not a crop or a re-encode (UX review finding 8), still without
+        // the metadata: the close-up served is the uploaded file with its EXIF segment cut out and nothing else changed.
+        List<String> full = JsonPath.read(market, "$[?(@.listingId == '" + listingId + "')].photos[*].fullUrl");
+        assertThat(full).hasSize(3);
+        for (String url : full) {
+            byte[] served = api.download(url);
+            assertThat(javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(served))).as("an image").isNotNull();
+            assertThat(new String(served, java.nio.charset.StandardCharsets.ISO_8859_1)).doesNotContain(GPS_SECRET);
+        }
+        List<String> detail = JsonPath.read(market, "$[?(@.listingId == '" + listingId + "')].photos[?(@.side == 'DETAIL')].fullUrl");
+        byte[] served = api.download(detail.get(0));
+        byte[] uploaded = geotaggedJpeg(TestImages.goodRetake(3));
+        assertThat(java.util.Arrays.copyOfRange(uploaded, uploaded.length - (served.length - 2), uploaded.length))
+                .isEqualTo(java.util.Arrays.copyOfRange(served, 2, served.length));
+    }
+
+    @Test
+    void aBuyerSeesPostageAndInsuranceBeforeAcceptingAndNoLabelIsBought() throws Exception {
+        String listingId = postedCard("Espeon", 300);
+        JwtRequestPostProcessor buyer = buyer("Thrifty Buyer");
+        String buyerOrg = lastBuyerOrg;
+        String postage = "/api/orgs/" + buyerOrg + "/market/" + listingId + "/postage";
+        String market = api.get("/api/orgs/" + buyerOrg + "/market", buyer).andReturn().getResponse().getContentAsString();
+        double price = JsonPath.<List<Number>>read(market, "$[?(@.listingId == '" + listingId + "')].offer.price").get(0).doubleValue();
+        double insurance = Math.max(1.0, Math.ceil(price) / 100.0);
+        int boughtBefore = shipper.bought.size();
+
+        // Without the buyer's address there is nothing to quote: the configured estimate.
+        api.get(postage, buyer).andExpect(status().isOk()).andExpect(jsonPath("$.quoted").value(false))
+                .andExpect(jsonPath("$.postage").value(6.00));
+        address(buyerOrg, buyer, "Thrifty Buyer");
+        String quote = api.get(postage, buyer).andExpect(status().isOk()).andExpect(jsonPath("$.quoted").value(true))
+                .andExpect(jsonPath("$.carrier").value("USPS")).andExpect(jsonPath("$.postage").value(5.10))
+                .andReturn().getResponse().getContentAsString();
+        double insured = ((Number) JsonPath.read(quote, "$.insurance")).doubleValue();
+        assertThat(insured).isCloseTo(insurance, Offset.offset(0.011));
+        assertThat(((Number) JsonPath.read(quote, "$.total")).doubleValue()).isCloseTo(5.10 + insured, Offset.offset(0.001));
+        // A quote that fails falls back to the estimate rather than keeping the buyer from the confirm step.
+        shipper.failing = true;
+        api.get(postage, buyer).andExpect(status().isOk()).andExpect(jsonPath("$.quoted").value(false));
+        shipper.failing = false;
+        assertThat(shipper.bought).as("an estimate never buys a label").hasSize(boughtBefore);
+
+        api.get("/api/orgs/" + orgId + "/market/" + listingId + "/postage", seller).andExpect(status().isNotFound());
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk());
+        api.get(postage, buyer).andExpect(status().isConflict());
+    }
+
+    @Test
+    void theOfferShowsWhatEachGradeRecentlySoldForAndWhyItIsLessSure() throws Exception {
+        String card = pricedCard("Sylveon", 300);
+
+        String offer = api.postJson(offers(card), "", seller).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        // From the comps stored with the offer: six PSA sales a grade over 90 days, 300 at a 10 and 180 at a 9.
+        assertThat(JsonPath.<List<String>>read(offer, "$.sold[*].grade")).containsExactlyInAnyOrder("7", "8", "9", "10");
+        assertThat(JsonPath.<List<String>>read(offer, "$.sold[*].gradingCompany")).containsOnly("PSA");
+        assertThat(JsonPath.<List<Integer>>read(offer, "$.sold[*].sales")).containsOnly(6);
+        assertThat(JsonPath.<List<Integer>>read(offer, "$.sold[*].windowDays")).containsOnly(90);
+        assertThat(JsonPath.<List<Number>>read(offer, "$.sold[?(@.grade == '10')].price").get(0).doubleValue()).isEqualTo(300.0);
+        assertThat(JsonPath.<List<Number>>read(offer, "$.sold[?(@.grade == '9')].price").get(0).doubleValue()).isEqualTo(180.0);
+        // Confidence B from comps: the seller is told it's the number of sales, not just the letter.
+        assertThat((String) JsonPath.read(offer, "$.confidence")).isEqualTo("B");
+        assertThat(JsonPath.<List<String>>read(offer, "$.lessSureBecause")).containsExactly("FEW_SALES");
+        // The seller's sale view shows the same, from the same stored offer.
+        String sale = api.get(sale(card), seller).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<Object>>read(sale, "$.offer.sold")).hasSize(4);
     }
 
     private static final String GPS_SECRET = "GPS 39.7817N 89.6501W";

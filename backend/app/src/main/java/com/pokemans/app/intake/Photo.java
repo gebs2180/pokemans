@@ -86,6 +86,11 @@ class Photo {
         return storageKey + ".view.jpg";
     }
 
+    /** Key for the copy buyers open full size: the upload byte for byte, without its metadata ({@link ExactCopy}). */
+    static String exactStorageKey(String storageKey) {
+        return storageKey + ".exact";
+    }
+
     /**
      * Records the uploaded object and the quality check result.
      *
