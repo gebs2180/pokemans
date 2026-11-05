@@ -532,6 +532,7 @@ class OffersFlowTest {
         String card = pricedCard("Returned Lapras", 300);
         api.uploadPhoto(orgId, card, "FRONT", TestImages.goodFront(), seller).andExpect(jsonPath("$.status").value("PASSED"));
         api.uploadPhoto(orgId, card, "BACK", TestImages.goodBack(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        assess(card); // again: an assessment made before the photos doesn't count for them
         String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
         api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
         api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
@@ -591,6 +592,7 @@ class OffersFlowTest {
         String card = pricedCard("Doubtful Ditto", 300);
         api.uploadPhoto(orgId, card, "FRONT", TestImages.goodFront(), seller).andExpect(jsonPath("$.status").value("PASSED"));
         api.uploadPhoto(orgId, card, "BACK", TestImages.goodBack(), seller).andExpect(jsonPath("$.status").value("PASSED"));
+        assess(card); // again: an assessment made before the photos doesn't count for them
         String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
         api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
         api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());

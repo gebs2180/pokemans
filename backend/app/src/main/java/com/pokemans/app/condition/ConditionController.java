@@ -49,6 +49,8 @@ class ConditionController {
     }
 
     /**
+     * @param assessment NONE, SYSTEM, REVIEWER, or PHOTOS_CHANGED when the front or back was retaken
+     *                   since the current one: it no longer counts until the card is assessed again
      * @param orgName whose card it is, so the reviewer can tell collectors apart
      * @param priced  true once its catalog card has a PSA price table: raw cards are valued on PSA's table only
      */
@@ -75,7 +77,8 @@ class ConditionController {
 
     record CardConditionView(UUID cardId, UUID orgId, String label, List<String> enabledProviders, List<PhotoLink> photos,
                              Catalog.IdentifiedCard identification, List<RequestView> requests,
-                             List<PredictionView> predictions, List<AssessmentView> assessments, Integer centeringCap) {
+                             List<PredictionView> predictions, List<AssessmentView> assessments, Integer centeringCap,
+                             boolean photosChanged) {
     }
 
     private final ConditionService condition;
@@ -87,10 +90,12 @@ class ConditionController {
     private final StorageProperties storage;
     private final Directory directory;
     private final Prices prices;
+    private final Assessments assessments;
 
     ConditionController(ConditionService condition, ConditionAssessmentRepository assessmentRepository,
                         PredictionRequestRepository requestRepository, CardItems cardItems, Catalog catalog, BlobStore blobs,
-                        StorageProperties storage, Directory directory, Prices prices) {
+                        StorageProperties storage, Directory directory, Prices prices, Assessments assessments) {
+        this.assessments = assessments;
         this.condition = condition;
         this.assessmentRepository = assessmentRepository;
         this.requestRepository = requestRepository;
@@ -124,7 +129,8 @@ class ConditionController {
             ConditionAssessment a = current.get(c.id());
             return new QueueItem(c.id(), c.orgId(), c.label(), c.createdAt(), id != null,
                     id == null ? null : id.name() + " · " + id.setName() + " " + id.number(),
-                    a == null ? "NONE" : a.getAuthorType().name(), a == null ? null : a.getConfidence(),
+                    a == null ? "NONE" : assessments.photosChanged(a) ? "PHOTOS_CHANGED" : a.getAuthorType().name(),
+                    a == null ? null : a.getConfidence(),
                     open.getOrDefault(c.id(), 0L).intValue(), orgNames.get(c.orgId()),
                     id != null && prices.latest(id.catalogCardId(), "PSA").isPresent());
         }).toList();
@@ -141,7 +147,8 @@ class ConditionController {
                 catalog.current(cardId).orElse(null),
                 condition.requests(cardId).stream().map(ConditionController::view).toList(),
                 condition.predictions(cardId).stream().map(ConditionController::view).toList(),
-                condition.assessments(cardId).stream().map(ConditionController::view).toList(), condition.centeringCap(cardId));
+                condition.assessments(cardId).stream().map(ConditionController::view).toList(), condition.centeringCap(cardId),
+                assessmentRepository.findByCardItemIdAndIsCurrentTrue(cardId).map(assessments::photosChanged).orElse(false));
     }
 
     /** Asks every enabled provider (again) about this card. */

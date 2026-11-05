@@ -11,8 +11,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
+import com.pokemans.app.intake.CardItems;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,9 +27,12 @@ public class Assessments {
     /**
      * A card's current assessed distribution, after the photo-confidence and surface adjustments.
      *
-     * @param confidence photo confidence
+     * @param confidence    photo confidence
+     * @param photosChanged true when the front or back was retaken since: the assessment no longer
+     *                      describes the photos in use, so it doesn't count until the card is assessed again
      */
-    public record Current(UUID assessmentId, UUID cardItemId, int version, GradeDistribution distribution, Confidence confidence) {
+    public record Current(UUID assessmentId, UUID cardItemId, int version, GradeDistribution distribution, Confidence confidence,
+                          boolean photosChanged) {
     }
 
     /**
@@ -67,12 +73,17 @@ public class Assessments {
     /** A sub-grade at or below this holds the card back. */
     static final double HOLDING_BACK_AT = 8.5;
 
+    /** Basis key for the front and back photo ids an assessment was made from. */
+    static final String PHOTO_IDS = "photoIds";
+
     private final ConditionAssessmentRepository assessments;
     private final ProviderPredictionRepository predictions;
+    private final CardItems cardItems;
 
-    Assessments(ConditionAssessmentRepository assessments, ProviderPredictionRepository predictions) {
+    Assessments(ConditionAssessmentRepository assessments, ProviderPredictionRepository predictions, CardItems cardItems) {
         this.assessments = assessments;
         this.predictions = predictions;
+        this.cardItems = cardItems;
     }
 
     /** Current assessment per card, for the cards that have one. */
@@ -83,14 +94,59 @@ public class Assessments {
         }
         return assessments.findByCardItemIdInAndIsCurrentTrue(cardItemIds).stream()
                 .collect(Collectors.toMap(ConditionAssessment::getCardItemId,
-                        a -> new Current(a.getId(), a.getCardItemId(), a.getVersion(), a.distribution(), a.getConfidence())));
+                        a -> new Current(a.getId(), a.getCardItemId(), a.getVersion(), a.distribution(), a.getConfidence(),
+                                photosChanged(a))));
+    }
+
+    /** True when the card's front or back was retaken since this assessment was made. */
+    boolean photosChanged(ConditionAssessment assessment) {
+        return photosChanged(assessment, cardItems.passedPhotos(assessment.getCardItemId()),
+                () -> predictions.findByCardItemIdOrderByCreatedAtDesc(assessment.getCardItemId()));
+    }
+
+    /**
+     * Whether an assessment no longer rests on the photos in use (the latest passing front and back). It
+     * records them since 2026-11-04. Older ones are judged from what they were built on: a system
+     * assessment by its graded predictions' photos, a reviewer's by whether a photo in use came after it.
+     */
+    static boolean photosChanged(ConditionAssessment assessment, List<CardItems.PhotoRef> passed,
+                                 Supplier<List<ProviderPrediction>> predictions) {
+        List<CardItems.PhotoRef> inUse = inUse(passed);
+        Set<String> inUseIds = inUse.stream().map(p -> p.id().toString()).collect(Collectors.toSet());
+        Map<String, Object> basis = assessment.getBasis() == null ? Map.of() : assessment.getBasis();
+        if (basis.get(PHOTO_IDS) instanceof List<?> recorded) {
+            return !recorded.stream().map(Object::toString).collect(Collectors.toSet()).equals(inUseIds);
+        }
+        if (assessment.getAuthorType() == ConditionAssessment.AuthorType.REVIEWER) {
+            return inUse.stream().anyMatch(p -> p.uploadedAt().isAfter(assessment.getCreatedAt()));
+        }
+        Set<String> used = basis.get("predictionIds") instanceof List<?> ids
+                ? ids.stream().map(Object::toString).collect(Collectors.toSet()) : Set.of();
+        return predictions.get().stream()
+                .filter(p -> used.contains(p.getId().toString()) && !p.isOwnMeasurement())
+                .anyMatch(p -> !madeOn(p, inUseIds));
+    }
+
+    /** The latest passing front and back, the photos a card is assessed from. */
+    static List<CardItems.PhotoRef> inUse(List<CardItems.PhotoRef> passed) {
+        return java.util.stream.Stream.of("FRONT", "BACK")
+                .flatMap(side -> passed.stream().filter(p -> p.side().equals(side))
+                        .max(Comparator.comparing(CardItems.PhotoRef::uploadedAt)).stream())
+                .toList();
+    }
+
+    /** Whether a prediction was made on exactly these photos. */
+    static boolean madeOn(ProviderPrediction p, Set<String> photoIds) {
+        return p.getPhotoIds() != null && p.getPhotoIds().stream().map(UUID::toString).collect(Collectors.toSet()).equals(photoIds);
     }
 
     /** The seller's view of the card's condition, once it has a current assessment. */
     @Transactional(readOnly = true)
     public Optional<Summary> summary(UUID cardItemId) {
         List<ProviderPrediction> latest = shownToSeller(cardItemId);
+        // An assessment of photos since replaced says nothing about the ones the seller sees.
         Optional<Summary> assessed = assessments.findByCardItemIdAndIsCurrentTrue(cardItemId)
+                .filter(a -> !photosChanged(a))
                 .map(a -> summarize(a.distribution(), latest));
         if (assessed.isPresent()) {
             return assessed;

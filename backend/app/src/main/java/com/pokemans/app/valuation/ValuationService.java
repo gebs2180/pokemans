@@ -46,6 +46,8 @@ class ValuationService {
     static final String LOT = "photographed lot: lots aren't valued";
     static final String NOT_IDENTIFIED = "not identified";
     static final String NO_ASSESSMENT = "no condition assessment";
+    /** The front or back was retaken since the card's condition was assessed: it waits to be assessed again. */
+    static final String PHOTOS_CHANGED = "photos retaken since its condition was assessed";
 
     private final CardItems cardItems;
     private final Catalog catalog;
@@ -195,7 +197,7 @@ class ValuationService {
                     id.number(), id.language(), id.setReleaseDate(), id.edition().name(), id.variant().name(), id.promo(),
                     id.authenticityRisk().name(), id.dexIds());
             Assessments.Current a = current.get(item.id());
-            CardInputs.Assessment assessment = a == null ? null
+            CardInputs.Assessment assessment = a == null || a.photosChanged() ? null
                     : new CardInputs.Assessment(a.assessmentId(), a.version(), a.distribution().asMap(), a.confidence());
             Outcomes.VerifiedGrade g = verified.get(item.id());
             CardInputs.Graded graded = g == null ? null : new CardInputs.Graded(g.outcomeId(), g.gradingCompany(), g.grade(),
@@ -208,7 +210,7 @@ class ValuationService {
             } else if (identity == null) {
                 reason = NOT_IDENTIFIED;
             } else if (graded == null && assessment == null) {
-                reason = NO_ASSESSMENT;
+                reason = a == null ? NO_ASSESSMENT : PHOTOS_CHANGED;
             } else {
                 String company = graded == null ? properties.gradingCompany() : graded.gradingCompany();
                 Optional<Prices.CardPrices> found = prices.latest(identity.catalogCardId(), company);

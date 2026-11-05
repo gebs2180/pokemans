@@ -691,6 +691,12 @@ export function AssessmentPanel({
             confidence {current.confidence}
           </p>
           {current.reason && <p className="muted">{current.reason}</p>}
+          {data.photosChanged && (
+            <p className="warn">
+              The front or back was retaken since this distribution, so it doesn't count and the card gets no offer. Press
+              Ask again to grade the new photos, or enter the distribution by hand.
+            </p>
+          )}
           <Bars distribution={current.distribution} />
         </>
       ) : (
