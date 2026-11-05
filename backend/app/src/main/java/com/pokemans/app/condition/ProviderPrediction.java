@@ -164,6 +164,10 @@ class ProviderPrediction {
         return cardItemId;
     }
 
+    List<UUID> getPhotoIds() {
+        return photoIds;
+    }
+
     String getProvider() {
         return provider;
     }

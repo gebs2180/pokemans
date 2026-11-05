@@ -128,7 +128,7 @@ class ConditionSummaryTest {
         ProviderPredictionRepository predictions = mock(ProviderPredictionRepository.class);
         when(assessments.findByCardItemIdAndIsCurrentTrue(any())).thenReturn(Optional.empty());
         when(predictions.findByCardItemIdOrderByCreatedAtDesc(any())).thenReturn(List.of(newestFirst));
-        return new Assessments(assessments, predictions);
+        return new Assessments(assessments, predictions, mock(com.pokemans.app.intake.CardItems.class));
     }
 
     @Test

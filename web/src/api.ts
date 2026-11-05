@@ -273,7 +273,7 @@ export type QueueItem = {
   createdAt: string
   identified: boolean
   identifiedAs: string | null
-  assessment: 'NONE' | 'SYSTEM' | 'REVIEWER'
+  assessment: 'NONE' | 'SYSTEM' | 'REVIEWER' | 'PHOTOS_CHANGED'
   confidence: Confidence | null
   openRequests: number
   /** Its catalog card has a PSA price table: without one the seller is stuck on "Waiting for prices". */
@@ -441,6 +441,8 @@ export type CardCondition = {
   predictions: Prediction[]
   assessments: Assessment[]
   centeringCap: number | null
+  /** The front or back was retaken since the current distribution: it doesn't count until assessed again. */
+  photosChanged: boolean
 }
 
 export const OUTCOMES = ['U', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const

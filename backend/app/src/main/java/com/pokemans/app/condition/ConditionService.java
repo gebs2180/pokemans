@@ -178,15 +178,18 @@ class ConditionService {
 
     /**
      * Builds a new system assessment from the latest answer of each provider. Leaves the card alone
-     * when a reviewer's assessment is current (theirs wins until they choose to rebuild) or when no
-     * provider answered (the reviewer enters it by hand).
+     * when a reviewer's assessment is current (theirs wins until they choose to rebuild, or until the
+     * photos they assessed are retaken) or when no provider answered on the photos in use (the reviewer
+     * enters it by hand).
      *
      * @return the new current assessment, or empty if none was made
      */
     @Transactional
     Optional<ConditionAssessment> rebuildSystemAssessment(UUID cardId) {
         Optional<ConditionAssessment> current = assessments.findByCardItemIdAndIsCurrentTrue(cardId);
-        if (current.isPresent() && current.get().getAuthorType() == ConditionAssessment.AuthorType.REVIEWER) {
+        if (current.isPresent() && current.get().getAuthorType() == ConditionAssessment.AuthorType.REVIEWER
+                && !Assessments.photosChanged(current.get(), cardItems.passedPhotos(cardId),
+                        () -> predictions.findByCardItemIdOrderByCreatedAtDesc(cardId))) {
             return Optional.empty();
         }
         return build(cardId, current.orElse(null));
@@ -197,7 +200,8 @@ class ConditionService {
     ConditionAssessment rebuildNow(UUID orgId, UUID cardId) {
         requireCard(orgId, cardId);
         return build(cardId, assessments.findByCardItemIdAndIsCurrentTrue(cardId).orElse(null))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No provider has graded this card yet"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                        "No provider has graded the photos in use: press Ask again, or enter the distribution by hand"));
     }
 
     /**
@@ -205,17 +209,23 @@ class ConditionService {
      * side: an unmeasurable photo says nothing about the card, and dropping the cap would raise it, so a
      * glare-ridden retake could beat a measurement. The seller stops seeing the older ratios, though
      * (Assessments#summary): they're no longer from the photo in use.
+     *
+     * A provider's grade counts only if it was made on the front and back in use: after a retake the
+     * older grades describe photos the card is no longer shown by, which may even be the wrong card or
+     * side, so the card waits for "Ask again" (2026-11-04).
      */
     private Optional<ConditionAssessment> build(UUID cardId, ConditionAssessment current) {
         CardItems.CardItemRef card = cardItems.get(cardId);
         List<ProviderPrediction> all = predictions.findByCardItemIdOrderByCreatedAtDesc(cardId);
+        List<CardItems.PhotoRef> photos = cardItems.passedPhotos(cardId);
+        List<String> inUse = photoIds(photos);
         Map<String, ProviderPrediction> latest = ProviderPrediction.latestSucceeded(all);
+        latest.values().removeIf(p -> !p.isOwnMeasurement() && !Assessments.madeOn(p, java.util.Set.copyOf(inUse)));
         Map<String, Double> grades = new LinkedHashMap<>();
         latest.forEach((provider, p) -> grades.put(provider, p.gradeForDistribution()));
         grades.values().removeIf(Objects::isNull);
         Integer centeringCap = ProviderPrediction.centeringCap(all);
 
-        List<CardItems.PhotoRef> photos = cardItems.passedPhotos(cardId);
         boolean wholeCard = latest(photos, "FRONT").map(p -> p.cropKey() != null).orElse(false)
                 && latest(photos, "BACK").map(p -> p.cropKey() != null).orElse(false);
         Optional<Catalog.IdentifiedCard> identity = catalog.current(cardId);
@@ -228,6 +238,7 @@ class ConditionService {
         }
         Map<String, Object> basis = new LinkedHashMap<>(result.basis());
         basis.put("predictionIds", latest.values().stream().map(p -> p.getId().toString()).toList());
+        basis.put(Assessments.PHOTO_IDS, inUse);
         basis.put("identified", identity.isPresent());
         String reason = "Built from " + String.join(" and ", grades.keySet())
                 + (centeringCap == null ? "" : ", centering caps it at " + centeringCap);
@@ -257,6 +268,7 @@ class ConditionService {
         basis.put("predictionIds", ProviderPrediction.latestSucceeded(all).values().stream().map(p -> p.getId().toString()).toList());
         basis.put("centeringCap", cap);
         basis.put("centeringCapOverridden", aboveCap);
+        basis.put(Assessments.PHOTO_IDS, photoIds(cardItems.passedPhotos(cardId)));
         return save(card, current, distribution, confidence, ConditionAssessment.AuthorType.REVIEWER, currentUser.id(), reason, basis);
     }
 
@@ -298,6 +310,11 @@ class ConditionService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Card not found");
         }
         return card;
+    }
+
+    /** The ids of the front and back in use, as recorded in an assessment's basis. */
+    private static List<String> photoIds(List<CardItems.PhotoRef> passed) {
+        return Assessments.inUse(passed).stream().map(p -> p.id().toString()).toList();
     }
 
     static Optional<CardItems.PhotoRef> latest(List<CardItems.PhotoRef> photos, String side) {
