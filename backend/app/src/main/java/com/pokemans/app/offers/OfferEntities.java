@@ -191,7 +191,7 @@ class ListingEvent {
      * 2026-11-01). RETURNED: sent back for an allowed reason. INSPECTED: a grade recorded under the
      * per-grade offers that came before firm prices. VOIDED: we took an open listing down, with its
      * offer. CANCELLED: we undid a taken deal. Both are the admin's, with no actor org and the reason in
-     * the note (Zach, 2026-10-21).
+     * the note.
      *
      * <p>SHIPPED, PAYMENT_CONFIRMED, DISPUTED and CARD_BACK are what the seller says, PAID what the
      * buyer says: a record of their word, since the money never passes through us. RESOLVED: the admin
@@ -337,7 +337,7 @@ class ListingEvent {
     }
 }
 
-/** We voided an offer: it can't be posted again (Zach, 2026-10-21). Append-only. */
+/** We voided an offer: it can't be posted again. Append-only. */
 @Entity
 @Table(name = "card_offer_void")
 class CardOfferVoid {
@@ -378,7 +378,7 @@ class CardOfferVoid {
 }
 
 /**
- * A label marked to be refunded, and what its provider said when asked (Zach, 2026-10-21). A request
+ * A label marked to be refunded, and what its provider said when asked. A request
  * the provider never answered can be made again. Append-only.
  */
 @Entity

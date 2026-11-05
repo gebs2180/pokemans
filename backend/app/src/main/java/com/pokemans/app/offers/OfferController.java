@@ -1,7 +1,6 @@
 package com.pokemans.app.offers;
 
 import com.pokemans.app.identity.Consents;
-import com.pokemans.app.identity.Directory;
 import com.pokemans.app.identity.OrgAccess;
 import com.pokemans.app.identity.OrgType;
 import com.pokemans.app.intake.CardItems;
@@ -14,13 +13,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.YearMonth;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +22,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -38,7 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
  * Instant offers. Sellers (members of a collector or contributor org) see our firm offer on a card and
  * post it to buyers; buyers (members of a buyer org who accepted the buyer terms) take one, get a
  * prepaid label sent to the seller, and record that the card arrived as shown and that they paid, or
- * return it, while the seller says whether they got paid. The admin buys labels that didn't go through and sees what to bill each buyer.
+ * return it, while the seller says whether they got paid. The admin's routes are in {@link OfferAdminController}.
  */
 @RestController
 class OfferController {
@@ -87,22 +79,6 @@ class OfferController {
     record AcceptResult(List<ListingViews.DealView> deals, String labelPending) {
     }
 
-    /**
-     * One buyer's labels in a month: what to bill them, off-platform. A cancelled deal's label is listed
-     * but not billed: we undid the deal, so its postage is ours, refunded or not.
-     */
-    record BuyerCharges(UUID buyerOrgId, String buyerName, int labels, BigDecimal postage, BigDecimal insurance, BigDecimal total,
-                        List<ChargeLine> lines) {
-    }
-
-    /**
-     * @param refund null, or the refund's state: "requested" until its provider answers, then the answer
-     * @param billed false once the deal was cancelled
-     */
-    record ChargeLine(UUID listingId, Instant boughtAt, String carrier, String service, String trackingCode, BigDecimal postage,
-                      BigDecimal insurance, String refund, boolean billed) {
-    }
-
     private final OfferService offers;
     private final ListingService listings;
     private final DealService deals;
@@ -111,11 +87,10 @@ class OfferController {
     private final OrgAccess access;
     private final CardItems cardItems;
     private final Consents consents;
-    private final Directory directory;
     private final CardStatusService statuses;
 
     OfferController(OfferService offers, ListingService listings, DealService deals, ListingViews views, Shipping shipping, OrgAccess access, CardItems cardItems,
-                    Consents consents, Directory directory, CardStatusService statuses) {
+                    Consents consents, CardStatusService statuses) {
         this.offers = offers;
         this.listings = listings;
         this.deals = deals;
@@ -124,7 +99,6 @@ class OfferController {
         this.access = access;
         this.cardItems = cardItems;
         this.consents = consents;
-        this.directory = directory;
         this.statuses = statuses;
     }
 
@@ -306,79 +280,6 @@ class OfferController {
         requireBuyer(orgId);
         deals.returned(orgId, listingId, body.reason(), body.note(), false);
         return deals.deals(orgId);
-    }
-
-    // Admin (by path)
-
-    /** Deals still waiting for their label, oldest first: retry the label, or record the arrival by hand. */
-    @GetMapping("/api/admin/deals/awaiting-label")
-    List<ListingViews.AwaitingLabel> awaitingLabels() {
-        return deals.awaitingLabels();
-    }
-
-    /** Overdue labels, for the count on the admin page. */
-    @GetMapping("/api/admin/deals/overdue")
-    ListingViews.Overdue overdue() {
-        return deals.overdue();
-    }
-
-    /** What an offer on the card would be now, or why it gets none, with the steps that set its confidence. Stores nothing. */
-    @GetMapping("/api/admin/cards/{cardId}/offer-preview")
-    OfferService.Preview offerPreview(@PathVariable UUID cardId) {
-        cardItems.get(cardId);
-        return offers.preview(cardId);
-    }
-
-    /** Records an arrival for the buyer when no label was bought (the card shipped another way). The note says how. */
-    @PostMapping("/api/admin/deals/{listingId}/received")
-    @ResponseStatus(HttpStatus.CREATED)
-    void adminReceived(@PathVariable UUID listingId, @RequestParam UUID buyerOrgId, @Valid @RequestBody ReceivedBody body) {
-        deals.received(buyerOrgId, listingId, body.note(), true);
-    }
-
-    /** Records a return for the buyer when no label was bought. The note says how the card shipped. */
-    @PostMapping("/api/admin/deals/{listingId}/returned")
-    @ResponseStatus(HttpStatus.CREATED)
-    void adminReturned(@PathVariable UUID listingId, @RequestParam UUID buyerOrgId, @Valid @RequestBody ReturnedBody body) {
-        deals.returned(buyerOrgId, listingId, body.reason(), body.note(), true);
-    }
-
-    /** Buys the label for any deal, e.g. once a shipping account is set up. */
-    @PostMapping("/api/admin/deals/{listingId}/label")
-    void adminLabel(@PathVariable UUID listingId, @RequestParam UUID buyerOrgId) {
-        deals.buyLabel(deals.requireDeal(buyerOrgId, listingId), buyerOrgId);
-    }
-
-    /** Labels bought in a month, per buyer: what to bill each one. {@code month} is yyyy-MM, UTC; default this month. */
-    @GetMapping("/api/admin/shipping/charges")
-    List<BuyerCharges> charges(@RequestParam(required = false) String month) {
-        YearMonth m;
-        try {
-            m = month == null ? YearMonth.now(ZoneOffset.UTC) : YearMonth.parse(month);
-        } catch (java.time.format.DateTimeParseException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "month is yyyy-MM");
-        }
-        Map<UUID, List<ShippingLabel>> byBuyer = new LinkedHashMap<>();
-        for (ShippingLabel l : shipping.labelsIn(m)) {
-            byBuyer.computeIfAbsent(l.getBuyerOrgId(), k -> new ArrayList<>()).add(l);
-        }
-        List<ShippingLabel> all = byBuyer.values().stream().flatMap(List::stream).toList();
-        Map<UUID, LabelRefund> refunds = shipping.refunds(all.stream().map(ShippingLabel::getId).toList());
-        Set<UUID> cancelled = deals.cancelledAmong(all.stream().map(ShippingLabel::getListingId).toList());
-        List<BuyerCharges> charges = new ArrayList<>();
-        byBuyer.forEach((buyer, ls) -> {
-            List<ChargeLine> lines = ls.stream().map(l -> {
-                LabelRefund r = refunds.get(l.getId());
-                String refund = r == null ? null : r.getProviderStatus() == null ? "requested" : r.getProviderStatus();
-                return new ChargeLine(l.getListingId(), l.getCreatedAt(), l.getCarrier(), l.getService(), l.getTrackingCode(),
-                        l.getPostage(), l.getInsuranceCost(), refund, !cancelled.contains(l.getListingId()));
-            }).toList();
-            List<ChargeLine> billed = lines.stream().filter(ChargeLine::billed).toList();
-            BigDecimal postage = billed.stream().map(ChargeLine::postage).reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal insurance = billed.stream().map(ChargeLine::insurance).reduce(BigDecimal.ZERO, BigDecimal::add);
-            charges.add(new BuyerCharges(buyer, directory.orgName(buyer), billed.size(), postage, insurance, postage.add(insurance), lines));
-        });
-        return charges;
     }
 
     private void requireSellerCard(UUID orgId, UUID cardId) {

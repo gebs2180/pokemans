@@ -117,8 +117,8 @@ public final class CardValuator {
         BigDecimal formula = stressedFmv.multiply(BigDecimal.ONE.subtract(f), Money.MC)
                 .multiply(shock, Money.MC)
                 .multiply(BigDecimal.ONE.subtract(depth), Money.MC);
-        // A 60-day forced sale never recovers more than a 30-day quick sale (Zach, 2026-10-18). The 1.0.0
-        // parameters keep the depth discount at or above d, so this only binds if a parameter set changes that.
+        // A 60-day forced sale never recovers more than a 30-day quick sale. This binds when the stress
+        // shock and depth discount together take off less than the quick-sale discount d.
         BigDecimal flv = formula.min(qsv);
         trace.add("FLV", "FMV_stressed x (1 - f) x shock x (1 - l), at most QSV", Money.cents(flv),
                 "f " + f + (flv.compareTo(formula) < 0 ? "; formula gave " + Money.cents(formula) + ", capped at QSV" : ""));
@@ -233,7 +233,7 @@ public final class CardValuator {
     }
 
     /**
-     * The confidence an instant offer is priced at (Zach, 2026-10-21). The offer uses the central
+     * The confidence an instant offer is priced at. The offer uses the central
      * distribution and net prices, never σ or the stressed distribution, so it starts from the same
      * base (photo and comps) and takes the penalties that bear on prices (a stale table), but not a
      * fallback σ, and it drops a level for a derived price only where the central distribution puts

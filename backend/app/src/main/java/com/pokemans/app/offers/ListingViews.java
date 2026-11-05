@@ -34,7 +34,7 @@ class ListingViews {
     record RungView(String grade, BigDecimal probability, BigDecimal price) {
     }
 
-    /** Something we undid, and why (Zach, 2026-10-21). */
+    /** Something we undid, and why. */
     record UndoView(String reason, Instant at) {
     }
 
@@ -190,8 +190,7 @@ class ListingViews {
 
     /**
      * The label as a buyer sees it: carrier and tracking, but not the printable label, which shows the
-     * seller's address. Buyers never learn where a seller is, so they can't meet up and deal around us
-     * (Zach, 2026-10-21).
+     * seller's address. Buyers never learn where a seller is, so they can't meet up and deal around us.
      */
     static LabelView withoutPrintable(LabelView label) {
         return label == null ? null

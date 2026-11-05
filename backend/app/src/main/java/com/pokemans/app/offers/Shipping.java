@@ -29,7 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Addresses and labels. A taken card gets a prepaid, insured label from the seller's address to the
- * buyer's, bought on our account and billed to the buyer monthly (Zach, 2026-10-19). No access checks:
+ * buyer's, bought on our account and billed to the buyer monthly. No access checks:
  * the controllers have done them.
  */
 @Service

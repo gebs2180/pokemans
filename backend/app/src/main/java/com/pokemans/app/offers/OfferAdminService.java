@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * The admin's undo for instant offers (Zach, 2026-10-21), by appending, never editing: void an offer
+ * The admin's undo for instant offers, by appending, never editing: void an offer
  * (taking it off the market if it's posted), cancel a deal a buyer took, and mark a cancelled deal's
  * label to be refunded. Each is a new row with who, when and why. Also what's waiting for the admin
  * after a sale: a seller who says they weren't paid, and returns to review. No access checks:
@@ -167,7 +167,7 @@ class OfferAdminService {
     }
 
     /**
-     * A doubt is final until cleared (Zach, 2026-11-02), so the moment one is recorded the card's offers are
+     * A doubt is final until cleared, so the moment one is recorded the card's offers are
      * voided and any listing comes down, in the finding's own transaction. One a buyer already took stays:
      * only the admin can say whether to cancel it. A later "verified" needs a new offer.
      */
