@@ -131,6 +131,40 @@ class CenteringFlowTest {
                 """, String.class, cardId)).isEqualTo(retakeId);
     }
 
+    /** Review of 2026-11-01, item 3: a retake holds the card until its new photos are graded (2026-11-04). */
+    @Test
+    void aRetakeHoldsTheAssessmentUntilTheNewPhotosAreGraded() throws Exception {
+        JwtRequestPostProcessor collector = api.user("auth0|retake-hold", List.of());
+        String orgId = api.collectorOrg("Retake Hold", "auth0|retake-hold");
+        String cardId = api.card(orgId, "Held card", collector);
+        api.uploadPhoto(orgId, cardId, "FRONT", TestImages.goodFront(), collector).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, cardId, "BACK", TestImages.goodBack(), collector).andExpect(jsonPath("$.status").value("PASSED"));
+        runWorker();
+        runWorker();
+        runWorker(); // assessed from the fake's grade on the first photos
+        String base = "/api/admin/orgs/" + orgId + "/cards/" + cardId;
+        String seller = "/api/orgs/" + orgId + "/cards/" + cardId + "/status";
+        api.get(base + "/condition", api.admin()).andExpect(jsonPath("$.photosChanged").value(false));
+        api.get(seller, collector).andExpect(jsonPath("$.condition.mostLikely").value(org.hamcrest.Matchers.greaterThan(0)));
+
+        api.uploadPhoto(orgId, cardId, "FRONT", TestImages.goodRetake(1), collector).andExpect(jsonPath("$.status").value("PASSED"));
+        runWorker(); // centering measures the retake; the fake's grade is of the old front, so nothing is rebuilt
+
+        api.get(base + "/condition", api.admin()).andExpect(jsonPath("$.photosChanged").value(true));
+        api.get("/api/admin/review-queue", api.admin())
+                .andExpect(jsonPath("$[?(@.cardId == '" + cardId + "')].assessment").value(org.hamcrest.Matchers.contains("PHOTOS_CHANGED")));
+        api.get(seller, collector).andExpect(jsonPath("$.condition.mostLikely").value(0));
+        api.postJson(base + "/assessments/rebuild", "{}", api.admin()).andExpect(status().isConflict());
+
+        api.postJson(base + "/prediction-requests", "{}", api.admin()).andExpect(status().is2xxSuccessful());
+        runWorker();
+        runWorker();
+        runWorker();
+
+        api.get(base + "/condition", api.admin()).andExpect(jsonPath("$.photosChanged").value(false));
+        api.get(seller, collector).andExpect(jsonPath("$.condition.mostLikely").value(org.hamcrest.Matchers.greaterThan(0)));
+    }
+
     @Test
     void aRetakeThatPassesWhileCenteringIsOpenIsMeasuredOnceThatFinishes() throws Exception {
         JwtRequestPostProcessor collector = api.user("auth0|centering-race", List.of());

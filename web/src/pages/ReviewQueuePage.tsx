@@ -7,6 +7,7 @@ const ASSESSMENT_LABEL: Record<QueueItem['assessment'], string> = {
   NONE: 'No distribution yet',
   SYSTEM: 'System distribution, not reviewed',
   REVIEWER: 'Reviewed',
+  PHOTOS_CHANGED: 'Photos retaken: assess again',
 }
 
 /** Admin: cards whose photos are all in, and what each still needs. */

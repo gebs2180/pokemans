@@ -18,6 +18,7 @@ const card: CardCondition = {
   predictions: [],
   assessments: [],
   centeringCap: null,
+  photosChanged: false,
 }
 
 describe('AssessmentPanel', () => {

@@ -41,7 +41,8 @@ class OfferService {
     private static final Map<String, String> UNVALUED = Map.of(
             "photographed lot: lots aren't valued", "Lots don't get offers: add the cards one by one.",
             "not identified", "We haven't identified this card yet.",
-            "no condition assessment", "Its condition hasn't been assessed yet.");
+            "no condition assessment", "Its condition hasn't been assessed yet.",
+            "photos retaken since its condition was assessed", "Its photos changed, so we're checking its condition again.");
 
     private final Valuations valuations;
     private final CardOfferRepository offers;

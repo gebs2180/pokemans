@@ -170,6 +170,10 @@ class CardStatusService {
             return new CardStatus(cardId, Stage.ASSESSING, identity,
                     "We're reviewing its condition from the photos." + NO_NOTIFICATIONS, false);
         }
+        if (reason != null && reason.equals("photos retaken since its condition was assessed")) {
+            return new CardStatus(cardId, Stage.ASSESSING, identity,
+                    "Your photos changed, so we're checking its condition again." + NO_NOTIFICATIONS, false);
+        }
         if (reason != null) {
             return new CardStatus(cardId, Stage.PRICING, identity,
                     "We don't have enough sold prices for this card yet. We add them by hand, so it may take a while, "

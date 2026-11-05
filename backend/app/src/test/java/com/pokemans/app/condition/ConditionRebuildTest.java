@@ -27,9 +27,21 @@ class ConditionRebuildTest {
 
     private static final UUID CARD = UUID.randomUUID();
     private static final UUID ORG = UUID.randomUUID();
+    private static final Instant TAKEN = Instant.parse("2026-11-01T10:00:00Z");
+    /** The front and back in use, unless a test retakes one. */
+    private static final CardItems.PhotoRef FRONT = photo("FRONT", TAKEN);
+    private static final CardItems.PhotoRef BACK = photo("BACK", TAKEN);
+
+    private static CardItems.PhotoRef photo(String side, Instant uploadedAt) {
+        return new CardItems.PhotoRef(UUID.randomUUID(), CARD, side, "key", "image/jpeg", "crop", uploadedAt, uploadedAt, "sha");
+    }
 
     private static PredictionRequest request(String provider) {
-        return new PredictionRequest(UUID.randomUUID(), CARD, provider, List.of(UUID.randomUUID()), null);
+        return request(provider, FRONT, BACK);
+    }
+
+    private static PredictionRequest request(String provider, CardItems.PhotoRef front, CardItems.PhotoRef back) {
+        return new PredictionRequest(UUID.randomUUID(), CARD, provider, List.of(front.id(), back.id()), null);
     }
 
     private static ProviderPrediction graded(String provider, Double overall, Double centering) {
@@ -59,14 +71,18 @@ class ConditionRebuildTest {
     }
 
     private static ConditionService service(ProviderPrediction... newestFirst) {
+        return service(null, List.of(FRONT, BACK), newestFirst);
+    }
+
+    private static ConditionService service(ConditionAssessment current, List<CardItems.PhotoRef> passed, ProviderPrediction... newestFirst) {
         ProviderPredictionRepository predictions = mock(ProviderPredictionRepository.class);
         when(predictions.findByCardItemIdOrderByCreatedAtDesc(CARD)).thenReturn(List.of(newestFirst));
         ConditionAssessmentRepository assessments = mock(ConditionAssessmentRepository.class);
-        when(assessments.findByCardItemIdAndIsCurrentTrue(CARD)).thenReturn(Optional.empty());
+        when(assessments.findByCardItemIdAndIsCurrentTrue(CARD)).thenReturn(Optional.ofNullable(current));
         when(assessments.save(any())).thenAnswer(call -> call.getArgument(0));
         CardItems cardItems = mock(CardItems.class);
         when(cardItems.get(CARD)).thenReturn(new CardItems.CardItemRef(CARD, ORG, "A card", false, 1, Instant.now()));
-        when(cardItems.passedPhotos(CARD)).thenReturn(List.of());
+        when(cardItems.passedPhotos(CARD)).thenReturn(passed);
         Catalog catalog = mock(Catalog.class);
         when(catalog.current(CARD)).thenReturn(Optional.empty());
         CurrentUser currentUser = mock(CurrentUser.class);
@@ -194,6 +210,93 @@ class ConditionRebuildTest {
         ConditionAssessment saved = byHand(even(Grade.U, Grade.of(1)), false, measured(1));
 
         assertThat(saved.getBasis()).containsEntry("centeringCapOverridden", false);
+    }
+
+    /** A grade made on these photos. */
+    private static ProviderPrediction gradedOn(CardItems.PhotoRef front, CardItems.PhotoRef back, double overall) {
+        return ProviderPrediction.succeeded(request("A", front, back),
+                new PreGradeProvider.Reading(null, overall, null, null, null, null, null, Map.of()), Map.of(), 1);
+    }
+
+    @Test
+    void anAssessmentRecordsThePhotosItWasMadeFrom() {
+        List<String> inUse = List.of(FRONT.id().toString(), BACK.id().toString());
+
+        assertThat(rebuild(graded("A", 9.0, null)).orElseThrow().getBasis()).containsEntry("photoIds", inUse);
+        assertThat(byHand(even(Grade.of(7), Grade.of(8)), false).getBasis()).containsEntry("photoIds", inUse);
+    }
+
+    /** Review of 2026-11-01, item 3: a retake left the assessment on the replaced photo's grades. */
+    @Test
+    void gradesOfARetakenPhotoDontBuildAnAssessment() {
+        CardItems.PhotoRef retake = photo("FRONT", TAKEN.plusSeconds(3600));
+
+        Optional<ConditionAssessment> built = service(null, List.of(FRONT, retake, BACK), measured(9), gradedOn(FRONT, BACK, 9.0))
+                .rebuildSystemAssessment(CARD);
+
+        assertThat(built).isEmpty();
+    }
+
+    @Test
+    void anAdminRebuildAfterARetakeSaysToAskAgain() {
+        CardItems.PhotoRef retake = photo("BACK", TAKEN.plusSeconds(3600));
+
+        assertThatThrownBy(() -> service(null, List.of(FRONT, BACK, retake), gradedOn(FRONT, BACK, 9.0)).rebuildNow(ORG, CARD))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Ask again");
+    }
+
+    @Test
+    void gradesOfTheRetakeBuildOne() {
+        CardItems.PhotoRef retake = photo("FRONT", TAKEN.plusSeconds(3600));
+
+        Optional<ConditionAssessment> built = service(null, List.of(FRONT, retake, BACK), gradedOn(retake, BACK, 8.0), gradedOn(FRONT, BACK, 9.0))
+                .rebuildSystemAssessment(CARD);
+
+        assertThat(built).isPresent();
+        assertThat(built.get().getBasis()).containsEntry("photoIds", List.of(retake.id().toString(), BACK.id().toString()));
+    }
+
+    @Test
+    void aRetakeMakesTheAssessmentStale() {
+        ConditionAssessment made = rebuild(graded("A", 9.0, null)).orElseThrow();
+        CardItems.PhotoRef retake = photo("BACK", TAKEN.plusSeconds(3600));
+
+        assertThat(Assessments.photosChanged(made, List.of(FRONT, BACK), List::of)).isFalse();
+        assertThat(Assessments.photosChanged(made, List.of(FRONT, BACK, retake), List::of)).isTrue();
+    }
+
+    @Test
+    void aReviewersAssessmentOfRetakenPhotosGivesWayToTheNewGrades() {
+        ConditionAssessment reviewed = byHand(even(Grade.of(9), Grade.of(10)), false);
+        CardItems.PhotoRef retake = photo("FRONT", TAKEN.plusSeconds(3600));
+
+        assertThat(service(reviewed, List.of(FRONT, BACK), graded("A", 8.0, null)).rebuildSystemAssessment(CARD))
+                .as("the reviewer's still stands on the photos they saw").isEmpty();
+        assertThat(service(reviewed, List.of(FRONT, retake, BACK), gradedOn(retake, BACK, 8.0)).rebuildSystemAssessment(CARD))
+                .isPresent();
+    }
+
+    /** Assessments saved before they recorded their photos. */
+    @Test
+    void anOlderReviewersAssessmentIsStaleOnceAPhotoInUseCameLater() {
+        ConditionAssessment reviewed = byHand(even(Grade.of(9), Grade.of(10)), false);
+        reviewed.getBasis().remove("photoIds");
+        CardItems.PhotoRef later = photo("FRONT", reviewed.getCreatedAt().plusSeconds(60));
+
+        assertThat(Assessments.photosChanged(reviewed, List.of(FRONT, BACK), List::of)).isFalse();
+        assertThat(Assessments.photosChanged(reviewed, List.of(FRONT, later, BACK), List::of)).isTrue();
+    }
+
+    @Test
+    void anOlderSystemAssessmentIsStaleWhenItsGradesWereOnOtherPhotos() {
+        ProviderPrediction grade = gradedOn(FRONT, BACK, 9.0);
+        ConditionAssessment made = rebuild(grade).orElseThrow();
+        made.getBasis().remove("photoIds");
+        CardItems.PhotoRef retake = photo("FRONT", TAKEN.plusSeconds(3600));
+
+        assertThat(Assessments.photosChanged(made, List.of(FRONT, BACK), () -> List.of(grade))).isFalse();
+        assertThat(Assessments.photosChanged(made, List.of(FRONT, retake, BACK), () -> List.of(grade))).isTrue();
     }
 
     @Test
