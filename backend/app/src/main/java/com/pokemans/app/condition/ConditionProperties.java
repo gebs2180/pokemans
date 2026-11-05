@@ -16,7 +16,6 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param disagreementForB     largest gap between provider grades that still allows confidence B
  * @param confidencePenaltyB   share of each grade's probability moved one grade down at confidence B
  * @param confidencePenaltyC   the same at confidence C
- * @param holoSurfacePenalty   moved one grade down for modern holos until a close-up clears the surface
  */
 @ConfigurationProperties("pokemans.condition")
 record ConditionProperties(
@@ -24,7 +23,6 @@ record ConditionProperties(
         @DefaultValue("1.5") double disagreementForB,
         @DefaultValue("0.10") BigDecimal confidencePenaltyB,
         @DefaultValue("0.25") BigDecimal confidencePenaltyC,
-        @DefaultValue("0.25") BigDecimal holoSurfacePenalty,
         @DefaultValue Worker worker,
         @DefaultValue Ximilar ximilar,
         @DefaultValue CardGrade cardgrade,

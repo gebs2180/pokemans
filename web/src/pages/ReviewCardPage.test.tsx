@@ -162,7 +162,8 @@ describe('Predictions', () => {
   })
 })
 
-describe('AssessmentPanel close-up warning', () => {
+/** There is no default surface shift (review D5), so confidence A needs no close-up. */
+describe('AssessmentPanel confidence A', () => {
   const holo: IdentifiedCard = {
     cardItemId: 'card1', catalogCardId: 'cat1', language: 'en', setName: 'Vivid Voltage', seriesName: null, setReleaseDate: '2020-11-13',
     number: '188', name: 'Pikachu VMAX', rarity: 'Rare Rainbow', edition: 'UNLIMITED', variant: 'HOLO', stamp: null, promo: false,
@@ -176,18 +177,8 @@ describe('AssessmentPanel close-up warning', () => {
     await user.selectOptions(screen.getByLabelText('Confidence'), 'A')
   }
 
-  it('warns that confidence A on a modern holo needs a close-up', async () => {
+  it("doesn't warn on a modern holo without a close-up", async () => {
     await pickA({ ...card, identification: holo })
-    expect(screen.getByRole('note')).toHaveTextContent('No passing close-up of this modern holo')
-  })
-
-  it("doesn't warn once there's a close-up", async () => {
-    await pickA({ ...card, identification: holo, photos: [{ id: 'p', side: 'DETAIL', url: 'https://x/p', cropUrl: null, capturedAt: null }] })
-    expect(screen.queryByRole('note')).not.toBeInTheDocument()
-  })
-
-  it("doesn't warn for a WotC-era holo", async () => {
-    await pickA({ ...card, identification: { ...holo, setReleaseDate: '1999-01-09' } })
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
   })
 })

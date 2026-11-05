@@ -107,7 +107,10 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
    - `pokemans-backup-write`: Object Read & Write, `pokemans-backups` only.
    Copy each Access Key ID and Secret Access Key (they're shown once), plus the S3 endpoint `https://<account-id>.r2.cloudflarestorage.com`.
 
-The backup can read photos but not delete them, and the app can't touch the backups.
+4. `pokemans-backups` → Settings → **Bucket lock rules** → Add rule: name `keep-30-days`, no prefix (the whole bucket), retention **30 days**. No one can delete or overwrite a backup in its first 30 days, whoever holds a token.
+5. `pokemans-backups` → Settings → **Object lifecycle rules** → Add rule: name `expire-dumps`, prefix `postgres/`, delete objects **35 days** after upload. Photos in the backup are never expired.
+
+The backup can read photos but not delete them, and the app can't touch the backups. R2 has no write-only token, so the backup's write token could still delete a backup; the lock rule is what stops it, for 30 days. The backup job itself never deletes: old dumps go by the lifecycle rule. A copy outside this Cloudflare account comes later (review D1).
 
 ### 4. Auth0 (dev tenant, or a new prod tenant)
 

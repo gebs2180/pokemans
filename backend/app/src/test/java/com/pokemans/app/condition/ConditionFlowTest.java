@@ -128,11 +128,11 @@ class ConditionFlowTest {
                 .andExpect(jsonPath("$.predictions[0].psaGrade").value(8.0))
                 .andExpect(jsonPath("$.assessments[0].version").value(1))
                 .andExpect(jsonPath("$.assessments[0].authorType").value("SYSTEM"))
-                // One provider: confidence B. Unidentified, so the holo surface shift applies too; the
-                // two downward moves take the median from the provider's PSA 8 to 7.
+                // One provider: confidence B, which moves some probability down. There is no default
+                // surface shift (review D5), so the median stays on the provider's PSA 8.
                 .andExpect(jsonPath("$.assessments[0].confidence").value("B"))
-                .andExpect(jsonPath("$.assessments[0].median").value("7"))
-                .andExpect(jsonPath("$.assessments[0].basis.modernHolo").value(true));
+                .andExpect(jsonPath("$.assessments[0].median").value("8"))
+                .andExpect(jsonPath("$.assessments[0].basis.modernHolo").doesNotExist());
         assertThat(jdbc.queryForObject("select raw::text from provider_prediction where card_item_id = ?::uuid", String.class, cardId))
                 .doesNotContain("_base64");
 

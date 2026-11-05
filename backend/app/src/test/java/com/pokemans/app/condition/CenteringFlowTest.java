@@ -86,7 +86,7 @@ class CenteringFlowTest {
                 .andExpect(jsonPath("$.predictions[?(@.provider == 'RAWMARK_CENTERING')].details.frontCentering.leftRight").exists())
                 .andExpect(jsonPath("$.assessments[0].basis.centeringCap").value(10))
                 .andExpect(jsonPath("$.assessments[0].basis.providerGrades.RAWMARK_CENTERING").doesNotExist())
-                .andExpect(jsonPath("$.assessments[0].median").value("7"));
+                .andExpect(jsonPath("$.assessments[0].median").value("8")); // no default surface shift (review D5)
 
         // The seller's view keeps the measurement beside the grades, and names no provider.
         String view = api.get(seller, collector)

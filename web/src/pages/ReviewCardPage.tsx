@@ -652,7 +652,6 @@ export function AssessmentPanel({
 
   const total = OUTCOMES.reduce((sum, o) => sum + (Number(values[o]) || 0), 0)
   const totalOk = Math.abs(total - 100) < 0.001
-  const noCloseUp = modernHoloWithoutCloseUp(data)
   const cap = data.centeringCap
   const overCap = cap == null ? 0 : OUTCOMES.reduce((sum, o) => sum + (Number(o) > cap ? Number(values[o]) || 0 : 0), 0)
 
@@ -730,12 +729,6 @@ export function AssessmentPanel({
             </select>
             <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why (required)" aria-label="Why" required maxLength={2000} />
           </div>
-          {confidence === 'A' && noCloseUp && (
-            <p className="warn small" role="note">
-              No passing close-up of this modern holo. The methodology shifts its surface down by default unless a close-up clears
-              it, so confidence A needs one: pick B or lower, or ask the collector for a close-up.
-            </p>
-          )}
           {overCap > 0 && (
             <div className="warn small" role="note">
               <p>
@@ -777,17 +770,6 @@ export function AssessmentPanel({
       )}
     </section>
   )
-}
-
-/** End of the WotC era (AuthenticityRisk.END_OF_WOTC_ERA): holos after it get the default surface shift. */
-const END_OF_WOTC_ERA = '2003-07-01'
-
-/** A holo or reverse holo from after the WotC era with no passing close-up: the surface shift hasn't been cleared. */
-function modernHoloWithoutCloseUp(data: CardCondition) {
-  const id = data.identification
-  if (!id || (id.variant !== 'HOLO' && id.variant !== 'REVERSE_HOLO')) return false
-  if (id.setReleaseDate != null && id.setReleaseDate < END_OF_WOTC_ERA) return false
-  return !data.photos.some((p) => p.side === 'DETAIL')
 }
 
 function Bars({ distribution }: { distribution: Distribution }) {

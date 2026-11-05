@@ -102,7 +102,6 @@ services:
       PGUSER: pokemans
       PGPASSWORD: ${POSTGRES_PASSWORD}
       BACKUP_AT: ${BACKUP_AT:-03:30}
-      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
       PHOTO_BUCKET: ${R2_PHOTO_BUCKET:-pokemans-photos}
       BACKUP_BUCKET: ${R2_BACKUP_BUCKET:-pokemans-backups}
       HEALTHCHECK_URL: ${BACKUP_HEALTHCHECK_URL:-}
