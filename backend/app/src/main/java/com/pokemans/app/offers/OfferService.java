@@ -142,6 +142,12 @@ class OfferService {
                 now.plus(properties.offerValidFor())));
     }
 
+    /** The card as identified when the offer was made, without valuing it again; null for no such offer. */
+    @Transactional(readOnly = true)
+    CardInputs.Identity identity(UUID offerId) {
+        return offers.findById(offerId).map(o -> inputs(o).identity()).orElse(null);
+    }
+
     @Transactional(readOnly = true)
     Optional<CardOffer> latest(UUID cardItemId) {
         return offers.findFirstByCardItemIdOrderByCreatedAtDesc(cardItemId);

@@ -134,18 +134,18 @@ class CardStatusService {
         Optional<SaleListing> listing = listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardId);
         List<ListingEvent> history = listing.map(l -> events.findByListingIdInOrderByCreatedAtAsc(List.of(l.getId()))).orElse(List.of());
         ListingService.Status listed = listing.map(l -> ListingService.status(l, history, Instant.now())).orElse(null);
-        OfferService.Quote quote = offers.quote(cardId);
-        CardInputs in = quote.value().inputs();
-        String identity = identity(in.identity());
+        // Once the card is posted or has an offer, the stage comes from the listing or the offer, and so does the identity
+        // (the card as it was offered): valuing it again would cost a valuation per card on every list (review finding 9).
         ListingService.Progress deal = ListingService.progress(history);
         if (listed == ListingService.Status.ACCEPTED) {
-            return afterTheSale(cardId, identity, deal, listing.orElseThrow().getId());
+            return afterTheSale(cardId, offeredAs(listing.orElseThrow()), deal, listing.orElseThrow().getId());
         }
         if (listed == ListingService.Status.BACK && deal.held()) {
-            return new CardStatus(cardId, Stage.RETURNED, identity, ListingService.HELD + NO_NOTIFICATIONS, false);
+            return new CardStatus(cardId, Stage.RETURNED, offeredAs(listing.orElseThrow()), ListingService.HELD + NO_NOTIFICATIONS, false);
         }
         if (listed == ListingService.Status.OPEN) {
-            return new CardStatus(cardId, Stage.LISTED, identity, "Posted to buyers: the first to accept buys it at the price.", false)
+            return new CardStatus(cardId, Stage.LISTED, offeredAs(listing.orElseThrow()),
+                    "Posted to buyers: the first to accept buys it at the price.", false)
                     .withDeadline(listing.orElseThrow().getExpiresAt());
         }
         // A card that came back can't go out again on the offer it sold at.
@@ -153,9 +153,13 @@ class CardStatusService {
         Optional<CardOffer> latest = offers.latest(cardId).filter(o -> o.getExpiresAt().isAfter(Instant.now()))
                 .filter(o -> voids.findByOfferId(o.getId()).isEmpty()).filter(o -> !o.getId().equals(soldAt));
         if (latest.isPresent()) {
-            return new CardStatus(cardId, Stage.OFFERED, identity, "You have an offer: sell at it, or let it expire.", false)
+            return new CardStatus(cardId, Stage.OFFERED, identity(offers.identity(latest.orElseThrow().getId())),
+                    "You have an offer: sell at it, or let it expire.", false)
                     .withDeadline(latest.orElseThrow().getExpiresAt());
         }
+        OfferService.Quote quote = offers.quote(cardId);
+        CardInputs in = quote.value().inputs();
+        String identity = identity(in.identity());
         List<CardItems.PhotoRef> photos = cardItems.passedPhotos(cardId);
         boolean captured = photos.stream().anyMatch(p -> p.side().equals("FRONT")) && photos.stream().anyMatch(p -> p.side().equals("BACK"));
         if (!captured) {
@@ -179,6 +183,11 @@ class CardStatusService {
             return new CardStatus(cardId, Stage.NO_OFFER, identity, quote.refusal() + nextStep(quote.refusal()), false);
         }
         return new CardStatus(cardId, Stage.READY, identity, "Ready for an instant offer.", true);
+    }
+
+    /** The card as identified when the listing's offer was made. */
+    private String offeredAs(SaleListing listing) {
+        return identity(offers.identity(listing.getOfferId()));
     }
 
     private CardStatus afterTheSale(UUID cardId, String identity, ListingService.Progress deal, UUID listingId) {
