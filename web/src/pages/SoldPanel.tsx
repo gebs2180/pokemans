@@ -3,6 +3,7 @@ import { apiPath, money, PAYMENT_METHOD, RETURN_REASON, type Listing, type ShipA
 import { safeHref } from '../safeHref'
 import { Field } from '../ui'
 import { AddressForm } from './AddressForm'
+import { days, usePolicy } from '../policy'
 
 const date = (at: string) => new Date(at).toLocaleDateString()
 
@@ -34,6 +35,7 @@ export function SoldPanel({
   act: (method: string, path: string, body?: unknown) => Promise<void>
   onAddressSaved: () => void
 }) {
+  const policy = usePolicy()
   // Each of these is recorded for good and the other side sees it: each asks once more.
   const [confirming, setConfirming] = useState<'shipped' | 'paid' | 'notPaid' | 'back' | 'disagree' | null>(null)
   const [note, setNote] = useState('')
@@ -120,7 +122,7 @@ export function SoldPanel({
         {stage === 'SOLD' && (
           <>
             <p>
-              They pay you {amount} directly{how(address)}, within 7 days of it arriving as shown. Rawmark doesn't handle the money.
+              They pay you {amount} directly{how(address)}, within {days(policy.payWithinDays)} of it arriving as shown. Rawmark doesn't handle the money.
             </p>
             {label && labelHref ? (
               <>
@@ -159,7 +161,7 @@ export function SoldPanel({
             <p className="alert-title">Shipped</p>
             {tracking}
             <p>
-              The buyer records it when it arrives. They then have 7 days to pay you {amount} directly{how(address)}, and you'll see the
+              The buyer records it when it arrives. They then have {days(policy.payWithinDays)} to pay you {amount} directly{how(address)}, and you'll see the
               pay-by date here.
             </p>
           </>

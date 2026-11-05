@@ -13,6 +13,8 @@ import com.pokemans.app.offers.CardStatusService.CardStatus;
 import com.pokemans.app.offers.CardStatusService.Need;
 import com.pokemans.app.offers.CardStatusService.Stage;
 import com.pokemans.app.valuation.CardInputs;
+import com.pokemans.valuation.ParameterSet;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -21,6 +23,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CardStatusServiceTest {
+
+    static final OfferPolicy POLICY = new OfferPolicy(ParameterSet.load("1.2.0"),
+            new OffersProperties(Duration.ofDays(7), Duration.ofDays(14), new BigDecimal("5000"), true));
 
     private static final Instant NOW = Instant.parse("2026-11-01T12:00:00Z");
 
@@ -79,6 +84,20 @@ class CardStatusServiceTest {
     }
 
     @Test
+    void theLotCopyNamesTheMinimumFromTheParameterSet() {
+        // Review finding 47: the $25 was written into the copy.
+        CardItems cardItems = mock(CardItems.class);
+        CardStatusService service = new CardStatusService(mock(OfferService.class), mock(SaleListingRepository.class),
+                mock(ListingEventRepository.class), cardItems, mock(CardOfferVoidRepository.class), mock(Assessments.class),
+                mock(Shipping.class), POLICY);
+        UUID lot = UUID.randomUUID();
+        when(cardItems.get(lot)).thenReturn(new CardItems.CardItemRef(lot, UUID.randomUUID(), "Binder", true, 40, NOW));
+
+        assertThat(POLICY.minFmvText()).isEqualTo("$25");
+        assertThat(service.status(lot).nextStep()).contains("worth " + POLICY.minFmvText() + " or more");
+    }
+
+    @Test
     void aPostedOrOfferedCardIsntValuedAgainForItsStatus() {
         // Review finding 9: the status quoted every card (a full valuation) before looking at its listing, so the card
         // list and the home page valued every sold and posted card on each load.
@@ -86,7 +105,7 @@ class CardStatusServiceTest {
         SaleListingRepository listings = mock(SaleListingRepository.class);
         CardItems cardItems = mock(CardItems.class);
         CardStatusService service = new CardStatusService(offers, listings, mock(ListingEventRepository.class), cardItems,
-                mock(CardOfferVoidRepository.class), mock(Assessments.class), mock(Shipping.class));
+                mock(CardOfferVoidRepository.class), mock(Assessments.class), mock(Shipping.class), POLICY);
         CardInputs.Identity umbreon = new CardInputs.Identity(UUID.randomUUID(), "Umbreon", "Evolving Skies", "215", "en", null,
                 "UNLIMITED", "NORMAL", false, null, List.of());
 

@@ -78,9 +78,11 @@ class CardStatusService {
     private final CardOfferVoidRepository voids;
     private final Assessments assessments;
     private final Shipping shipping;
+    private final OfferPolicy policy;
 
     CardStatusService(OfferService offers, SaleListingRepository listings, ListingEventRepository events, CardItems cardItems,
-                      CardOfferVoidRepository voids, Assessments assessments, Shipping shipping) {
+                      CardOfferVoidRepository voids, Assessments assessments, Shipping shipping, OfferPolicy policy) {
+        this.policy = policy;
         this.offers = offers;
         this.shipping = shipping;
         this.assessments = assessments;
@@ -129,7 +131,7 @@ class CardStatusService {
     private CardStatus stage(UUID cardId) {
         CardItems.CardItemRef card = cardItems.get(cardId);
         if (card.lot()) {
-            return new CardStatus(cardId, Stage.LOT, null, "Lots don't get offers: add the cards worth $25 or more one by one.", false);
+            return new CardStatus(cardId, Stage.LOT, null, "Lots don't get offers: add the cards worth " + policy.minFmvText() + " or more one by one.", false);
         }
         Optional<SaleListing> listing = listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardId);
         List<ListingEvent> history = listing.map(l -> events.findByListingIdInOrderByCreatedAtAsc(List.of(l.getId()))).orElse(List.of());
@@ -197,7 +199,7 @@ class CardStatusService {
     private CardStatus afterTheSale(UUID cardId, String identity, ListingStateMachine.Progress deal, UUID listingId) {
         return switch (deal.stage()) {
             case SHIPPED -> new CardStatus(cardId, Stage.SHIPPED, identity,
-                    "On its way to the buyer. They record it when it arrives, and then have 7 days to pay you." + NO_NOTIFICATIONS, false);
+                    "On its way to the buyer. They record it when it arrives, and then have " + policy.terms().payWithinDays() + " days to pay you." + NO_NOTIFICATIONS, false);
             case ARRIVED -> new CardStatus(cardId, Stage.ARRIVED, identity,
                     "It arrived. The buyer pays you directly: tell us here when they have, or if they haven't by the date on this page.", false)
                     .withDeadline(deal.payBy()).withSellersWord(deal.disputedAt() == null);
@@ -211,12 +213,12 @@ class CardStatusService {
         };
     }
 
-    private static String nextStep(String refusal) {
+    private String nextStep(String refusal) {
         if (refusal.contains("sales data")) {
             return " We add sold prices by hand, and it may qualify then." + NO_NOTIFICATIONS;
         }
         if (refusal.contains("minimum")) {
-            return " Instant offers are for cards worth $25 or more.";
+            return " Instant offers are for cards worth " + policy.minFmvText() + " or more.";
         }
         return "";
     }

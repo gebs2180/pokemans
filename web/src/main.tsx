@@ -6,6 +6,7 @@ import '@fontsource-variable/figtree'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './AuthProvider.tsx'
+import { PolicyProvider } from './PolicyProvider.tsx'
 
 // A deploy renames the lazy chunks under tabs that are still open; reload once to pick up the new ones.
 // The sessionStorage flag stops a loop if the chunk is really gone; without storage we don't reload.
@@ -24,7 +25,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <PolicyProvider>
+          <App />
+        </PolicyProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

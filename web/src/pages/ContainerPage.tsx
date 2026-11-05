@@ -7,6 +7,7 @@ import { useLoad } from '../useLoad'
 import { ReportsList } from './ReportsPanel'
 import { COLLATERAL } from '../flags'
 import { message } from '../format'
+import { dollars, usePolicy } from '../policy'
 
 /** Lender and insurer reports are paused unless the build turns them on. */
 
@@ -38,6 +39,7 @@ export function ContainerView({
   lead?: ReactNode
   children?: ReactNode
 }) {
+  const policy = usePolicy()
   const api = useApi()
   const navigate = useNavigate()
   const { data, error } = useLoad(
@@ -100,7 +102,7 @@ export function ContainerView({
       )}
 
       <form onSubmit={addCard} className="panel form" aria-describedby={formError.describedBy}>
-        <Field label="Card name and number" hint={lots ? 'Its name and number, as printed.' : "Its name and number, as printed. One card at a time: we'll tell you if it's under our $25 minimum."}>
+        <Field label="Card name and number" hint={lots ? 'Its name and number, as printed.' : `Its name and number, as printed. One card at a time: we'll tell you if it's under our ${dollars(policy.minFmv)} minimum.`}>
           {(control) => (
             <input
               {...control}
@@ -129,7 +131,7 @@ export function ContainerView({
             )}
           </div>
         )}
-        {lot && <p className="muted small">Lots are kept with their photos, but don't get offers: add cards worth $25 or more one by one.</p>}
+        {lot && <p className="muted small">Lots are kept with their photos, but don't get offers: add cards worth {dollars(policy.minFmv)} or more one by one.</p>}
         <div className="actions">
           <button type="submit" disabled={adding} aria-busy={adding}>
             Add card
