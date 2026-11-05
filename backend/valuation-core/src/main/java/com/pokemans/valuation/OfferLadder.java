@@ -8,7 +8,7 @@ import java.util.Objects;
 
 /**
  * An instant offer on a raw card: one firm price, the expected value over its condition distribution
- * of what a buyer could pay for it at each grade (Zach, 2026-10-19). The buyer accepts it or doesn't;
+ * of what a buyer could pay for it at each grade. The buyer accepts it or doesn't;
  * no grade is settled afterwards, so the buyer keeps the upside of a 10 and carries the downside.
  *
  * <pre>
@@ -27,7 +27,7 @@ public final class OfferLadder {
     public record Rung(Grade grade, BigDecimal probability, BigDecimal price) {
     }
 
-    /** @param price the firm price: Σ p · rung price, in cents */
+    /** @param price the firm price: Σ p · rung price, in dollars, rounded to cents */
     public record Offer(List<Rung> rungs, BigDecimal price, ParameterSet.LiquidityTier liquidityTier, Trace trace) {
     }
 

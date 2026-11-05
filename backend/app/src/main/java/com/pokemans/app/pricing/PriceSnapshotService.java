@@ -64,14 +64,16 @@ class PriceSnapshotService {
     private final PriceStatsRepository stats;
     private final Catalog catalog;
     private final PricingProperties properties;
+    private final ParameterSet params;
 
     PriceSnapshotService(SoldCompRepository comps, PriceSnapshotRepository snapshots, PriceStatsRepository stats,
-                         Catalog catalog, PricingProperties properties) {
+                         Catalog catalog, PricingProperties properties, ParameterSet params) {
         this.comps = comps;
         this.snapshots = snapshots;
         this.stats = stats;
         this.catalog = catalog;
         this.properties = properties;
+        this.params = params;
     }
 
     /**
@@ -81,7 +83,6 @@ class PriceSnapshotService {
      */
     @Transactional
     Result snapshotAll(LocalDate asOf) {
-        ParameterSet params = ParameterSet.load(properties.parameterSet());
         GradePricer pricer = new GradePricer(params);
         LocalDate from = asOf.minusDays(lookbackDays(params));
 

@@ -1,5 +1,6 @@
 package com.pokemans.app.catalog;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -14,7 +15,7 @@ import org.hibernate.type.SqlTypes;
 /** One reading of a card's front photo: queued, then what the reader saw (or why it failed). */
 @Entity
 @Table(name = "card_reading")
-class CardReading {
+class CardReading extends AssignedIdEntity<UUID> {
 
     enum Status { PENDING, DONE, FAILED }
 
@@ -107,7 +108,8 @@ class CardReading {
                 notes, model, raw);
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

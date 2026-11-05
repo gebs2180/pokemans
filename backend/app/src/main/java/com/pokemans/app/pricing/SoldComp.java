@@ -1,5 +1,6 @@
 package com.pokemans.app.pricing;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -16,7 +17,7 @@ import org.hibernate.type.SqlTypes;
 /** One stored sold sale with its provenance. Append-only: no setters. */
 @Entity
 @Table(name = "sold_comp")
-class SoldComp {
+class SoldComp extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -64,7 +65,8 @@ class SoldComp {
         this.createdAt = Instant.now();
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

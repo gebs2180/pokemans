@@ -1,5 +1,6 @@
 package com.pokemans.app.identity;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -9,7 +10,7 @@ import java.util.UUID;
 /** A user's acceptance of one version of the data-use terms for one org. Append-only. */
 @Entity
 @Table(name = "consent_record")
-class ConsentRecord {
+class ConsentRecord extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -20,6 +21,11 @@ class ConsentRecord {
     private Instant acceptedAt;
 
     protected ConsentRecord() {
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
     }
 
     ConsentRecord(UUID orgId, UUID userId, String termsVersion, String termsSha256) {

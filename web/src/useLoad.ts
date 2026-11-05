@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { message } from './format'
 
 /** Runs an async loader on mount and whenever its dependencies change; reload() runs it again. */
 export function useLoad<T>(loader: () => Promise<T>, deps: unknown[]) {
@@ -24,7 +25,7 @@ export function useLoad<T>(loader: () => Promise<T>, deps: unknown[]) {
         if (!cancelled) setData(value)
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) setError(message(e))
       })
     return () => {
       cancelled = true

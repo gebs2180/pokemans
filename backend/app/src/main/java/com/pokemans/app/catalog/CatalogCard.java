@@ -1,5 +1,6 @@
 package com.pokemans.app.catalog;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -19,7 +20,7 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(name = "catalog_card")
-class CatalogCard {
+class CatalogCard extends AssignedIdEntity<UUID> {
 
     enum Provider { TCGDEX, MANUAL }
 
@@ -78,7 +79,8 @@ class CatalogCard {
         this.createdAt = Instant.now();
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

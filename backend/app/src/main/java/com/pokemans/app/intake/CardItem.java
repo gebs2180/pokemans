@@ -1,5 +1,6 @@
 package com.pokemans.app.intake;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -13,7 +14,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "card_item")
-class CardItem {
+class CardItem extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -50,7 +51,8 @@ class CardItem {
         return new CardItem(orgId, null, collectionId, label, lot, quantity, createdBy);
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

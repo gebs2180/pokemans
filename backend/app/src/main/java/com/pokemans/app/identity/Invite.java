@@ -1,5 +1,6 @@
 package com.pokemans.app.identity;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -11,7 +12,7 @@ import java.util.UUID;
 /** A single-use invite into an org. Only the token's SHA-256 is stored. */
 @Entity
 @Table(name = "invite")
-public class Invite {
+public class Invite extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -54,6 +55,7 @@ public class Invite {
         this.acceptedAt = now;
     }
 
+    @Override
     public UUID getId() {
         return id;
     }

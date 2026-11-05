@@ -16,13 +16,12 @@ import java.util.stream.Collectors;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * The admin's undo for instant offers (Zach, 2026-10-21), by appending, never editing: void an offer
+ * The admin's undo for instant offers, by appending, never editing: void an offer
  * (taking it off the market if it's posted), cancel a deal a buyer took, and mark a cancelled deal's
  * label to be refunded. Each is a new row with who, when and why. Also what's waiting for the admin
  * after a sale: a seller who says they weren't paid, and returns to review. No access checks:
@@ -43,11 +42,11 @@ class OfferAdminService {
     }
 
     /** The offer's latest listing, as the admin sees it. */
-    record Listing(UUID id, ListingService.Status status, Instant listedAt, Instant closedAt, UUID buyerOrgId,
-                   ListingService.Party buyer, ListingService.LabelView label, Refund labelRefund, String outcome, Undo undone) {
+    record Listing(UUID id, ListingStateMachine.Status status, Instant listedAt, Instant closedAt, UUID buyerOrgId,
+                   ListingViews.Party buyer, ListingViews.LabelView label, Refund labelRefund, String outcome, Undo undone) {
     }
 
-    record Offer(UUID offerId, UUID orgId, String sellerName, UUID cardItemId, ListingService.CardView card, BigDecimal price,
+    record Offer(UUID offerId, UUID orgId, String sellerName, UUID cardItemId, ListingViews.CardView card, BigDecimal price,
                  BigDecimal fmv, String confidence, Instant createdAt, Instant expiresAt, boolean expired, Undo voided, Listing listing) {
     }
 
@@ -62,32 +61,32 @@ class OfferAdminService {
      * @param progress what each side has said so far
      */
     record Attention(UUID listingId, AttentionKind kind, Instant since, String note, UUID sellerOrgId, UUID cardItemId,
-                     ListingService.CardView card, BigDecimal price, ListingService.Party buyer, ListingService.Party seller,
-                     String trackingCode, ListingService.OutcomeView outcome, ListingService.Progress progress) {
+                     ListingViews.CardView card, BigDecimal price, ListingViews.Party buyer, ListingViews.Party seller,
+                     String trackingCode, ListingViews.OutcomeView outcome, ListingStateMachine.Progress progress) {
     }
 
     private final CardOfferRepository offers;
     private final CardOfferVoidRepository voids;
     private final SaleListingRepository listings;
     private final ListingEventRepository events;
-    private final ListingService listingService;
+    private final ListingViews views;
     private final Shipping shipping;
     private final Directory directory;
     private final CurrentUser currentUser;
-    private final JdbcTemplate jdbc;
+    private final ListingLock lock;
 
     OfferAdminService(CardOfferRepository offers, CardOfferVoidRepository voids, SaleListingRepository listings,
-                      ListingEventRepository events, ListingService listingService, Shipping shipping, Directory directory,
-                      CurrentUser currentUser, JdbcTemplate jdbc) {
+                      ListingEventRepository events, ListingViews views, Shipping shipping, Directory directory,
+                      CurrentUser currentUser, ListingLock lock) {
         this.offers = offers;
         this.voids = voids;
         this.listings = listings;
         this.events = events;
-        this.listingService = listingService;
+        this.views = views;
         this.shipping = shipping;
         this.directory = directory;
         this.currentUser = currentUser;
-        this.jdbc = jdbc;
+        this.lock = lock;
     }
 
     /** The newest offers, newest first, with their latest listing. */
@@ -100,15 +99,15 @@ class OfferAdminService {
     @Transactional(readOnly = true)
     List<Attention> attention() {
         List<SaleListing> taken = listings.findAllAccepted();
-        Map<UUID, List<ListingEvent>> history = listingService.history(taken);
+        Map<UUID, List<ListingEvent>> history = events.history(taken);
         List<Attention> waiting = new ArrayList<>();
         for (SaleListing l : taken) {
             List<ListingEvent> h = history.getOrDefault(l.getId(), List.of());
-            ListingEvent raised = ListingService.awaitingAdmin(h);
+            ListingEvent raised = ListingStateMachine.awaitingAdmin(h);
             if (raised == null) {
                 continue;
             }
-            ListingService.OutcomeView outcome = ListingService.outcome(h);
+            ListingViews.OutcomeView outcome = ListingViews.outcome(h);
             boolean returned = outcome != null && outcome.type().equals("RETURNED");
             AttentionKind kind = raised.getType() == ListingEvent.Type.RETURNED ? AttentionKind.RETURNED
                     : returned ? AttentionKind.RETURN_DISPUTED : AttentionKind.NOT_PAID;
@@ -117,9 +116,9 @@ class OfferAdminService {
             var buyer = directory.contact(accepted.getActorOrgId(), accepted.getActorUserId());
             var seller = directory.contact(l.getOrgId(), l.getListedBy());
             waiting.add(new Attention(l.getId(), kind, raised.getCreatedAt(), raised.getNote(), l.getOrgId(), l.getCardItemId(),
-                    ListingService.card(OfferService.inputs(offer)), offer.getPrice(),
-                    new ListingService.Party(buyer.orgName(), buyer.email()), new ListingService.Party(seller.orgName(), seller.email()),
-                    shipping.label(l.getId()).map(ShippingLabel::getTrackingCode).orElse(null), outcome, ListingService.progress(h)));
+                    ListingViews.card(OfferService.inputs(offer)), offer.getPrice(),
+                    new ListingViews.Party(buyer.orgName(), buyer.email()), new ListingViews.Party(seller.orgName(), seller.email()),
+                    shipping.label(l.getId()).map(ShippingLabel::getTrackingCode).orElse(null), outcome, ListingStateMachine.progress(h)));
         }
         waiting.sort(Comparator.comparing(Attention::since));
         return waiting;
@@ -134,7 +133,7 @@ class OfferAdminService {
         SaleListing listing = listings.findById(listingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Deal not found"));
         lockCard(listing.getCardItemId());
-        if (ListingService.awaitingAdmin(listingService.history(List.of(listing)).getOrDefault(listingId, List.of())) == null) {
+        if (ListingStateMachine.awaitingAdmin(events.history(List.of(listing)).getOrDefault(listingId, List.of())) == null) {
             throw conflict("Nothing is waiting on this deal.");
         }
         events.saveAndFlush(ListingEvent.resolved(listingId, currentUser.id(), how));
@@ -152,14 +151,14 @@ class OfferAdminService {
             throw conflict("This offer is already void.");
         }
         List<SaleListing> posted = listings.findByOfferIdIn(List.of(offerId));
-        Map<UUID, List<ListingEvent>> history = listingService.history(posted);
+        Map<UUID, List<ListingEvent>> history = events.history(posted);
         Instant now = Instant.now();
         for (SaleListing l : posted) {
-            ListingService.Status status = ListingService.status(l, history.getOrDefault(l.getId(), List.of()), now);
-            if (status == ListingService.Status.ACCEPTED) {
+            ListingStateMachine.Status status = ListingStateMachine.status(l, history.getOrDefault(l.getId(), List.of()), now);
+            if (status == ListingStateMachine.Status.ACCEPTED) {
                 throw conflict("A buyer has taken this card: cancel the deal instead.");
             }
-            if (status == ListingService.Status.OPEN) {
+            if (status == ListingStateMachine.Status.OPEN) {
                 save(ListingEvent.voided(l.getId(), currentUser.id(), reason), "A buyer took this card just now: cancel the deal instead.");
             }
         }
@@ -168,7 +167,7 @@ class OfferAdminService {
     }
 
     /**
-     * A doubt is final until cleared (Zach, 2026-11-02), so the moment one is recorded the card's offers are
+     * A doubt is final until cleared, so the moment one is recorded the card's offers are
      * voided and any listing comes down, in the finding's own transaction. One a buyer already took stays:
      * only the admin can say whether to cancel it. A later "verified" needs a new offer.
      */
@@ -182,9 +181,9 @@ class OfferAdminService {
                 continue;
             }
             List<SaleListing> posted = listings.findByOfferIdIn(List.of(offer.getId()));
-            Map<UUID, List<ListingEvent>> history = listingService.history(posted);
+            Map<UUID, List<ListingEvent>> history = events.history(posted);
             List<SaleListing> open = posted.stream()
-                    .filter(l -> ListingService.status(l, history.getOrDefault(l.getId(), List.of()), now) == ListingService.Status.OPEN).toList();
+                    .filter(l -> ListingStateMachine.status(l, history.getOrDefault(l.getId(), List.of()), now) == ListingStateMachine.Status.OPEN).toList();
             boolean taken = history.values().stream().flatMap(List::stream).anyMatch(e -> e.getType() == ListingEvent.Type.ACCEPTED);
             if (taken || (open.isEmpty() && !offer.getExpiresAt().isAfter(now))) {
                 continue;
@@ -203,14 +202,14 @@ class OfferAdminService {
         SaleListing listing = listings.findById(listingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Deal not found"));
         lockCard(listing.getCardItemId());
-        List<ListingEvent> history = listingService.history(List.of(listing)).getOrDefault(listingId, List.of());
-        switch (ListingService.status(listing, history, Instant.now())) {
+        List<ListingEvent> history = events.history(List.of(listing)).getOrDefault(listingId, List.of());
+        switch (ListingStateMachine.status(listing, history, Instant.now())) {
             case ACCEPTED -> { }
             case CANCELLED -> throw conflict("This deal is already cancelled.");
             case BACK -> throw conflict("This card already came back to the seller.");
             default -> throw conflict("No buyer has taken this card, so there's no deal to cancel: void the offer instead.");
         }
-        ListingService.OutcomeView outcome = ListingService.outcome(history);
+        ListingViews.OutcomeView outcome = ListingViews.outcome(history);
         if (outcome != null) {
             throw conflict("The buyer already recorded this card as " + outcome.type().toLowerCase() + ", so the deal can't be cancelled.");
         }
@@ -248,14 +247,14 @@ class OfferAdminService {
         Map<UUID, SaleListing> latest = listings.findByOfferIdIn(ids).stream()
                 .collect(Collectors.toMap(SaleListing::getOfferId, Function.identity(),
                         (a, b) -> a.getCreatedAt().isAfter(b.getCreatedAt()) ? a : b));
-        Map<UUID, List<ListingEvent>> history = listingService.history(new ArrayList<>(latest.values()));
+        Map<UUID, List<ListingEvent>> history = events.history(new ArrayList<>(latest.values()));
         Instant now = Instant.now();
         List<Offer> views = new ArrayList<>();
         for (CardOffer o : page) {
             CardOfferVoid v = voided.get(o.getId());
             SaleListing l = latest.get(o.getId());
             views.add(new Offer(o.getId(), o.getOrgId(), directory.orgName(o.getOrgId()), o.getCardItemId(),
-                    ListingService.card(OfferService.inputs(o)), o.getPrice(), o.getFmv(), o.getConfidence(), o.getCreatedAt(),
+                    ListingViews.card(OfferService.inputs(o)), o.getPrice(), o.getFmv(), o.getConfidence(), o.getCreatedAt(),
                     o.getExpiresAt(), !o.getExpiresAt().isAfter(now),
                     v == null ? null : new Undo(v.getReason(), v.getCreatedAt(), v.getVoidedBy(), directory.email(v.getVoidedBy())),
                     l == null ? null : listing(l, history.getOrDefault(l.getId(), List.of()), now)));
@@ -264,14 +263,14 @@ class OfferAdminService {
     }
 
     private Listing listing(SaleListing l, List<ListingEvent> history, Instant now) {
-        ListingService.Status status = ListingService.status(l, history, now);
+        ListingStateMachine.Status status = ListingStateMachine.status(l, history, now);
         ListingEvent closed = history.stream().filter(e -> e.getType() == ListingEvent.Type.ACCEPTED
                 || e.getType() == ListingEvent.Type.WITHDRAWN || e.getType() == ListingEvent.Type.VOIDED).findFirst().orElse(null);
         ListingEvent accepted = history.stream().filter(e -> e.getType() == ListingEvent.Type.ACCEPTED).findFirst().orElse(null);
-        ListingService.Party buyer = null;
+        ListingViews.Party buyer = null;
         if (accepted != null) {
             var c = directory.contact(accepted.getActorOrgId(), accepted.getActorUserId());
-            buyer = new ListingService.Party(c.orgName(), c.email());
+            buyer = new ListingViews.Party(c.orgName(), c.email());
         }
         Undo undone = history.stream()
                 .filter(e -> e.getType() == ListingEvent.Type.CANCELLED || e.getType() == ListingEvent.Type.VOIDED)
@@ -283,15 +282,15 @@ class OfferAdminService {
                 .map(r -> new Refund(r.getReason(), r.getCreatedAt(), r.getRequestedBy(), directory.email(r.getRequestedBy()), r.getProviderStatus(),
                         r.getProviderError()))
                 .orElse(null);
-        ListingService.OutcomeView outcome = ListingService.outcome(history);
+        ListingViews.OutcomeView outcome = ListingViews.outcome(history);
         return new Listing(l.getId(), status, l.getCreatedAt(), closed == null ? null : closed.getCreatedAt(),
-                accepted == null ? null : accepted.getActorOrgId(), buyer, listingService.label(l.getId()), refund,
+                accepted == null ? null : accepted.getActorOrgId(), buyer, views.label(l.getId()), refund,
                 outcome == null ? null : outcome.type(), undone);
     }
 
     /** The same lock posting takes, so a void and a post (or a cancel and a repost) can't interleave. */
     private void lockCard(UUID cardItemId) {
-        jdbc.queryForObject("select pg_advisory_xact_lock(hashtext(?))", Object.class, "listing:" + cardItemId);
+        lock.lock(cardItemId);
     }
 
     /** Saves an admin event; the database lets a listing close once and a deal end once, so a lost race is a 409. */

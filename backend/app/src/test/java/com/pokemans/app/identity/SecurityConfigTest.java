@@ -43,6 +43,19 @@ class SecurityConfigTest {
     }
 
     @Test
+    void theOfferTermsNumbersArePublic() throws Exception {
+        // Served from where they are set, so copy can't drift from them (review finding 47).
+        mvc.perform(get("/api/policy")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.minFmv").value(25))
+                .andExpect(jsonPath("$.maxPrice").value(5000))
+                .andExpect(jsonPath("$.offerValidDays").value(7))
+                .andExpect(jsonPath("$.listingOpenDays").value(14))
+                .andExpect(jsonPath("$.shipWithinDays").value(3))
+                .andExpect(jsonPath("$.payWithinDays").value(7))
+                .andExpect(jsonPath("$.margins.B").value(0.13));
+    }
+
+    @Test
     void apiRequiresAToken() throws Exception {
         mvc.perform(get("/api/me")).andExpect(status().isUnauthorized());
     }

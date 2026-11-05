@@ -1,5 +1,6 @@
 package com.pokemans.app.intake;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -9,7 +10,7 @@ import java.util.UUID;
 /** A partner's batch of cards headed for a grader. */
 @Entity
 @Table(name = "submission_batch")
-class SubmissionBatch {
+class SubmissionBatch extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -29,7 +30,8 @@ class SubmissionBatch {
         this.createdAt = Instant.now();
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

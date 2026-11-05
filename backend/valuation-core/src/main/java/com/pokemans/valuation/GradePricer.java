@@ -160,7 +160,7 @@ public final class GradePricer {
             return known;
         }
         Confidence c = switch (method.get(grade)) {
-            case OBSERVED -> fromCompCount(observed.get(grade).salesInWindow());
+            case OBSERVED -> params.fromCompCount(BigDecimal.valueOf(observed.get(grade).salesInWindow()));
             case NO_SALES -> Confidence.D;
             case INTERPOLATED, STEP_DOWN, CARD_STEP_DOWN, CARRIED_DOWN -> {
                 Confidence worst = Confidence.A;
@@ -172,20 +172,6 @@ public final class GradePricer {
         };
         out.put(grade, c);
         return c;
-    }
-
-    private Confidence fromCompCount(int n) {
-        BigDecimal count = BigDecimal.valueOf(n);
-        if (count.compareTo(params.compsForA()) >= 0) {
-            return Confidence.A;
-        }
-        if (count.compareTo(params.compsForB()) >= 0) {
-            return Confidence.B;
-        }
-        if (count.compareTo(params.compsForC()) >= 0) {
-            return Confidence.C;
-        }
-        return Confidence.D;
     }
 
     private void fillMissingGrades(Input input, EnumMap<Grade, BigDecimal> gross, EnumMap<Grade, GradePrice.Method> method,

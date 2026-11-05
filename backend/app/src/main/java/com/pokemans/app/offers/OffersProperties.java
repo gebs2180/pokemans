@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * Instant offers (Zach, 2026-10-19).
+ * Instant offers.
  *
  * <p>The buyer's margin is in the parameter set, by the card's confidence (1.2.0 on).
  *

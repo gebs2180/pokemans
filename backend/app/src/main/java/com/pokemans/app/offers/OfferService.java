@@ -26,7 +26,7 @@ import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Prices instant offers (Zach, 2026-10-19): the card valued as of now, then one firm price, the
+ * Prices instant offers: the card valued as of now, then one firm price, the
  * expected value of what a buyer could pay at each grade ({@link OfferLadder}). Stored with every
  * input, the per-grade ladder behind the price, and the trace. No access checks:
  * the controllers have done them.
@@ -91,7 +91,7 @@ class OfferService {
             return new Quote(value, "Its authenticity is in doubt, so it gets no offer.", null, null);
         }
         CardValuation v = value.valuation();
-        // The offer's own confidence: the FLV-only penalties (fallback σ, the stress) don't apply (Zach, 2026-10-21).
+        // The offer's own confidence: the FLV-only penalties (fallback σ, the stress) don't apply.
         if (v.offerConfidence() == Confidence.D) {
             return new Quote(value, "There isn't enough sales data to make a firm offer on this card yet.", null, null);
         }
@@ -141,6 +141,12 @@ class OfferService {
                 JSON.writeValueAsString(in), value.params().version(), margin, JSON.writeValueAsString(ladder),
                 offer.price(), v.fmv(), v.offerConfidence().name(), in.provenance().authFlagUnresolved(), trace, currentUser.id(), now,
                 now.plus(properties.offerValidFor())));
+    }
+
+    /** The card as identified when the offer was made, without valuing it again; null for no such offer. */
+    @Transactional(readOnly = true)
+    CardInputs.Identity identity(UUID offerId) {
+        return offers.findById(offerId).map(o -> inputs(o).identity()).orElse(null);
     }
 
     @Transactional(readOnly = true)

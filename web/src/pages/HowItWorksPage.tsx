@@ -4,19 +4,21 @@ import { Link, useLocation } from 'react-router'
 import { useApi, type Me, type OrgType } from '../api'
 import { CONTACT } from '../contact'
 import { useLoad } from '../useLoad'
+import { days, dollars, usePolicy } from '../policy'
 
 const TERMS_LABEL: Partial<Record<OrgType, string>> = { COLLECTOR: 'seller terms', CONTRIBUTOR: 'contributor terms', BUYER: 'buyer terms' }
 
 export type GuideFor = 'seller' | 'buyer' | 'contributor'
 
 function TheTest() {
+  const policy = usePolicy()
   return (
     <section>
       <h2>It's a test</h2>
       <ul>
         <li>
           Rawmark gives you one firm price for a raw card, worked out from the grade it's likely to get. Offers go up to{' '}
-          <strong>$5,000</strong>, the most a shipping label can insure.
+          <strong>{dollars(policy.maxPrice)}</strong>, the most a shipping label can insure.
         </li>
         <li>Offers can be wrong, and the app can stop working or be paused.</li>
         <li>
@@ -30,6 +32,7 @@ function TheTest() {
 }
 
 function Selling() {
+  const policy = usePolicy()
   return (
     <section>
       <h2>Selling a card</h2>
@@ -40,10 +43,10 @@ function Selling() {
         </li>
         <li>
           <strong>One firm price.</strong> Once your card is identified and checked, you can get one price. "How we priced it" shows how we
-          got there. An offer is good for 7 days.
+          got there. An offer is good for {days(policy.offerValidDays)}.
         </li>
         <li>
-          <strong>Selling</strong> puts your card in front of every buyer for 14 days. Posting isn't a sale yet: you can withdraw it until a
+          <strong>Selling</strong> puts your card in front of every buyer for {days(policy.listingOpenDays)}. Posting isn't a sale yet: you can withdraw it until a
           buyer takes it. While it's posted, don't sell it anywhere else.
         </li>
         <li>
@@ -52,13 +55,13 @@ function Selling() {
         </li>
         <li>
           <strong>Shipping.</strong> You don't pay postage: the buyer does. Wait until the prepaid label shows on the card's page, then ship{' '}
-          <strong>within 3 days</strong>, with that label, the card in a <strong>sleeve and toploader inside a bubble mailer</strong>. Don't
+          <strong>within {days(policy.shipWithinDays)}</strong>, with that label, the card in a <strong>sleeve and toploader inside a bubble mailer</strong>. Don't
           ship before the label shows. Press <strong>I've shipped it</strong> on the card's page once it's with the carrier. If you can't
           ship, tell us and we'll cancel the deal.
         </li>
         <li>
           <strong>Getting paid.</strong> The buyer pays you the offer price directly, not through the app,{' '}
-          <strong>within 7 days of the card arriving</strong> as shown.
+          <strong>within {days(policy.payWithinDays)} of the card arriving</strong> as shown.
         </li>
         <li>
           <strong>Lost or damaged in the post?</strong> We claim on the label's insurance and pass on what the insurer pays.
@@ -69,6 +72,7 @@ function Selling() {
 }
 
 function Buying() {
+  const policy = usePolicy()
   return (
     <section>
       <h2>Buying a card</h2>
@@ -84,15 +88,15 @@ function Buying() {
           <strong>Postage is yours.</strong> We buy an insured label when you accept, and bill you for postage and insurance once a month.
         </li>
         <li>
-          <strong>When it arrives,</strong> record it in Your deals and pay the seller within <strong>7 days</strong>.
+          <strong>When it arrives,</strong> record it in Your deals and pay the seller within <strong>{days(policy.payWithinDays)}</strong>.
         </li>
         <li>
           <strong>You can send a card back for only three reasons:</strong> it isn't genuine, it isn't the card that was listed, or it
-          doesn't match its photos. Send it back within those 7 days, tracked and at your cost, and record why in the app. "I think it's an
+          doesn't match its photos. Send it back within those {days(policy.payWithinDays)}, tracked and at your cost, and record why in the app. "I think it's an
           8, not a 9" isn't a reason: condition the photos show is your risk.
         </li>
         <li>A card marked "not yet authenticated" is sold subject to you checking it in hand. If it isn't genuine, send it back.</li>
-        <li>Not paying for a card or sending it back within 7 days ends your part in the test.</li>
+        <li>Not paying for a card or sending it back within {days(policy.payWithinDays)} ends your part in the test.</li>
       </ul>
     </section>
   )

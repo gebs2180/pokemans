@@ -78,9 +78,11 @@ class CardStatusService {
     private final CardOfferVoidRepository voids;
     private final Assessments assessments;
     private final Shipping shipping;
+    private final OfferPolicy policy;
 
     CardStatusService(OfferService offers, SaleListingRepository listings, ListingEventRepository events, CardItems cardItems,
-                      CardOfferVoidRepository voids, Assessments assessments, Shipping shipping) {
+                      CardOfferVoidRepository voids, Assessments assessments, Shipping shipping, OfferPolicy policy) {
+        this.policy = policy;
         this.offers = offers;
         this.shipping = shipping;
         this.assessments = assessments;
@@ -129,33 +131,37 @@ class CardStatusService {
     private CardStatus stage(UUID cardId) {
         CardItems.CardItemRef card = cardItems.get(cardId);
         if (card.lot()) {
-            return new CardStatus(cardId, Stage.LOT, null, "Lots don't get offers: add the cards worth $25 or more one by one.", false);
+            return new CardStatus(cardId, Stage.LOT, null, "Lots don't get offers: add the cards worth " + policy.minFmvText() + " or more one by one.", false);
         }
         Optional<SaleListing> listing = listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardId);
         List<ListingEvent> history = listing.map(l -> events.findByListingIdInOrderByCreatedAtAsc(List.of(l.getId()))).orElse(List.of());
-        ListingService.Status listed = listing.map(l -> ListingService.status(l, history, Instant.now())).orElse(null);
-        OfferService.Quote quote = offers.quote(cardId);
-        CardInputs in = quote.value().inputs();
-        String identity = identity(in.identity());
-        ListingService.Progress deal = ListingService.progress(history);
-        if (listed == ListingService.Status.ACCEPTED) {
-            return afterTheSale(cardId, identity, deal, listing.orElseThrow().getId());
+        ListingStateMachine.Status listed = listing.map(l -> ListingStateMachine.status(l, history, Instant.now())).orElse(null);
+        // Once the card is posted or has an offer, the stage comes from the listing or the offer, and so does the identity
+        // (the card as it was offered): valuing it again would cost a valuation per card on every list (review finding 9).
+        ListingStateMachine.Progress deal = ListingStateMachine.progress(history);
+        if (listed == ListingStateMachine.Status.ACCEPTED) {
+            return afterTheSale(cardId, offeredAs(listing.orElseThrow()), deal, listing.orElseThrow().getId());
         }
-        if (listed == ListingService.Status.BACK && deal.held()) {
-            return new CardStatus(cardId, Stage.RETURNED, identity, ListingService.HELD + NO_NOTIFICATIONS, false);
+        if (listed == ListingStateMachine.Status.BACK && deal.held()) {
+            return new CardStatus(cardId, Stage.RETURNED, offeredAs(listing.orElseThrow()), ListingStateMachine.HELD + NO_NOTIFICATIONS, false);
         }
-        if (listed == ListingService.Status.OPEN) {
-            return new CardStatus(cardId, Stage.LISTED, identity, "Posted to buyers: the first to accept buys it at the price.", false)
+        if (listed == ListingStateMachine.Status.OPEN) {
+            return new CardStatus(cardId, Stage.LISTED, offeredAs(listing.orElseThrow()),
+                    "Posted to buyers: the first to accept buys it at the price.", false)
                     .withDeadline(listing.orElseThrow().getExpiresAt());
         }
         // A card that came back can't go out again on the offer it sold at.
-        UUID soldAt = listed == ListingService.Status.BACK ? listing.get().getOfferId() : null;
+        UUID soldAt = listed == ListingStateMachine.Status.BACK ? listing.get().getOfferId() : null;
         Optional<CardOffer> latest = offers.latest(cardId).filter(o -> o.getExpiresAt().isAfter(Instant.now()))
                 .filter(o -> voids.findByOfferId(o.getId()).isEmpty()).filter(o -> !o.getId().equals(soldAt));
         if (latest.isPresent()) {
-            return new CardStatus(cardId, Stage.OFFERED, identity, "You have an offer: sell at it, or let it expire.", false)
+            return new CardStatus(cardId, Stage.OFFERED, identity(offers.identity(latest.orElseThrow().getId())),
+                    "You have an offer: sell at it, or let it expire.", false)
                     .withDeadline(latest.orElseThrow().getExpiresAt());
         }
+        OfferService.Quote quote = offers.quote(cardId);
+        CardInputs in = quote.value().inputs();
+        String identity = identity(in.identity());
         List<CardItems.PhotoRef> photos = cardItems.passedPhotos(cardId);
         boolean captured = photos.stream().anyMatch(p -> p.side().equals("FRONT")) && photos.stream().anyMatch(p -> p.side().equals("BACK"));
         if (!captured) {
@@ -185,10 +191,15 @@ class CardStatusService {
         return new CardStatus(cardId, Stage.READY, identity, "Ready for an instant offer.", true);
     }
 
-    private CardStatus afterTheSale(UUID cardId, String identity, ListingService.Progress deal, UUID listingId) {
+    /** The card as identified when the listing's offer was made. */
+    private String offeredAs(SaleListing listing) {
+        return identity(offers.identity(listing.getOfferId()));
+    }
+
+    private CardStatus afterTheSale(UUID cardId, String identity, ListingStateMachine.Progress deal, UUID listingId) {
         return switch (deal.stage()) {
             case SHIPPED -> new CardStatus(cardId, Stage.SHIPPED, identity,
-                    "On its way to the buyer. They record it when it arrives, and then have 7 days to pay you." + NO_NOTIFICATIONS, false);
+                    "On its way to the buyer. They record it when it arrives, and then have " + policy.terms().payWithinDays() + " days to pay you." + NO_NOTIFICATIONS, false);
             case ARRIVED -> new CardStatus(cardId, Stage.ARRIVED, identity,
                     "It arrived. The buyer pays you directly: tell us here when they have, or if they haven't by the date on this page.", false)
                     .withDeadline(deal.payBy()).withSellersWord(deal.disputedAt() == null);
@@ -198,16 +209,16 @@ class CardStatusService {
             case RETURNED -> new CardStatus(cardId, Stage.RETURNED, identity,
                     "The buyer is sending it back. Tell us here once you have it.", false).withSellersWord(true);
             default -> new CardStatus(cardId, Stage.SOLD, identity, "A buyer took it: ship it with the prepaid label once it shows on this card's page.", false)
-                    .withDeadline(shipping.label(listingId).map(l -> l.getCreatedAt().plus(ListingService.SHIP_WITHIN)).orElse(null));
+                    .withDeadline(shipping.label(listingId).map(l -> l.getCreatedAt().plus(ListingStateMachine.SHIP_WITHIN)).orElse(null));
         };
     }
 
-    private static String nextStep(String refusal) {
+    private String nextStep(String refusal) {
         if (refusal.contains("sales data")) {
             return " We add sold prices by hand, and it may qualify then." + NO_NOTIFICATIONS;
         }
         if (refusal.contains("minimum")) {
-            return " Instant offers are for cards worth $25 or more.";
+            return " Instant offers are for cards worth " + policy.minFmvText() + " or more.";
         }
         return "";
     }

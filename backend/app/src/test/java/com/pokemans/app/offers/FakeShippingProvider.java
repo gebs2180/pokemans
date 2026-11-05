@@ -20,6 +20,8 @@ class FakeShippingProvider implements ShippingProvider {
     final List<String> refunded = new CopyOnWriteArrayList<>();
     volatile boolean failing;
     volatile String failure = "carrier is down";
+    /** While set, a purchase goes through but sells a label the database refuses (negative postage): a failure after the provider. */
+    volatile boolean unrecordable;
     /** While set, a purchase waits here: a test can hold one in flight and see what a second request does. */
     volatile CountDownLatch gate;
     final AtomicInteger inFlight = new AtomicInteger();
@@ -60,13 +62,13 @@ class FakeShippingProvider implements ShippingProvider {
         bought.add(new Bought(from, to, insuredValue, reference));
         String tracking = "9400" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         return new Label(name(), "shp_" + tracking, "USPS", "GroundAdvantage", tracking, "https://labels.example/" + tracking + ".pdf",
-                new BigDecimal("5.10"), insuredValue.multiply(new BigDecimal("0.01")).setScale(2, java.math.RoundingMode.HALF_UP));
+                unrecordable ? new BigDecimal("-1") : new BigDecimal("5.10"), insuredValue.multiply(new BigDecimal("0.01")).setScale(2, java.math.RoundingMode.HALF_UP));
     }
 
     @Override
     public String refund(String shipmentId) {
         if (failing) {
-            throw new IllegalStateException("carrier is down");
+            throw new IllegalStateException(failure);
         }
         refunded.add(shipmentId);
         return "submitted";

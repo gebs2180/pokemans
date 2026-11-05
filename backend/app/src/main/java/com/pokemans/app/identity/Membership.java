@@ -1,5 +1,6 @@
 package com.pokemans.app.identity;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -13,7 +14,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @SQLRestriction("ended_at is null")
 @Table(name = "membership")
-public class Membership {
+public class Membership extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -43,6 +44,7 @@ public class Membership {
         this.endedAt = now;
     }
 
+    @Override
     public UUID getId() {
         return id;
     }

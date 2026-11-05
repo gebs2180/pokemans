@@ -51,7 +51,8 @@ class RouteSweepTest {
     private static final String UNSEEDED = "00000000-0000-0000-0000-00000000dead";
 
     /** The routes open to any signed-in user, each with its own check. */
-    private static final List<String> NOT_ORG_SCOPED = List.of("/api/me", "/api/invites/{token}", "/api/invites/{token}/accept");
+    private static final List<String> NOT_ORG_SCOPED = List.of("/api/me", "/api/invites/{token}", "/api/invites/{token}/accept",
+            "/api/policy");
 
     /** A valid body for each route that needs one: validation runs before the controller, so a bad body proves nothing. */
     private static final Map<String, String> BODIES = Map.ofEntries(

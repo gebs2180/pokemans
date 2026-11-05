@@ -1,5 +1,6 @@
 package com.pokemans.app.identity;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -9,7 +10,7 @@ import java.util.UUID;
 /** A person who has logged in at least once, keyed by the OIDC subject. */
 @Entity
 @Table(name = "app_user")
-public class AppUser {
+public class AppUser extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -20,6 +21,7 @@ public class AppUser {
     protected AppUser() {
     }
 
+    @Override
     public UUID getId() {
         return id;
     }

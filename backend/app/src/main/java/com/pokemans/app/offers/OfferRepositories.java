@@ -2,9 +2,12 @@ package com.pokemans.app.offers;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -68,4 +71,13 @@ interface ListingEventRepository extends JpaRepository<ListingEvent, UUID> {
     List<ListingEvent> findByListingIdInOrderByCreatedAtAsc(Collection<UUID> listingIds);
 
     boolean existsByListingIdAndType(UUID listingId, ListingEvent.Type type);
+
+    /** Each listing's events, oldest first; a listing with none is absent. */
+    default Map<UUID, List<ListingEvent>> history(List<SaleListing> ls) {
+        if (ls.isEmpty()) {
+            return Map.of();
+        }
+        return findByListingIdInOrderByCreatedAtAsc(ls.stream().map(SaleListing::getId).toList()).stream()
+                .collect(Collectors.groupingBy(ListingEvent::getListingId, LinkedHashMap::new, Collectors.toList()));
+    }
 }

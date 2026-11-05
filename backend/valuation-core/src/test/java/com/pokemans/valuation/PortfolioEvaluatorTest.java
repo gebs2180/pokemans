@@ -135,6 +135,28 @@ class PortfolioEvaluatorTest {
     }
 
     @Test
+    void aSliceOfExactlyFortyPercentIsNotHaircutButFortyOneIs() {
+        // 100 cards of 10, so no cap binds: the slice's share of the base is just its card count.
+        PortfolioEvaluator.Result atForty = evaluator.evaluate(slice(40), Optional.empty());
+        assertThat(atForty.collateralBase()).isEqualByComparingTo("1000");
+        assertThat(atForty.trace().stepsFor("correlation[set:big]")).isEmpty();
+
+        // 41 x 10 = 410 is over 40%: 10% off the slice, 41 off the base.
+        PortfolioEvaluator.Result atFortyOne = evaluator.evaluate(slice(41), Optional.empty());
+        assertThat(atFortyOne.collateralBase()).isEqualByComparingTo("959");
+        assertThat(atFortyOne.trace().stepsFor("correlation[set:big]")).hasSize(1);
+    }
+
+    /** 100 cards of FLV 10, {@code inSlice} of them in one set and the rest each in its own. */
+    private static List<PortfolioEvaluator.Card> slice(int inSlice) {
+        List<PortfolioEvaluator.Card> cards = new ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            cards.add(card("c-" + i, "10", i < inSlice ? "big" : "own-" + i, false));
+        }
+        return cards;
+    }
+
+    @Test
     void alphaIsTheLendersChoiceWithinZeroToOne() {
         assertThatThrownBy(() -> PortfolioEvaluator.advance(d("100"), d("1.5")))
                 .isInstanceOf(IllegalArgumentException.class);

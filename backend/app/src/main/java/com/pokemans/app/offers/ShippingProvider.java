@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 
 /**
  * Buys prepaid shipping labels on our account (HLD provider ports). Labels are billed to the buyer
- * each month, off-platform (Zach, 2026-10-19). With no provider configured, a taken card waits for its
+ * each month, off-platform. With no provider configured, a taken card waits for its
  * label and the admin buys one once a provider is set up.
  */
 interface ShippingProvider {
@@ -45,7 +45,7 @@ interface ShippingProvider {
     Label buy(Address from, Address to, Parcel parcel, BigDecimal insuredValue, String reference);
 
     /**
-     * Asks for an unused label's postage back (Zach, 2026-10-21).
+     * Asks for an unused label's postage back.
      *
      * @param shipmentId the provider's id for the label's shipment
      * @return the provider's answer, e.g. EasyPost's submitted, refunded, rejected or not_applicable

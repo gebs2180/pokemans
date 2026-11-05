@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -44,6 +45,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/error").permitAll()
+                        // The offer terms' numbers, for the public how-it-works page.
+                        .requestMatchers(HttpMethod.GET, "/api/policy").permitAll()
                         .requestMatchers("/api/admin/**").hasRole(Role.ADMIN.name())
                         // Org-scoped endpoints (/api/orgs/{orgId}/...) check membership in OrgAccess.
                         .requestMatchers("/api/**").authenticated()

@@ -1,5 +1,6 @@
 package com.pokemans.app.identity;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -11,7 +12,7 @@ import java.util.UUID;
 /** A partner (shop, group-submission operator) or a collector's own account. */
 @Entity
 @Table(name = "org")
-public class Org {
+public class Org extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -30,6 +31,7 @@ public class Org {
         this.createdAt = Instant.now();
     }
 
+    @Override
     public UUID getId() {
         return id;
     }

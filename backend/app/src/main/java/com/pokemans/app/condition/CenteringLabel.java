@@ -1,5 +1,6 @@
 package com.pokemans.app.condition;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -17,7 +18,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "centering_label")
-class CenteringLabel {
+class CenteringLabel extends AssignedIdEntity<UUID> {
 
     enum Face { FRONT, BACK }
 
@@ -57,7 +58,8 @@ class CenteringLabel {
         this.createdAt = Instant.now();
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

@@ -7,7 +7,7 @@ import { respond } from '../test/auth0'
 import { AdminOffersPage } from './AdminOffersPage'
 
 const card = { name: 'Umbreon', setName: 'Evolving Skies', number: '215', language: 'en', edition: 'UNLIMITED', variant: 'HOLO', label: 'x', distribution: {}, gradedAs: null }
-const label = { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l.pdf', insuredValue: 300, boughtAt: '2026-10-20T10:00:00Z' }
+const label = { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l.pdf', insuredValue: 300, boughtAt: '2026-10-20T10:00:00Z', shipBy: '2026-10-23T10:00:00Z' }
 
 const listing = (over: Partial<AdminListing> = {}): AdminListing => ({
   id: 'l1',

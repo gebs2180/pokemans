@@ -1,5 +1,6 @@
 package com.pokemans.app.valuation;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -12,7 +13,7 @@ import org.hibernate.type.SqlTypes;
 /** One card item's line in a valuation run, valued or not. Append-only. */
 @Entity
 @Table(name = "card_valuation")
-class CardValuationRecord {
+class CardValuationRecord extends AssignedIdEntity<UUID> {
 
     enum Status { VALUED, UNVALUED }
 
@@ -98,7 +99,8 @@ class CardValuationRecord {
         this.trace = traceJson;
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

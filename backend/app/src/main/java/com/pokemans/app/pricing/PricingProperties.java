@@ -9,9 +9,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
  * Comp ingestion and per-grade price snapshots. Pricing rules and their constants (windows,
- * half-life, trimming, confidence thresholds) come from the valuation parameter set, not from here.
+ * half-life, trimming, confidence thresholds) come from the valuation parameter set ({@code pokemans.parameter-set}),
+ * not from here.
  *
- * @param parameterSet         valuation parameter set version used for snapshots
  * @param currency             the only currency accepted (USD in v1); other comps are rejected
  * @param minCardsPerRatio     cards with both adjacent grades observed before an era step-down ratio is used
  * @param volatilityMonths     30-day changes looked back over for σ
@@ -19,7 +19,6 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties("pokemans.pricing")
 record PricingProperties(
-        @DefaultValue("1.0.0") String parameterSet,
         @DefaultValue("USD") String currency,
         @DefaultValue("3") int minCardsPerRatio,
         @DefaultValue("12") int volatilityMonths,

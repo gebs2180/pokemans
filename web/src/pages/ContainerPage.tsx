@@ -7,6 +7,7 @@ import { useLoad } from '../useLoad'
 import { ReportsList } from './ReportsPanel'
 import { COLLATERAL } from '../flags'
 import { message } from '../format'
+import { dollars, usePolicy } from '../policy'
 
 /** Lender and insurer reports are paused unless the build turns them on. */
 
@@ -38,6 +39,7 @@ export function ContainerView({
   lead?: ReactNode
   children?: ReactNode
 }) {
+  const policy = usePolicy()
   const api = useApi()
   const navigate = useNavigate()
   const { data, error } = useLoad(
@@ -45,10 +47,10 @@ export function ContainerView({
     [api, orgId, kind, containerId],
   )
   // Where each card is on the way to a sale; collections only (batches are for partners, who don't sell).
-  const { data: statuses } = useLoad(
+  const { data: statuses, error: statusError } = useLoad(
     () =>
       kind === 'collections'
-        ? api<CardStatus[]>('GET', apiPath`/api/orgs/${orgId}/collections/${containerId}/status`).catch(() => [] as CardStatus[])
+        ? api<CardStatus[]>('GET', apiPath`/api/orgs/${orgId}/collections/${containerId}/status`)
         : Promise.resolve([] as CardStatus[]),
     [api, orgId, kind, containerId],
   )
@@ -100,7 +102,7 @@ export function ContainerView({
       )}
 
       <form onSubmit={addCard} className="panel form" aria-describedby={formError.describedBy}>
-        <Field label="Card name and number" hint={lots ? 'Its name and number, as printed.' : "Its name and number, as printed. One card at a time: we'll tell you if it's under our $25 minimum."}>
+        <Field label="Card name and number" hint={lots ? 'Its name and number, as printed.' : `Its name and number, as printed. One card at a time: we'll tell you if it's under our ${dollars(policy.minFmv)} minimum.`}>
           {(control) => (
             <input
               {...control}
@@ -129,7 +131,7 @@ export function ContainerView({
             )}
           </div>
         )}
-        {lot && <p className="muted small">Lots are kept with their photos, but don't get offers: add cards worth $25 or more one by one.</p>}
+        {lot && <p className="muted small">Lots are kept with their photos, but don't get offers: add cards worth {dollars(policy.minFmv)} or more one by one.</p>}
         <div className="actions">
           <button type="submit" disabled={adding} aria-busy={adding}>
             Add card
@@ -138,6 +140,11 @@ export function ContainerView({
         {formError.message}
       </form>
 
+      {statusError && (
+        <p className="alert alert-warning" role="status">
+          Couldn't load where each card is: {statusError}
+        </p>
+      )}
       {data.cards.length === 0 && <EmptyState title="No cards yet.">Add the first one above, then photograph it.</EmptyState>}
       <ul className="tile-list">
         {data.cards.map((card) => {
@@ -172,7 +179,7 @@ export function ContainerView({
 /** Reports issued for the collection, and for the admin the way to value it. */
 export function CollectionReports({ orgId, collectionId }: { orgId: string; collectionId: string }) {
   const api = useApi()
-  const { data: me } = useLoad(() => api<Me>('GET', '/api/me'), [api])
+  const { data: me, error: meError } = useLoad(() => api<Me>('GET', '/api/me'), [api])
   const { data: reports, error } = useLoad(
     () => api<ReportView[]>('GET', apiPath`/api/orgs/${orgId}/collections/${collectionId}/reports`),
     [api, orgId, collectionId],
@@ -186,6 +193,7 @@ export function CollectionReports({ orgId, collectionId }: { orgId: string; coll
         </p>
       )}
       {error && <p className="error" role="alert">{error}</p>}
+      {meError && <p className="error" role="alert">Couldn't check your access: {meError}</p>}
       {reports && <ReportsList reports={reports} downloadPath={(id) => apiPath`/api/orgs/${orgId}/reports/${id}/download`} />}
     </section>
   )

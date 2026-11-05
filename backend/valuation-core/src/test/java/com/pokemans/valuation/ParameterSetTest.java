@@ -9,6 +9,19 @@ import org.junit.jupiter.api.Test;
 
 class ParameterSetTest {
 
+    /** One ladder for a card's weighted comps and a single grade's sales (review finding 58). */
+    @Test
+    void confidenceFromACountOfSalesClimbsAtEachThreshold() {
+        ParameterSet p = ParameterSet.defaults();
+
+        assertThat(p.fromCompCount(new BigDecimal("1.99"))).isEqualTo(Confidence.D);
+        assertThat(p.fromCompCount(new BigDecimal("2"))).isEqualTo(Confidence.C);
+        assertThat(p.fromCompCount(new BigDecimal("4.9"))).isEqualTo(Confidence.C);
+        assertThat(p.fromCompCount(new BigDecimal("5"))).isEqualTo(Confidence.B);
+        assertThat(p.fromCompCount(new BigDecimal("9.99"))).isEqualTo(Confidence.B);
+        assertThat(p.fromCompCount(BigDecimal.TEN)).isEqualTo(Confidence.A);
+    }
+
     @Test
     void loadsTheMethodologyDefaults() {
         ParameterSet p = ParameterSet.defaults();

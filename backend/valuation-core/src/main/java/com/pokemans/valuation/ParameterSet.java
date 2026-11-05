@@ -207,4 +207,18 @@ public record ParameterSet(
     private static int integer(Properties p, String key) {
         return Integer.parseInt(required(p, key));
     }
+
+    /** Confidence from a count of sales, against the A, B and C thresholds. A weighted count may be fractional. */
+    public Confidence fromCompCount(BigDecimal count) {
+        if (count.compareTo(compsForA) >= 0) {
+            return Confidence.A;
+        }
+        if (count.compareTo(compsForB) >= 0) {
+            return Confidence.B;
+        }
+        if (count.compareTo(compsForC) >= 0) {
+            return Confidence.C;
+        }
+        return Confidence.D;
+    }
 }

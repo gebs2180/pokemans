@@ -1,5 +1,6 @@
 package com.pokemans.app.outcomes;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -15,7 +16,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "outcome_verification")
-class OutcomeVerification {
+class OutcomeVerification extends AssignedIdEntity<UUID> {
 
     enum Status { VERIFIED, MISMATCH }
 
@@ -29,6 +30,11 @@ class OutcomeVerification {
     private Instant createdAt;
 
     protected OutcomeVerification() {
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
     }
 
     OutcomeVerification(UUID outcomeId, Status status, String note, UUID verifiedBy) {

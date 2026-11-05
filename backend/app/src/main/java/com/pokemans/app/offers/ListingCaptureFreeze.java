@@ -27,7 +27,7 @@ class ListingCaptureFreeze implements CaptureFreeze {
     public Optional<String> frozenReason(UUID cardItemId) {
         return listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardItemId).flatMap(l -> {
             List<ListingEvent> history = events.findByListingIdInOrderByCreatedAtAsc(List.of(l.getId()));
-            return switch (ListingService.status(l, history, Instant.now())) {
+            return switch (ListingStateMachine.status(l, history, Instant.now())) {
                 case OPEN -> Optional.of("This card is posted to buyers, so its photos can't change. Withdraw it first to retake one.");
                 case ACCEPTED -> Optional.of("This card is sold, so its photos stay as the buyer saw them.");
                 default -> Optional.empty();

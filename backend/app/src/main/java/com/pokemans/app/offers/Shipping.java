@@ -1,5 +1,6 @@
 package com.pokemans.app.offers;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import com.pokemans.app.identity.CurrentUser;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -29,7 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Addresses and labels. A taken card gets a prepaid, insured label from the seller's address to the
- * buyer's, bought on our account and billed to the buyer monthly (Zach, 2026-10-19). No access checks:
+ * buyer's, bought on our account and billed to the buyer monthly. No access checks:
  * the controllers have done them.
  */
 @Service
@@ -101,8 +102,9 @@ class Shipping {
     }
 
     /**
-     * Buys the label for a taken card, once. Runs in its own transaction after the accept has
-     * committed, so a provider failure never undoes the sale: the label can be bought again.
+     * Buys the label for a taken card, once. Joins the caller's transaction ({@code DealService.buyLabel}, under the
+     * card's listing lock), which starts after the accept's own has committed, so a provider failure never undoes the
+     * sale: the label can be bought again. The provider is called with that transaction and the lock held.
      *
      * @throws ResponseStatusException 503 with no provider set up, 502 when the provider fails
      */
@@ -159,7 +161,9 @@ class Shipping {
             try {
                 status = seller.get().refund(label.getProviderShipmentId());
             } catch (RuntimeException e) {
-                error = "Couldn't ask for the refund: " + e.getMessage();
+                // The provider's answer can quote an address, and this is stored and shown: only its status or kind (finding 11).
+                log.warn("Couldn't ask for the refund of label {}: {}", label.getId(), failure(e));
+                error = "Couldn't ask for the refund: " + failure(e) + ".";
             }
         }
         try {
@@ -198,7 +202,7 @@ record PaymentHandle(PaymentHandle.Method method, String handle) {
 /** Where an org ships from or to, and for a seller how they get paid. The latest row is current. Append-only. */
 @Entity
 @Table(name = "ship_address")
-class ShipAddress {
+class ShipAddress extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -248,7 +252,8 @@ class ShipAddress {
         return paymentMethod == null ? null : new PaymentHandle(paymentMethod, paymentHandle);
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 
@@ -260,7 +265,7 @@ class ShipAddress {
 /** A label bought for a taken card. Append-only. */
 @Entity
 @Table(name = "shipping_label")
-class ShippingLabel {
+class ShippingLabel extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -302,7 +307,8 @@ class ShippingLabel {
         this.createdAt = Instant.now();
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

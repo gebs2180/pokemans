@@ -1,5 +1,6 @@
 package com.pokemans.app.condition;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -15,7 +16,7 @@ import org.hibernate.type.SqlTypes;
 /** One provider call to make for one card: queued, submitted, then done or failed. */
 @Entity
 @Table(name = "prediction_request")
-class PredictionRequest {
+class PredictionRequest extends AssignedIdEntity<UUID> {
 
     enum Status { PENDING, SUBMITTED, DONE, FAILED }
 
@@ -98,7 +99,8 @@ class PredictionRequest {
         return status == Status.PENDING || status == Status.SUBMITTED;
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

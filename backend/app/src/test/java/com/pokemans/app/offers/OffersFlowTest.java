@@ -81,6 +81,8 @@ class OffersFlowTest {
         seller = api.user(subject, List.of());
         collectionId = TestApi.read(api.postJson("/api/orgs/" + orgId + "/collections", "{\"name\":\"For sale\"}", seller), "$.id");
         shipper.failing = false;
+        shipper.failure = "carrier is down";
+        shipper.unrecordable = false;
         shipper.gate = null;
     }
 
@@ -148,6 +150,10 @@ class OffersFlowTest {
         api.get(sale(card), seller).andExpect(jsonPath("$.listing.status").value("ACCEPTED"))
                 .andExpect(jsonPath("$.listing.buyer.orgName").value("First Buyer"))
                 .andExpect(jsonPath("$.listing.label.labelUrl", containsString("https://labels.example/")));
+        // The ship-by date comes from the API, so the web app doesn't recompute it (review finding 17).
+        String boughtAt = TestApi.read(api.get(sale(card), seller), "$.listing.label.boughtAt");
+        String shipBy = TestApi.read(api.get(sale(card), seller), "$.listing.label.shipBy");
+        assertThat(Instant.parse(shipBy)).isEqualTo(Instant.parse(boughtAt).plus(Duration.ofDays(3)));
         api.postJson("/api/orgs/" + orgId + "/listings/" + listingId + "/withdraw", "", seller).andExpect(status().isConflict());
 
         // On arrival: received and paid, once, by the buyer who took it.
@@ -181,6 +187,14 @@ class OffersFlowTest {
                 .hasMessageContaining("append-only");
         assertThatThrownBy(() -> jdbc.update("update card_offer set price = 1 where id = ?::uuid", offerId))
                 .hasMessageContaining("append-only");
+
+        // A refund's listing must be its label's own (review finding 56).
+        String other = postedCard("Mismatched Mew", 100);
+        assertThatThrownBy(() -> jdbc.update("""
+                insert into label_refund (id, label_id, listing_id, reason, requested_by, created_at)
+                select gen_random_uuid(), l.id, ?::uuid, 'x', (select id from app_user limit 1), now()
+                from shipping_label l where l.listing_id = ?::uuid""", other, listingId))
+                .hasMessageContaining("label_refund_label_listing_fk");
     }
 
     @Test
@@ -207,6 +221,22 @@ class OffersFlowTest {
     }
 
     @Test
+    void aLabelThatCantBeRecordedStillLeavesTheBuyerWithTheCard() throws Exception {
+        // Review finding 7: only a ResponseStatusException was caught, so any other failure after the take (here the
+        // database refusing the label) answered 500 to a buyer who now owns the card.
+        String listingId = postedCard("Haunter", 200);
+        JwtRequestPostProcessor buyer = buyer("Unlucky Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Unlucky Buyer");
+        shipper.unrecordable = true;
+
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk())
+                .andExpect(jsonPath("$.labelPending", containsString("couldn't buy the shipping label")))
+                .andExpect(jsonPath("$.deals[0].listingId").value(listingId))
+                .andExpect(jsonPath("$.deals[0].label").isEmpty());
+    }
+
+    @Test
     void twoLabelRequestsAtOnceBuyOneLabel() throws Exception {
         // Security review 2026-10-26: a retry while the first purchase was still with the provider bought a second label
         // on our account, which the unique index then refused to record, so it was neither billed nor refundable here.
@@ -229,7 +259,12 @@ class OffersFlowTest {
             while (shipper.inFlight.get() == 0 && System.currentTimeMillis() < deadline) {
                 Thread.onSpinWait();
             }
-            Thread.sleep(500); // time for the second request to reach the provider too, if nothing stops it
+            // The second request either reaches the provider too, or waits on the listing's lock: wait for one
+            // of them, not a fixed time (review finding 53).
+            while (shipper.inFlight.get() < 2 && waitingOnALock() == 0 && System.currentTimeMillis() < deadline) {
+                Thread.onSpinWait();
+            }
+            assertThat(shipper.inFlight.get() + waitingOnALock()).as("both requests in").isEqualTo(2);
             shipper.gate.countDown();
             for (Future<Integer> call : calls) {
                 assertThat(call.get(20, TimeUnit.SECONDS)).isEqualTo(200);
@@ -238,6 +273,11 @@ class OffersFlowTest {
             pool.shutdownNow();
         }
         assertThat(shipper.bought.stream().filter(b -> b.reference().equals(listingId))).hasSize(1);
+    }
+
+    /** Sessions waiting for an advisory lock ({@link ListingLock}) right now. */
+    private int waitingOnALock() {
+        return jdbc.queryForObject("select count(*) from pg_locks where locktype = 'advisory' and not granted", Integer.class);
     }
 
     @Test
@@ -608,11 +648,11 @@ class OffersFlowTest {
     void aDealFromBeforeTheSplitCountsAsArrivedAndPaid() {
         ListingEvent taken = ListingEvent.accepted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
         ListingEvent old = legacyReceived(taken.getListingId());
-        ListingService.Progress progress = ListingService.progress(List.of(taken, old));
-        assertThat(progress.stage()).isEqualTo(ListingService.DealStage.PAID);
+        ListingStateMachine.Progress progress = ListingStateMachine.progress(List.of(taken, old));
+        assertThat(progress.stage()).isEqualTo(ListingStateMachine.DealStage.PAID);
         assertThat(progress.pricePaid()).isEqualByComparingTo("99.50");
         assertThat(progress.arrivedAt()).isEqualTo(progress.paidAt());
-        assertThat(ListingService.progress(List.of(taken, ListingEvent.cancelled(taken.getListingId(), UUID.randomUUID(), "x")))).isNull();
+        assertThat(ListingStateMachine.progress(List.of(taken, ListingEvent.cancelled(taken.getListingId(), UUID.randomUUID(), "x")))).isNull();
     }
 
     /** A RECEIVED row as it was written before arrival and payment were split. */
@@ -664,6 +704,38 @@ class OffersFlowTest {
         assess(vintage);
         api.postJson(offers(vintage), "", seller).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.subjectToAuthentication").value(true));
+    }
+
+    @Test
+    void thinDataOrALowValueGetsNoOffer() throws Exception {
+        // Review finding 12: the confidence D and $25 refusals had no test.
+        String unsure = card("Blurry Espeon");
+        priceLadder(identify(unsure, "Espeon " + UUID.randomUUID().toString().substring(0, 4), "2015-05-06", "NORMAL", "Rare"), 300);
+        api.postJson("/api/admin/orgs/" + orgId + "/cards/" + unsure + "/assessments",
+                "{\"distribution\":{\"9\":0.5,\"10\":0.5},\"confidence\":\"D\",\"reason\":\"blurry\"}", api.admin())
+                .andExpect(status().isCreated());
+        api.postJson(offers(unsure), "", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("There isn't enough sales data to make a firm offer on this card yet."));
+
+        String cheap = pricedCard("Cheap Pidgey", 60);
+        api.postJson(offers(cheap), "", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Its value is under the $25 minimum for an offer."));
+        assertThat(jdbc.queryForObject("select count(*) from card_offer where card_item_id in (?::uuid, ?::uuid)", Integer.class,
+                unsure, cheap)).isZero();
+    }
+
+    @Test
+    void anOfferLastsSevenDaysAndAListingFourteen() throws Exception {
+        // Review finding 12: the expiry tests wrote expires_at by hand, so nothing checked the windows themselves.
+        String card = pricedCard("Timed Jolteon", 300);
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        assertThat(jdbc.queryForObject("select extract(epoch from expires_at - created_at)::bigint from card_offer where id = ?::uuid",
+                Long.class, offerId)).isEqualTo(Duration.ofDays(7).toSeconds());
+
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        assertThat(jdbc.queryForObject("select extract(epoch from expires_at - created_at)::bigint from sale_listing where offer_id = ?::uuid",
+                Long.class, offerId)).isEqualTo(Duration.ofDays(14).toSeconds());
     }
 
     @Test
@@ -758,7 +830,9 @@ class OffersFlowTest {
         shipper.failing = true;
         api.postJson(refund, "{\"reason\":\"unused\"}", api.admin()).andExpect(status().isOk())
                 .andExpect(jsonPath("$.listing.labelRefund.providerStatus").isEmpty())
-                .andExpect(jsonPath("$.listing.labelRefund.providerError", containsString("carrier is down")));
+                // What the provider said can quote an address (review finding 11): we keep only its status or the error's kind.
+                .andExpect(jsonPath("$.listing.labelRefund.providerError", containsString("Couldn't ask for the refund")))
+                .andExpect(jsonPath("$.listing.labelRefund.providerError", org.hamcrest.Matchers.not(containsString("carrier is down"))));
         shipper.failing = false;
         api.postJson(refund, "{\"reason\":\"unused\"}", api.admin()).andExpect(status().isOk())
                 .andExpect(jsonPath("$.listing.labelRefund.providerStatus").value("submitted"))
@@ -1063,14 +1137,14 @@ class OffersFlowTest {
         SaleListing open = new SaleListing(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), now, now.plusSeconds(60));
         SaleListing old = new SaleListing(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), now, now.minusSeconds(1));
 
-        assertThat(ListingService.status(open, List.of(), now)).isEqualTo(ListingService.Status.OPEN);
-        assertThat(ListingService.status(old, List.of(), now)).isEqualTo(ListingService.Status.EXPIRED);
+        assertThat(ListingStateMachine.status(open, List.of(), now)).isEqualTo(ListingStateMachine.Status.OPEN);
+        assertThat(ListingStateMachine.status(old, List.of(), now)).isEqualTo(ListingStateMachine.Status.EXPIRED);
         ListingEvent taken = ListingEvent.accepted(old.getId(), UUID.randomUUID(), UUID.randomUUID());
-        assertThat(ListingService.status(old, List.of(taken), now)).isEqualTo(ListingService.Status.ACCEPTED);
-        assertThat(ListingService.status(old, List.of(taken, ListingEvent.cancelled(old.getId(), UUID.randomUUID(), "x")), now))
-                .isEqualTo(ListingService.Status.CANCELLED);
-        assertThat(ListingService.status(open, List.of(ListingEvent.voided(open.getId(), UUID.randomUUID(), "x")), now))
-                .isEqualTo(ListingService.Status.VOIDED);
+        assertThat(ListingStateMachine.status(old, List.of(taken), now)).isEqualTo(ListingStateMachine.Status.ACCEPTED);
+        assertThat(ListingStateMachine.status(old, List.of(taken, ListingEvent.cancelled(old.getId(), UUID.randomUUID(), "x")), now))
+                .isEqualTo(ListingStateMachine.Status.CANCELLED);
+        assertThat(ListingStateMachine.status(open, List.of(ListingEvent.voided(open.getId(), UUID.randomUUID(), "x")), now))
+                .isEqualTo(ListingStateMachine.Status.VOIDED);
     }
 
     /** How much a count in the track record grew; other tests share the database. */

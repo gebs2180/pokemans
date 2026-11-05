@@ -1,5 +1,6 @@
 package com.pokemans.app.provenance;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -23,7 +24,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "authenticity_verification")
-class AuthenticityVerification {
+class AuthenticityVerification extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -64,7 +65,8 @@ class AuthenticityVerification {
         return Set.copyOf(photoIds);
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

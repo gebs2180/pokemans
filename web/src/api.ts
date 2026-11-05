@@ -767,7 +767,7 @@ export type Offer = {
   price: number
   fmv: number
   confidence: Confidence
-  /** The margin left to the buyer, set by the confidence (A 10%, B 13%, C 17% in parameter set 1.2.0). */
+  /** The margin left to the buyer, set by the confidence (per the parameter set; usePolicy().margins has them). */
   buyerMargin: number
   graded: boolean
   subjectToAuthentication: boolean
@@ -860,6 +860,8 @@ export type ShippingLabel = {
   labelUrl: string | null
   insuredValue: number
   boughtAt: string
+  /** When the seller must hand it to the carrier. */
+  shipBy: string
 }
 
 /** What happened once the card arrived. INSPECTED is a grade recorded under the per-grade offers that came before. */
@@ -880,7 +882,7 @@ export type DealProgress = {
   stage: DealStage
   shippedAt: string | null
   arrivedAt: string | null
-  /** 7 days from the recorded arrival. */
+  /** The policy's payWithinDays from the recorded arrival. */
   payBy: string | null
   /** When the buyer says they paid. */
   paidAt: string | null

@@ -58,11 +58,12 @@ class ValuationService {
     private final ValuationRunRepository runs;
     private final CardValuationRecordRepository lines;
     private final ValuationProperties properties;
+    private final ParameterSet params;
     private final CurrentUser currentUser;
 
     ValuationService(CardItems cardItems, Catalog catalog, Assessments assessments, Prices prices, Provenance provenance,
                      Outcomes outcomes, ValuationRunRepository runs, CardValuationRecordRepository lines,
-                     ValuationProperties properties, CurrentUser currentUser) {
+                     ValuationProperties properties, ParameterSet params, CurrentUser currentUser) {
         this.cardItems = cardItems;
         this.catalog = catalog;
         this.assessments = assessments;
@@ -72,11 +73,12 @@ class ValuationService {
         this.runs = runs;
         this.lines = lines;
         this.properties = properties;
+        this.params = params;
         this.currentUser = currentUser;
     }
 
     ParameterSet parameterSet() {
-        return ParameterSet.load(properties.parameterSet());
+        return params;
     }
 
     GradingCost defaultGradingCost() {

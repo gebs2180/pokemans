@@ -1,5 +1,6 @@
 package com.pokemans.app.offers;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -14,7 +15,7 @@ import org.hibernate.type.SqlTypes;
 /** Our firm offer on one card, valid until {@link #getExpiresAt()}. Append-only. */
 @Entity
 @Table(name = "card_offer")
-class CardOffer {
+class CardOffer extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -68,7 +69,8 @@ class CardOffer {
         this.expiresAt = expiresAt;
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 
@@ -128,7 +130,7 @@ class CardOffer {
 /** An offer posted to buyers. Append-only: what happens to it is in {@link ListingEvent}. */
 @Entity
 @Table(name = "sale_listing")
-class SaleListing {
+class SaleListing extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -152,7 +154,8 @@ class SaleListing {
         this.expiresAt = expiresAt;
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 
@@ -184,14 +187,14 @@ class SaleListing {
 /** Something that happened to a listing. Append-only; a listing is closed at most once. */
 @Entity
 @Table(name = "listing_event")
-class ListingEvent {
+class ListingEvent extends AssignedIdEntity<UUID> {
 
     /**
      * RECEIVED: arrived genuine and as shown; with a price, it's from before PAID split off (UX review,
      * 2026-11-01). RETURNED: sent back for an allowed reason. INSPECTED: a grade recorded under the
      * per-grade offers that came before firm prices. VOIDED: we took an open listing down, with its
      * offer. CANCELLED: we undid a taken deal. Both are the admin's, with no actor org and the reason in
-     * the note (Zach, 2026-10-21).
+     * the note.
      *
      * <p>SHIPPED, PAYMENT_CONFIRMED, DISPUTED and CARD_BACK are what the seller says, PAID what the
      * buyer says: a record of their word, since the money never passes through us. RESOLVED: the admin
@@ -219,6 +222,11 @@ class ListingEvent {
     private Instant createdAt;
 
     protected ListingEvent() {
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
     }
 
     private ListingEvent(UUID listingId, Type type, UUID actorOrgId, UUID actorUserId) {
@@ -337,10 +345,10 @@ class ListingEvent {
     }
 }
 
-/** We voided an offer: it can't be posted again (Zach, 2026-10-21). Append-only. */
+/** We voided an offer: it can't be posted again. Append-only. */
 @Entity
 @Table(name = "card_offer_void")
-class CardOfferVoid {
+class CardOfferVoid extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -350,6 +358,11 @@ class CardOfferVoid {
     private Instant createdAt;
 
     protected CardOfferVoid() {
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
     }
 
     CardOfferVoid(UUID offerId, String reason, UUID voidedBy) {
@@ -378,12 +391,12 @@ class CardOfferVoid {
 }
 
 /**
- * A label marked to be refunded, and what its provider said when asked (Zach, 2026-10-21). A request
+ * A label marked to be refunded, and what its provider said when asked. A request
  * the provider never answered can be made again. Append-only.
  */
 @Entity
 @Table(name = "label_refund")
-class LabelRefund {
+class LabelRefund extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -397,6 +410,11 @@ class LabelRefund {
     private Instant createdAt;
 
     protected LabelRefund() {
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
     }
 
     LabelRefund(UUID labelId, UUID listingId, String reason, UUID requestedBy, String provider, String providerStatus,

@@ -1,5 +1,6 @@
 package com.pokemans.app.condition;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import com.pokemans.valuation.Confidence;
 import com.pokemans.valuation.Grade;
 import com.pokemans.valuation.GradeDistribution;
@@ -24,7 +25,7 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(name = "condition_assessment")
-class ConditionAssessment {
+class ConditionAssessment extends AssignedIdEntity<UUID> {
 
     enum AuthorType { SYSTEM, REVIEWER }
 
@@ -99,7 +100,8 @@ class ConditionAssessment {
         return diff;
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

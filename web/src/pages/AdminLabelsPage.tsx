@@ -4,6 +4,7 @@ import { apiPath, money, useApi, type AwaitingLabel } from '../api'
 import { useLoad } from '../useLoad'
 import { ArrivalForm, CardTitle, Photos } from './MarketPage'
 import { Loading, PageError } from '../ui'
+import { message } from '../format'
 
 /**
  * Admin: deals a buyer took whose prepaid label didn't go through. Buy the label again (once shipping
@@ -23,7 +24,7 @@ export function AdminLabelsPage() {
       await api('POST', apiPath`/api/admin/deals/${deal.listingId}/label?buyerOrgId=${deal.buyerOrgId}`)
       reload()
     } catch (e) {
-      setFailed({ listingId: deal.listingId, message: e instanceof Error ? e.message : String(e) })
+      setFailed({ listingId: deal.listingId, message: message(e) })
     } finally {
       setBusy(null)
     }

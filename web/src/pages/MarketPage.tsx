@@ -25,6 +25,8 @@ import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
 import { HowPriced } from './OfferPanel'
+import { message as errorText } from '../format'
+import { days, usePolicy } from '../policy'
 
 export function CardTitle({ card }: { card: OfferCard }) {
   return (
@@ -180,6 +182,7 @@ const NO_ADDRESS = 'Add the address cards should ship to first.'
 
 /** Buyers: raw cards posted at one firm price. The first buyer to accept buys the card at it. */
 export function MarketPage() {
+  const policy = usePolicy()
   const { orgId = '' } = useParams()
   const api = useApi()
   const { data, error, reload } = useLoad(() => api<MarketItem[]>('GET', apiPath`/api/orgs/${orgId}/market`), [api, orgId])
@@ -207,7 +210,7 @@ export function MarketPage() {
           : 'Bought: the seller has a prepaid label to you. It is in Your deals.',
       )
     } catch (e) {
-      setFailed({ listingId, message: e instanceof Error ? e.message : String(e) })
+      setFailed({ listingId, message: errorText(e) })
     } finally {
       setBusy(false)
       setConfirming(null)
@@ -222,7 +225,7 @@ export function MarketPage() {
       const estimate = await api<PostageEstimate>('GET', apiPath`/api/orgs/${orgId}/market/${listingId}/postage`)
       setPostage((p) => (p?.listingId === listingId ? { listingId, estimate } : p))
     } catch (e) {
-      setPostage((p) => (p?.listingId === listingId ? { listingId, error: e instanceof Error ? e.message : String(e) } : p))
+      setPostage((p) => (p?.listingId === listingId ? { listingId, error: errorText(e) } : p))
     }
   }
 
@@ -297,7 +300,7 @@ export function MarketPage() {
                     <p className="muted">Estimating postage and insurance…</p>
                   )}
                   <p>
-                    You pay the seller {money(item.offer.price)} directly, <strong>within 7 days of it arriving</strong>.
+                    You pay the seller {money(item.offer.price)} directly, <strong>within {days(policy.payWithinDays)} of it arriving</strong>.
                   </p>
                   <div className="actions">
                     <button onClick={() => accept(item.listingId)} disabled={busy} aria-busy={busy}>
@@ -333,6 +336,7 @@ export function MarketPage() {
 
 /** Buyers: cards you bought, their labels, and what to record when each one arrives. */
 export function DealsPage() {
+  const policy = usePolicy()
   const { orgId = '' } = useParams()
   const api = useApi()
   const { data, error, reload } = useLoad(() => api<Deal[]>('GET', apiPath`/api/orgs/${orgId}/deals`), [api, orgId])
@@ -344,7 +348,7 @@ export function DealsPage() {
       await api('POST', apiPath`/api/orgs/${orgId}/deals/${listingId}/label`)
       reload()
     } catch (e) {
-      setLabelError(e instanceof Error ? e.message : String(e))
+      setLabelError(errorText(e))
     }
   }
 
@@ -378,7 +382,7 @@ export function DealsPage() {
               </>
             )}
             .
-            {!deal.cancelled && !deal.outcome && ' Pay them directly, within 7 days of it arriving as shown. Rawmark doesn\'t handle the money.'}
+            {!deal.cancelled && !deal.outcome && ` Pay them directly, within ${days(policy.payWithinDays)} of it arriving as shown. Rawmark doesn't handle the money.`}
           </p>
           {deal.payTo ? (
             !deal.progress?.paidAt && (
@@ -426,6 +430,7 @@ export function DealsPage() {
 
 /** What's been recorded on a deal, and what the buyer does next: pay by the date, or send it back. */
 function DealOutcome({ deal, path, onSaved }: { deal: Deal; path: string; onSaved: () => void }) {
+  const policy = usePolicy()
   const { outcome, progress } = deal
   const date = (at: string) => new Date(at).toLocaleDateString()
   return (
@@ -454,7 +459,7 @@ function DealOutcome({ deal, path, onSaved }: { deal: Deal; path: string; onSave
           {progress?.stage === 'BACK' ? (
             <p className="small">The seller has it back.</p>
           ) : (
-            <p className="small">Send it back tracked, at your cost, within 7 days of it arriving. You don't pay for it. Zach looks at every return.</p>
+            <p className="small">Send it back tracked, at your cost, within {days(policy.payWithinDays)} of it arriving. You don't pay for it. Zach looks at every return.</p>
           )}
         </div>
       )}
@@ -503,7 +508,7 @@ export function PaidForm({ path, price, onSaved }: { path: string; price: number
       await api('POST', `${path}/paid`, { pricePaid: parseMoney(paid), note: note || null })
       onSaved()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(errorText(err))
     } finally {
       setBusy(false)
     }
@@ -568,11 +573,12 @@ export function PaidForm({ path, price, onSaved }: { path: string; price: number
 
 /**
  * Once the card is in hand: it came as shown, or it goes back for one of the allowed reasons. Paying is a
- * step of its own, since the buyer has 7 days.
+ * step of its own, since the buyer has days to pay (the policy's payWithinDays).
  *
  * @param path the deal's API path: the buyer's, or the admin's (which adds ?buyerOrgId and needs a note)
  */
 export function ArrivalForm({ path, onSaved, noteRequired = false }: { path: string; onSaved: () => void; noteRequired?: boolean }) {
+  const policy = usePolicy()
   const api = useApi()
   // Hidden behind "It arrived", so nothing can be recorded the minute a card is bought. The admin came here to record one.
   const [open, setOpen] = useState(noteRequired)
@@ -607,7 +613,7 @@ export function ArrivalForm({ path, onSaved, noteRequired = false }: { path: str
       }
       onSaved()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(errorText(err))
     } finally {
       setBusy(false)
     }
@@ -687,7 +693,7 @@ export function ArrivalForm({ path, onSaved, noteRequired = false }: { path: str
                 ? "Say this card isn't genuine? That's a serious thing to tell a seller: they see it with your note, and Zach reviews it."
                 : returning
                   ? `Record that you're sending it back: ${RETURN_REASON[reason as DeclinedReason]}?`
-                  : 'Record that it arrived as shown? The 7 days to pay start now.'}
+                  : `Record that it arrived as shown? The ${days(policy.payWithinDays)} to pay start now.`}
             </p>
             <div className="actions">
               <button type="submit" className={notGenuine ? 'danger' : undefined} disabled={busy} aria-busy={busy}>

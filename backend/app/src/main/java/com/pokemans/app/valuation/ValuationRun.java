@@ -1,5 +1,6 @@
 package com.pokemans.app.valuation;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -13,7 +14,7 @@ import org.hibernate.type.SqlTypes;
 /** One valuation of a collection: its inputs, the portfolio results and the trace. Append-only. */
 @Entity
 @Table(name = "valuation_run")
-class ValuationRun {
+class ValuationRun extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -85,7 +86,8 @@ class ValuationRun {
         this.createdAt = Instant.now();
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

@@ -1,5 +1,6 @@
 package com.pokemans.app.outcomes;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -16,7 +17,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "grade_outcome")
-class GradeOutcome {
+class GradeOutcome extends AssignedIdEntity<UUID> {
 
     enum Source { CONTRIBUTOR, PARTNER, ADMIN }
 
@@ -53,7 +54,8 @@ class GradeOutcome {
         this.createdAt = Instant.now();
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

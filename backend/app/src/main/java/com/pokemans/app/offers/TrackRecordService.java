@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The instant-offer track record: what happened to the firm offers we posted, read from the same view
- * the analysis workspace uses ({@code v_offer_outcomes}, V16), so the admin page and the notebooks
+ * the analysis workspace uses ({@code v_offer_outcomes}), so the admin page and the notebooks
  * can't disagree. Every rate comes with the counts behind it, and the caveats travel with the numbers.
  */
 @Service
@@ -43,8 +43,9 @@ class TrackRecordService {
     /**
      * @param acceptanceRate accepted / (accepted + withdrawn + expired); null with none closed
      * @param medianHoursToAccept null with none accepted
+     * @param voided              listings we took down: left out of the rate
+     * @param cancelled           the deals we undid: left out of the rate
      */
-    /** @param voided listings we took down, and cancelled the deals we undid: left out of the rate */
     record Acceptance(String band, int listings, int open, int accepted, int withdrawn, int expired, int closed,
                       BigDecimal acceptanceRate, BigDecimal medianHoursToAccept, int voided, int cancelled) {
     }
