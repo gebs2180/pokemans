@@ -624,11 +624,11 @@ class OffersFlowTest {
     void aDealFromBeforeTheSplitCountsAsArrivedAndPaid() {
         ListingEvent taken = ListingEvent.accepted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
         ListingEvent old = legacyReceived(taken.getListingId());
-        ListingService.Progress progress = ListingService.progress(List.of(taken, old));
-        assertThat(progress.stage()).isEqualTo(ListingService.DealStage.PAID);
+        ListingStateMachine.Progress progress = ListingStateMachine.progress(List.of(taken, old));
+        assertThat(progress.stage()).isEqualTo(ListingStateMachine.DealStage.PAID);
         assertThat(progress.pricePaid()).isEqualByComparingTo("99.50");
         assertThat(progress.arrivedAt()).isEqualTo(progress.paidAt());
-        assertThat(ListingService.progress(List.of(taken, ListingEvent.cancelled(taken.getListingId(), UUID.randomUUID(), "x")))).isNull();
+        assertThat(ListingStateMachine.progress(List.of(taken, ListingEvent.cancelled(taken.getListingId(), UUID.randomUUID(), "x")))).isNull();
     }
 
     /** A RECEIVED row as it was written before arrival and payment were split. */
@@ -1113,14 +1113,14 @@ class OffersFlowTest {
         SaleListing open = new SaleListing(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), now, now.plusSeconds(60));
         SaleListing old = new SaleListing(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), now, now.minusSeconds(1));
 
-        assertThat(ListingService.status(open, List.of(), now)).isEqualTo(ListingService.Status.OPEN);
-        assertThat(ListingService.status(old, List.of(), now)).isEqualTo(ListingService.Status.EXPIRED);
+        assertThat(ListingStateMachine.status(open, List.of(), now)).isEqualTo(ListingStateMachine.Status.OPEN);
+        assertThat(ListingStateMachine.status(old, List.of(), now)).isEqualTo(ListingStateMachine.Status.EXPIRED);
         ListingEvent taken = ListingEvent.accepted(old.getId(), UUID.randomUUID(), UUID.randomUUID());
-        assertThat(ListingService.status(old, List.of(taken), now)).isEqualTo(ListingService.Status.ACCEPTED);
-        assertThat(ListingService.status(old, List.of(taken, ListingEvent.cancelled(old.getId(), UUID.randomUUID(), "x")), now))
-                .isEqualTo(ListingService.Status.CANCELLED);
-        assertThat(ListingService.status(open, List.of(ListingEvent.voided(open.getId(), UUID.randomUUID(), "x")), now))
-                .isEqualTo(ListingService.Status.VOIDED);
+        assertThat(ListingStateMachine.status(old, List.of(taken), now)).isEqualTo(ListingStateMachine.Status.ACCEPTED);
+        assertThat(ListingStateMachine.status(old, List.of(taken, ListingEvent.cancelled(old.getId(), UUID.randomUUID(), "x")), now))
+                .isEqualTo(ListingStateMachine.Status.CANCELLED);
+        assertThat(ListingStateMachine.status(open, List.of(ListingEvent.voided(open.getId(), UUID.randomUUID(), "x")), now))
+                .isEqualTo(ListingStateMachine.Status.VOIDED);
     }
 
     /** How much a count in the track record grew; other tests share the database. */

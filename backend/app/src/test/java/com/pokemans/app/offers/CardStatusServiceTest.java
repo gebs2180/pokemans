@@ -27,10 +27,10 @@ class CardStatusServiceTest {
     @Test
     void aLabelIsOverduePastItsDateUntilTheCardShips() {
         Instant late = NOW.minus(Duration.ofDays(4));
-        assertThat(ListingService.overdue(late, ListingService.DealStage.SOLD, NOW)).isTrue();
-        assertThat(ListingService.overdue(NOW.minus(Duration.ofDays(2)), ListingService.DealStage.SOLD, NOW)).isFalse();
-        assertThat(ListingService.overdue(late, ListingService.DealStage.SHIPPED, NOW)).isFalse();
-        assertThat(ListingService.overdue(late, ListingService.DealStage.RETURNED, NOW)).isFalse();
+        assertThat(ListingStateMachine.overdue(late, ListingStateMachine.DealStage.SOLD, NOW)).isTrue();
+        assertThat(ListingStateMachine.overdue(NOW.minus(Duration.ofDays(2)), ListingStateMachine.DealStage.SOLD, NOW)).isFalse();
+        assertThat(ListingStateMachine.overdue(late, ListingStateMachine.DealStage.SHIPPED, NOW)).isFalse();
+        assertThat(ListingStateMachine.overdue(late, ListingStateMachine.DealStage.RETURNED, NOW)).isFalse();
     }
 
     private static Need need(Stage stage, Instant deadline, boolean retake) {

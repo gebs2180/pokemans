@@ -293,8 +293,8 @@ class MarketRacesTest {
         Instant end = listing.getExpiresAt();
         Instant before = end.minus(1, ChronoUnit.MICROS);
 
-        assertThat(ListingService.status(listing, List.of(), before)).isEqualTo(ListingService.Status.OPEN);
-        assertThat(ListingService.status(listing, List.of(), end)).isEqualTo(ListingService.Status.EXPIRED);
+        assertThat(ListingStateMachine.status(listing, List.of(), before)).isEqualTo(ListingStateMachine.Status.OPEN);
+        assertThat(ListingStateMachine.status(listing, List.of(), end)).isEqualTo(ListingStateMachine.Status.EXPIRED);
         // The market's query and the status agree on both sides of the line.
         assertThat(listings.findOpen(before).stream().map(SaleListing::getId)).contains(listing.getId());
         assertThat(listings.findOpen(end).stream().map(SaleListing::getId)).doesNotContain(listing.getId());

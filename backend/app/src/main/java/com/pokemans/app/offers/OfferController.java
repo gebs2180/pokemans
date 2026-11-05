@@ -84,7 +84,7 @@ class OfferController {
     }
 
     /** @param labelPending why the label didn't come with the accept, or null; it can be bought again */
-    record AcceptResult(List<ListingService.DealView> deals, String labelPending) {
+    record AcceptResult(List<ListingViews.DealView> deals, String labelPending) {
     }
 
     /**
@@ -105,6 +105,8 @@ class OfferController {
 
     private final OfferService offers;
     private final ListingService listings;
+    private final DealService deals;
+    private final ListingViews views;
     private final Shipping shipping;
     private final OrgAccess access;
     private final CardItems cardItems;
@@ -112,10 +114,12 @@ class OfferController {
     private final Directory directory;
     private final CardStatusService statuses;
 
-    OfferController(OfferService offers, ListingService listings, Shipping shipping, OrgAccess access, CardItems cardItems,
+    OfferController(OfferService offers, ListingService listings, DealService deals, ListingViews views, Shipping shipping, OrgAccess access, CardItems cardItems,
                     Consents consents, Directory directory, CardStatusService statuses) {
         this.offers = offers;
         this.listings = listings;
+        this.deals = deals;
+        this.views = views;
         this.shipping = shipping;
         this.access = access;
         this.cardItems = cardItems;
@@ -151,7 +155,7 @@ class OfferController {
     // Sellers
 
     @GetMapping("/api/orgs/{orgId}/cards/{cardId}/sale")
-    ListingService.SaleView sale(@PathVariable UUID orgId, @PathVariable UUID cardId) {
+    ListingViews.SaleView sale(@PathVariable UUID orgId, @PathVariable UUID cardId) {
         requireSellerCard(orgId, cardId);
         return listings.sale(cardId);
     }
@@ -180,17 +184,17 @@ class OfferController {
     /** Prices the card now. 409 with the reason when it gets no offer. */
     @PostMapping("/api/orgs/{orgId}/cards/{cardId}/offers")
     @ResponseStatus(HttpStatus.CREATED)
-    ListingService.OfferView price(@PathVariable UUID orgId, @PathVariable UUID cardId) {
+    ListingViews.OfferView price(@PathVariable UUID orgId, @PathVariable UUID cardId) {
         requireSellerCard(orgId, cardId);
         consents.requireAccepted(orgId);
         listings.requireNotHeld(cardId);
-        return listings.offerView(offers.price(orgId, cardId), null);
+        return views.offerView(offers.price(orgId, cardId), null);
     }
 
     /** Posts the offer to every buyer. Not a sale yet: a buyer has to take it. */
     @PostMapping("/api/orgs/{orgId}/cards/{cardId}/listings")
     @ResponseStatus(HttpStatus.CREATED)
-    ListingService.SaleView post(@PathVariable UUID orgId, @PathVariable UUID cardId, @Valid @RequestBody PostRequest request) {
+    ListingViews.SaleView post(@PathVariable UUID orgId, @PathVariable UUID cardId, @Valid @RequestBody PostRequest request) {
         requireSellerCard(orgId, cardId);
         consents.requireAccepted(orgId);
         listings.post(orgId, cardId, request.offerId());
@@ -209,34 +213,34 @@ class OfferController {
     @PostMapping("/api/orgs/{orgId}/listings/{listingId}/shipped")
     void shipped(@PathVariable UUID orgId, @PathVariable UUID listingId) {
         access.require(orgId, SELLER_ORGS);
-        listings.shipped(orgId, listingId);
+        deals.shipped(orgId, listingId);
     }
 
     /** "I got paid." */
     @PostMapping("/api/orgs/{orgId}/listings/{listingId}/payment-confirmed")
     void paymentConfirmed(@PathVariable UUID orgId, @PathVariable UUID listingId) {
         access.require(orgId, SELLER_ORGS);
-        listings.paymentConfirmed(orgId, listingId);
+        deals.paymentConfirmed(orgId, listingId);
     }
 
     /** "I haven't been paid", or "I disagree with this return": either goes to the admin. */
     @PostMapping("/api/orgs/{orgId}/listings/{listingId}/dispute")
     void dispute(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody DisputeBody body) {
         access.require(orgId, SELLER_ORGS);
-        listings.disputed(orgId, listingId, body.note());
+        deals.disputed(orgId, listingId, body.note());
     }
 
     /** A returned card is back with the seller. */
     @PostMapping("/api/orgs/{orgId}/listings/{listingId}/card-back")
     void cardBack(@PathVariable UUID orgId, @PathVariable UUID listingId) {
         access.require(orgId, SELLER_ORGS);
-        listings.cardBack(orgId, listingId);
+        deals.cardBack(orgId, listingId);
     }
 
     // Buyers
 
     @GetMapping("/api/orgs/{orgId}/market")
-    List<ListingService.MarketItem> market(@PathVariable UUID orgId) {
+    List<ListingViews.MarketItem> market(@PathVariable UUID orgId) {
         requireBuyer(orgId);
         return listings.market();
     }
@@ -255,7 +259,7 @@ class OfferController {
         SaleListing taken = listings.accept(orgId, listingId);
         String pending = null;
         try {
-            listings.buyLabel(taken, orgId);
+            deals.buyLabel(taken, orgId);
         } catch (ResponseStatusException e) {
             pending = e.getReason();
         } catch (RuntimeException e) {
@@ -263,59 +267,59 @@ class OfferController {
             log.error("Couldn't record the label for listing {}: {}", listingId, e.getClass().getSimpleName());
             pending = LABEL_PENDING;
         }
-        return new AcceptResult(listings.deals(orgId), pending);
+        return new AcceptResult(deals.deals(orgId), pending);
     }
 
     @GetMapping("/api/orgs/{orgId}/deals")
-    List<ListingService.DealView> deals(@PathVariable UUID orgId) {
+    List<ListingViews.DealView> deals(@PathVariable UUID orgId) {
         requireBuyer(orgId);
-        return listings.deals(orgId);
+        return deals.deals(orgId);
     }
 
     /** Tries the label again, for a deal whose label didn't go through. */
     @PostMapping("/api/orgs/{orgId}/deals/{listingId}/label")
-    List<ListingService.DealView> label(@PathVariable UUID orgId, @PathVariable UUID listingId) {
+    List<ListingViews.DealView> label(@PathVariable UUID orgId, @PathVariable UUID listingId) {
         requireBuyer(orgId);
-        listings.buyLabel(listings.requireDeal(orgId, listingId), orgId);
-        return listings.deals(orgId);
+        deals.buyLabel(deals.requireDeal(orgId, listingId), orgId);
+        return deals.deals(orgId);
     }
 
     @PostMapping("/api/orgs/{orgId}/deals/{listingId}/received")
     @ResponseStatus(HttpStatus.CREATED)
-    List<ListingService.DealView> received(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody ReceivedBody body) {
+    List<ListingViews.DealView> received(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody ReceivedBody body) {
         requireBuyer(orgId);
-        listings.received(orgId, listingId, body.note(), false);
-        return listings.deals(orgId);
+        deals.received(orgId, listingId, body.note(), false);
+        return deals.deals(orgId);
     }
 
     @PostMapping("/api/orgs/{orgId}/deals/{listingId}/paid")
     @ResponseStatus(HttpStatus.CREATED)
-    List<ListingService.DealView> paid(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody PaidBody body) {
+    List<ListingViews.DealView> paid(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody PaidBody body) {
         requireBuyer(orgId);
-        listings.paid(orgId, listingId, body.pricePaid(), body.note());
-        return listings.deals(orgId);
+        deals.paid(orgId, listingId, body.pricePaid(), body.note());
+        return deals.deals(orgId);
     }
 
     @PostMapping("/api/orgs/{orgId}/deals/{listingId}/returned")
     @ResponseStatus(HttpStatus.CREATED)
-    List<ListingService.DealView> returned(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody ReturnedBody body) {
+    List<ListingViews.DealView> returned(@PathVariable UUID orgId, @PathVariable UUID listingId, @Valid @RequestBody ReturnedBody body) {
         requireBuyer(orgId);
-        listings.returned(orgId, listingId, body.reason(), body.note(), false);
-        return listings.deals(orgId);
+        deals.returned(orgId, listingId, body.reason(), body.note(), false);
+        return deals.deals(orgId);
     }
 
     // Admin (by path)
 
     /** Deals still waiting for their label, oldest first: retry the label, or record the arrival by hand. */
     @GetMapping("/api/admin/deals/awaiting-label")
-    List<ListingService.AwaitingLabel> awaitingLabels() {
-        return listings.awaitingLabels();
+    List<ListingViews.AwaitingLabel> awaitingLabels() {
+        return deals.awaitingLabels();
     }
 
     /** Overdue labels, for the count on the admin page. */
     @GetMapping("/api/admin/deals/overdue")
-    ListingService.Overdue overdue() {
-        return listings.overdue();
+    ListingViews.Overdue overdue() {
+        return deals.overdue();
     }
 
     /** What an offer on the card would be now, or why it gets none, with the steps that set its confidence. Stores nothing. */
@@ -329,20 +333,20 @@ class OfferController {
     @PostMapping("/api/admin/deals/{listingId}/received")
     @ResponseStatus(HttpStatus.CREATED)
     void adminReceived(@PathVariable UUID listingId, @RequestParam UUID buyerOrgId, @Valid @RequestBody ReceivedBody body) {
-        listings.received(buyerOrgId, listingId, body.note(), true);
+        deals.received(buyerOrgId, listingId, body.note(), true);
     }
 
     /** Records a return for the buyer when no label was bought. The note says how the card shipped. */
     @PostMapping("/api/admin/deals/{listingId}/returned")
     @ResponseStatus(HttpStatus.CREATED)
     void adminReturned(@PathVariable UUID listingId, @RequestParam UUID buyerOrgId, @Valid @RequestBody ReturnedBody body) {
-        listings.returned(buyerOrgId, listingId, body.reason(), body.note(), true);
+        deals.returned(buyerOrgId, listingId, body.reason(), body.note(), true);
     }
 
     /** Buys the label for any deal, e.g. once a shipping account is set up. */
     @PostMapping("/api/admin/deals/{listingId}/label")
     void adminLabel(@PathVariable UUID listingId, @RequestParam UUID buyerOrgId) {
-        listings.buyLabel(listings.requireDeal(buyerOrgId, listingId), buyerOrgId);
+        deals.buyLabel(deals.requireDeal(buyerOrgId, listingId), buyerOrgId);
     }
 
     /** Labels bought in a month, per buyer: what to bill each one. {@code month} is yyyy-MM, UTC; default this month. */
@@ -360,7 +364,7 @@ class OfferController {
         }
         List<ShippingLabel> all = byBuyer.values().stream().flatMap(List::stream).toList();
         Map<UUID, LabelRefund> refunds = shipping.refunds(all.stream().map(ShippingLabel::getId).toList());
-        Set<UUID> cancelled = listings.cancelledAmong(all.stream().map(ShippingLabel::getListingId).toList());
+        Set<UUID> cancelled = deals.cancelledAmong(all.stream().map(ShippingLabel::getListingId).toList());
         List<BuyerCharges> charges = new ArrayList<>();
         byBuyer.forEach((buyer, ls) -> {
             List<ChargeLine> lines = ls.stream().map(l -> {

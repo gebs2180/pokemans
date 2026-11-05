@@ -101,7 +101,7 @@ class Shipping {
     }
 
     /**
-     * Buys the label for a taken card, once. Joins the caller's transaction ({@code ListingService.buyLabel}, under the
+     * Buys the label for a taken card, once. Joins the caller's transaction ({@code DealService.buyLabel}, under the
      * card's listing lock), which starts after the accept's own has committed, so a provider failure never undoes the
      * sale: the label can be bought again. The provider is called with that transaction and the lock held.
      *

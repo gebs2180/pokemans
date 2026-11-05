@@ -133,23 +133,23 @@ class CardStatusService {
         }
         Optional<SaleListing> listing = listings.findFirstByCardItemIdOrderByCreatedAtDesc(cardId);
         List<ListingEvent> history = listing.map(l -> events.findByListingIdInOrderByCreatedAtAsc(List.of(l.getId()))).orElse(List.of());
-        ListingService.Status listed = listing.map(l -> ListingService.status(l, history, Instant.now())).orElse(null);
+        ListingStateMachine.Status listed = listing.map(l -> ListingStateMachine.status(l, history, Instant.now())).orElse(null);
         // Once the card is posted or has an offer, the stage comes from the listing or the offer, and so does the identity
         // (the card as it was offered): valuing it again would cost a valuation per card on every list (review finding 9).
-        ListingService.Progress deal = ListingService.progress(history);
-        if (listed == ListingService.Status.ACCEPTED) {
+        ListingStateMachine.Progress deal = ListingStateMachine.progress(history);
+        if (listed == ListingStateMachine.Status.ACCEPTED) {
             return afterTheSale(cardId, offeredAs(listing.orElseThrow()), deal, listing.orElseThrow().getId());
         }
-        if (listed == ListingService.Status.BACK && deal.held()) {
-            return new CardStatus(cardId, Stage.RETURNED, offeredAs(listing.orElseThrow()), ListingService.HELD + NO_NOTIFICATIONS, false);
+        if (listed == ListingStateMachine.Status.BACK && deal.held()) {
+            return new CardStatus(cardId, Stage.RETURNED, offeredAs(listing.orElseThrow()), ListingStateMachine.HELD + NO_NOTIFICATIONS, false);
         }
-        if (listed == ListingService.Status.OPEN) {
+        if (listed == ListingStateMachine.Status.OPEN) {
             return new CardStatus(cardId, Stage.LISTED, offeredAs(listing.orElseThrow()),
                     "Posted to buyers: the first to accept buys it at the price.", false)
                     .withDeadline(listing.orElseThrow().getExpiresAt());
         }
         // A card that came back can't go out again on the offer it sold at.
-        UUID soldAt = listed == ListingService.Status.BACK ? listing.get().getOfferId() : null;
+        UUID soldAt = listed == ListingStateMachine.Status.BACK ? listing.get().getOfferId() : null;
         Optional<CardOffer> latest = offers.latest(cardId).filter(o -> o.getExpiresAt().isAfter(Instant.now()))
                 .filter(o -> voids.findByOfferId(o.getId()).isEmpty()).filter(o -> !o.getId().equals(soldAt));
         if (latest.isPresent()) {
@@ -190,7 +190,7 @@ class CardStatusService {
         return identity(offers.identity(listing.getOfferId()));
     }
 
-    private CardStatus afterTheSale(UUID cardId, String identity, ListingService.Progress deal, UUID listingId) {
+    private CardStatus afterTheSale(UUID cardId, String identity, ListingStateMachine.Progress deal, UUID listingId) {
         return switch (deal.stage()) {
             case SHIPPED -> new CardStatus(cardId, Stage.SHIPPED, identity,
                     "On its way to the buyer. They record it when it arrives, and then have 7 days to pay you." + NO_NOTIFICATIONS, false);
@@ -203,7 +203,7 @@ class CardStatusService {
             case RETURNED -> new CardStatus(cardId, Stage.RETURNED, identity,
                     "The buyer is sending it back. Tell us here once you have it.", false).withSellersWord(true);
             default -> new CardStatus(cardId, Stage.SOLD, identity, "A buyer took it: ship it with the prepaid label once it shows on this card's page.", false)
-                    .withDeadline(shipping.label(listingId).map(l -> l.getCreatedAt().plus(ListingService.SHIP_WITHIN)).orElse(null));
+                    .withDeadline(shipping.label(listingId).map(l -> l.getCreatedAt().plus(ListingStateMachine.SHIP_WITHIN)).orElse(null));
         };
     }
 
