@@ -1,6 +1,7 @@
 package com.pokemans.app.offers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -21,11 +22,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +40,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
@@ -68,6 +73,12 @@ class MarketRacesTest {
     @Autowired
     private SaleListingRepository listings;
 
+    @Autowired
+    private ListingLock listingLock;
+
+    @Autowired
+    private PlatformTransactionManager transactions;
+
     private TestApi api;
     private TestMarket market;
     private Seller seller;
@@ -79,6 +90,7 @@ class MarketRacesTest {
         seller = market.seller();
         shipper.failing = false;
         shipper.failure = "carrier is down";
+        shipper.unrecordable = false;
         shipper.gate = null;
     }
 
@@ -313,6 +325,59 @@ class MarketRacesTest {
 
         api.postJson("/api/orgs/" + seller.orgId() + "/cards/" + card.cardId() + "/listings", "{\"offerId\":\"" + expired + "\"}", seller.who())
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.detail", containsString("expired")));
+    }
+
+    @Test
+    void everyWriteOnACardWaitsForItsListingLock() throws Exception {
+        // Review finding 39: the lock was copied into three places; each write path must still take the one ListingLock.
+        Posted offered = market.offered(seller, "Locked Post Pidgeot");
+        waitsForTheLock(offered, () -> code("/api/orgs/" + seller.orgId() + "/cards/" + offered.cardId() + "/listings",
+                "{\"offerId\":\"" + offered.offerId() + "\"}", seller), 201);
+
+        Posted withdrawn = market.posted(seller, "Locked Withdraw Raichu");
+        waitsForTheLock(withdrawn, () -> code("/api/orgs/" + seller.orgId() + "/listings/" + withdrawn.listingId() + "/withdraw", "", seller), 200);
+
+        Posted voided = market.posted(seller, "Locked Void Arcanine");
+        waitsForTheLock(voided, () -> adminStatus("/api/admin/offers/" + voided.offerId() + "/void"), 200);
+
+        Posted taken = market.posted(seller, "Locked Accept Dragonite");
+        Buyer buyer = market.buyer();
+        waitsForTheLock(taken, () -> code(TestMarket.accept(buyer, taken), "", buyer), 200);
+
+        String price = TestApi.read(api.get("/api/orgs/" + buyer.orgId() + "/deals", buyer.who()), "$[0].offer.price");
+        waitsForTheLock(taken, () -> code("/api/orgs/" + buyer.orgId() + "/deals/" + taken.listingId() + "/received",
+                RECEIVED.formatted(price), buyer), 201);
+
+        Posted cancelled = market.posted(seller, "Locked Cancel Machamp");
+        api.postJson(TestMarket.accept(buyer, cancelled), "", buyer.who()).andExpect(status().isOk());
+        waitsForTheLock(cancelled, () -> adminStatus("/api/admin/deals/" + cancelled.listingId() + "/cancel"), 200);
+    }
+
+    /** Holds the card's listing lock in another transaction, checks the call waits for it, then lets it through. */
+    private void waitsForTheLock(Posted card, Callable<Integer> call, int expected) throws Exception {
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> holder = pool.submit(() -> new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+                listingLock.lock(UUID.fromString(card.cardId()));
+                held.countDown();
+                try {
+                    release.await(30, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            assertThat(held.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<Integer> waiting = pool.submit(call);
+            assertThatThrownBy(() -> waiting.get(750, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            release.countDown();
+            holder.get(10, TimeUnit.SECONDS);
+            assertThat(waiting.get(30, TimeUnit.SECONDS)).isEqualTo(expected);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
     }
 
     /** A posted card whose listing window has closed: a second listing row, since the table refuses updates. */

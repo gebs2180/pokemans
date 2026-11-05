@@ -16,7 +16,6 @@ import java.util.stream.Collectors;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -74,11 +73,11 @@ class OfferAdminService {
     private final Shipping shipping;
     private final Directory directory;
     private final CurrentUser currentUser;
-    private final JdbcTemplate jdbc;
+    private final ListingLock lock;
 
     OfferAdminService(CardOfferRepository offers, CardOfferVoidRepository voids, SaleListingRepository listings,
                       ListingEventRepository events, ListingService listingService, Shipping shipping, Directory directory,
-                      CurrentUser currentUser, JdbcTemplate jdbc) {
+                      CurrentUser currentUser, ListingLock lock) {
         this.offers = offers;
         this.voids = voids;
         this.listings = listings;
@@ -87,7 +86,7 @@ class OfferAdminService {
         this.shipping = shipping;
         this.directory = directory;
         this.currentUser = currentUser;
-        this.jdbc = jdbc;
+        this.lock = lock;
     }
 
     /** The newest offers, newest first, with their latest listing. */
@@ -291,7 +290,7 @@ class OfferAdminService {
 
     /** The same lock posting takes, so a void and a post (or a cancel and a repost) can't interleave. */
     private void lockCard(UUID cardItemId) {
-        jdbc.queryForObject("select pg_advisory_xact_lock(hashtext(?))", Object.class, "listing:" + cardItemId);
+        lock.lock(cardItemId);
     }
 
     /** Saves an admin event; the database lets a listing close once and a deal end once, so a lost race is a 409. */

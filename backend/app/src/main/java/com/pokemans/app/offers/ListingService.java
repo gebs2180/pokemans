@@ -27,7 +27,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -203,12 +202,12 @@ class ListingService {
     private final StorageProperties storage;
     private final CurrentUser currentUser;
     private final CardItems cardItems;
-    private final JdbcTemplate jdbc;
+    private final ListingLock lock;
     private final OrgAccess access;
 
     ListingService(CardOfferRepository offers, CardOfferVoidRepository voids, SaleListingRepository listings, ListingEventRepository events,
                    OffersProperties properties, Directory directory, Shipping shipping, BlobStore blobs, StorageProperties storage,
-                   CurrentUser currentUser, CardItems cardItems, JdbcTemplate jdbc, OrgAccess access) {
+                   CurrentUser currentUser, CardItems cardItems, ListingLock lock, OrgAccess access) {
         this.offers = offers;
         this.voids = voids;
         this.listings = listings;
@@ -220,7 +219,7 @@ class ListingService {
         this.storage = storage;
         this.currentUser = currentUser;
         this.cardItems = cardItems;
-        this.jdbc = jdbc;
+        this.lock = lock;
         this.access = access;
     }
 
@@ -286,8 +285,8 @@ class ListingService {
 
     @Transactional
     void withdraw(UUID orgId, UUID listingId) {
-        SaleListing listing = listings.findByIdAndOrgId(listingId, orgId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
+        SaleListing listing = lockDeal(listings.findByIdAndOrgId(listingId, orgId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found")));
         requireOpen(listing, Map.of(Status.ACCEPTED, "A buyer has already taken this card, so it can't be withdrawn.",
                 Status.WITHDRAWN, "This listing is already withdrawn.", Status.EXPIRED, "This listing has already expired.",
                 Status.VOIDED, "We've already taken this listing down.", Status.CANCELLED, "This deal was cancelled.",
@@ -413,7 +412,7 @@ class ListingService {
      */
     @Transactional
     void received(UUID buyerOrgId, UUID listingId, String note, boolean byAdmin) {
-        requireDeal(buyerOrgId, listingId);
+        lockDeal(requireDeal(buyerOrgId, listingId));
         requireNotCancelled(listingId);
         requireShippable(listingId, note, byAdmin);
         recordOutcome(ListingEvent.received(listingId, buyerOrgId, currentUser.id(), adminNote(note, byAdmin)));
@@ -451,7 +450,7 @@ class ListingService {
      */
     @Transactional
     void returned(UUID buyerOrgId, UUID listingId, ListingEvent.DeclinedReason reason, String note, boolean byAdmin) {
-        requireDeal(buyerOrgId, listingId);
+        lockDeal(requireDeal(buyerOrgId, listingId));
         requireNotCancelled(listingId);
         if (reason == ListingEvent.DeclinedReason.NOT_GENUINE && blankToNull(note) == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Say in the note why you think the card isn't genuine.");
@@ -605,7 +604,7 @@ class ListingService {
     }
 
     private SaleListing lockDeal(SaleListing listing) {
-        jdbc.queryForObject("select pg_advisory_xact_lock(hashtext(?))", Object.class, "listing:" + listing.getCardItemId());
+        lock.lock(listing.getCardItemId());
         return listing;
     }
 
@@ -639,7 +638,7 @@ class ListingService {
     }
 
     private void lockListings(UUID cardItemId) {
-        jdbc.queryForObject("select pg_advisory_xact_lock(hashtext(?))", Object.class, "listing:" + cardItemId);
+        lock.lock(cardItemId);
     }
 
     /** 409 with the reason for the listing's state, unless it is open. */
