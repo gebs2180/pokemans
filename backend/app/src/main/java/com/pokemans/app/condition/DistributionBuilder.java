@@ -26,10 +26,10 @@ import java.util.TreeMap;
  *       own to the average, since a card centred for a 10 can still have the corners of a 4.</li>
  *   <li>Confidence comes from how many providers answered, how far apart they are, and whether every
  *       photo showed the whole card. Lower confidence moves probability down.</li>
- *   <li>Modern holos get the default surface shift down; a reviewer can clear it after a close-up.</li>
  * </ol>
  *
- * Nothing here moves probability up. U (ungradable) stays at zero: alteration and trimming are a
+ * There is no default surface shift for holos or full arts: surface counts through the providers'
+ * grades, which score it (Zach, 2026-11-04, review D5). Nothing here moves probability up. U (ungradable) stays at zero: alteration and trimming are a
  * reviewer's call, not a photo model's.
  */
 final class DistributionBuilder {
@@ -39,10 +39,9 @@ final class DistributionBuilder {
     /**
      * @param providerGrades     one grade per provider that answered (provider name to grade), 1–10 scale
      * @param wholeCardInPhotos  every photo used had the whole card detected
-     * @param modernHolo         the card is identified as a holo or reverse holo from after the WotC era
      * @param centeringCap       the best grade measured centering allows, or null when it wasn't measured
      */
-    record Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, boolean modernHolo, Integer centeringCap) {
+    record Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, Integer centeringCap) {
     }
 
     record Result(GradeDistribution distribution, Confidence confidence, Map<String, Object> basis) {
@@ -67,7 +66,7 @@ final class DistributionBuilder {
             perProvider.add(spread(whole));
         });
         GradeDistribution distribution = average(perProvider);
-        // Before the confidence and holo shifts, so they still move mass below the cap.
+        // Before the confidence shift, so it still moves mass below the cap.
         if (input.centeringCap() != null) {
             distribution = distribution.capAt(Grade.of(Math.max(1, Math.min(10, input.centeringCap()))));
         }
@@ -90,9 +89,6 @@ final class DistributionBuilder {
         if (confidencePenalty.signum() > 0) {
             distribution = distribution.applyPhotoConfidencePenalty(confidencePenalty);
         }
-        if (input.modernHolo()) {
-            distribution = distribution.applySurfacePenalty(properties.holoSurfacePenalty());
-        }
 
         Map<String, Object> basis = new LinkedHashMap<>();
         basis.put("providerGrades", input.providerGrades());
@@ -100,9 +96,7 @@ final class DistributionBuilder {
         basis.put("providerGap", gap);
         basis.put("centeringCap", input.centeringCap());
         basis.put("wholeCardInPhotos", input.wholeCardInPhotos());
-        basis.put("modernHolo", input.modernHolo());
         basis.put("confidencePenalty", confidencePenalty);
-        basis.put("holoSurfacePenalty", input.modernHolo() ? properties.holoSurfacePenalty() : BigDecimal.ZERO);
         basis.put("spread", new TreeMap<>(properties.spread()));
         return new Result(distribution, confidence, basis);
     }

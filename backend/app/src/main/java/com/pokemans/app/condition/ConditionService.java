@@ -1,8 +1,6 @@
 package com.pokemans.app.condition;
 
-import com.pokemans.app.catalog.AuthenticityRisk;
 import com.pokemans.app.catalog.Catalog;
-import com.pokemans.app.catalog.Variant;
 import com.pokemans.app.identity.CurrentUser;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.valuation.Confidence;
@@ -229,10 +227,8 @@ class ConditionService {
         boolean wholeCard = latest(photos, "FRONT").map(p -> p.cropKey() != null).orElse(false)
                 && latest(photos, "BACK").map(p -> p.cropKey() != null).orElse(false);
         Optional<Catalog.IdentifiedCard> identity = catalog.current(cardId);
-        // Unidentified cards get the holo surface shift too: unknown finish, so conservative.
-        boolean modernHolo = identity.map(ConditionService::isModernHolo).orElse(true);
 
-        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades, wholeCard, modernHolo, centeringCap));
+        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades, wholeCard, centeringCap));
         if (result == null) {
             return Optional.empty();
         }
@@ -319,11 +315,5 @@ class ConditionService {
 
     static Optional<CardItems.PhotoRef> latest(List<CardItems.PhotoRef> photos, String side) {
         return photos.stream().filter(p -> p.side().equals(side)).max(Comparator.comparing(CardItems.PhotoRef::uploadedAt));
-    }
-
-    /** Holo or reverse holo printed after the WotC era (unknown release date counts as modern). */
-    static boolean isModernHolo(Catalog.IdentifiedCard card) {
-        boolean holo = card.variant() == Variant.HOLO || card.variant() == Variant.REVERSE_HOLO;
-        return holo && (card.setReleaseDate() == null || !card.setReleaseDate().isBefore(AuthenticityRisk.END_OF_WOTC_ERA));
     }
 }
