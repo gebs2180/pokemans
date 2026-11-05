@@ -1,5 +1,7 @@
 package com.pokemans.app.identity;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -18,7 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
  * (plus the seller terms) for contributors, and the terms buyers commit to when they take up an
  * instant offer. Who accepted which version is kept. A new version of a text needs a new version
  * string: acceptances are tied to the exact text by its hash, and an older acceptance no longer counts.
- * Every text is a plain-language draft for Zach, not reviewed legal wording.
+ * The texts and their history are in {@code resources/terms}; see its CHANGELOG.md.
  */
 @Service
 public class Consents {
@@ -31,112 +33,28 @@ public class Consents {
     public record TermsAccepted(UUID orgId, OrgType orgType, UUID userId) {
     }
 
-    /**
-     * What a seller commits to by posting a card (2026-10-21). Shared by collectors and contributors.
-     * 2026-10-26: the $500 beta maximum is gone; offers go up to what a label can insure.
-     * 2026-11-01: how the seller gets paid goes to the buyer, the seller says in the app when they
-     * shipped and whether they were paid, and a card returned as not genuine waits for our review.
-     */
-    static final String SELLER_TERMS_BODY = """
-            1. Each card you post is yours to sell, genuine, and the card you listed, as its photos show it. \
-            You tell us about anything the photos don't show, such as a crease, writing, or a trimmed or altered card.
-            2. While a card is posted you don't sell it anywhere else. You can withdraw it until a buyer accepts. \
-            Once a buyer accepts, the sale is firm at the offer price for both of you, whatever grade the card later gets.
-            3. You ship the card within 3 days of its prepaid label showing in the app, with that label, in a \
-            sleeve and toploader in a bubble mailer, and say so in the app. Don't ship before the label shows. If \
-            you can't ship, tell us and we cancel the deal.
-            4. The buyer pays you the offer price directly, off the app, within 7 days of the card arriving as \
-            shown, using the PayPal, Venmo or Zelle details you give us. Keep those details right: we pass them on \
-            and don't check them, and we never handle the money. Tell us in the app when you've been paid, or if you \
-            haven't. They can send the card back only if it isn't genuine, isn't the listed card, or doesn't match \
-            its photos.
-            5. If a parcel is lost or damaged on the way, we claim on the label's insurance and pass what the \
-            insurer pays to you. The buyer owes nothing for a card that didn't arrive as shown.
-            6. Buyers see the photos of the cards you post. We store your photos, your cards' details and what \
-            happens to them (the offer, the sale, and any grade a card later gets), and use them to build and check \
-            our condition models and offers, including commercially. We may send the photos to pre-grading \
-            services we use, under their terms. We never sell your photos.
-            7. After a sale each side sees the other's name and email, and the buyer sees your payment details. \
-            Each of you uses them only for that sale. Buyers never see your address, except as the return address \
-            on the parcel. During the test you don't sell to \
-            a buyer you met here outside the app.
-            8. We are not a party to the sale and don't hold cards or money. If buyer and seller disagree about \
-            whether a card matches its photos, Zach decides from the photos and what each of you says. We can void \
-            an offer or cancel a deal that went wrong; each is recorded with who, when and why. A card sent back as \
-            not genuine gets no new offer until we've reviewed it.
-            9. This is a test. Offers can be wrong and the app can stop working or be paused. Offers go up to \
-            $5,000, the most a shipping label can insure. Breaking these terms can end your part in the test.""";
+    private static final String FOOTER = "\n\nAsk Zach if anything here is unclear.";
+
+    /** What a seller commits to by posting a card. Shared by collectors and contributors. */
+    static final String SELLER_TERMS_BODY = text("seller-2026-11-01");
 
     public static final String SELLER_TERMS_VERSION = "seller-2026-11-01";
 
-    static final String SELLER_TERMS_TEXT = "By posting a card for sale here you agree that:\n\n" + SELLER_TERMS_BODY
-            + "\n\nAsk Zach if anything here is unclear.";
+    static final String SELLER_TERMS_TEXT = "By posting a card for sale here you agree that:\n\n" + SELLER_TERMS_BODY + FOOTER;
 
     private static final Terms SELLER_TERMS = new Terms(SELLER_TERMS_VERSION, SELLER_TERMS_TEXT, sha256(SELLER_TERMS_TEXT));
 
-    /** Contributors can sell too, so their terms carry the seller terms (2026-10-21). */
+    /** Contributors can sell too, so their terms carry the seller terms. */
     public static final String CONTRIBUTOR_TERMS_VERSION = "contributor-2026-11-01";
 
-    static final String CONTRIBUTOR_TERMS_TEXT = """
-            By sharing photos and grading results here you agree that:
-
-            1. You took the photos, or have the right to share them.
-            2. We store the photos, the grading company, cert number and grade, and when and by whom they were shared.
-            3. We use them to build, test and calibrate our own card condition models and valuation methods, \
-            including commercially. We may send the photos to pre-grading services we use, under their terms.
-            4. We don't publish your photos or show them to other users, except the photos of a card you post for \
-            sale, which buyers see. We never sell them. Results built from many cards (for example accuracy \
-            figures) may be shared without your photos or details.
-            5. You can ask us to delete what you shared; we will, except where it is already part of a model or \
-            figure that has been trained or published.
-
-            You get a free collection report in return.
-
-            If you post a card for sale here, you also agree that:
-
-            """ + SELLER_TERMS_BODY + "\n\nAsk Zach if anything here is unclear.";
+    static final String CONTRIBUTOR_TERMS_TEXT = text("contributor-2026-11-01") + "\n\n" + SELLER_TERMS_BODY + FOOTER;
 
     private static final Terms CONTRIBUTOR_TERMS = new Terms(CONTRIBUTOR_TERMS_VERSION, CONTRIBUTOR_TERMS_TEXT, sha256(CONTRIBUTOR_TERMS_TEXT));
 
-    /**
-     * Firm offers: one price, no grade settled on arrival. 2026-10-21 adds transit loss, cancelled
-     * deals, cards subject to authentication, disputes, non-payment and dealing around the app.
-     * 2026-11-01: arriving and paying are recorded apart, the buyer gets the seller's payment details,
-     * the seller says whether they were paid, and "not genuine" needs a reason.
-     */
+    /** Firm offers: one price, no grade settled on arrival. */
     public static final String BUYER_TERMS_VERSION = "buyer-firm-2026-11-01";
 
-    static final String BUYER_TERMS_TEXT = """
-            By accepting an instant offer here you agree that:
-
-            1. Accepting is a commitment to buy the card at the offer price. The price is fixed: it doesn't \
-            change with the grade you think the card is when it arrives, or the grade it later gets.
-            2. You pay the seller the offer price directly, off the app, using the payment details we show you \
-            once you accept, within 7 days of the card arriving, if it is genuine, is the card listed and matches \
-            the photos you saw when you accepted. We never handle the money. Otherwise you send it \
-            back within those 7 days, tracked and at your cost, and record why. Those are the only reasons to send \
-            a card back.
-            3. A card marked "not yet authenticated" is offered subject to authentication in hand: check it when \
-            it arrives, and send it back as not genuine if it isn't.
-            4. We buy an insured, prepaid shipping label for the card when you accept, from the seller to the \
-            address you gave us, and bill you for it (postage and insurance) each month. If we cancel a deal \
-            before the card arrives, its label isn't billed to you.
-            5. If a parcel is lost or damaged on the way, you owe nothing for it. We claim on the label's \
-            insurance and pass what the insurer pays to the seller.
-            6. You record in the app when the card arrives, then what you paid, or why you sent it back; "not \
-            genuine" needs a note saying why, and the seller sees it. The seller tells us whether they were paid. \
-            We keep these records and use them to check and improve our offers.
-            7. After a sale each side sees the other's name and email, and you see the seller's payment details. \
-            Each of you uses them only for that sale. During \
-            the test you don't buy from a seller you met here outside the app.
-            8. We are not a party to the sale and don't hold cards or money. If buyer and seller disagree about \
-            whether a card matches its photos, Zach decides from the photos and what each of you says. We can void \
-            an offer or cancel a deal that went wrong; each is recorded with who, when and why. A posted card can \
-            be taken by another buyer first.
-            9. This is a test. Offers can be wrong and the app can stop working or be paused. Not paying for, or \
-            not sending back, a card within 7 days of it arriving ends your part in the test, and we tell the seller.
-
-            Ask Zach if anything here is unclear.""";
+    static final String BUYER_TERMS_TEXT = text("buyer-firm-2026-11-01");
 
     private static final Terms BUYER_TERMS = new Terms(BUYER_TERMS_VERSION, BUYER_TERMS_TEXT, sha256(BUYER_TERMS_TEXT));
 
@@ -197,7 +115,23 @@ public class Consents {
         return accepted;
     }
 
-    private static String sha256(String text) {
+    /**
+     * A terms text from {@code resources/terms}, with line endings as LF and the file's final newline dropped, so
+     * how the file was checked out or saved can't change its hash.
+     */
+    static String text(String name) {
+        try (var in = Consents.class.getResourceAsStream("/terms/" + name + ".txt")) {
+            if (in == null) {
+                throw new IllegalStateException("No terms text " + name);
+            }
+            String text = new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
+            return text.endsWith("\n") ? text.substring(0, text.length() - 1) : text;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    static String sha256(String text) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
