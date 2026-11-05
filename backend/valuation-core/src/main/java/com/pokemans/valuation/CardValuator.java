@@ -5,6 +5,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * Step 4: FMV, RV, QSV and FLV for one card, with a confidence grade.
@@ -203,26 +204,14 @@ public final class CardValuator {
      */
     private Confidence confidence(Input in, Trace trace) {
         BigDecimal weightedComps = weightedComps(in);
-        Confidence fromComps = fromComps(weightedComps);
+        Confidence fromComps = params.fromCompCount(weightedComps);
         Confidence base = in.photoConfidence().worse(fromComps);
         trace.add("confidence_base", "worse of photo and comps", base,
                 "photo " + in.photoConfidence() + ", comps " + fromComps + " (weighted sales " + Money.cents(weightedComps) + ")");
-        for (ConfidencePenalty penalty : in.penalties()) {
-            if (penalty.levels() == 0) {
-                continue;
-            }
-            base = Staleness.drop(base, penalty.levels());
-            trace.add("confidence_penalty", penalty.reason() + ", drop " + penalty.levels(), base, "");
-        }
+        base = applyPenalties(base, in, false, "confidence_penalty", trace);
 
         GradeDistribution stressed = in.distribution().shiftDown(in.knownGrade() ? 0 : stressShift(base));
-        StringBuilder derived = new StringBuilder();
-        for (Grade grade : Grade.values()) {
-            boolean inPlay = in.distribution().p(grade).signum() > 0 || stressed.p(grade).signum() > 0;
-            if (inPlay && in.prices().get(grade).derived()) {
-                derived.append(derived.isEmpty() ? "" : ", ").append(grade);
-            }
-        }
+        String derived = derivedGrades(in, g -> in.distribution().p(g).signum() > 0 || stressed.p(g).signum() > 0);
         if (derived.isEmpty()) {
             trace.add("confidence", "no derived prices in play", base, "");
             return base;
@@ -240,20 +229,9 @@ public final class CardValuator {
      * probability.
      */
     private Confidence offerConfidence(Input in, Trace trace) {
-        Confidence c = in.photoConfidence().worse(fromComps(weightedComps(in)));
-        for (ConfidencePenalty penalty : in.penalties()) {
-            if (penalty.levels() == 0 || penalty.flvOnly()) {
-                continue;
-            }
-            c = Staleness.drop(c, penalty.levels());
-            trace.add("offer_confidence_penalty", penalty.reason() + ", drop " + penalty.levels(), c, "");
-        }
-        StringBuilder derived = new StringBuilder();
-        for (Grade grade : Grade.values()) {
-            if (in.distribution().p(grade).signum() > 0 && in.prices().get(grade).derived()) {
-                derived.append(derived.isEmpty() ? "" : ", ").append(grade);
-            }
-        }
+        Confidence c = in.photoConfidence().worse(params.fromCompCount(weightedComps(in)));
+        c = applyPenalties(c, in, true, "offer_confidence_penalty", trace);
+        String derived = derivedGrades(in, g -> in.distribution().p(g).signum() > 0);
         if (derived.isEmpty()) {
             trace.add("offer_confidence", "base and price penalties; no derived price where the card is likely", c,
                     "FLV-only penalties (fallback sigma, the stress) left out");
@@ -277,15 +255,27 @@ public final class CardValuator {
         return weighted;
     }
 
-    private Confidence fromComps(BigDecimal weightedComps) {
-        if (weightedComps.compareTo(params.compsForA()) >= 0) {
-            return Confidence.A;
-        } else if (weightedComps.compareTo(params.compsForB()) >= 0) {
-            return Confidence.B;
-        } else if (weightedComps.compareTo(params.compsForC()) >= 0) {
-            return Confidence.C;
+    /** Drops the confidence for each penalty, leaving out those that bear only on FLV when pricing an offer. */
+    private static Confidence applyPenalties(Confidence c, Input in, boolean offer, String step, Trace trace) {
+        for (ConfidencePenalty penalty : in.penalties()) {
+            if (penalty.levels() == 0 || (offer && penalty.flvOnly())) {
+                continue;
+            }
+            c = Staleness.drop(c, penalty.levels());
+            trace.add(step, penalty.reason() + ", drop " + penalty.levels(), c, "");
         }
-        return Confidence.D;
+        return c;
+    }
+
+    /** The grades in play whose price is derived, as "G9, G10", or empty if none. */
+    private static String derivedGrades(Input in, Predicate<Grade> inPlay) {
+        StringBuilder derived = new StringBuilder();
+        for (Grade grade : Grade.values()) {
+            if (inPlay.test(grade) && in.prices().get(grade).derived()) {
+                derived.append(derived.isEmpty() ? "" : ", ").append(grade);
+            }
+        }
+        return derived.toString();
     }
 
     private static String describe(GradeDistribution distribution, GradePriceTable prices) {
