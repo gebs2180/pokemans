@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,6 +42,9 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @RestController
 class OfferController {
+
+    private static final Logger log = LoggerFactory.getLogger(OfferController.class);
+    private static final String LABEL_PENDING = "We couldn't buy the shipping label just now. Try again later; we've been told.";
 
     private static final OrgType[] SELLER_ORGS = {OrgType.COLLECTOR, OrgType.CONTRIBUTOR};
     private static final OrgType[] SHIPPING_ORGS = {OrgType.COLLECTOR, OrgType.CONTRIBUTOR, OrgType.BUYER};
@@ -253,6 +258,10 @@ class OfferController {
             listings.buyLabel(taken, orgId);
         } catch (ResponseStatusException e) {
             pending = e.getReason();
+        } catch (RuntimeException e) {
+            // The take has committed, so the buyer owns the card whatever went wrong here: never a 500 (review finding 7).
+            log.error("Couldn't record the label for listing {}: {}", listingId, e.getClass().getSimpleName());
+            pending = LABEL_PENDING;
         }
         return new AcceptResult(listings.deals(orgId), pending);
     }

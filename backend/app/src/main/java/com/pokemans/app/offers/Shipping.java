@@ -101,8 +101,9 @@ class Shipping {
     }
 
     /**
-     * Buys the label for a taken card, once. Runs in its own transaction after the accept has
-     * committed, so a provider failure never undoes the sale: the label can be bought again.
+     * Buys the label for a taken card, once. Joins the caller's transaction ({@code ListingService.buyLabel}, under the
+     * card's listing lock), which starts after the accept's own has committed, so a provider failure never undoes the
+     * sale: the label can be bought again. The provider is called with that transaction and the lock held.
      *
      * @throws ResponseStatusException 503 with no provider set up, 502 when the provider fails
      */
@@ -159,7 +160,9 @@ class Shipping {
             try {
                 status = seller.get().refund(label.getProviderShipmentId());
             } catch (RuntimeException e) {
-                error = "Couldn't ask for the refund: " + e.getMessage();
+                // The provider's answer can quote an address, and this is stored and shown: only its status or kind (finding 11).
+                log.warn("Couldn't ask for the refund of label {}: {}", label.getId(), failure(e));
+                error = "Couldn't ask for the refund: " + failure(e) + ".";
             }
         }
         try {

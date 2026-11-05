@@ -81,6 +81,8 @@ class OffersFlowTest {
         seller = api.user(subject, List.of());
         collectionId = TestApi.read(api.postJson("/api/orgs/" + orgId + "/collections", "{\"name\":\"For sale\"}", seller), "$.id");
         shipper.failing = false;
+        shipper.failure = "carrier is down";
+        shipper.unrecordable = false;
         shipper.gate = null;
     }
 
@@ -204,6 +206,22 @@ class OffersFlowTest {
         api.postJson(retry, "", buyer).andExpect(status().isOk()).andExpect(jsonPath("$[0].label.trackingCode").isNotEmpty());
         api.postJson(retry, "", buyer).andExpect(status().isOk()); // already bought: the same label, not a second one
         assertThat(shipper.bought.stream().filter(b -> b.reference().equals(listingId))).hasSize(1);
+    }
+
+    @Test
+    void aLabelThatCantBeRecordedStillLeavesTheBuyerWithTheCard() throws Exception {
+        // Review finding 7: only a ResponseStatusException was caught, so any other failure after the take (here the
+        // database refusing the label) answered 500 to a buyer who now owns the card.
+        String listingId = postedCard("Haunter", 200);
+        JwtRequestPostProcessor buyer = buyer("Unlucky Buyer");
+        String buyerOrg = lastBuyerOrg;
+        address(buyerOrg, buyer, "Unlucky Buyer");
+        shipper.unrecordable = true;
+
+        api.postJson(accept(buyerOrg, listingId), "", buyer).andExpect(status().isOk())
+                .andExpect(jsonPath("$.labelPending", containsString("couldn't buy the shipping label")))
+                .andExpect(jsonPath("$.deals[0].listingId").value(listingId))
+                .andExpect(jsonPath("$.deals[0].label").isEmpty());
     }
 
     @Test
@@ -665,6 +683,38 @@ class OffersFlowTest {
     }
 
     @Test
+    void thinDataOrALowValueGetsNoOffer() throws Exception {
+        // Review finding 12: the confidence D and $25 refusals had no test.
+        String unsure = card("Blurry Espeon");
+        priceLadder(identify(unsure, "Espeon " + UUID.randomUUID().toString().substring(0, 4), "2015-05-06", "NORMAL", "Rare"), 300);
+        api.postJson("/api/admin/orgs/" + orgId + "/cards/" + unsure + "/assessments",
+                "{\"distribution\":{\"9\":0.5,\"10\":0.5},\"confidence\":\"D\",\"reason\":\"blurry\"}", api.admin())
+                .andExpect(status().isCreated());
+        api.postJson(offers(unsure), "", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("There isn't enough sales data to make a firm offer on this card yet."));
+
+        String cheap = pricedCard("Cheap Pidgey", 60);
+        api.postJson(offers(cheap), "", seller).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Its value is under the $25 minimum for an offer."));
+        assertThat(jdbc.queryForObject("select count(*) from card_offer where card_item_id in (?::uuid, ?::uuid)", Integer.class,
+                unsure, cheap)).isZero();
+    }
+
+    @Test
+    void anOfferLastsSevenDaysAndAListingFourteen() throws Exception {
+        // Review finding 12: the expiry tests wrote expires_at by hand, so nothing checked the windows themselves.
+        String card = pricedCard("Timed Jolteon", 300);
+        String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
+        assertThat(jdbc.queryForObject("select extract(epoch from expires_at - created_at)::bigint from card_offer where id = ?::uuid",
+                Long.class, offerId)).isEqualTo(Duration.ofDays(7).toSeconds());
+
+        api.postJson("/api/orgs/" + orgId + "/ship-address", SELLER_ADDRESS, seller).andExpect(status().isCreated());
+        api.postJson(listings(card), "{\"offerId\":\"" + offerId + "\"}", seller).andExpect(status().isCreated());
+        assertThat(jdbc.queryForObject("select extract(epoch from expires_at - created_at)::bigint from sale_listing where offer_id = ?::uuid",
+                Long.class, offerId)).isEqualTo(Duration.ofDays(14).toSeconds());
+    }
+
+    @Test
     void aVoidedOfferComesOffTheMarketAndCantBeSold() throws Exception {
         String card = pricedCard("Flareon", 300);
         String offerId = TestApi.read(api.postJson(offers(card), "", seller).andExpect(status().isCreated()), "$.id");
@@ -756,7 +806,9 @@ class OffersFlowTest {
         shipper.failing = true;
         api.postJson(refund, "{\"reason\":\"unused\"}", api.admin()).andExpect(status().isOk())
                 .andExpect(jsonPath("$.listing.labelRefund.providerStatus").isEmpty())
-                .andExpect(jsonPath("$.listing.labelRefund.providerError", containsString("carrier is down")));
+                // What the provider said can quote an address (review finding 11): we keep only its status or the error's kind.
+                .andExpect(jsonPath("$.listing.labelRefund.providerError", containsString("Couldn't ask for the refund")))
+                .andExpect(jsonPath("$.listing.labelRefund.providerError", org.hamcrest.Matchers.not(containsString("carrier is down"))));
         shipper.failing = false;
         api.postJson(refund, "{\"reason\":\"unused\"}", api.admin()).andExpect(status().isOk())
                 .andExpect(jsonPath("$.listing.labelRefund.providerStatus").value("submitted"))
