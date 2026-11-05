@@ -1,5 +1,6 @@
 package com.pokemans.app.provenance;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -15,7 +16,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "custody_record")
-class CustodyRecord {
+class CustodyRecord extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -55,7 +56,8 @@ class CustodyRecord {
         this.createdAt = Instant.now();
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

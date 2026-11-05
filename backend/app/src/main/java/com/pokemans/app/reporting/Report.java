@@ -1,5 +1,6 @@
 package com.pokemans.app.reporting;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -12,7 +13,7 @@ import java.util.UUID;
 /** An issued report PDF: which run it renders, where it is stored and its hash. Append-only. */
 @Entity
 @Table(name = "report")
-class Report {
+class Report extends AssignedIdEntity<UUID> {
 
     enum Type { LENDER, INSURER }
 
@@ -50,7 +51,8 @@ class Report {
         this.issuedAt = issuedAt;
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

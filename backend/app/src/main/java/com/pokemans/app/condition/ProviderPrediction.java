@@ -1,5 +1,6 @@
 package com.pokemans.app.condition;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -19,7 +20,7 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(name = "provider_prediction")
-class ProviderPrediction {
+class ProviderPrediction extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -156,7 +157,8 @@ class ProviderPrediction {
         return succeeded && isOwnMeasurement() && centering != null ? (int) Math.floor(centering) : null;
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

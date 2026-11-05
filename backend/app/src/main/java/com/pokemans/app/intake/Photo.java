@@ -1,5 +1,6 @@
 package com.pokemans.app.intake;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -18,7 +19,7 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(name = "photo")
-class Photo {
+class Photo extends AssignedIdEntity<UUID> {
 
     enum Side { FRONT, BACK, DETAIL }
 
@@ -122,7 +123,8 @@ class Photo {
         this.checkedAt = now;
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

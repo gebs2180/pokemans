@@ -1,5 +1,6 @@
 package com.pokemans.app.offers;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import com.pokemans.app.identity.CurrentUser;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -201,7 +202,7 @@ record PaymentHandle(PaymentHandle.Method method, String handle) {
 /** Where an org ships from or to, and for a seller how they get paid. The latest row is current. Append-only. */
 @Entity
 @Table(name = "ship_address")
-class ShipAddress {
+class ShipAddress extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -251,7 +252,8 @@ class ShipAddress {
         return paymentMethod == null ? null : new PaymentHandle(paymentMethod, paymentHandle);
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 
@@ -263,7 +265,7 @@ class ShipAddress {
 /** A label bought for a taken card. Append-only. */
 @Entity
 @Table(name = "shipping_label")
-class ShippingLabel {
+class ShippingLabel extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -305,7 +307,8 @@ class ShippingLabel {
         this.createdAt = Instant.now();
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

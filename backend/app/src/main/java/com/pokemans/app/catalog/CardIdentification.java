@@ -1,5 +1,6 @@
 package com.pokemans.app.catalog;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -15,7 +16,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "card_identification")
-class CardIdentification {
+class CardIdentification extends AssignedIdEntity<UUID> {
 
     enum Source { REVIEWER, PROVIDER }
 
@@ -78,7 +79,8 @@ class CardIdentification {
         return readingId;
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 

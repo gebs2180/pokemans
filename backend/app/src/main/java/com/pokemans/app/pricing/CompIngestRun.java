@@ -1,5 +1,6 @@
 package com.pokemans.app.pricing;
 
+import com.pokemans.app.persistence.AssignedIdEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -14,7 +15,7 @@ import org.hibernate.type.SqlTypes;
 /** One ingestion pass over the tracked cards for one price source. */
 @Entity
 @Table(name = "comp_ingest_run")
-class CompIngestRun {
+class CompIngestRun extends AssignedIdEntity<UUID> {
 
     @Id
     private UUID id;
@@ -69,7 +70,8 @@ class CompIngestRun {
         finishedAt = Instant.now();
     }
 
-    UUID getId() {
+    @Override
+    public UUID getId() {
         return id;
     }
 
