@@ -222,7 +222,7 @@ describe('ContainerPage', () => {
     cards: [card(), { ...card(), id: 'card2', label: 'Umbreon', captureComplete: false, missingSides: ['BACK'] }],
   }
 
-  function renderCollection(posts: unknown[] = []) {
+  function renderCollection(posts: unknown[] = [], statusFails = false) {
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
@@ -231,6 +231,7 @@ describe('ContainerPage', () => {
           return Promise.resolve(respond(201, { ...card(), id: 'new1', label: 'Mew 151/165' }))
         }
         if (url.endsWith('/status')) {
+          if (statusFails) return Promise.resolve(respond(500, { detail: 'Server error' }))
           return Promise.resolve(respond(200, [{ ...status, stage: 'SOLD', identity: 'Pikachu VMAX · Vivid Voltage 188 · EN', deadline: '2026-11-05T12:00:00Z' }]))
         }
         return Promise.resolve(respond(200, detail))
@@ -252,6 +253,12 @@ describe('ContainerPage', () => {
     expect(screen.getByText('Pikachu VMAX · Vivid Voltage 188 · EN')).toBeInTheDocument()
     expect(screen.getByText('Needs back')).toBeInTheDocument()
     expect(screen.getByText(/^Ship by Nov 5/)).toBeInTheDocument()
+  })
+
+  it("says so when it can't load where each card is, instead of dropping the stages", async () => {
+    // Review finding 48: a failed status call used to leave every card without its stage, silently.
+    renderCollection([], true)
+    expect(await screen.findByText(/Couldn't load where each card is/)).toBeInTheDocument()
   })
 
   it('goes straight to a new card to photograph it', async () => {

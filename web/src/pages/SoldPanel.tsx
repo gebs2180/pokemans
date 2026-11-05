@@ -4,14 +4,7 @@ import { safeHref } from '../safeHref'
 import { Field } from '../ui'
 import { AddressForm } from './AddressForm'
 
-const DAY = 86_400_000
-
 const date = (at: string) => new Date(at).toLocaleDateString()
-
-/** The seller terms' deadline: 3 days from the label showing. */
-function shipBy(boughtAt: string) {
-  return date(new Date(new Date(boughtAt).getTime() + 3 * DAY).toISOString())
-}
 
 /** "by Venmo (@sam)", or nothing when the seller hasn't said. */
 function how(address: ShipAddress | null | undefined) {
@@ -141,7 +134,7 @@ export function SoldPanel({
                 <ul className="small">
                   <li>Put the card in a sleeve, then a toploader, in a bubble mailer.</li>
                   <li>Stick this label on the mailer. Use only this label: it's the insured one.</li>
-                  <li>Hand it to the carrier by {shipBy(label.boughtAt)}.</li>
+                  <li>Hand it to the carrier by {date(label.shipBy)}.</li>
                 </ul>
                 {confirming === 'shipped' ? (
                   confirmStep("Has the carrier got it? We take the label away once you say so, since it's used.", "Confirm: it's shipped", () => say('shipped'))

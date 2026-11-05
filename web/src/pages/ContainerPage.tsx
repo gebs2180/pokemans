@@ -45,10 +45,10 @@ export function ContainerView({
     [api, orgId, kind, containerId],
   )
   // Where each card is on the way to a sale; collections only (batches are for partners, who don't sell).
-  const { data: statuses } = useLoad(
+  const { data: statuses, error: statusError } = useLoad(
     () =>
       kind === 'collections'
-        ? api<CardStatus[]>('GET', apiPath`/api/orgs/${orgId}/collections/${containerId}/status`).catch(() => [] as CardStatus[])
+        ? api<CardStatus[]>('GET', apiPath`/api/orgs/${orgId}/collections/${containerId}/status`)
         : Promise.resolve([] as CardStatus[]),
     [api, orgId, kind, containerId],
   )
@@ -138,6 +138,11 @@ export function ContainerView({
         {formError.message}
       </form>
 
+      {statusError && (
+        <p className="alert alert-warning" role="status">
+          Couldn't load where each card is: {statusError}
+        </p>
+      )}
       {data.cards.length === 0 && <EmptyState title="No cards yet.">Add the first one above, then photograph it.</EmptyState>}
       <ul className="tile-list">
         {data.cards.map((card) => {
@@ -172,7 +177,7 @@ export function ContainerView({
 /** Reports issued for the collection, and for the admin the way to value it. */
 export function CollectionReports({ orgId, collectionId }: { orgId: string; collectionId: string }) {
   const api = useApi()
-  const { data: me } = useLoad(() => api<Me>('GET', '/api/me'), [api])
+  const { data: me, error: meError } = useLoad(() => api<Me>('GET', '/api/me'), [api])
   const { data: reports, error } = useLoad(
     () => api<ReportView[]>('GET', apiPath`/api/orgs/${orgId}/collections/${collectionId}/reports`),
     [api, orgId, collectionId],
@@ -186,6 +191,7 @@ export function CollectionReports({ orgId, collectionId }: { orgId: string; coll
         </p>
       )}
       {error && <p className="error" role="alert">{error}</p>}
+      {meError && <p className="error" role="alert">Couldn't check your access: {meError}</p>}
       {reports && <ReportsList reports={reports} downloadPath={(id) => apiPath`/api/orgs/${orgId}/reports/${id}/download`} />}
     </section>
   )

@@ -25,6 +25,7 @@ import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
 import { HowPriced } from './OfferPanel'
+import { message as errorText } from '../format'
 
 export function CardTitle({ card }: { card: OfferCard }) {
   return (
@@ -207,7 +208,7 @@ export function MarketPage() {
           : 'Bought: the seller has a prepaid label to you. It is in Your deals.',
       )
     } catch (e) {
-      setFailed({ listingId, message: e instanceof Error ? e.message : String(e) })
+      setFailed({ listingId, message: errorText(e) })
     } finally {
       setBusy(false)
       setConfirming(null)
@@ -222,7 +223,7 @@ export function MarketPage() {
       const estimate = await api<PostageEstimate>('GET', apiPath`/api/orgs/${orgId}/market/${listingId}/postage`)
       setPostage((p) => (p?.listingId === listingId ? { listingId, estimate } : p))
     } catch (e) {
-      setPostage((p) => (p?.listingId === listingId ? { listingId, error: e instanceof Error ? e.message : String(e) } : p))
+      setPostage((p) => (p?.listingId === listingId ? { listingId, error: errorText(e) } : p))
     }
   }
 
@@ -344,7 +345,7 @@ export function DealsPage() {
       await api('POST', apiPath`/api/orgs/${orgId}/deals/${listingId}/label`)
       reload()
     } catch (e) {
-      setLabelError(e instanceof Error ? e.message : String(e))
+      setLabelError(errorText(e))
     }
   }
 
@@ -503,7 +504,7 @@ export function PaidForm({ path, price, onSaved }: { path: string; price: number
       await api('POST', `${path}/paid`, { pricePaid: parseMoney(paid), note: note || null })
       onSaved()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(errorText(err))
     } finally {
       setBusy(false)
     }
@@ -607,7 +608,7 @@ export function ArrivalForm({ path, onSaved, noteRequired = false }: { path: str
       }
       onSaved()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(errorText(err))
     } finally {
       setBusy(false)
     }

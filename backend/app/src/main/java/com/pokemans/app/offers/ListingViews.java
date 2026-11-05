@@ -73,8 +73,12 @@ class ListingViews {
     record Party(String orgName, String email) {
     }
 
-    /** @param labelUrl the printable label; shown to the seller, who ships the card */
-    record LabelView(String carrier, String service, String trackingCode, String labelUrl, BigDecimal insuredValue, Instant boughtAt) {
+    /**
+     * @param labelUrl the printable label; shown to the seller, who ships the card
+     * @param shipBy   when the seller must hand it to the carrier, from {@link ListingStateMachine#SHIP_WITHIN} (review finding 17)
+     */
+    record LabelView(String carrier, String service, String trackingCode, String labelUrl, BigDecimal insuredValue, Instant boughtAt,
+                     Instant shipBy) {
     }
 
     /**
@@ -191,13 +195,14 @@ class ListingViews {
      */
     static LabelView withoutPrintable(LabelView label) {
         return label == null ? null
-                : new LabelView(label.carrier(), label.service(), label.trackingCode(), null, label.insuredValue(), label.boughtAt());
+                : new LabelView(label.carrier(), label.service(), label.trackingCode(), null, label.insuredValue(), label.boughtAt(),
+                        label.shipBy());
     }
 
     LabelView label(UUID listingId) {
         return shipping.label(listingId)
                 .map(x -> new LabelView(x.getCarrier(), x.getService(), x.getTrackingCode(), x.getLabelUrl(), x.getInsuredValue(),
-                        x.getCreatedAt()))
+                        x.getCreatedAt(), x.getCreatedAt().plus(ListingStateMachine.SHIP_WITHIN)))
                 .orElse(null);
     }
 

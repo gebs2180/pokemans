@@ -44,7 +44,7 @@ const ready: CardStatus = { cardId: 'card1', stage: 'READY', identity: 'Umbreon 
 /** Answers GETs by path (sale answers in turn), records POSTs and answers them with {@code postAnswer}. */
 function stubApi(
   sales: Sale[],
-  shipFrom: ShipAddress | null,
+  shipFrom: ShipAddress | null | 'fails',
   postAnswer: () => Response = () => new Response(null, { status: 201 }),
   status: CardStatus = ready,
 ) {
@@ -57,7 +57,10 @@ function stubApi(
         posts.push({ url, body: init.body ? JSON.parse(String(init.body)) : undefined })
         return Promise.resolve(postAnswer())
       }
-      if (url.endsWith('/ship-address')) return Promise.resolve(shipFrom ? respond(200, shipFrom) : new Response(null, { status: 200 }))
+      if (url.endsWith('/ship-address')) {
+        if (shipFrom === 'fails') return Promise.resolve(respond(500, { detail: 'Server error' }))
+        return Promise.resolve(shipFrom ? respond(200, shipFrom) : new Response(null, { status: 200 }))
+      }
       if (url.endsWith('/status')) return Promise.resolve(respond(200, status))
       return Promise.resolve(respond(200, sales[Math.min(i++, sales.length - 1)]))
     }),
@@ -214,7 +217,7 @@ describe('OfferPanel', () => {
           listing: {
             id: 'l1', offerId: 'offer1', status: 'ACCEPTED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
             closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: 'shop@example.com' },
-            label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' },
+            label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z', shipBy: '2026-10-25T10:00:00Z' },
             outcome: null,
             undone: null,
             progress: null,
@@ -230,7 +233,15 @@ describe('OfferPanel', () => {
     expect(screen.getByText(/tracking 9400111, insured for \$419.98/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Sell for/ })).not.toBeInTheDocument()
     expect(screen.getByText(/in a bubble mailer/)).toBeInTheDocument()
-    expect(screen.getByText(`Hand it to the carrier by ${new Date('2026-10-23T10:00:00Z').toLocaleDateString()}.`)).toBeInTheDocument()
+    // The API's ship-by date, not one worked out from boughtAt (review finding 17).
+    expect(screen.getByText(`Hand it to the carrier by ${new Date('2026-10-25T10:00:00Z').toLocaleDateString()}.`)).toBeInTheDocument()
+  })
+
+  it("says so when it can't load the seller's address", async () => {
+    // Review finding 48: the error was dropped, leaving Sell disabled with no reason.
+    stubApi([{ offer: offer(), listing: null }], 'fails')
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+    expect(await screen.findByText(/Couldn't load your shipping address/)).toBeInTheDocument()
   })
 
   it('says why we withdrew an offer, and offers a new one instead of selling', async () => {
@@ -250,7 +261,7 @@ describe('OfferPanel', () => {
           listing: {
             id: 'l1', offerId: 'offer1', status: 'CANCELLED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
             closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null },
-            label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' },
+            label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z', shipBy: '2026-10-23T10:00:00Z' },
             outcome: null,
             undone: { reason: 'buyer closed', at: '2026-10-21T10:00:00Z' },
             progress: null,
@@ -268,7 +279,7 @@ describe('OfferPanel', () => {
 })
 
 describe('OfferPanel after the sale', () => {
-  const printable = { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' }
+  const printable = { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z', shipBy: '2026-10-23T10:00:00Z' }
   const none: DealProgress = {
     stage: 'SOLD', shippedAt: null, arrivedAt: null, payBy: null, paidAt: null, pricePaid: null, paidNote: null,
     confirmedAt: null, disputedAt: null, disputeNote: null, review: null, held: false, cardBackAt: null,
@@ -791,7 +802,7 @@ describe('DealsPage', () => {
 
   it('records the arrival once the card is labelled', async () => {
     renderDeals([
-      { ...deal, label: { carrier: 'USPS', service: 'Ground', trackingCode: '94', labelUrl: 'https://l', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z' } },
+      { ...deal, label: { carrier: 'USPS', service: 'Ground', trackingCode: '94', labelUrl: 'https://l', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z', shipBy: '2026-10-23T10:00:00Z' } },
     ])
     expect(await screen.findByRole('button', { name: 'It arrived' })).toBeInTheDocument()
     expect(screen.getByText(/Pay them directly, within 7 days of it arriving as shown/)).toBeInTheDocument()

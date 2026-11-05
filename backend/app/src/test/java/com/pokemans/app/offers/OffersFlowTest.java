@@ -150,6 +150,10 @@ class OffersFlowTest {
         api.get(sale(card), seller).andExpect(jsonPath("$.listing.status").value("ACCEPTED"))
                 .andExpect(jsonPath("$.listing.buyer.orgName").value("First Buyer"))
                 .andExpect(jsonPath("$.listing.label.labelUrl", containsString("https://labels.example/")));
+        // The ship-by date comes from the API, so the web app doesn't recompute it (review finding 17).
+        String boughtAt = TestApi.read(api.get(sale(card), seller), "$.listing.label.boughtAt");
+        String shipBy = TestApi.read(api.get(sale(card), seller), "$.listing.label.shipBy");
+        assertThat(Instant.parse(shipBy)).isEqualTo(Instant.parse(boughtAt).plus(Duration.ofDays(3)));
         api.postJson("/api/orgs/" + orgId + "/listings/" + listingId + "/withdraw", "", seller).andExpect(status().isConflict());
 
         // On arrival: received and paid, once, by the buyer who took it.

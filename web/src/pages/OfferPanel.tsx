@@ -15,6 +15,7 @@ import {
 import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
 import { SoldPanel } from './SoldPanel'
+import { message } from '../format'
 
 /** "$300 (3 sales, 90 days)": the sold price a grade's worth starts from, with what it rests on. */
 function soldFor(sold: SoldPrice | undefined) {
@@ -84,14 +85,17 @@ export function HowPriced({ offer }: { offer: Offer }) {
   )
 }
 
-/** A member's card: get our instant offer, sell at it, and follow the sale through to the buyer. */
-/** @param onChange called after the seller gets an offer, posts or withdraws, so the rest of the card page catches up */
+/**
+ * A member's card: get our instant offer, sell at it, and follow the sale through to the buyer.
+ *
+ * @param onChange called after the seller gets an offer, posts or withdraws, so the rest of the card page catches up
+ */
 export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId: string; onChange?: () => void }) {
   const api = useApi()
   const salePath = apiPath`/api/orgs/${orgId}/cards/${cardId}/sale`
   const { data: sale, error, reload } = useLoad(() => api<Sale>('GET', salePath), [api, salePath])
   // Wrapped, so "no address on file" (an empty response) is told apart from "still loading".
-  const { data: shipFrom, reload: reloadAddress } = useLoad(
+  const { data: shipFrom, error: addressError, reload: reloadAddress } = useLoad(
     () => api<ShipAddress | null>('GET', apiPath`/api/orgs/${orgId}/ship-address`).then((address) => ({ address })),
     [api, orgId],
   )
@@ -115,7 +119,7 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
       reloadStatus()
       onChange?.()
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e))
+      setActionError(message(e))
     } finally {
       setBusy(false)
     }
@@ -293,6 +297,7 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
       {listing && (listing.status === 'WITHDRAWN' || listing.status === 'EXPIRED') && (
         <p className="muted small">Your last posting was {listing.status.toLowerCase()}.</p>
       )}
+      {addressError && <p className="error" role="alert">Couldn't load your shipping address: {addressError}</p>}
       {actionError && <p className="error" role="alert">{actionError}</p>}
     </section>
   )

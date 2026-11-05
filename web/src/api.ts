@@ -860,6 +860,8 @@ export type ShippingLabel = {
   labelUrl: string | null
   insuredValue: number
   boughtAt: string
+  /** When the seller must hand it to the carrier. */
+  shipBy: string
 }
 
 /** What happened once the card arrived. INSPECTED is a grade recorded under the per-grade offers that came before. */

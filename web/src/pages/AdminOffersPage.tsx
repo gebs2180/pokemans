@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { apiPath, money, RETURN_REASON, useApi, type AdminListing, type AdminOffer, type AttentionKind, type DealAttention, type Undo } from '../api'
 import { useLoad } from '../useLoad'
 import { Loading } from '../ui'
+import { message } from '../format'
 
 const STATUS: Record<AdminListing['status'], string> = {
   OPEN: 'On the market',
@@ -52,7 +53,7 @@ export function UndoAction({
       setReason('')
       onDone()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(message(err))
     } finally {
       setBusy(false)
     }
