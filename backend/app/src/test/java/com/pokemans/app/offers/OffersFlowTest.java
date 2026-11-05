@@ -251,7 +251,12 @@ class OffersFlowTest {
             while (shipper.inFlight.get() == 0 && System.currentTimeMillis() < deadline) {
                 Thread.onSpinWait();
             }
-            Thread.sleep(500); // time for the second request to reach the provider too, if nothing stops it
+            // The second request either reaches the provider too, or waits on the listing's lock: wait for one
+            // of them, not a fixed time (review finding 53).
+            while (shipper.inFlight.get() < 2 && waitingOnALock() == 0 && System.currentTimeMillis() < deadline) {
+                Thread.onSpinWait();
+            }
+            assertThat(shipper.inFlight.get() + waitingOnALock()).as("both requests in").isEqualTo(2);
             shipper.gate.countDown();
             for (Future<Integer> call : calls) {
                 assertThat(call.get(20, TimeUnit.SECONDS)).isEqualTo(200);
@@ -260,6 +265,11 @@ class OffersFlowTest {
             pool.shutdownNow();
         }
         assertThat(shipper.bought.stream().filter(b -> b.reference().equals(listingId))).hasSize(1);
+    }
+
+    /** Sessions waiting for an advisory lock ({@link ListingLock}) right now. */
+    private int waitingOnALock() {
+        return jdbc.queryForObject("select count(*) from pg_locks where locktype = 'advisory' and not granted", Integer.class);
     }
 
     @Test

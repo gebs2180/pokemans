@@ -11,15 +11,18 @@ import com.pokemans.app.TestApi;
 import com.pokemans.app.TestcontainersConfiguration;
 import com.pokemans.app.identity.SecurityProperties;
 import com.pokemans.app.storage.BlobStore;
+import com.pokemans.app.storage.PhotoDecodes;
 import com.pokemans.app.storage.StorageProperties;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +49,9 @@ class PhotoChecksAtOnceTest {
     @Autowired
     private StorageProperties storage;
 
+    @Autowired
+    private PhotoDecodes decodes;
+
     @MockitoSpyBean
     private BlobStore blobs;
 
@@ -69,12 +75,15 @@ class PhotoChecksAtOnceTest {
             photoIds.add(JsonPath.read(slot, "$.photoId"));
         }
 
+        // Each read holds until every confirm is either reading or queued for a turn (review finding 53): without
+        // the limit all six would be reading at once, and with it the rest are provably waiting, not just late.
         AtomicInteger inFlight = new AtomicInteger();
         AtomicInteger most = new AtomicInteger();
+        CountDownLatch gate = new CountDownLatch(1);
         doAnswer(call -> {
             most.accumulateAndGet(inFlight.incrementAndGet(), Math::max);
             try {
-                Thread.sleep(300);
+                assertThat(gate.await(20, TimeUnit.SECONDS)).as("the test opened the gate").isTrue();
                 return call.callRealMethod();
             } finally {
                 inFlight.decrementAndGet();
@@ -88,6 +97,12 @@ class PhotoChecksAtOnceTest {
                         .andExpect(status().isOk()).andReturn().getResponse().getStatus();
                 results.add(pool.submit(confirm));
             }
+            long deadline = System.currentTimeMillis() + 10_000;
+            while (inFlight.get() + decodes.waiting() < photoIds.size() && System.currentTimeMillis() < deadline) {
+                Thread.onSpinWait();
+            }
+            assertThat(inFlight.get() + decodes.waiting()).as("every confirm reading or queued").isEqualTo(photoIds.size());
+            gate.countDown();
             for (Future<Integer> result : results) {
                 assertThat(result.get()).isEqualTo(200);
             }

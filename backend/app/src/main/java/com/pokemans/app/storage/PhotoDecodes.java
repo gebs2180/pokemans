@@ -28,6 +28,11 @@ public class PhotoDecodes {
         this.turns = new Semaphore(storage.photoChecksAtOnce(), true);
     }
 
+    /** How many callers are waiting for a turn now, roughly: for tests and monitoring. */
+    public int waiting() {
+        return turns.getQueueLength();
+    }
+
     /**
      * Runs {@code work} once a turn comes up, waiting at most {@code wait}.
      *
