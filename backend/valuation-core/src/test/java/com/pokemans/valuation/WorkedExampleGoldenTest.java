@@ -2,11 +2,19 @@ package com.pokemans.valuation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Golden test: the worked example in the Raw Collection Valuation Methodology (2026-10-15).
@@ -16,10 +24,24 @@ import org.junit.jupiter.api.Test;
  * <p>Net prices are taken from the doc's grade table as given: only grades 5 to 10 have sales, so
  * grades 4 down to 1 are derived by the 0.78 step-down. The pricer's own derivation is covered in
  * {@link GradePricerTest}.
+ *
+ * <p>The example runs under every bundled parameter set (review finding 10), so whichever one the app is
+ * configured with ({@code pokemans.parameter-set}) reproduces the doc: a set may add rules, but not move these numbers.
  */
 class WorkedExampleGoldenTest {
 
     private final ParameterSet params = ParameterSet.defaults();
+
+    /** Every parameter set bundled in {@code parameter-sets/}. */
+    static List<String> bundledSets() throws IOException, URISyntaxException {
+        Path dir = Path.of(ParameterSet.class.getResource("/parameter-sets/" + ParameterSet.DEFAULT_VERSION + ".properties").toURI()).getParent();
+        try (Stream<Path> files = Files.list(dir)) {
+            List<String> versions = files.map(f -> f.getFileName().toString()).filter(n -> n.endsWith(".properties"))
+                    .map(n -> n.substring(0, n.length() - ".properties".length())).sorted().toList();
+            assertThat(versions).contains("1.0.0", "1.2.0");
+            return versions;
+        }
+    }
 
     private static BigDecimal d(String value) {
         return new BigDecimal(value);
@@ -104,9 +126,10 @@ class WorkedExampleGoldenTest {
         assertThat(stressed.p(Grade.U)).isEqualByComparingTo("0.02");
     }
 
-    @Test
-    void reproducesTheWorkedExample() {
-        CardValuation v = new CardValuator(params).value(exampleInput());
+    @ParameterizedTest
+    @MethodSource("bundledSets")
+    void reproducesTheWorkedExample(String version) {
+        CardValuation v = new CardValuator(ParameterSet.load(version)).value(exampleInput());
 
         assertThat(dollars(v.fmv())).isEqualByComparingTo("411");
         assertThat(dollars(v.rv())).isEqualByComparingTo("481");
@@ -119,9 +142,10 @@ class WorkedExampleGoldenTest {
         assertThat(dollars(advance)).isEqualByComparingTo("64");
     }
 
-    @Test
-    void exactIntermediateValues() {
-        CardValuation v = new CardValuator(params).value(exampleInput());
+    @ParameterizedTest
+    @MethodSource("bundledSets")
+    void exactIntermediateValues(String version) {
+        CardValuation v = new CardValuator(ParameterSet.load(version)).value(exampleInput());
 
         assertThat(v.fmv()).isEqualByComparingTo("410.95");
         assertThat(v.rv()).isEqualByComparingTo("480.81");
@@ -134,22 +158,24 @@ class WorkedExampleGoldenTest {
         assertThat(v.depthDiscount()).isEqualByComparingTo("0.10");
     }
 
-    @Test
-    void derivedPricesDropConfidenceOneLevelAndStressStaysTwoGrades() {
-        CardValuation v = new CardValuator(params).value(exampleInput());
+    @ParameterizedTest
+    @MethodSource("bundledSets")
+    void derivedPricesDropConfidenceOneLevelAndStressStaysTwoGrades(String version) {
+        CardValuation v = new CardValuator(ParameterSet.load(version)).value(exampleInput());
 
         assertThat(v.confidence()).isEqualTo(Confidence.B);
         assertThat(v.stressShift()).isEqualTo(2);
     }
 
-    @Test
-    void everyValueIsTraced() {
-        CardValuation v = new CardValuator(params).value(exampleInput());
+    @ParameterizedTest
+    @MethodSource("bundledSets")
+    void everyValueIsTraced(String version) {
+        CardValuation v = new CardValuator(ParameterSet.load(version)).value(exampleInput());
 
         for (String subject : new String[] {"FMV", "RV", "QSV", "FMV_stressed", "volatility_shock", "depth_discount", "FLV", "confidence"}) {
             assertThat(v.trace().stepsFor(subject)).as(subject).isNotEmpty();
         }
         assertThat(v.trace().stepsFor("confidence").getFirst().detail()).contains("4").contains("3");
-        assertThat(v.trace().stepsFor("parameters").getFirst().value()).isEqualTo("1.0.0");
+        assertThat(v.trace().stepsFor("parameters").getFirst().value()).isEqualTo(version);
     }
 }

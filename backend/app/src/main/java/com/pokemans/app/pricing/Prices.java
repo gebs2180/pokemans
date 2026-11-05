@@ -54,10 +54,10 @@ public class Prices {
     private final PriceStatsRepository stats;
     private final Staleness staleness;
 
-    Prices(PriceSnapshotRepository snapshots, PriceStatsRepository stats, PricingProperties properties) {
+    Prices(PriceSnapshotRepository snapshots, PriceStatsRepository stats, ParameterSet params) {
         this.snapshots = snapshots;
         this.stats = stats;
-        this.staleness = new Staleness(ParameterSet.load(properties.parameterSet()));
+        this.staleness = new Staleness(params);
     }
 
     /**
