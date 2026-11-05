@@ -1,6 +1,7 @@
 package com.pokemans.app.condition;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -169,5 +170,11 @@ class ConditionFlowTest {
                 .andExpect(jsonPath("$.authorType").value("SYSTEM"));
         assertThat(jdbc.queryForObject("select count(*) from condition_assessment where card_item_id = ?::uuid and is_current",
                 Integer.class, cardId)).isEqualTo(1);
+
+        // Only stepping down may change a stored version (review finding 40).
+        assertThatThrownBy(() -> jdbc.update("update condition_assessment set confidence = 'A' where card_item_id = ?::uuid and version = 1",
+                cardId)).hasMessageContaining("append-only");
+        assertThatThrownBy(() -> jdbc.update("update condition_assessment set is_current = true where card_item_id = ?::uuid and version = 1",
+                cardId)).hasMessageContaining("append-only");
     }
 }

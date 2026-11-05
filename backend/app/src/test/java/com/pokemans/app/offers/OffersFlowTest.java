@@ -187,6 +187,14 @@ class OffersFlowTest {
                 .hasMessageContaining("append-only");
         assertThatThrownBy(() -> jdbc.update("update card_offer set price = 1 where id = ?::uuid", offerId))
                 .hasMessageContaining("append-only");
+
+        // A refund's listing must be its label's own (review finding 56).
+        String other = postedCard("Mismatched Mew", 100);
+        assertThatThrownBy(() -> jdbc.update("""
+                insert into label_refund (id, label_id, listing_id, reason, requested_by, created_at)
+                select gen_random_uuid(), l.id, ?::uuid, 'x', (select id from app_user limit 1), now()
+                from shipping_label l where l.listing_id = ?::uuid""", other, listingId))
+                .hasMessageContaining("label_refund_label_listing_fk");
     }
 
     @Test

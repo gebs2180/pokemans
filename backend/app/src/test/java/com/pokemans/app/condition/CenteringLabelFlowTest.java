@@ -1,6 +1,7 @@
 package com.pokemans.app.condition;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
@@ -100,6 +101,9 @@ class CenteringLabelFlowTest {
         api.get(card.base() + "/centering-labels", api.admin()).andExpect(jsonPath("$.front.left").value(2.6));
         assertThat(jdbc.queryForObject("select count(*) from centering_label where card_item_id = ?::uuid", Integer.class, card.cardId()))
                 .isEqualTo(2);
+        // Append-only, enforced (review finding 40).
+        assertThatThrownBy(() -> jdbc.update("update centering_label set left_mm = 1 where card_item_id = ?::uuid", card.cardId()))
+                .hasMessageContaining("append-only");
     }
 
     @Test

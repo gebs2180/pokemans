@@ -32,9 +32,17 @@ class MigrationV17Test {
     @Autowired
     private JdbcTemplate jdbc;
 
+    /**
+     * Repeatable migrations (R__) run after the versioned ones whatever the target, and read the latest
+     * schema, so a run stopped at an old version leaves them out.
+     */
     private Flyway flyway(String target) {
-        return Flyway.configure().dataSource(dataSource).schemas(SCHEMA).defaultSchema(SCHEMA)
-                .locations("classpath:db/migration").target(target).load();
+        var config = Flyway.configure().dataSource(dataSource).schemas(SCHEMA).defaultSchema(SCHEMA)
+                .locations("classpath:db/migration").target(target);
+        if (!"latest".equals(target)) {
+            config.repeatableSqlMigrationPrefix("NOT_NOW__");
+        }
+        return config.load();
     }
 
     @Test
