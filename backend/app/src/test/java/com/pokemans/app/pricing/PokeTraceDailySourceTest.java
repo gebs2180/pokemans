@@ -30,57 +30,8 @@ class PokeTraceDailySourceTest {
                 null, false);
     }
 
-    private static Map<String, Object> row(int n, double avg, double low, double high) {
-        return Map.of("date", "2026-10-20", "source", "ebay", "avg", avg, "low", low, "high", high, "saleCount", n);
-    }
-
     private static List<BigDecimal> prices(List<PriceSource.Sale> sales) {
         return sales.stream().map(PriceSource.Sale::price).toList();
-    }
-
-    @Test
-    void eachDayBecomesItsSaleCountOfSales() {
-        PokeTraceDailySource.Key psa9 = new PokeTraceDailySource.Key("PSA_9", "ebay", "2026-10-20");
-        LocalDate day = LocalDate.of(2026, 10, 20);
-        assertThat(prices(PokeTraceDailySource.expand(CATALOG, DEEP, psa9, row(1, 500, 500, 500), day, "USD")))
-                .containsExactly(new BigDecimal("500.00"));
-        assertThat(prices(PokeTraceDailySource.expand(CATALOG, DEEP, psa9, row(2, 500, 450, 550), day, "USD")))
-                .containsExactly(new BigDecimal("450.00"), new BigDecimal("550.00"));
-        List<PriceSource.Sale> four = PokeTraceDailySource.expand(CATALOG, DEEP, psa9, row(4, 500, 400, 640), day, "USD");
-        assertThat(prices(four)).containsExactly(new BigDecimal("400.00"), new BigDecimal("640.00"), new BigDecimal("500.00"),
-                new BigDecimal("500.00"));
-        assertThat(four).allSatisfy(s -> {
-            assertThat(s.gradingCompany()).isEqualTo(PriceSource.GradingCompany.PSA);
-            assertThat(s.grade()).isEqualByComparingTo("9");
-            assertThat(s.soldDate()).isEqualTo(day);
-            assertThat(s.raw()).containsEntry("expansion", "low, high and 2 at the average");
-        });
-        assertThat(four.stream().map(PriceSource.Sale::externalSaleId).distinct()).hasSize(4);
-
-        // Half grades, raw conditions, and what is never a sale: no sales, EUR listings, TCGplayer on a graded tier.
-        assertThat(PokeTraceDailySource.expand(CATALOG, DEEP, new PokeTraceDailySource.Key("BGS_9_5", "ebay", "2026-10-20"),
-                row(1, 900, 900, 900), day, "USD").getFirst().grade()).isEqualByComparingTo("9.5");
-        assertThat(PokeTraceDailySource.expand(CATALOG, DEEP, new PokeTraceDailySource.Key("DAMAGED", "tcgplayer", "2026-10-20"),
-                row(1, 20, 20, 20), day, "USD").getFirst().rawCondition()).isEqualTo(PriceSource.RawCondition.DAMAGED);
-        assertThat(PokeTraceDailySource.expand(CATALOG, DEEP, psa9, row(0, 500, 500, 500), day, "USD")).isEmpty();
-        assertThat(PokeTraceDailySource.expand(CATALOG, DEEP, new PokeTraceDailySource.Key("PSA_9", "cardmarket_unsold", "2026-10-20"),
-                row(3, 500, 400, 600), day, "USD")).isEmpty();
-        assertThat(PokeTraceDailySource.expand(CATALOG, DEEP, new PokeTraceDailySource.Key("PSA_9", "tcgplayer", "2026-10-20"),
-                row(3, 500, 400, 600), day, "USD")).isEmpty();
-        assertThat(PokeTraceDailySource.expand(CATALOG, DEEP, new PokeTraceDailySource.Key("SEALED", "ebay", "2026-10-20"),
-                row(3, 500, 400, 600), day, "USD")).isEmpty();
-    }
-
-    @Test
-    void aRowWithBlankFieldsStillBecomesSales() {
-        Map<String, Object> row = new java.util.HashMap<>(row(1, 500, 500, 500));
-        row.put("median30d", null);
-
-        List<PriceSource.Sale> sales = PokeTraceDailySource.expand(CATALOG, DEEP, new PokeTraceDailySource.Key("PSA_9", "ebay", "2026-10-20"),
-                row, LocalDate.parse("2026-10-20"), "USD");
-
-        assertThat(sales).hasSize(1);
-        assertThat(sales.getFirst().raw()).doesNotContainKey("median30d");
     }
 
     @Test
@@ -88,14 +39,15 @@ class PokeTraceDailySourceTest {
         PokeTraceDailySource source = new PokeTraceDailySource(SAMPLE, Map.of(CATALOG, DEEP));
         List<PriceSource.Sale> sales = source.soldSales(card(CATALOG), FROM, TO);
 
-        // 14 sales per tier in the sample: PSA 5-10, three raw conditions; CGC 10 has 3.
+        // One comp per sale day: PSA 9's 14 sales fell on 13 days; CGC 10 has 3.
         Map<String, Long> byTier = sales.stream().collect(Collectors.groupingBy(
                 s -> s.gradingCompany() == null ? s.rawCondition().name() : s.gradingCompany() + "_" + s.grade().stripTrailingZeros().toPlainString(),
                 Collectors.counting()));
         assertThat(byTier).containsOnlyKeys("PSA_5", "PSA_6", "PSA_7", "PSA_8", "PSA_9", "PSA_10", "NEAR_MINT", "LIGHTLY_PLAYED",
                 "DAMAGED", "CGC_10");
-        assertThat(byTier.get("PSA_9")).isEqualTo(14); // the cardmarket_unsold and TCGplayer rows are left out
-        assertThat(byTier.get("NEAR_MINT")).isEqualTo(14);
+        assertThat(byTier.get("PSA_9")).isEqualTo(13); // the cardmarket_unsold and TCGplayer rows are left out
+        assertThat(byTier.get("PSA_10")).isEqualTo(14);
+        assertThat(byTier.get("NEAR_MINT")).isEqualTo(13);
         assertThat(byTier.get("CGC_10")).isEqualTo(3);
         assertThat(sales).allSatisfy(s -> {
             assertThat(s.source()).isEqualTo(PokeTraceDailySource.NAME);

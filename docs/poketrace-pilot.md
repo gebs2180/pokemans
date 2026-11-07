@@ -63,14 +63,7 @@ At 50 rows a page, a year of daily rows is about 8 pages per tier, fewer on quie
 
 ### 1. Calibration only: no decision needed, build before buying
 
-A **test-scoped** `PokeTraceDailySource implements PriceSource` reads the saved JSON and turns each daily row into sales for `CompIngestionService`, the same path a licensed source will use:
-
-- `saleCount` 1 → one sale at `avg`.
-- `saleCount` 2 → two sales, at `low` and `high`.
-- `saleCount` n ≥ 3 → one at `low`, one at `high` and n − 2 at `avg`. That keeps the count exact, the range exact and the mean close.
-- `externalSaleId` = `<uuid>|<tier>|<date>|<i>`, so a re-import is a no-op.
-- `source` = `POKETRACE_DAILY`, and `raw` keeps the day's row.
-- Raw tiers map to `RawCondition`.
+A **test-scoped** `PokeTraceDailySource implements PriceSource` reads the saved JSON and turns each daily row into sales for `CompIngestionService`, the same path the live source uses. It was first built to expand a day of n sales into n comps (low, high and n − 2 at `avg`). Since 2026-11-07 it uses the live sale-day rule instead (`PokeTraceDays`, below): one comp per day with a sale, at the day's `avg`, because the count is noised. Raw tiers map to `RawCondition`, and `raw` keeps the day's row.
 
 `OfferSanityRunner` gets a second input, `POKEMANS_OFFER_SANITY_POKETRACE=<folder>`. It identifies the 30 cards from `manifest.csv`, ingests through the source, refreshes and runs the same sweep. It runs only in the Testcontainers database, so nothing reaches the app's data.
 
@@ -82,16 +75,16 @@ It answers:
 - How offers compare with the raw NEAR_MINT prices, the floor a vendor checks first (finding 5).
 - σ measured from 12 months instead of the fallback.
 
-### 2. Live offers: Zach's call, after the pilot
+### 2. Live offers: built 2026-11-07
 
-A production `PokeTraceSource` would price real offers from daily aggregates rather than individual sales. Three things to settle before that:
+PokeTrace gave written permission on 2026-11-07 (see [price-data-sources.md](price-data-sources.md)), and said `saleCount` is noised: a positive count is shifted by −2 to +4, never below 1, and zero stays zero. Zach chose the sale-day rule, and the production `PokeTraceSource` prices real offers with it:
 
-- **Methodology:** step 3 says "every price traces to *sold* comps with dates and counts". Daily rows have dates and counts but, on busy days, not each price. Options:
-  - accept the expansion above;
-  - treat a busy day as one comp with weight n;
-  - cap the confidence of aggregate-sourced prices.
-- **Licence:** confirm with PokeTrace in writing that collector offers priced from their data are allowed, and whether data can be kept after cancelling. The terms are silent on both; `PriceSource`'s own rule is "only added, and only enabled, once its licence covers" storage and use.
-- **Cost:** staying on Pro is $19.99 a month for the whole catalog. That's cheap if the answers are yes.
+- **One comp per sale day.** Each (tier, source, day) with a positive count is one comp at the day's `avg`, whatever the count. The count is never used as a count, so confidence, the sales rate and trimming all count sale days, a lower bound on the sales. A day with no sale, or no `avg`, is no comp, and today's row is left out until the day is over.
+- **Which rows.** PSA tiers and raw conditions only, since a raw card is valued on PSA's table. Graded tiers come from eBay; raw from eBay or TCGplayer. Never Cardmarket or `cardmarket_unsold`.
+- **Ids.** `externalSaleId` = `<poketraceId>|<tier>|<source>|<day>`, so re-pulls are no-ops. A card's first pull asks for `1y`, later ones `30d` (`pokemans.pricing.poketrace.backfill` and `recent`).
+- **Mapping.** An admin maps each catalog card to its PokeTrace card from the card's prices panel, because PokeTrace's search doesn't split editions. Mappings are append-only (`poketrace_card`), unmapping is a row with no id, and a candidate that disagrees with our card (number, set, edition, variant, language, stamp) needs a reason. A price table uses only the comps of the card's current mapping, so a wrong mapping is undone by remapping, with the old comps kept.
+- **Switching it on.** Off by default. Prod needs `POKETRACE_ENABLED=true`, `POKETRACE_API_KEY` and `PRICING_INGESTION_ENABLED=true` (the daily pull), all set by Zach.
+- **Cost:** Pro, $19.99 a month for the whole catalog.
 
 ## Built (2026-10-26): day 1 is buy, set the key, run
 
@@ -148,7 +141,7 @@ The pull covered 27 cards rather than 30. Several candidates didn't match, other
 
 - **Coverage:** at a likely PSA 9 and photo confidence B, 22 of 27 cards get a firm offer, 4 are over the $5,000 maximum and 1 has no PSA table.
 - **Prices:** the engine's PSA 8 and 9 for Base Charizard sit within about 1% of PokeTrace's own 90-day median, which is what the method should do.
-- **Confidence is flattered:** comps grade A in 387 of 486 rows. It rests on the approximate counts, so it can't be trusted yet. Recommendation: cap prices from these rows at confidence B until the flag is explained.
+- **Confidence is flattered:** comps grade A in 387 of 486 rows. It rests on the approximate counts, so it can't be trusted yet. Recommendation: cap prices from these rows at confidence B until the flag is explained. (Superseded 2026-11-07: PokeTrace explained the flag as deliberate noise, and the live source counts sale days instead of `saleCount`, so no cap is needed.)
 - **Thin top grades are unsafe:** Mewtwo-EX 98/99 shows a single PSA 10 sale far out of line with its raw price, and Base Charizard's PSA 10 days differ by more than 100× low to high. Trimming starts at 10 sales, so a tier with a few wild days goes through untouched. Wild days are rare overall (8 of 3,168 tier days beyond 3× the tier's median), but that test needs 5 days in a tier, so it misses the thinnest tiers.
 - **Volatility is broken by those rows:** Base Charizard's σ comes out at 20.48, where the method expects something near 0.08. Offers don't use σ, but FLV does, so it needs outlier handling before lenders resume.
 - **Some offers fall below raw:** at a likely PSA 9, 5 of the 22 offers are under the lowest raw near-mint sale of the last 90 days, so a seller would do better selling raw.

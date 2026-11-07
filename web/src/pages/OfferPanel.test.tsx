@@ -612,8 +612,8 @@ describe('HowPriced', () => {
 
     expect(await screen.findByText('Fairly sure (B), because there are only a few recent sales.')).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Recently sold for' })).toBeInTheDocument()
-    expect(screen.getByRole('row', { name: /PSA 10/ })).toHaveTextContent('$900.00 (3 sales, 90 days)')
-    expect(screen.getByRole('row', { name: /PSA 9/ })).toHaveTextContent('$450.00 (1 sale, 180 days)')
+    expect(screen.getByRole('row', { name: /PSA 10/ })).toHaveTextContent('$900.00 (at least 3 sales, 90 days)')
+    expect(screen.getByRole('row', { name: /PSA 9/ })).toHaveTextContent('$450.00 (at least 1 sale, 180 days)')
     expect(screen.getByRole('row', { name: /^PSA 8 / })).toHaveTextContent('no sales of its own')
   })
 

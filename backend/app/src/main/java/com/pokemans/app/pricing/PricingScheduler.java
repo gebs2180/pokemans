@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
-/** Runs the pricing refresh nightly. Off by default (no licensed price source); tests drive it directly. */
+/** Runs the pricing refresh nightly. Off by default (PRICING_INGESTION_ENABLED); tests drive it directly. */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
 @ConditionalOnBooleanProperty("pokemans.pricing.ingestion.enabled")

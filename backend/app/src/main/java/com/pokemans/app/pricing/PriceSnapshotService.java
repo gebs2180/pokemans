@@ -65,9 +65,11 @@ class PriceSnapshotService {
     private final Catalog catalog;
     private final PricingProperties properties;
     private final ParameterSet params;
+    private final PokeTraceMappings poketraceMappings;
 
     PriceSnapshotService(SoldCompRepository comps, PriceSnapshotRepository snapshots, PriceStatsRepository stats,
-                         Catalog catalog, PricingProperties properties, ParameterSet params) {
+                         Catalog catalog, PricingProperties properties, ParameterSet params, PokeTraceMappings poketraceMappings) {
+        this.poketraceMappings = poketraceMappings;
         this.comps = comps;
         this.snapshots = snapshots;
         this.stats = stats;
@@ -91,8 +93,12 @@ class PriceSnapshotService {
         cardIds.addAll(comps.findCatalogCardIdsSoldBetween(from, asOf));
         List<Catalog.CardSummary> cards = catalog.cards(cardIds);
 
-        // Every comp in the window in one query, rather than one query per card.
+        // Every comp in the window in one query, rather than one query per card. A PokeTrace comp counts
+        // only while its card is still mapped to the PokeTrace card it came from.
+        Map<UUID, String> poketrace = poketraceMappings.all();
         Map<UUID, List<SoldComp>> soldByCard = comps.findBySoldOnBetween(from, asOf).stream()
+                .filter(c -> !PokeTraceSource.NAME.equals(c.getSource())
+                        || c.getExternalSaleId().startsWith(poketrace.getOrDefault(c.getCatalogCardId(), "\0") + "|"))
                 .collect(Collectors.groupingBy(SoldComp::getCatalogCardId));
 
         // Pass 1: observed prices per card and company, grouped by era and company, build the ratio tables.

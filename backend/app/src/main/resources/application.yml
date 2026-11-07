@@ -93,11 +93,18 @@ pokemans:
     # Starting value, to be set from real data: how many cards an era step-down ratio needs.
     min-cards-per-ratio: 3
     ingestion:
-      # Nightly comp ingestion and snapshot refresh. Off: no price source is licensed yet
+      # Nightly comp ingestion and snapshot refresh, from every enabled price source
       # (docs/price-data-sources.md). Vendor keys go in the environment, never in this file.
       enabled: ${PRICING_INGESTION_ENABLED:false}
       cron: "0 30 6 * * *"
       lookback: 400d
+    poketrace:
+      # PokeTrace Pro (written permission 2026-11-07): one comp per sale day at the day's average,
+      # only for cards an admin has mapped. A card's first pull goes a year back, later ones 30 days.
+      enabled: ${POKETRACE_ENABLED:false}
+      api-key: ${POKETRACE_API_KEY:}
+      backfill: 1y
+      recent: 30d
   offers:
     # Instant offers (Zach, 2026-10-19): one firm price, the expected value over the card's grades of the
     # quick-sale value less the buyer's margin, which the parameter set sets by confidence (1.2.0: A 10%,

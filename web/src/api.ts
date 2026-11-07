@@ -583,6 +583,25 @@ export type PriceTable = {
 
 export type PricesView = { catalogCardId: string; comps: CompView[]; tables: PriceTable[]; skipped: string[] }
 
+/** Which PokeTrace card a catalog card is; poketraceId is null when never mapped or unmapped. */
+export type PokeTraceMappingView = {
+  enabled: boolean
+  poketraceId: string | null
+  poketraceCard: Record<string, unknown> | null
+  overrideReason: string | null
+  mappedBy: string | null
+  mappedAt: string | null
+}
+
+export type PokeTraceCandidate = {
+  poketraceId: string
+  name: string | null
+  cardNumber: string | null
+  variant: string | null
+  setName: string | null
+  disagreements: string[]
+}
+
 // Provenance: authenticity findings and custody
 
 export type Finding = 'VERIFIED_AUTHENTIC' | 'SUSPECTED_COUNTERFEIT' | 'COUNTERFEIT'
