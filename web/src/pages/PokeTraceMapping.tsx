@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { apiPath, useApi, type PokeTraceCandidate, type PokeTraceMappingView } from '../api'
+import { apiPath, useApi, type PokeTraceCandidate, type PokeTraceMappingView, type PokeTracePull } from '../api'
 import { message } from '../format'
 import { useLoad } from '../useLoad'
 
@@ -16,6 +16,8 @@ export function PokeTraceMapping({ catalogCardId, onChanged }: { catalogCardId: 
   const [reasons, setReasons] = useState<Record<string, string>>({})
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [pulling, setPulling] = useState(false)
+  const [pulled, setPulled] = useState<PokeTracePull | null>(null)
 
   if (data?.enabled !== true) return null
 
@@ -42,8 +44,20 @@ export function PokeTraceMapping({ catalogCardId, onChanged }: { catalogCardId: 
   const unmap = () =>
     run(async () => {
       await api('DELETE', url)
+      setPulled(null)
       reload()
       onChanged?.()
+    })
+  const pull = () =>
+    run(async () => {
+      setPulled(null)
+      setPulling(true)
+      try {
+        setPulled(await api<PokeTracePull>('POST', `${url}/pull`))
+        onChanged?.()
+      } finally {
+        setPulling(false)
+      }
     })
 
   const card = data.poketraceCard
@@ -69,8 +83,25 @@ export function PokeTraceMapping({ catalogCardId, onChanged }: { catalogCardId: 
       <p>
         <button onClick={search} disabled={busy}>
           {data.poketraceId ? 'Change PokeTrace card' : 'Find on PokeTrace'}
-        </button>
+        </button>{' '}
+        {data.poketraceId && (
+          <button onClick={pull} disabled={busy}>
+            Pull sales now
+          </button>
+        )}
       </p>
+      {data.poketraceId && !pulled && !pulling && (
+        <p className="muted small">Sales are pulled nightly. A first pull fetches a year of history and can take a minute.</p>
+      )}
+      {pulling && <p className="muted small">Pulling from PokeTrace…</p>}
+      {pulled && (
+        <p className="small" role="status">
+          Pulled {pulled.fetched} sale days: {pulled.inserted} new, {pulled.duplicates} already stored
+          {pulled.rejected > 0 && `, ${pulled.rejected} rejected`}.{' '}
+          {pulled.repriced ? 'Prices refreshed.' : 'Another refresh was running: click Refresh prices in a minute.'}
+          {pulled.errors.length > 0 && <span className="error"> PokeTrace failed: {pulled.errors.join('; ')}</span>}
+        </p>
+      )}
       {candidates && candidates.length === 0 && <p className="muted">PokeTrace has no card by this name.</p>}
       {candidates && candidates.length > 0 && (
         <table className="table">

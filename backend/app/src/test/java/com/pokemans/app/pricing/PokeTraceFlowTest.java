@@ -187,8 +187,13 @@ class PokeTraceFlowTest {
                 .andExpect(jsonPath("$.overrideReason").doesNotExist())
                 .andExpect(jsonPath("$.poketraceCard.cardNumber").value("004/102"));
 
-        // First pull: a year back. PSA 8, PSA 10 and near mint, 5 sale days each; today, no-sale days and listings are left out.
-        ingest(card);
+        // The admin's pull now, the first one: a year back. PSA 8, PSA 10 and near mint, 5 sale days each; today,
+        // no-sale days and listings are left out. It re-prices straight after.
+        api.postJson(url + "/pull", "", api.user("auth0|nope-" + UUID.randomUUID(), List.of())).andExpect(status().isForbidden());
+        api.postJson(url + "/pull", "", api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.fetched").value(15))
+                .andExpect(jsonPath("$.inserted").value(15))
+                .andExpect(jsonPath("$.repriced").value(true));
         assertThat(fake.asked).filteredOn(a -> a.startsWith("pt-a:")).containsExactly("pt-a:PSA_8@1y", "pt-a:PSA_10@1y",
                 "pt-a:NEAR_MINT@1y");
         List<SoldComp> stored = comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card));
@@ -218,8 +223,9 @@ class PokeTraceFlowTest {
         assertThat(remapped.skipped().get(UUID.fromString(card))).contains("No graded sales");
         assertThat(comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card))).hasSize(15);
 
-        // Unmapped: nothing is asked for.
+        // Unmapped: nothing is asked for, and a pull is refused.
         mvc.perform(delete(url).with(api.admin())).andExpect(status().isOk()).andExpect(jsonPath("$.poketraceId").doesNotExist());
+        api.postJson(url + "/pull", "", api.admin()).andExpect(status().isBadRequest());
         fake.asked.clear();
         ingest(card);
         assertThat(fake.asked).isEmpty();

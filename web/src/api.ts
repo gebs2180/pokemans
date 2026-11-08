@@ -593,6 +593,16 @@ export type PokeTraceMappingView = {
   mappedAt: string | null
 }
 
+/** What pulling a card from PokeTrace now stored; repriced is false when another refresh was running. */
+export type PokeTracePull = {
+  fetched: number
+  inserted: number
+  duplicates: number
+  rejected: number
+  errors: string[]
+  repriced: boolean
+}
+
 export type PokeTraceCandidate = {
   poketraceId: string
   name: string | null

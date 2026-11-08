@@ -22,6 +22,29 @@ describe('PokeTraceMapping', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
+  it('pulls a mapped card now and says what it stored', async () => {
+    const user = userEvent.setup()
+    const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/pull') && init?.method === 'POST')
+        return respond(200, { fetched: 12, inserted: 9, duplicates: 3, rejected: 0, errors: [], repriced: true })
+      return respond(200, { ...unmapped, poketraceId: 'pt-a', poketraceCard: { name: 'Victini', cardNumber: '171/086' } })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const onChanged = vi.fn()
+    render(<PokeTraceMapping catalogCardId="c1" onChanged={onChanged} />)
+
+    await user.click(await screen.findByRole('button', { name: 'Pull sales now' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Pulled 12 sale days: 9 new, 3 already stored. Prices refreshed.')
+    expect(onChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers no pull for an unmapped card', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respond(200, unmapped)))
+    render(<PokeTraceMapping catalogCardId="c1" />)
+    await screen.findByRole('button', { name: 'Find on PokeTrace' })
+    expect(screen.queryByRole('button', { name: 'Pull sales now' })).not.toBeInTheDocument()
+  })
+
   it('maps a matching card, and a mismatching one only with a reason', async () => {
     const user = userEvent.setup()
     const fetch = vi.fn(async (url: string, init?: RequestInit) => {
