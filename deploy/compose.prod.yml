@@ -56,6 +56,9 @@ services:
       CARDGRADE_ENABLED: ${CARDGRADE_ENABLED:-false}
       CARDGRADE_API_KEY: ${CARDGRADE_API_KEY:-}
       CENTERING_ENABLED: ${CENTERING_ENABLED:-false}
+      POKETRACE_ENABLED: ${POKETRACE_ENABLED:-false}
+      POKETRACE_API_KEY: ${POKETRACE_API_KEY:-}
+      PRICING_INGESTION_ENABLED: ${PRICING_INGESTION_ENABLED:-false}
     # A 4 GB VPS: the JVM takes 60% of this limit as heap.
     mem_limit: 1536m
     logging: *logging
