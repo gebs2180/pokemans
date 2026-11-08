@@ -15,6 +15,7 @@ import { DateInput, MoneyInput } from '../inputs'
 import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { CompCsvImport } from './CompCsvImport'
+import { PokeTraceMapping } from './PokeTraceMapping'
 import { label, message, money, today } from '../format'
 
 const COMPANIES: GradingCompany[] = ['PSA', 'CGC', 'BGS', 'SGC', 'TAG', 'ACE']
@@ -60,6 +61,7 @@ export function PricesPanel({ catalogCardId, number = null }: { catalogCardId: s
         on its own.
       </p>
       {error && <p className="error" role="alert">{error}</p>}
+      <PokeTraceMapping catalogCardId={catalogCardId} onChanged={reload} />
       <CompForm base={base} onAdded={reload} />
       <CompCsvImport base={base} number={number} onAdded={reload} />
       {data && <CompList comps={data.comps} />}
@@ -91,7 +93,7 @@ export function PricesPanel({ catalogCardId, number = null }: { catalogCardId: s
           <PriceTableView grades={t.grades} />
           <p className="muted small">
             σ {t.sigma === null ? `not enough history (${t.sigmaChanges} monthly changes)` : `${(t.sigma * 100).toFixed(1)}%`} ·{' '}
-            {t.salesPerMonth} sales/month (all sales of the card) · pricing parameters {t.parameterSet} (offers and valuations have
+            {t.salesPerMonth} sales/month (all comps of the card; a PokeTrace comp is a sale day) · pricing parameters {t.parameterSet} (offers and valuations have
             their own set)
           </p>
         </div>
@@ -241,7 +243,9 @@ function CompList({ comps }: { comps: CompView[] }) {
                 )}{' '}
                 <span className="muted small">{label(c.listingType)}</span>
               </td>
-              <td className="muted small">{c.source.toLowerCase()}</td>
+              <td className="muted small">
+                {c.source === 'POKETRACE' ? `poketrace, ${String(c.details.source ?? '')} day's average` : c.source.toLowerCase()}
+              </td>
             </tr>
           )
         })}

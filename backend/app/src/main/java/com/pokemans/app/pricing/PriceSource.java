@@ -13,8 +13,9 @@ import java.util.UUID;
  * A source of sold comps (HLD: {@code PriceDataProvider}). Sold sales only: a sale without a sold
  * date can't be built, and there is no listing type for an asking price.
  *
- * <p>No source is licensed yet (docs/price-data-sources.md). An adapter is only added, and only
- * enabled, once its licence covers storing comps and showing them in lender and insurer reports.
+ * <p>An adapter is only added, and only enabled, once its licence covers storing comps and using them
+ * as the product does (docs/price-data-sources.md). PokeTrace's covers offers and showing derived
+ * prices and counts to logged-in users; lender and insurer reports need checking when they resume.
  */
 interface PriceSource {
 

@@ -23,7 +23,8 @@ record PricingProperties(
         @DefaultValue("3") int minCardsPerRatio,
         @DefaultValue("12") int volatilityMonths,
         List<Era> eras,
-        @DefaultValue Ingestion ingestion) {
+        @DefaultValue Ingestion ingestion,
+        @DefaultValue PokeTrace poketrace) {
 
     /** WotC, then the EX to Black & White years, XY to Sun & Moon, and Sword & Shield on. */
     static final List<Era> DEFAULT_ERAS = List.of(
@@ -63,5 +64,21 @@ record PricingProperties(
     record Ingestion(@DefaultValue("false") boolean enabled,
                      @DefaultValue("0 30 6 * * *") String cron,
                      @DefaultValue("400d") Duration lookback) {
+    }
+
+    /**
+     * PokeTrace Pro as a comp source (written permission 2026-11-07, docs/price-data-sources.md).
+     *
+     * @param enabled  ingest from PokeTrace in the nightly run, and let admins map cards to it
+     * @param apiKey   from the PokeTrace dashboard; in the server's env, never in the repo
+     * @param backfill history asked for a card's first pull; later pulls ask for {@code recent}
+     * @param recent   history asked for once a card has PokeTrace comps; duplicates are skipped
+     */
+    record PokeTrace(@DefaultValue("false") boolean enabled,
+                     String apiKey,
+                     @DefaultValue("https://api.poketrace.com/v1") java.net.URI baseUrl,
+                     @DefaultValue("20s") Duration timeout,
+                     @DefaultValue("1y") String backfill,
+                     @DefaultValue("30d") String recent) {
     }
 }

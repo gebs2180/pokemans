@@ -130,7 +130,7 @@ async function sellACard(browser: Browser, testInfo: TestInfo, admin: Page, card
   await expect(collector.getByText(/^(Fairly|Less) sure \([BC]\), because the photos leave its condition less certain/)).toBeVisible()
   await collector.locator('summary', { hasText: 'How we priced it' }).click()
   await expect(collector.getByRole('columnheader', { name: 'Recently sold for' })).toBeVisible()
-  await expect(collector.getByRole('row', { name: /^PSA 9 / })).toContainText(/\$1\d\d\.\d\d \(\d+ sales, 90 days\)/) // 3 sales a run; the phone and desktop runs share a database
+  await expect(collector.getByRole('row', { name: /^PSA 9 / })).toContainText(/\$1\d\d\.\d\d \(at least \d+ sales, 90 days\)/) // 3 sales a run; the phone and desktop runs share a database
   await expectNoSideScroll(collector)
   const sell = collector.getByRole('button', { name: /^sell for \$/i })
   const price = dollars(await sell.innerText())

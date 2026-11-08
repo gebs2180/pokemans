@@ -8,8 +8,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * The nightly pricing refresh: comps from every configured price source for the identified cards,
- * then fresh snapshots. There are no {@link PriceSource} beans in production until one is licensed,
- * so for now a run only re-snapshots the comps already stored.
+ * then fresh snapshots. The only production {@link PriceSource} is {@link PokeTraceSource}, when
+ * enabled; without it a run only re-snapshots the comps already stored.
  */
 @Service
 class PricingRefresh {

@@ -18,10 +18,10 @@ import { SoldPanel } from './SoldPanel'
 import { message } from '../format'
 import { days, usePolicy } from '../policy'
 
-/** "$300 (3 sales, 90 days)": the sold price a grade's worth starts from, with what it rests on. */
+/** "$300 (at least 3 sales, 90 days)": the sold price a grade's worth starts from, with what it rests on. */
 function soldFor(sold: SoldPrice | undefined) {
   if (!sold) return 'no sales of its own'
-  return `${money(sold.price)} (${sold.sales} ${sold.sales === 1 ? 'sale' : 'sales'}, ${sold.windowDays} days)`
+  return `${money(sold.price)} (at least ${sold.sales} ${sold.sales === 1 ? 'sale' : 'sales'}, ${sold.windowDays} days)`
 }
 
 /**

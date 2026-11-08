@@ -11,6 +11,8 @@ interface SoldCompRepository extends JpaRepository<SoldComp, UUID> {
 
     boolean existsBySourceAndExternalSaleId(String source, String externalSaleId);
 
+    boolean existsBySourceAndExternalSaleIdStartingWith(String source, String prefix);
+
     List<SoldComp> findBySoldOnBetween(LocalDate from, LocalDate to);
 
     List<SoldComp> findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID catalogCardId);
@@ -37,4 +39,10 @@ interface PriceStatsRepository extends JpaRepository<PriceStats, UUID> {
 }
 
 interface CompIngestRunRepository extends JpaRepository<CompIngestRun, UUID> {
+}
+
+interface PokeTraceCardRepository extends JpaRepository<PokeTraceCard, UUID> {
+
+    /** The newest mapping row for the card; it counts, whether it maps or unmaps. */
+    Optional<PokeTraceCard> findFirstByCatalogCardIdOrderByCreatedAtDesc(UUID catalogCardId);
 }
