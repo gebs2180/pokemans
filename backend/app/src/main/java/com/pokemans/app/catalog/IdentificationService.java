@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,14 +36,17 @@ class IdentificationService {
     private final CardIdentificationRepository identifications;
     private final CardItems cardItems;
     private final CurrentUser currentUser;
+    private final ApplicationEventPublisher events;
 
     IdentificationService(Optional<CatalogProvider> provider, CatalogCardRepository catalogCards,
-                          CardIdentificationRepository identifications, CardItems cardItems, CurrentUser currentUser) {
+                          CardIdentificationRepository identifications, CardItems cardItems, CurrentUser currentUser,
+                          ApplicationEventPublisher events) {
         this.provider = provider;
         this.catalogCards = catalogCards;
         this.identifications = identifications;
         this.cardItems = cardItems;
         this.currentUser = currentUser;
+        this.events = events;
     }
 
     List<CatalogProvider.Hit> search(String name, String number, String language) {
@@ -74,8 +78,10 @@ class IdentificationService {
             payload = card.payload();
         }
         CatalogCard catalogCard = findOrCreate(identity, payload, currentUser.id());
-        return identifications.save(CardIdentification.confirmedByReviewer(orgId, cardId, catalogCard.getId(),
-                blankToNull(choice.note()), currentUser.id()));
+        CardIdentification saved = identifications.save(CardIdentification.confirmedByReviewer(orgId, cardId,
+                catalogCard.getId(), blankToNull(choice.note()), currentUser.id()));
+        events.publishEvent(new Catalog.CardIdentified(catalogCard.getId()));
+        return saved;
     }
 
     /** The catalog identity with this key, created on first use. {@code createdBy} is null for a reader's suggestion. */

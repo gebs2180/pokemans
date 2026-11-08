@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.pokemans.app.TestApi;
 import com.pokemans.app.TestcontainersConfiguration;
 import com.pokemans.app.catalog.Catalog;
+import com.jayway.jsonpath.JsonPath;
 import com.pokemans.app.identity.SecurityProperties;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -132,9 +133,13 @@ class PokeTraceFlowTest {
     }
 
     private String identified(String setName) throws Exception {
+        return identified(setName, "4");
+    }
+
+    private String identified(String setName, String number) throws Exception {
         String cardId = api.card(orgId, "Flow Charizard", api.admin());
         String json = "{\"provider\":\"MANUAL\",\"language\":\"en\",\"edition\":\"UNLIMITED\",\"variant\":\"HOLO\","
-                + "\"setName\":\"" + setName + "\",\"setReleaseDate\":\"1999-01-09\",\"number\":\"4\",\"name\":\"Flow Charizard\"}";
+                + "\"setName\":\"" + setName + "\",\"setReleaseDate\":\"1999-01-09\",\"number\":\"" + number + "\",\"name\":\"Flow Charizard\"}";
         return TestApi.read(api.postJson("/api/admin/orgs/" + orgId + "/cards/" + cardId + "/identifications",
                 json, api.admin()).andExpect(status().isCreated()), "$.current.card.id");
     }
@@ -229,5 +234,55 @@ class PokeTraceFlowTest {
         fake.asked.clear();
         ingest(card);
         assertThat(fake.asked).isEmpty();
+    }
+
+    /** The card's row in the admin's PokeTrace queue, once its automatic search has stored something. */
+    private Map<String, Object> searched(String card) throws Exception {
+        for (int i = 0; i < 100; i++) {
+            String body = api.get("/api/admin/poketrace/queue", api.admin()).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            List<Map<String, Object>> rows = JsonPath.read(body, "$.items[?(@.catalogCardId == '" + card + "')]");
+            if (!rows.isEmpty() && rows.getFirst().get("searchedAt") != null) {
+                return rows.getFirst();
+            }
+            Thread.sleep(100);
+        }
+        throw new AssertionError("No PokeTrace suggestion for " + card);
+    }
+
+    @Test
+    void anIdentifiedCardIsSearchedAndAnAdminApprovesItsCleanMatch() throws Exception {
+        String setName = "PT Queue " + UUID.randomUUID().toString().substring(0, 6);
+        fake.setName = setName;
+        String clean = identified(setName);
+        String mismatch = identified(setName, "77");
+
+        // Searched on identification: one clean match is suggested; no candidate with our number means none is.
+        assertThat(searched(clean).get("suggestedId")).isEqualTo("pt-a");
+        Map<String, Object> other = searched(mismatch);
+        assertThat(other.get("suggestedId")).isNull();
+        assertThat((List<?>) other.get("candidates")).hasSize(2);
+        // A suggestion prices nothing: the card is still unmapped.
+        assertThat(mappings.poketraceId(UUID.fromString(clean))).isEmpty();
+
+        String user = "auth0|nope-" + UUID.randomUUID();
+        api.get("/api/admin/poketrace/queue", api.user(user, List.of())).andExpect(status().isForbidden());
+        String approve = "{\"catalogCardIds\":[\"" + clean + "\",\"" + mismatch + "\"]}";
+        api.postJson("/api/admin/poketrace/queue/approve", approve, api.user(user, List.of())).andExpect(status().isForbidden());
+        api.postJson("/api/admin/poketrace/queue/search", "", api.admin()).andExpect(status().isOk());
+
+        api.postJson("/api/admin/poketrace/queue/approve", approve, api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.mapped.length()").value(1))
+                .andExpect(jsonPath("$.mapped[0]").value(clean))
+                .andExpect(jsonPath("$.failures[0].catalogCardId").value(mismatch))
+                .andExpect(jsonPath("$.failures[0].error", containsString("card page")));
+        assertThat(mappings.poketraceId(UUID.fromString(clean))).contains("pt-a");
+        assertThat(mappings.current(UUID.fromString(clean)).orElseThrow().getOverrideReason()).isNull();
+
+        // Mapped cards leave the queue; approving again says it's already mapped.
+        String body = api.get("/api/admin/poketrace/queue", api.admin()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<?>>read(body, "$.items[?(@.catalogCardId == '" + clean + "')]")).isEmpty();
+        api.postJson("/api/admin/poketrace/queue/approve", "{\"catalogCardIds\":[\"" + clean + "\"]}", api.admin())
+                .andExpect(jsonPath("$.failures[0].error").value("Already mapped"));
     }
 }

@@ -20,6 +20,7 @@ const AdminOffersPage = lazy(() => import('./pages/AdminOffersPage').then((m) =>
 const OfferTrackRecordPage = lazy(() => import('./pages/OfferTrackRecordPage').then((m) => ({ default: m.OfferTrackRecordPage })))
 const AdminLabelsPage = lazy(() => import('./pages/AdminLabelsPage').then((m) => ({ default: m.AdminLabelsPage })))
 const ShippingChargesPage = lazy(() => import('./pages/ShippingChargesPage').then((m) => ({ default: m.ShippingChargesPage })))
+const PokeTraceQueuePage = lazy(() => import('./pages/PokeTraceQueuePage').then((m) => ({ default: m.PokeTraceQueuePage })))
 const ReviewQueuePage = lazy(() => import('./pages/ReviewQueuePage').then((m) => ({ default: m.ReviewQueuePage })))
 const CenteringLabelsPage = lazy(() => import('./pages/CenteringLabelsPage').then((m) => ({ default: m.CenteringLabelsPage })))
 const CenteringLabelCardPage = lazy(() => import('./pages/CenteringLabelsPage').then((m) => ({ default: m.CenteringLabelCardPage })))
@@ -86,6 +87,7 @@ function App() {
               <Route path="/admin/offers" element={<OfferTrackRecordPage />} />
               <Route path="/admin/deals" element={<AdminOffersPage />} />
               <Route path="/admin/shipping" element={<ShippingChargesPage />} />
+              <Route path="/admin/poketrace" element={<PokeTraceQueuePage />} />
               <Route path="/admin/labels" element={<AdminLabelsPage />} />
               <Route path="/admin/centering" element={<CenteringLabelsPage />} />
               <Route path="/admin/centering/:orgId/:cardId" element={<CenteringLabelCardPage />} />

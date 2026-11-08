@@ -35,6 +35,14 @@ public class Catalog {
                               String number, String name, Edition edition, Variant variant, String stamp, boolean promo) {
     }
 
+    /** Published after a reviewer's identification commits. */
+    public record CardIdentified(UUID catalogCardId) {
+    }
+
+    /** A physical card that is currently identified as {@code catalogCardId}. */
+    public record IdentifiedItem(UUID catalogCardId, UUID orgId, UUID cardItemId) {
+    }
+
     private final CardIdentificationRepository identifications;
     private final CatalogCardRepository catalogCards;
 
@@ -82,6 +90,14 @@ public class Catalog {
     @Transactional(readOnly = true)
     public List<CardSummary> identifiedCards() {
         return cards(identifications.findCurrentCatalogCardIds());
+    }
+
+    /** One current physical card per identified catalog card (the newest identified), to link a card to. */
+    @Transactional(readOnly = true)
+    public List<IdentifiedItem> identifiedItems() {
+        return identifications.findCurrentItemPerCatalogCard().stream()
+                .map(i -> new IdentifiedItem(i.getCatalogCardId(), i.getOrgId(), i.getCardItemId()))
+                .toList();
     }
 
     @Transactional(readOnly = true)

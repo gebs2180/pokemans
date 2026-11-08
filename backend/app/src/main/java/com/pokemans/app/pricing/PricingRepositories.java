@@ -41,6 +41,19 @@ interface PriceStatsRepository extends JpaRepository<PriceStats, UUID> {
 interface CompIngestRunRepository extends JpaRepository<CompIngestRun, UUID> {
 }
 
+interface PokeTraceSuggestionRepository extends JpaRepository<PokeTraceSuggestion, UUID> {
+
+    Optional<PokeTraceSuggestion> findFirstByCatalogCardIdOrderByCreatedAtDesc(UUID catalogCardId);
+
+    boolean existsByCatalogCardId(UUID catalogCardId);
+
+    /** The newest suggestion per catalog card. */
+    @Query(nativeQuery = true, value = """
+            select distinct on (catalog_card_id) * from poketrace_suggestion
+            order by catalog_card_id, created_at desc, id desc""")
+    List<PokeTraceSuggestion> findLatestPerCard();
+}
+
 interface PokeTraceCardRepository extends JpaRepository<PokeTraceCard, UUID> {
 
     /** The newest mapping row for the card; it counts, whether it maps or unmaps. */

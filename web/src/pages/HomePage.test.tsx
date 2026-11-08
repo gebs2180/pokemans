@@ -221,9 +221,11 @@ describe('Admin', () => {
       '/api/admin/review-queue': [{ identified: true, priced: false }, { identified: true, priced: true }, { identified: false, priced: false }],
       '/api/admin/deals/attention': [{}, {}],
       '/api/admin/deals/overdue': { labels: 1 },
+      '/api/admin/poketrace/queue': { enabled: true, searching: false, items: [{}, {}, {}] },
     })
     page('/admin')
-    expect(await screen.findByRole('heading', { name: 'Needs attention: 4' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Needs attention: 7' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '3 cards to map on PokeTrace' })).toHaveAttribute('href', '/admin/poketrace')
     expect(screen.getByRole('link', { name: '1 card with no comps' })).toHaveAttribute('href', '/admin/review')
     expect(screen.getByRole('link', { name: '2 cards with a return or payment to sort out' })).toHaveAttribute('href', '/admin/deals')
     expect(screen.getByRole('link', { name: '1 card past the ship-by date, not marked shipped' })).toHaveAttribute('href', '/admin/deals')
