@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention, type Org, type OrgType, type OverdueDeals, type QueueItem } from '../api'
+import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention, type Org, type OrgType, type OverdueDeals, type PokeTraceQueue, type QueueItem } from '../api'
 import { useLoad } from '../useLoad'
 import { Loading, PageError } from '../ui'
 import { OrgPeople } from './OrgPeople'
@@ -11,14 +11,16 @@ function NeedsAttention({ deals, dealsError }: { deals: DealAttention[] | null; 
   const api = useApi()
   const queue = useLoad(() => api<QueueItem[]>('GET', '/api/admin/review-queue'), [api])
   const overdue = useLoad(() => api<OverdueDeals>('GET', '/api/admin/deals/overdue'), [api])
-  const error = queue.error ?? overdue.error ?? dealsError
+  const poketrace = useLoad(() => api<PokeTraceQueue>('GET', '/api/admin/poketrace/queue'), [api])
+  const error = queue.error ?? overdue.error ?? poketrace.error ?? dealsError
   if (error) return <p className="error" role="alert">Couldn't load what needs attention: {error}</p>
-  if (!queue.data || !overdue.data || !deals) return null
+  if (!queue.data || !overdue.data || !poketrace.data || !deals) return null
 
   const lines = [
     { count: queue.data.filter((i) => i.identified && !i.priced).length, text: 'with no comps', to: '/admin/review' },
     { count: deals.length, text: 'with a return or payment to sort out', to: '/admin/deals' },
     { count: overdue.data.labels, text: "past the ship-by date, not marked shipped", to: '/admin/deals' },
+    { count: poketrace.data.items.length, text: 'to map on PokeTrace', to: '/admin/poketrace' },
   ].filter((l) => l.count > 0)
   return (
     <section className="panel">
@@ -89,7 +91,8 @@ export function AdminPage() {
         <Link to="/admin/review">Review queue →</Link> · <Link to="/admin/outcomes">Graded results to check →</Link> ·{' '}
         <Link to="/admin/deals">Offers and deals{attention && attention.length > 0 && ` (${attention.length} need you)`} →</Link> · <Link to="/admin/offers">Offer track record →</Link> ·{' '}
         <Link to="/admin/labels">Labels to buy →</Link> ·{' '}
-        <Link to="/admin/shipping">Postage to bill →</Link> · <Link to="/admin/centering">Centering labels →</Link>
+        <Link to="/admin/shipping">Postage to bill →</Link> · <Link to="/admin/centering">Centering labels →</Link> ·{' '}
+        <Link to="/admin/poketrace">PokeTrace mapping →</Link>
       </p>
       <NeedsAttention deals={attention ?? null} dealsError={attentionError ?? null} />
       <h1>Orgs</h1>

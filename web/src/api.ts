@@ -612,6 +612,30 @@ export type PokeTraceCandidate = {
   disagreements: string[]
 }
 
+/**
+ * An identified card with no PokeTrace mapping yet. searchedAt is null when PokeTrace hasn't been searched;
+ * suggestedId is the one clean match, when there is exactly one. A suggestion prices nothing until approved.
+ */
+export type PokeTraceQueueItem = {
+  catalogCardId: string
+  orgId: string
+  cardItemId: string
+  name: string
+  setName: string | null
+  number: string | null
+  edition: Edition | null
+  variant: Variant | null
+  language: string | null
+  searchedAt: string | null
+  suggestedId: string | null
+  candidates: PokeTraceCandidate[]
+  error: string | null
+}
+
+export type PokeTraceQueue = { enabled: boolean; searching: boolean; items: PokeTraceQueueItem[] }
+
+export type PokeTraceApproval = { mapped: string[]; failures: { catalogCardId: string; error: string }[] }
+
 // Provenance: authenticity findings and custody
 
 export type Finding = 'VERIFIED_AUTHENTIC' | 'SUSPECTED_COUNTERFEIT' | 'COUNTERFEIT'

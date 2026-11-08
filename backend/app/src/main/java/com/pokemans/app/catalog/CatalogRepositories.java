@@ -30,6 +30,24 @@ interface CardIdentificationRepository extends JpaRepository<CardIdentification,
                 where status = 'CONFIRMED'
                 order by card_item_id, created_at desc) current_identity""")
     List<UUID> findCurrentCatalogCardIds();
+
+    /** One physical card per catalog card that some card is currently confirmed as: the newest identified. */
+    @Query(nativeQuery = true, value = """
+            select distinct on (catalog_card_id) catalog_card_id as catalogCardId, org_id as orgId, card_item_id as cardItemId
+            from (
+                select distinct on (card_item_id) catalog_card_id, org_id, card_item_id, created_at from card_identification
+                where status = 'CONFIRMED'
+                order by card_item_id, created_at desc) current_identity
+            order by catalog_card_id, created_at desc""")
+    List<CurrentItem> findCurrentItemPerCatalogCard();
+
+    interface CurrentItem {
+        UUID getCatalogCardId();
+
+        UUID getOrgId();
+
+        UUID getCardItemId();
+    }
 }
 
 interface CardReadingRepository extends JpaRepository<CardReading, UUID> {
