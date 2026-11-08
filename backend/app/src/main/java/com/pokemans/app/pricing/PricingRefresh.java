@@ -48,6 +48,27 @@ class PricingRefresh {
     }
 
     /**
+     * One card's sales from one source now, over the nightly run's window, then a re-snapshot if no
+     * other refresh is running. The ingestion runs outside the lock (a sale stored twice is skipped as
+     * a duplicate), so an admin's pull can't make the nightly run skip a night.
+     *
+     * @return the ingestion run, and whether the prices were re-snapshotted
+     */
+    Pull pullOne(PriceSource source, Catalog.CardSummary card, LocalDate asOf) {
+        LocalDate from = asOf.minusDays(properties.ingestion().lookback().toDays());
+        CompIngestRun run = ingestion.ingest(source, List.of(card), from, asOf);
+        try {
+            snapshotOnly(asOf);
+            return new Pull(run, true);
+        } catch (PricingLock.Busy e) {
+            return new Pull(run, false);
+        }
+    }
+
+    record Pull(CompIngestRun run, boolean repriced) {
+    }
+
+    /**
      * Re-snapshots the stored comps (no ingestion), holding the pricing lock: the admin's refresh.
      *
      * @throws PricingLock.Busy if another refresh is running

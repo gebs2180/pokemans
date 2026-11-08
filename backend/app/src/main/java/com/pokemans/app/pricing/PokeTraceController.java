@@ -7,6 +7,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,16 +45,44 @@ class PokeTraceController {
                        UUID mappedBy, Instant mappedAt) {
     }
 
+    /** What a pull stored; {@code repriced} false when another refresh held the lock (the comps are stored either way). */
+    record PullView(int fetched, int inserted, int duplicates, int rejected, List<String> errors, boolean repriced) {
+    }
+
     private final ObjectProvider<PokeTraceApi> api;
     private final PokeTraceMappings mappings;
+    private final PricingRefresh refresh;
+    private final SoldCompRepository comps;
+    private final PricingProperties properties;
     private final Catalog catalog;
     private final CurrentUser currentUser;
 
-    PokeTraceController(ObjectProvider<PokeTraceApi> api, PokeTraceMappings mappings, Catalog catalog, CurrentUser currentUser) {
+    PokeTraceController(ObjectProvider<PokeTraceApi> api, PokeTraceMappings mappings, PricingRefresh refresh, SoldCompRepository comps,
+                        PricingProperties properties, Catalog catalog, CurrentUser currentUser) {
         this.api = api;
         this.mappings = mappings;
+        this.refresh = refresh;
+        this.comps = comps;
+        this.properties = properties;
         this.catalog = catalog;
         this.currentUser = currentUser;
+    }
+
+    /**
+     * Pulls this mapped card's PokeTrace sales now instead of at the nightly run, then re-prices.
+     * The first pull of a card asks for a year of history, so it can take a minute.
+     */
+    @PostMapping("/pull")
+    PullView pull(@PathVariable UUID catalogCardId) {
+        Catalog.CardSummary card = card(catalogCardId);
+        PokeTraceSource source = new PokeTraceSource(api(), mappings, comps, properties);
+        if (mappings.poketraceId(catalogCardId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Map the card to a PokeTrace card first");
+        }
+        PricingRefresh.Pull pull = refresh.pullOne(source, card, LocalDate.now(ZoneOffset.UTC));
+        CompIngestRun run = pull.run();
+        return new PullView(run.getFetched(), run.getInserted(), run.getDuplicates(), run.getRejected(),
+                run.getErrors() == null ? List.of() : run.getErrors(), pull.repriced());
     }
 
     @GetMapping
