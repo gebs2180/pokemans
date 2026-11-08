@@ -26,6 +26,9 @@ class HttpPokeTraceApi implements PokeTraceApi {
     private static final ParameterizedTypeReference<Map<String, Object>> OBJECT = new ParameterizedTypeReference<>() {
     };
     private static final int PAGE = 50;
+    private static final int SEARCH_PAGE = 20;
+    /** 200 cards of one name is far more than any Pokémon has; this stops a runaway cursor. */
+    private static final int MAX_SEARCH_PAGES = 10;
     private static final int ATTEMPTS = 4;
     /** A year of daily rows is about 8 pages; this stops a runaway cursor. */
     private static final int MAX_PAGES = 60;
@@ -48,11 +51,28 @@ class HttpPokeTraceApi implements PokeTraceApi {
                 .build();
     }
 
+    /** Every single card with the name, page by page: /cards returns at most 20 a page (OpenAPI 1.7.0). */
     @Override
     public List<Map<String, Object>> search(String text) {
-        Map<String, Object> body = get(u -> u.path("/cards").queryParam("search", text).queryParam("game", "pokemon")
-                .queryParam("market", "US").queryParam("limit", PAGE).build());
-        return rows(body);
+        List<Map<String, Object>> rows = new ArrayList<>();
+        String cursor = null;
+        for (int page = 0; page < MAX_SEARCH_PAGES; page++) {
+            String at = cursor;
+            Map<String, Object> body = get(u -> {
+                UriBuilder b = u.path("/cards").queryParam("search", text).queryParam("game", "pokemon").queryParam("market", "US")
+                        .queryParam("product_type", "single").queryParam("limit", SEARCH_PAGE);
+                if (at != null) {
+                    b.queryParam("cursor", at);
+                }
+                return b.build();
+            });
+            rows.addAll(rows(body));
+            cursor = nextCursor(body);
+            if (cursor == null) {
+                break;
+            }
+        }
+        return rows;
     }
 
     @Override
@@ -75,13 +95,18 @@ class HttpPokeTraceApi implements PokeTraceApi {
                 return b.build(poketraceId, tier);
             });
             rows.addAll(rows(body));
-            Map<?, ?> pagination = body != null && body.get("pagination") instanceof Map<?, ?> p ? p : Map.of();
-            if (!Boolean.TRUE.equals(pagination.get("hasMore")) || pagination.get("nextCursor") == null) {
+            cursor = nextCursor(body);
+            if (cursor == null) {
                 return rows;
             }
-            cursor = pagination.get("nextCursor").toString();
         }
         throw new IllegalStateException("PokeTrace history for " + poketraceId + " " + tier + " ran past " + MAX_PAGES + " pages");
+    }
+
+    private static String nextCursor(Map<String, Object> body) {
+        Map<?, ?> pagination = body != null && body.get("pagination") instanceof Map<?, ?> p ? p : Map.of();
+        return Boolean.TRUE.equals(pagination.get("hasMore")) && pagination.get("nextCursor") != null
+                ? pagination.get("nextCursor").toString() : null;
     }
 
     private Map<String, Object> get(java.util.function.Function<UriBuilder, java.net.URI> uri) {

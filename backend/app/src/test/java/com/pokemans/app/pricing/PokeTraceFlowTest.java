@@ -47,10 +47,14 @@ class PokeTraceFlowTest {
     /** "pt-a" matches the card; "pt-b" has another number and no sales. */
     static final class FakeApi implements PokeTraceApi {
         volatile String setName = "";
+        volatile boolean onlyOtherNumbers;
         final List<String> asked = new CopyOnWriteArrayList<>();
 
         @Override
         public List<Map<String, Object>> search(String text) {
+            if (onlyOtherNumbers) {
+                return List.of(detail("pt-b"));
+            }
             return List.of(detail("pt-b"), detail("pt-a"), Map.of("id", "pt-sealed", "productType", "sealed"));
         }
 
@@ -155,12 +159,21 @@ class PokeTraceFlowTest {
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.poketraceId").doesNotExist());
 
-        // Our number first; the sealed product is left out.
+        // Only the card with our number; the other number and the sealed product are left out.
         api.get(url + "/candidates", api.admin()).andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].poketraceId").value("pt-a"))
-                .andExpect(jsonPath("$[0].disagreements.length()").value(0))
-                .andExpect(jsonPath("$[1].disagreements[0]", containsString("number")));
+                .andExpect(jsonPath("$[0].disagreements.length()").value(0));
+        // With no card of our number, the wider list stays and says why it isn't ours.
+        fake.onlyOtherNumbers = true;
+        try {
+            api.get(url + "/candidates", api.admin()).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(1))
+                    .andExpect(jsonPath("$[0].poketraceId").value("pt-b"))
+                    .andExpect(jsonPath("$[0].disagreements[0]", containsString("number")));
+        } finally {
+            fake.onlyOtherNumbers = false;
+        }
 
         // Refused: a disagreeing card without a reason, a card PokeTrace doesn't have, a non-admin.
         putJson(url, "{\"poketraceId\":\"pt-b\"}", api.admin()).andExpect(status().isBadRequest())

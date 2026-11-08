@@ -60,19 +60,31 @@ class PokeTraceController {
         return view(catalogCardId);
     }
 
-    /** PokeTrace's search for the card's name, cards with our number first. One request to PokeTrace. */
+    /**
+     * PokeTrace's single cards with the card's name, narrowed to our number and then our set when any
+     * match, so a common name (a dozen Victinis) shows only the card itself. With no match at a step
+     * the wider list stays, and each row's disagreements say why it isn't ours.
+     */
     @GetMapping("/candidates")
     List<Candidate> candidates(@PathVariable UUID catalogCardId) {
         Catalog.CardSummary card = card(catalogCardId);
-        String ourNumber = PokeTraceMappings.number(card.number());
-        return api().search(card.name()).stream()
+        List<Candidate> all = api().search(card.name()).stream()
                 .filter(c -> c.get("id") != null && "single".equals(String.valueOf(c.getOrDefault("productType", "single"))))
                 .map(c -> new Candidate(c.get("id").toString(), str(c.get("name")), str(c.get("cardNumber")), str(c.get("variant")),
                         c.get("set") instanceof Map<?, ?> s ? str(s.get("name")) : null, PokeTraceMappings.disagreements(card, c)))
-                .sorted(Comparator.comparing((Candidate c) -> !PokeTraceMappings.number(c.cardNumber()).equals(ourNumber))
-                        .thenComparingInt(c -> c.disagreements().size()))
+                .toList();
+        return narrow(narrow(all, "number "), "set ").stream()
+                .sorted(Comparator.comparingInt((Candidate c) -> c.disagreements().size()))
                 .limit(25)
                 .toList();
+    }
+
+    /** The candidates without a disagreement of this kind, or all of them when every one has it. */
+    private static List<Candidate> narrow(List<Candidate> candidates, String kind) {
+        List<Candidate> matching = candidates.stream()
+                .filter(c -> c.disagreements().stream().noneMatch(d -> d.startsWith(kind)))
+                .toList();
+        return matching.isEmpty() ? candidates : matching;
     }
 
     @PutMapping
