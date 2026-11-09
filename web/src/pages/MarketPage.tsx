@@ -9,6 +9,7 @@ import {
   SIDE_LABEL,
   useApi,
   type AcceptResult,
+  type BuyerOutcomeRecord,
   type Deal,
   type DeclinedReason,
   type MarketItem,
@@ -25,6 +26,7 @@ import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
 import { HowPriced } from './OfferPanel'
+import { DealOutcomeForm, OutcomeRecord } from './DealOutcomeForm'
 import { message as errorText } from '../format'
 import { days, usePolicy } from '../policy'
 
@@ -340,6 +342,10 @@ export function DealsPage() {
   const { orgId = '' } = useParams()
   const api = useApi()
   const { data, error, reload } = useLoad(() => api<Deal[]>('GET', apiPath`/api/orgs/${orgId}/deals`), [api, orgId])
+  const { data: record, reload: reloadRecord } = useLoad(
+    () => api<BuyerOutcomeRecord>('GET', apiPath`/api/orgs/${orgId}/deal-outcomes`),
+    [api, orgId],
+  )
   const [labelError, setLabelError] = useState<string | null>(null)
 
   async function retryLabel(listingId: string) {
@@ -357,6 +363,7 @@ export function DealsPage() {
     <>
       <BuyerNav orgId={orgId} />
       <h1>Your deals</h1>
+      {record && <OutcomeRecord record={record} />}
       {labelError && <p className="error" role="alert">{labelError}</p>}
       {!data && <Loading />}
       {data?.length === 0 && (
@@ -416,7 +423,16 @@ export function DealsPage() {
             </div>
           )}
           {deal.outcome ? (
-            <DealOutcome deal={deal} path={apiPath`/api/orgs/${orgId}/deals/${deal.listingId}`} onSaved={reload} />
+            <>
+              <DealOutcome deal={deal} path={apiPath`/api/orgs/${orgId}/deals/${deal.listingId}`} onSaved={reload} />
+              {deal.outcome.type === 'RECEIVED' && deal.progress && deal.progress.stage !== 'RETURNED' && deal.progress.stage !== 'BACK' && record && (
+                <DealOutcomeForm
+                  path={apiPath`/api/orgs/${orgId}/deals/${deal.listingId}`}
+                  latest={record.outcomes.find((o) => o.listingId === deal.listingId) ?? null}
+                  onSaved={reloadRecord}
+                />
+              )}
+            </>
           ) : deal.cancelled ? null : deal.label ? (
             <ArrivalForm path={apiPath`/api/orgs/${orgId}/deals/${deal.listingId}`} onSaved={reload} />
           ) : (

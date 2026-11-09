@@ -42,6 +42,9 @@ dependencies {
 // OpenCV loads its bundled native library through JNI, which Java 24+ warns about unless allowed.
 tasks.withType<Test>().configureEach {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
+    // Gradle's 512 MB default ran out in the report PDFs' font loading once the suite passed ~340 tests,
+    // with the cached Spring contexts held alongside.
+    maxHeapSize = "1g"
     // ./gradlew test -Dgolden.update=true rewrites the golden report files (GoldenReportTest).
     systemProperty("golden.update", System.getProperty("golden.update") ?: "false")
 }

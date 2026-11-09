@@ -32,7 +32,7 @@ class TrackRecordService {
             "Sellers choose which offers to post. They post the ones they like, so posted offers lean towards cards we priced generously, and the acceptance rate is about those, not all offers.",
             "Arrivals and prices paid are recorded by the buyer. A buyer who never records an arrival drops out of the delivery and price numbers until they do.",
             "A card posted more than once counts once per listing. Withdrawn and expired listings both count as not accepted; open listings aren't counted yet. Listings we voided and deals we cancelled are left out of every rate.",
-            "Offers are firm, so no grade is judged on arrival: grade accuracy has to come from graders' results for sold cards, which aren't collected yet.");
+            "Offers are firm, so no grade is judged on arrival. Grade accuracy comes from what buyers say their cards graded, on Deal outcomes: only cards a buyer chose to grade, and a grade counts as checked once its cert is verified.");
 
     record Band(String label, BigDecimal min, BigDecimal max) {
         boolean contains(BigDecimal value) {

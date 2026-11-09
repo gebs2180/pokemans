@@ -190,7 +190,21 @@ The realized sales are the evidence for the later lender and insurer pitch: our 
 - **Caveats, shown on the page:**
   - Sellers only post offers they like.
   - Buyers record arrivals themselves, and those who never record one drop out.
-  - Grade accuracy has to come from graders' results for sold cards, which aren't collected yet.
+  - Grade accuracy comes from what buyers say their cards graded (see Deal outcomes): only the cards a buyer chose to grade.
+
+## Deal outcomes (deep review 2026-11-09, C1)
+
+Closes the calibration loop: after a deal, the buyer says what happened to the card, so the condition we predicted can be compared with real grades.
+
+- **Who:** only a member of the buying org, once the card has arrived and stayed (not cancelled, not returned). Nobody else can record one, the admin included, since it's the buyer's word (`POST /api/orgs/{orgId}/deals/{listingId}/outcomes`, `OrgAccess.requireMember`, which gives the admin no pass).
+- **What:** "What happened to this card?" on the buyer's deals, with three answers:
+  - **Graded:** grader (PSA, BGS, CGC, SGC, TAG), grade as on the label (half grades stored as given, folded down only when compared), cert number, optional label wording and date. It goes into `grade_outcome` (source `BUYER`, filed under the seller's org, which owns the card), so the admin checks the cert on Graded results as for any other. A verified cert values the card as graded.
+  - **Resold raw:** the price.
+  - **Kept.**
+- **Append-only (V28 `deal_outcome`):** a correction is a new row, and the newest row is the answer. A buyer grade a later answer replaces stops valuing the card, but stays stored. The same answer twice is refused, and a cert can belong to only one card.
+- **Who sees it:** the buyer org sees its own answers and its record: of the cards it graded, how many came back within one grade of our predicted median. The seller doesn't see the buyer's grade.
+- **Admin "Deal outcomes"** (`/admin/deal-outcomes`, `GET /api/admin/deal-outcomes`): every deal's latest outcome against its offer's stored prediction: the distribution and median, the stressed median (the shift named in the offer's trace, else 2 grades, 3 at confidence C or D), the returned grade folded down (a result without a number counts as U), whether it is within ±1, and whether it is below the stressed median. Totals are shown for all grades and for checked certs only, against the targets (within ±1 at least 80%, below the stressed median under 5%). Certs that didn't match, and offers on cards already graded (which predicted no condition), are left out of the counts.
+- **Tests:** `DealOutcomesTest` (only the buying org's members, before arrival, the comparison and corrections, a verified cert valuing the card until it's taken back, resale and cert rules, append-only), `CalibrationTest`, `RouteSweepTest`; Vitest for the buyer form and the admin page; the e2e beta flow records a grade and finds it on the admin page.
 
 ## Open
 
@@ -199,7 +213,7 @@ The realized sales are the evidence for the later lender and insurer pitch: our 
 - **After the sale, open (2026-11-01):** Shipped is the seller's word, since we don't read tracking yet. Nobody is told when a pay-by date passes: the seller has to look. "Arrived as shown" is final in the app, so a buyer who taps it and then finds a problem needs the admin.
 - **Undo, open (2026-10-21):** the seller sees a voided offer's reason as the admin typed it, so write it for them; a cancelled deal after the card shipped needs the card back by hand; a refund's later status (EasyPost moves `submitted` to `refunded` or `rejected`) isn't fetched yet.
 - **Invoices:** monthly postage bills are produced by hand from "Postage to bill". There is no invoicing or payment collection.
-- **Grade accuracy:** add a way for buyers to report a grader's result when they slab a card they bought, as calibration data from a grader.
+- **Deal outcomes, open (2026-11-09):** buyers grade the cards they think will grade well, so the sample leans high. Nobody is reminded to record an outcome. A cert the buyer typed is UNVERIFIED until the admin checks it on Graded results.
 - **Notifications:** buyers aren't told when a card is posted, and sellers aren't emailed their label. Email waits for the notifier (M6). Until then a seller's home page lists what needs them across their orgs (`GET /api/orgs/{orgId}/needs-you`): a label to use with its ship-by date, an offer to get or take up with its end date, failed photos, and after a sale, a pay-by date to say they've been paid by, a payment the buyer recorded to confirm, and a returning card to say is back. A label stays listed until the seller says it shipped, or an arrival or return is recorded. A deal raised with the admin leaves the list until it's closed.
 - **"Instant" depends on the review queue.** An offer needs an identified, assessed card, and identification and condition review are still done by hand.
 - **Outside interest:** a marketplace for shops and collectors isn't "primarily to the financial services industry", but the employer's general outside-interest disclosure may still apply. Raise it in the lawyer hour.

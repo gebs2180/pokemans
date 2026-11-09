@@ -28,23 +28,28 @@ public class Outcomes {
 
     private final GradeOutcomeRepository outcomes;
     private final OutcomeVerificationRepository verifications;
+    private final DealOutcomes dealOutcomes;
 
-    Outcomes(GradeOutcomeRepository outcomes, OutcomeVerificationRepository verifications) {
+    Outcomes(GradeOutcomeRepository outcomes, OutcomeVerificationRepository verifications, DealOutcomes dealOutcomes) {
         this.outcomes = outcomes;
         this.verifications = verifications;
+        this.dealOutcomes = dealOutcomes;
     }
 
     /**
      * For each card whose latest returned grade is numeric and whose latest cert check on it is
      * VERIFIED. A card with a mismatched or unchecked cert, or a newer outcome not yet checked, is
-     * left out: it is still raw for valuation.
+     * left out: it is still raw for valuation. A buyer's grade that the buyer has since corrected or taken
+     * back no longer counts, checked or not.
      */
     @Transactional(readOnly = true)
     public Map<UUID, VerifiedGrade> verifiedGrades(Collection<UUID> cardItemIds) {
         if (cardItemIds.isEmpty()) {
             return Map.of();
         }
-        Map<UUID, GradeOutcome> latest = outcomes.findByCardItemIdInOrderByCreatedAtDesc(cardItemIds).stream()
+        List<GradeOutcome> all = outcomes.findByCardItemIdInOrderByCreatedAtDesc(cardItemIds);
+        java.util.Set<UUID> retracted = new java.util.HashSet<>(dealOutcomes.retracted(all));
+        Map<UUID, GradeOutcome> latest = all.stream().filter(o -> !retracted.contains(o.getId()))
                 .collect(Collectors.toMap(GradeOutcome::getCardItemId, Function.identity(), (newer, older) -> newer));
         List<UUID> outcomeIds = latest.values().stream().map(GradeOutcome::getId).toList();
         Map<UUID, OutcomeVerification> check = outcomeIds.isEmpty() ? Map.of()

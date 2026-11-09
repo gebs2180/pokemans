@@ -14,6 +14,19 @@ interface GradeOutcomeRepository extends JpaRepository<GradeOutcome, UUID> {
     List<GradeOutcome> findAllByOrderByCreatedAtAsc();
 
     boolean existsByGraderAndCertNumber(Grader grader, String certNumber);
+
+    boolean existsByGraderAndCertNumberAndCardItemIdNot(Grader grader, String certNumber, UUID cardItemId);
+}
+
+interface DealOutcomeRepository extends JpaRepository<DealOutcome, UUID> {
+
+    List<DealOutcome> findByListingIdInOrderByCreatedAtAsc(Collection<UUID> listingIds);
+
+    List<DealOutcome> findByBuyerOrgIdOrderByCreatedAtAsc(UUID buyerOrgId);
+
+    List<DealOutcome> findAllByOrderByCreatedAtAsc();
+
+    List<DealOutcome> findByGradeOutcomeIdIn(Collection<UUID> gradeOutcomeIds);
 }
 
 interface OutcomeVerificationRepository extends JpaRepository<OutcomeVerification, UUID> {

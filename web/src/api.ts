@@ -458,7 +458,7 @@ export type OutcomeView = {
   orgId: string
   cardId: string
   cardLabel: string
-  source: 'CONTRIBUTOR' | 'PARTNER' | 'ADMIN'
+  source: 'CONTRIBUTOR' | 'PARTNER' | 'ADMIN' | 'BUYER'
   grader: Grader
   certNumber: string
   grade: number | null
@@ -1011,6 +1011,70 @@ export type Deal = {
   /** How the seller gets paid. Null once nothing is owed, or if they gave none. */
   payTo: PaymentHandle | null
   progress: DealProgress | null
+}
+
+export type DealOutcomeKind = 'GRADED' | 'RESOLD_RAW' | 'KEPT'
+
+/** The newest thing the buyer said happened to a card after its deal. Corrections are new rows: earlier counts the ones before. */
+export type RecordedDealOutcome = {
+  id: string
+  listingId: string
+  offerId: string
+  cardItemId: string
+  buyerOrgId: string
+  kind: DealOutcomeKind
+  gradeOutcomeId: string | null
+  grader: Grader | null
+  certNumber: string | null
+  /** As on the label, half grades kept; null for a result without a number. */
+  grade: number | null
+  gradeLabel: string | null
+  gradedOn: string | null
+  certStatus: OutcomeView['status'] | null
+  lookupUrl: string | null
+  resalePrice: number | null
+  note: string | null
+  recordedAt: string
+  earlier: number
+}
+
+/** A buyer org's record: of the cards it graded, how many came back within one grade of our prediction. */
+export type BuyerOutcomeRecord = {
+  graded: number
+  withinOne: number
+  verified: number
+  resold: number
+  kept: number
+  outcomes: RecordedDealOutcome[]
+}
+
+export type CalibrationSummary = { graded: number; withinOne: number; belowStressed: number }
+
+/** One deal's outcome against its offer's prediction. The prediction fields are null when the offer priced a card already graded. */
+export type AdminDealOutcomeRow = {
+  listingId: string
+  offerId: string
+  buyerOrgId: string
+  buyer: string | null
+  card: OfferCard
+  offerPrice: number
+  confidence: Confidence | null
+  predicted: Record<string, number> | null
+  median: string | null
+  stressShift: number | null
+  stressedMedian: string | null
+  outcome: RecordedDealOutcome
+  returnedGrade: string | null
+  withinOne: boolean | null
+  belowStressed: boolean | null
+}
+
+export type AdminCalibration = {
+  all: CalibrationSummary
+  verified: CalibrationSummary
+  resold: number
+  kept: number
+  rows: AdminDealOutcomeRow[]
 }
 
 /** A deal whose label hasn't been bought, for the admin. */
