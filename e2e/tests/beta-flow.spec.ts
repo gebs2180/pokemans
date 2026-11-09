@@ -276,7 +276,7 @@ test('a raw card goes from photos to an offer, a sale, its arrival and its payme
   await expect(deal.getByText(/seller confirmed they got paid/i)).toBeVisible()
 
   // The buyer says what grade it came back with; the admin sees it against the offer's prediction.
-  const cert = `${Date.now()}${Math.floor(Math.random() * 1000)}`
+  const cert = crypto.randomUUID().replaceAll('-', '').slice(0, 16)
   await expect(deal.getByText('What happened to this card?')).toBeVisible()
   await deal.getByRole('radio', { name: 'I had it graded' }).check()
   await deal.getByRole('spinbutton', { name: 'Grade' }).fill('8.5')
