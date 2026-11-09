@@ -47,10 +47,28 @@ class ListingViews {
      * @param voided          set once we voided the offer: it can't be posted, get a new one
      * @param sold            what each grade recently sold for, or null when showing sold prices is switched off
      * @param lessSureBecause why the confidence is below A ({@link LessSure}), empty at A
+     * @param rawSales        what the card recently sold for raw in near mint when the offer was made; null for offers from
+     *                        before that check, or when showing sold prices is switched off
      */
     record OfferView(UUID id, BigDecimal price, BigDecimal fmv, String confidence, BigDecimal buyerMargin, boolean graded,
                      boolean subjectToAuthentication, List<RungView> ladder, Instant createdAt, Instant expiresAt, boolean expired,
-                     UndoView voided, List<SoldView> sold, List<String> lessSureBecause) {
+                     UndoView voided, List<SoldView> sold, List<String> lessSureBecause, RawSalesView rawSales) {
+
+        /** Without the raw sanity check: it is for the admin and the seller, not a buyer's bargaining chip. */
+        OfferView forBuyer() {
+            return new OfferView(id, price, fmv, confidence, buyerMargin, graded, subjectToAuthentication, ladder, createdAt, expiresAt,
+                    expired, voided, sold, lessSureBecause, null);
+        }
+    }
+
+    /**
+     * The raw sanity band (deep review 2026-11-09, B1): the card's raw near-mint sales of the 90 days before the quote.
+     *
+     * @param lowest the lowest of them (a PokeTrace comp is a day's average), or null when there were none
+     * @param sales  how many (sale days for PokeTrace)
+     * @param below  the firm price is under {@code lowest}: flagged to the admin and the seller, never refused
+     */
+    record RawSalesView(BigDecimal lowest, int sales, java.time.LocalDate since, boolean below) {
     }
 
     /**
@@ -227,7 +245,9 @@ class ListingViews {
         return new OfferView(o.getId(), o.getPrice(), o.getFmv(), o.getConfidence(), o.getBuyerMargin(), o.isGraded(),
                 o.isSubjectToAuthentication(), ladder, o.getCreatedAt(), o.getExpiresAt(), !o.getExpiresAt().isAfter(Instant.now()),
                 voided == null ? null : new UndoView(voided.getReason(), voided.getCreatedAt()),
-                properties.showSoldPrices() ? sold(OfferService.inputs(o)) : null, lessSureBecause(o));
+                properties.showSoldPrices() ? sold(OfferService.inputs(o)) : null, lessSureBecause(o),
+                properties.showSoldPrices() && o.getRawNmSales() != null
+                        ? new RawSalesView(o.getRawNmLow(), o.getRawNmSales(), o.getRawNmSince(), o.isBelowRawSales()) : null);
     }
 
     /** The grades with sold comps of their own, from the prices stored with the offer: never a fresh query. */

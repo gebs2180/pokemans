@@ -220,6 +220,33 @@ describe('OfferPreviewPanel', () => {
     expect(screen.getByText(/fallback sigma, drop 1/)).toBeInTheDocument()
     expect(screen.getByText(/derived grades \[5, 6, 7\]/)).toBeInTheDocument()
   })
+
+  it('flags an offer below recent raw near-mint sales', async () => {
+    stub({
+      offered: true, refusal: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [],
+      rawSales: { lowest: 140, sales: 3, since: '2026-08-11', below: true },
+    })
+    render(<OfferPreviewPanel cardId="card1" />)
+    expect(await screen.findByText(/Below recent raw sales of \$140\.00: the lowest of 3 raw near-mint comps since 2026-08-11/)).toBeInTheDocument()
+  })
+
+  it('says the offer clears recent raw sales, or that there were none to check', async () => {
+    stub({
+      offered: true, refusal: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [],
+      rawSales: { lowest: 90, sales: 1, since: '2026-08-11', below: false },
+    })
+    const { unmount } = render(<OfferPreviewPanel cardId="card1" />)
+    expect(await screen.findByText(/At or above recent raw sales: lowest \$90\.00 of 1 raw near-mint comp since/)).toBeInTheDocument()
+    expect(screen.queryByText(/Below recent raw sales/)).not.toBeInTheDocument()
+    unmount()
+
+    stub({
+      offered: true, refusal: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [],
+      rawSales: { lowest: null, sales: 0, since: '2026-08-11', below: false },
+    })
+    render(<OfferPreviewPanel cardId="card1" />)
+    expect(await screen.findByText('No raw near-mint sales since 2026-08-11 to check the offer against.')).toBeInTheDocument()
+  })
 })
 
 describe('ReviewCardPage', () => {

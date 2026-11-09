@@ -104,7 +104,7 @@ class DealService {
             Directory.Contact seller = directory.contact(l.getOrgId(), l.getListedBy());
             Progress progress = progress(h);
             boolean owed = progress != null && progress.stage() != DealStage.RETURNED && progress.stage() != DealStage.BACK;
-            deals.add(new DealView(l.getId(), card(in).forBuyer(), views.offerView(offer), views.photos(in), new Party(seller.orgName(), seller.email()),
+            deals.add(new DealView(l.getId(), card(in).forBuyer(), views.offerView(offer).forBuyer(), views.photos(in), new Party(seller.orgName(), seller.email()),
                     acceptedEvent.getCreatedAt(), withoutPrintable(views.label(l.getId())), outcome(h), undone(h, ListingEvent.Type.CANCELLED),
                     owed ? shipping.address(l.getOrgId()).map(ShipAddress::payment).orElse(null) : null,
                     progress == null ? null : progress.forBuyer()));

@@ -63,8 +63,19 @@ public class TestMarket {
         return new Buyer(orgId, who);
     }
 
+    /** Something done to the card's catalog entry (its catalog card ID) once it is priced, before the offer is made. */
+    @FunctionalInterface
+    public interface CatalogStep {
+        void apply(String catalogCardId) throws Exception;
+    }
+
     /** A priced card with a new offer on it, not posted yet. */
     public Posted offered(Seller seller, String name) throws Exception {
+        return offered(seller, name, catalog -> { });
+    }
+
+    /** {@link #offered(Seller, String)}, with a step on the catalog card before the offer (more comps, say). */
+    public Posted offered(Seller seller, String name, CatalogStep beforeOffer) throws Exception {
         String cardId = TestApi.read(api.postJson("/api/orgs/" + seller.orgId() + "/collections/" + seller.collectionId() + "/cards",
                 "{\"label\":\"" + name + "\",\"lot\":false,\"quantity\":1}", seller.who()).andExpect(status().isCreated()), "$.id");
         String catalog = TestApi.read(api.postJson("/api/admin/orgs/" + seller.orgId() + "/cards/" + cardId + "/identifications",
@@ -73,6 +84,7 @@ public class TestMarket {
                         + "\",\"name\":\"" + name + " " + UUID.randomUUID().toString().substring(0, 4) + "\",\"rarity\":\"Rare\"}",
                 api.admin()).andExpect(status().isCreated()), "$.current.card.id");
         priceLadder(catalog);
+        beforeOffer.apply(catalog);
         api.postJson("/api/admin/orgs/" + seller.orgId() + "/cards/" + cardId + "/assessments", NEAR_MINT, api.admin())
                 .andExpect(status().isCreated());
         String offerId = TestApi.read(api.postJson("/api/orgs/" + seller.orgId() + "/cards/" + cardId + "/offers", "", seller.who())
@@ -82,7 +94,12 @@ public class TestMarket {
 
     /** A priced, offered card posted to buyers. */
     public Posted posted(Seller seller, String name) throws Exception {
-        Posted offered = offered(seller, name);
+        return posted(seller, name, catalog -> { });
+    }
+
+    /** {@link #posted(Seller, String)}, with a step on the catalog card before the offer. */
+    public Posted posted(Seller seller, String name, CatalogStep beforeOffer) throws Exception {
+        Posted offered = offered(seller, name, beforeOffer);
         api.postJson("/api/orgs/" + seller.orgId() + "/cards/" + offered.cardId() + "/listings",
                 "{\"offerId\":\"" + offered.offerId() + "\"}", seller.who()).andExpect(status().isCreated());
         String listingId = TestApi.read(api.get("/api/orgs/" + seller.orgId() + "/cards/" + offered.cardId() + "/sale", seller.who()), "$.listing.id");

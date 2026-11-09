@@ -163,6 +163,12 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
         <>
           <p className="offer-price">{money(offer.price)}</p>
           {offer.subjectToAuthentication && <p className="muted small">Subject to the buyer authenticating the card in hand.</p>}
+          {offer.rawSales?.below && offer.rawSales.lowest != null && (
+            <p className="alert alert-warning">
+              This offer is below recent raw sales of {money(offer.rawSales.lowest)}: that's the lowest near-mint ungraded sale we
+              have for this card in the 90 days before the offer. You may do better selling it raw yourself.
+            </p>
+          )}
           <HowPriced offer={offer} />
           {!live &&
             (soldAtThisOffer ? (

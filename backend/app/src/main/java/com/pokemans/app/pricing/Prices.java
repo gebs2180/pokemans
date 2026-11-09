@@ -50,14 +50,43 @@ public class Prices {
                              long daysOld, int staleLevels) {
     }
 
+    /**
+     * A card's raw near-mint sales over a recent window: what the card sold for ungraded, for a sanity
+     * check on an offer. Never part of a price table.
+     *
+     * @param lowest the lowest of them, or null when there were none. A PokeTrace comp is a day's
+     *               average, so this is the lowest day, not necessarily the lowest single sale
+     * @param sales  comps in the window (for PokeTrace, sale days)
+     * @param since  first day of the window
+     */
+    public record RawSales(BigDecimal lowest, int sales, LocalDate since, List<UUID> compIds) {
+    }
+
     private final PriceSnapshotRepository snapshots;
     private final PriceStatsRepository stats;
+    private final SoldCompRepository comps;
+    private final PricingProperties properties;
     private final Staleness staleness;
 
-    Prices(PriceSnapshotRepository snapshots, PriceStatsRepository stats, ParameterSet params) {
+    Prices(PriceSnapshotRepository snapshots, PriceStatsRepository stats, SoldCompRepository comps, PricingProperties properties,
+           ParameterSet params) {
         this.snapshots = snapshots;
         this.stats = stats;
+        this.comps = comps;
+        this.properties = properties;
         this.staleness = new Staleness(params);
+    }
+
+    /** The card's raw near-mint sales from the last {@code days} days, today included, in our currency only. */
+    @Transactional(readOnly = true)
+    public RawSales rawNearMint(UUID catalogCardId, int days) {
+        LocalDate since = LocalDate.now(ZoneOffset.UTC).minusDays(days);
+        List<SoldComp> sold = comps.findByCatalogCardIdAndRawConditionAndSoldOnGreaterThanEqual(catalogCardId,
+                        PriceSource.RawCondition.NEAR_MINT, since).stream()
+                .filter(c -> properties.currency().equals(c.getCurrency()))
+                .toList();
+        BigDecimal lowest = sold.stream().map(SoldComp::getPrice).min(BigDecimal::compareTo).orElse(null);
+        return new RawSales(lowest, sold.size(), since, sold.stream().map(SoldComp::getId).toList());
     }
 
     /**

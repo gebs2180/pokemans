@@ -625,6 +625,23 @@ describe('HowPriced', () => {
   })
 })
 
+describe('raw sales flag', () => {
+  it('tells the seller plainly when the offer is below recent raw sales', async () => {
+    stubApi([{ offer: offer({ rawSales: { lowest: 140, sales: 3, since: '2026-08-11', below: true } }), listing: null }], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText(/This offer is below recent raw sales of \$140\.00/)).toBeInTheDocument()
+  })
+
+  it('says nothing when the offer clears them, or there were none', async () => {
+    stubApi([{ offer: offer({ rawSales: { lowest: 90, sales: 3, since: '2026-08-11', below: false } }), listing: null }], address)
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText('Fairly sure (B), because there are only a few recent sales.')).toBeInTheDocument()
+    expect(screen.queryByText(/below recent raw sales/)).not.toBeInTheDocument()
+  })
+})
+
 /** The form as a buyer sees it after tapping "It arrived". */
 function OpenArrivalForm({ onSaved }: { onSaved: () => void }) {
   return <ArrivalForm path="/api/orgs/b1/deals/l1" onSaved={onSaved} noteRequired={false} />

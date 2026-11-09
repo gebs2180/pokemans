@@ -68,6 +68,31 @@ The lender and insurer side is paused while Zach clears his outside interest wit
 
   Unverified high-risk cards (vintage holos, Japanese promos) get an offer, marked "subject to the buyer authenticating the card in hand".
 
+## Stale and low offers (deep review 2026-11-09, B1 and B3; defaults to confirm)
+
+These defaults are the reviewing session's picks, not Zach's decisions yet.
+
+- **Raw sanity band (B1 step 1).** When an offer is quoted, the card's raw near-mint comps from the last 90 days are looked up. These are what PokeTrace stores. A PokeTrace comp is a day's average, so "lowest" is the lowest day.
+  - The lowest one, the count and the window start are stored on the offer (`card_offer.raw_nm_*`).
+  - The firm price below the lowest one sets `below_raw_sales`.
+  - **The flag never refuses the offer and never changes the formula.**
+  - The admin's offer preview on the review page shows the raw comps and the flag.
+  - The seller is told "This offer is below recent raw sales of $X" on the card's offer.
+  - Buyers never see it: the market and their deals leave it out.
+  - It is hidden with the sold prices (`pokemans.offers.show-sold-prices`).
+  - Mapping raw conditions to grades (step 2) isn't done.
+- **Re-pricing at post and accept (B3).** Posting an offer, and a buyer accepting one, both re-run the offer's own ladder against the card's current price table and sales rate.
+  - "The offer's own ladder" means the stored grade probabilities and buyer margin.
+  - The current parameter set is used, and the default grading cost.
+  - So only the market can move the price here: photo and condition changes have their own checks, which run first.
+  - If the price moved more than `pokemans.offers.reprice-threshold` either way, the request is refused with "The price has changed. Get a new offer." The threshold defaults to 10%. It is a property, not part of the parameter set, and exactly 10% still holds.
+  - The same refusal applies when the card can't be priced today.
+  - The refusal appends rows and never edits one. At post, it appends a `card_offer_void`. At accept, it appends a `VOIDED` listing event plus the offer void, so the card comes off the market.
+  - The void rows commit although the request is refused.
+  - Their `voided_by` is the user whose request found the move: the seller or the buyer.
+  - The self-dealing and address refusals at accept come before the re-price, so a refused buyer doesn't take the card off the market.
+  - A listing voided this way counts as `VOIDED` in the track record.
+
 ## Undo (Zach, 2026-10-21)
 
 Before the closed beta, the admin can take back a mistake (a wrong identification, a bad price, a deal that fell through). Nothing is edited: each undo is a new row with who, when and why, so the record shows the mistake and its correction.

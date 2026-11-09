@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 class CardStatusServiceTest {
 
     static final OfferPolicy POLICY = new OfferPolicy(ParameterSet.load("1.2.0"),
-            new OffersProperties(Duration.ofDays(7), Duration.ofDays(14), new BigDecimal("5000"), true));
+            new OffersProperties(Duration.ofDays(7), Duration.ofDays(14), new BigDecimal("5000"), true, new BigDecimal("0.10")));
 
     private static final Instant NOW = Instant.parse("2026-11-01T12:00:00Z");
 
