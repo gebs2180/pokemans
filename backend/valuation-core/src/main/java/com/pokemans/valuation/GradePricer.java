@@ -33,7 +33,9 @@ import java.util.Objects;
  *   <li>No graded sales in any grade: refused, so the caller leaves the card unpriced.
  *   <li>Net of grading costs, unless the raw-sale price for that condition is higher.
  *   <li>Per-grade confidence: observed prices from their comp count, derived prices one level below
- *       the grades they came from (so a step-down chain drops once per step), U with no sales D.
+ *       the grades they came from (so a step-down chain drops once per step), U with no sales D. From
+ *       parameter set 1.3.0, an observed price from fewer than the minimum sales even in the extended
+ *       window is thin: it is still the price, but its confidence drops one level as a derived one would.
  * </ul>
  */
 public final class GradePricer {
@@ -160,7 +162,11 @@ public final class GradePricer {
             return known;
         }
         Confidence c = switch (method.get(grade)) {
-            case OBSERVED -> params.fromCompCount(BigDecimal.valueOf(observed.get(grade).salesInWindow()));
+            case OBSERVED -> {
+                int sales = observed.get(grade).salesInWindow();
+                Confidence fromCount = params.fromCompCount(BigDecimal.valueOf(sales));
+                yield params.thinGradesAreDerived() && sales < params.minSalesInWindow() ? fromCount.drop() : fromCount;
+            }
             case NO_SALES -> Confidence.D;
             case INTERPOLATED, STEP_DOWN, CARD_STEP_DOWN, CARRIED_DOWN -> {
                 Confidence worst = Confidence.A;

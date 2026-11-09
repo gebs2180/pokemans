@@ -690,6 +690,12 @@ export function AssessmentPanel({
             confidence {current.confidence}
           </p>
           {current.reason && <p className="muted">{current.reason}</p>}
+          {current.authorType === 'SYSTEM' && (
+            <p className="muted small">
+              Built from the providers' grades with a spread, a cap on 10 and a floor on U. All of these are starting guesses,
+              uncalibrated until returned grades exist to check them against.
+            </p>
+          )}
           {data.photosChanged && (
             <p className="warn">
               The front or back was retaken since this distribution, so it doesn't count and the card gets no offer. Press

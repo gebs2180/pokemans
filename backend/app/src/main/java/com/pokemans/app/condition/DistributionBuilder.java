@@ -21,16 +21,25 @@ import java.util.TreeMap;
  *   <li>Each provider grade is folded down to a whole grade (half grades fold down) and spread over
  *       neighbouring grades, more below than above.</li>
  *   <li>Providers are averaged.</li>
+ *   <li>P(10) is capped ({@link ConditionProperties#maxTenProbability()}): the excess moves down to 9. A
+ *       provider 10 would otherwise put 0.60 on 10 (its own 0.50 plus the +1 mass the edge keeps), and the
+ *       PSA 10 price dominates an offer (review B2).</li>
  *   <li>A centering-only reading (our own measurement) caps the result: whatever probability sits
  *       above the best grade the centering allows moves onto that grade. It never adds a grade of its
  *       own to the average, since a card centred for a 10 can still have the corners of a 4.</li>
  *   <li>Confidence comes from how many providers answered, how far apart they are, and whether every
  *       photo showed the whole card. Lower confidence moves probability down.</li>
+ *   <li>U gets at least {@link ConditionProperties#ungradableFloor()}, taken proportionally from the other
+ *       grades: a photo model can't see a trimmed or recoloured card (review B2).</li>
  * </ol>
  *
+ * The 10 cap and the U floor are for system distributions only: a reviewer's hand-entered distribution
+ * doesn't come through here, and a graded card is certain at its grade. Every number here (spread, cap,
+ * floor, penalties) is a starting guess until returned grades exist to calibrate it.
+ *
  * There is no default surface shift for holos or full arts: surface counts through the providers'
- * grades, which score it (Zach, 2026-11-04, review D5). Nothing here moves probability up. U (ungradable) stays at zero: alteration and trimming are a
- * reviewer's call, not a photo model's.
+ * grades, which score it (Zach, 2026-11-04, review D5). Nothing here moves probability up. Beyond the U floor,
+ * alteration and trimming are a reviewer's call, not a photo model's.
  */
 final class DistributionBuilder {
 
@@ -65,7 +74,7 @@ final class DistributionBuilder {
             folded.put(provider, whole);
             perProvider.add(spread(whole));
         });
-        GradeDistribution distribution = average(perProvider);
+        GradeDistribution distribution = capTen(average(perProvider), properties.maxTenProbability());
         // Before the confidence shift, so it still moves mass below the cap.
         if (input.centeringCap() != null) {
             distribution = distribution.capAt(Grade.of(Math.max(1, Math.min(10, input.centeringCap()))));
@@ -89,6 +98,8 @@ final class DistributionBuilder {
         if (confidencePenalty.signum() > 0) {
             distribution = distribution.applyPhotoConfidencePenalty(confidencePenalty);
         }
+        // Last, so nothing after it can take U below the floor. It scales the grades down, so P(10) stays capped.
+        distribution = floorUngradable(distribution, properties.ungradableFloor());
 
         Map<String, Object> basis = new LinkedHashMap<>();
         basis.put("providerGrades", input.providerGrades());
@@ -98,16 +109,48 @@ final class DistributionBuilder {
         basis.put("wholeCardInPhotos", input.wholeCardInPhotos());
         basis.put("confidencePenalty", confidencePenalty);
         basis.put("spread", new TreeMap<>(properties.spread()));
+        basis.put("maxTenProbability", properties.maxTenProbability());
+        basis.put("ungradableFloor", properties.ungradableFloor());
         return new Result(distribution, confidence, basis);
     }
 
-    /** The configured spread around one whole grade; mass past 10 or below 1 stays on the edge grade. */
+    /**
+     * The configured spread around one whole grade; mass past 10 or below 1 stays on the edge grade.
+     * {@link #build} then caps P(10), so the edge can't pile mass onto 10.
+     */
     GradeDistribution spread(int grade) {
         EnumMap<Grade, BigDecimal> p = new EnumMap<>(Grade.class);
         properties.spread().forEach((offset, weight) -> {
             Grade target = Grade.of(Math.max(1, Math.min(10, grade + offset)));
             p.merge(target, weight, BigDecimal::add);
         });
+        return GradeDistribution.of(p);
+    }
+
+    /** Moves whatever probability on 10 exceeds {@code max} down to 9. Downward only. */
+    static GradeDistribution capTen(GradeDistribution distribution, BigDecimal max) {
+        BigDecimal excess = distribution.p(Grade.G10).subtract(max);
+        if (excess.signum() <= 0) {
+            return distribution;
+        }
+        EnumMap<Grade, BigDecimal> p = new EnumMap<>(distribution.asMap());
+        p.put(Grade.G10, max);
+        p.merge(Grade.G9, excess, BigDecimal::add);
+        return GradeDistribution.of(p);
+    }
+
+    /**
+     * Raises U to {@code floor} if it is below, scaling every grade by the same factor so the total stays 1.
+     * Every grade's probability falls or stays: nothing moves up.
+     */
+    static GradeDistribution floorUngradable(GradeDistribution distribution, BigDecimal floor) {
+        BigDecimal u = distribution.p(Grade.U);
+        if (u.compareTo(floor) >= 0) {
+            return distribution;
+        }
+        BigDecimal scale = BigDecimal.ONE.subtract(floor).divide(BigDecimal.ONE.subtract(u), MC);
+        EnumMap<Grade, BigDecimal> p = new EnumMap<>(Grade.class);
+        distribution.asMap().forEach((grade, q) -> p.put(grade, grade.isUngradable() ? floor : q.multiply(scale, MC)));
         return GradeDistribution.of(p);
     }
 

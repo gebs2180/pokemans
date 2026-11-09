@@ -16,6 +16,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param disagreementForB     largest gap between provider grades that still allows confidence B
  * @param confidencePenaltyB   share of each grade's probability moved one grade down at confidence B
  * @param confidencePenaltyC   the same at confidence C
+ * @param maxTenProbability    the most probability a system distribution puts on 10; the rest moves down to 9.
+ *                             Raw cards that look perfect in photos grade 10 far less often than the spread's
+ *                             edge rule implies (review B2). A starting guess, not calibrated
+ * @param ungradableFloor      the least probability a system distribution puts on U, taken proportionally from
+ *                             the other grades: a photo model can't see trimming or recolouring (review B2).
+ *                             A starting guess, not calibrated
  */
 @ConfigurationProperties("pokemans.condition")
 record ConditionProperties(
@@ -23,6 +29,8 @@ record ConditionProperties(
         @DefaultValue("1.5") double disagreementForB,
         @DefaultValue("0.10") BigDecimal confidencePenaltyB,
         @DefaultValue("0.25") BigDecimal confidencePenaltyC,
+        @DefaultValue("0.25") BigDecimal maxTenProbability,
+        @DefaultValue("0.02") BigDecimal ungradableFloor,
         @DefaultValue Worker worker,
         @DefaultValue Ximilar ximilar,
         @DefaultValue CardGrade cardgrade,
@@ -38,6 +46,13 @@ record ConditionProperties(
         BigDecimal sum = spread.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         if (sum.compareTo(BigDecimal.ONE) != 0) {
             throw new IllegalArgumentException("pokemans.condition.spread must sum to 1, got " + sum);
+        }
+        if (maxTenProbability == null || maxTenProbability.signum() < 0 || maxTenProbability.compareTo(BigDecimal.ONE) > 0) {
+            throw new IllegalArgumentException("pokemans.condition.max-ten-probability must be in [0, 1], got " + maxTenProbability);
+        }
+        // Below 1: a floor of 1 would leave nothing for the grades.
+        if (ungradableFloor == null || ungradableFloor.signum() < 0 || ungradableFloor.compareTo(BigDecimal.ONE) >= 0) {
+            throw new IllegalArgumentException("pokemans.condition.ungradable-floor must be in [0, 1), got " + ungradableFloor);
         }
     }
 

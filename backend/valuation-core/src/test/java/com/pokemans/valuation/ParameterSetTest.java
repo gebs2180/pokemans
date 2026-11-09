@@ -78,6 +78,39 @@ class ParameterSetTest {
     }
 
     @Test
+    void version130AddsTheModalGradeAndThinGradeRules() throws Exception {
+        ParameterSet v120 = ParameterSet.load("1.2.0");
+        ParameterSet v130 = ParameterSet.load("1.3.0");
+
+        assertThat(v130.usesModalGradeConfidence()).isTrue();
+        assertThat(v130.thinGradesAreDerived()).isTrue();
+        assertThat(v120.usesModalGradeConfidence()).isFalse();
+        assertThat(v120.thinGradesAreDerived()).isFalse();
+        assertThat(v120.modalGradeConfidence()).isNull();
+        // Everything else is 1.2.0's.
+        assertThat(new ParameterSet("1.2.0", v130.halfLifeDays(), v130.windowDays(), v130.extendedWindowDays(),
+                v130.minSalesInWindow(), v130.outlierTrimMinSales(), v130.outlierTrimFraction(), v130.cardLadderMinGrades(),
+                v130.cardLadderMinSpan(), v130.staleGraceDays(), v130.staleDaysPerLevel(), v130.highLiquidityAbove(),
+                v130.lowLiquidityBelow(), v130.sellingFees(), v130.buyerCosts(), v130.searchPremiumHigh(),
+                v130.searchPremiumMid(), v130.searchPremiumLow(), v130.speedDiscountHigh(), v130.speedDiscountMid(),
+                v130.speedDiscountLow(), v130.stressK(), v130.stressMonths(), v130.stressShiftGrades(),
+                v130.stressShiftGradesConfidenceC(), v130.depthDiscountFloor(), v130.depthDiscountCap(), v130.compsForA(),
+                v130.compsForB(), v130.compsForC(), v130.minFmv(), v130.singleCardCap(), v130.topFiveCap(),
+                v130.correlationThreshold(), v130.correlationHaircut(), v130.suggestedAlphaLow(), v130.suggestedAlphaHigh(),
+                v130.gradeFirstMinLift(), v130.gradeFirstTopN(), v130.fallbackSigma(), v130.offerMarginA(),
+                v130.offerMarginB(), v130.offerMarginC(), null, null)).isEqualTo(v120);
+
+        java.util.Properties p = new java.util.Properties();
+        try (var in = ParameterSet.class.getResourceAsStream("/parameter-sets/1.3.0.properties")) {
+            p.load(in);
+        }
+        p.setProperty("confidence.modalGrade", "yes");
+        assertThatThrownBy(() -> ParameterSet.fromProperties(p)).isInstanceOf(IllegalArgumentException.class);
+        p.setProperty("confidence.modalGrade", "false");
+        assertThat(ParameterSet.fromProperties(p).usesModalGradeConfidence()).isFalse();
+    }
+
+    @Test
     void unknownVersionFails() {
         assertThatThrownBy(() -> ParameterSet.load("9.9.9")).isInstanceOf(IllegalArgumentException.class);
     }

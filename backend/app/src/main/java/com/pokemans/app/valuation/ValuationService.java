@@ -1,5 +1,6 @@
 package com.pokemans.app.valuation;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.pokemans.app.catalog.Catalog;
 import com.pokemans.app.condition.Assessments;
 import com.pokemans.app.identity.CurrentUser;
@@ -40,8 +41,21 @@ import tools.jackson.databind.json.JsonMapper;
 @EnableConfigurationProperties(ValuationProperties.class)
 class ValuationService {
 
-    /** Canonical JSON: sorted map keys, so equal inputs always hash the same. */
-    static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
+    /**
+     * Canonical JSON: sorted map keys, so equal inputs always hash the same. Parameter-set fields added in
+     * 1.3.0 are left out while null, so a stored older run re-serializes, and hashes, exactly as it did.
+     */
+    static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+            .addMixIn(ParameterSet.class, ParameterSetJson.class).build();
+
+    /** Jackson mix-in for {@link #JSON}: the parameter-set fields that older sets don't have. */
+    abstract static class ParameterSetJson {
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract Boolean modalGradeConfidence();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract Boolean thinGradesDerived();
+    }
 
     static final String LOT = "photographed lot: lots aren't valued";
     static final String NOT_IDENTIFIED = "not identified";
