@@ -59,6 +59,7 @@ services:
       POKETRACE_ENABLED: ${POKETRACE_ENABLED:-false}
       POKETRACE_API_KEY: ${POKETRACE_API_KEY:-}
       PRICING_INGESTION_ENABLED: ${PRICING_INGESTION_ENABLED:-false}
+      PRICING_HEALTHCHECK_URL: ${PRICING_HEALTHCHECK_URL:-}
     # A 4 GB VPS: the JVM takes 60% of this limit as heap.
     mem_limit: 1536m
     logging: *logging
@@ -91,7 +92,7 @@ services:
       - caddy-config:/config
     logging: *logging
 
-  # Nightly Postgres dump and photo-bucket copy to the backup bucket (backup/backup.sh).
+  # Nightly Postgres dump and photo-bucket copy to the backup bucket, and optionally off-site (backup/backup.sh).
   backup:
     build: ./backup
     image: pokemans-backup
@@ -108,6 +109,12 @@ services:
       PHOTO_BUCKET: ${R2_PHOTO_BUCKET:-pokemans-photos}
       BACKUP_BUCKET: ${R2_BACKUP_BUCKET:-pokemans-backups}
       HEALTHCHECK_URL: ${BACKUP_HEALTHCHECK_URL:-}
+      # Weekly restore test into a throwaway database, straight after that night's backup (backup/restore-test.sh).
+      RESTORE_TEST_DAYS: ${RESTORE_TEST_DAYS:-Sun}
+      RESTORE_TEST_HEALTHCHECK_URL: ${RESTORE_TEST_HEALTHCHECK_URL:-}
+      # Optional off-site copy on another provider and account (backup/README.md). Off unless both are set.
+      OFFSITE_REMOTE: ${OFFSITE_REMOTE:-}
+      OFFSITE_PATH: ${OFFSITE_PATH:-}
       # rclone remotes: "photos" reads the photo bucket, "backups" writes the backup bucket (separate tokens).
       RCLONE_CONFIG_PHOTOS_TYPE: s3
       RCLONE_CONFIG_PHOTOS_PROVIDER: Cloudflare
