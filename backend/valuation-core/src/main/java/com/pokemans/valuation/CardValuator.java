@@ -197,21 +197,23 @@ public final class CardValuator {
 
     /**
      * Base confidence is the worse of photo confidence and comp confidence (probability-weighted count
-     * of observed sales behind the prices). Any derived price that carries probability in the central
+     * of observed sales behind the prices; from 1.3.0 also no better than the count behind the modal
+     * grade, see {@link #compsConfidence}). Any derived price that carries probability in the central
      * or stressed distribution drops it one level. The stress checked is the one the base confidence
      * gets (3 grades at C or D, else 2): a drop from B to C deepens the stress, but by then it has
      * already dropped, so checking the base's stress is enough.
      */
     private Confidence confidence(Input in, Trace trace) {
         BigDecimal weightedComps = weightedComps(in);
-        Confidence fromComps = params.fromCompCount(weightedComps);
+        Confidence fromComps = compsConfidence(in);
         Confidence base = in.photoConfidence().worse(fromComps);
         trace.add("confidence_base", "worse of photo and comps", base,
-                "photo " + in.photoConfidence() + ", comps " + fromComps + " (weighted sales " + Money.cents(weightedComps) + ")");
+                "photo " + in.photoConfidence() + ", comps " + fromComps + " (weighted sales " + Money.cents(weightedComps)
+                        + (params.usesModalGradeConfidence() ? modalDetail(in) : "") + ")");
         base = applyPenalties(base, in, false, "confidence_penalty", trace);
 
         GradeDistribution stressed = in.distribution().shiftDown(in.knownGrade() ? 0 : stressShift(base));
-        String derived = derivedGrades(in, g -> in.distribution().p(g).signum() > 0 || stressed.p(g).signum() > 0);
+        String derived = derivedGrades(in, params, g -> in.distribution().p(g).signum() > 0 || stressed.p(g).signum() > 0);
         if (derived.isEmpty()) {
             trace.add("confidence", "no derived prices in play", base, "");
             return base;
@@ -229,9 +231,9 @@ public final class CardValuator {
      * probability.
      */
     private Confidence offerConfidence(Input in, Trace trace) {
-        Confidence c = in.photoConfidence().worse(params.fromCompCount(weightedComps(in)));
+        Confidence c = in.photoConfidence().worse(compsConfidence(in));
         c = applyPenalties(c, in, true, "offer_confidence_penalty", trace);
-        String derived = derivedGrades(in, g -> in.distribution().p(g).signum() > 0);
+        String derived = derivedGrades(in, params, g -> in.distribution().p(g).signum() > 0);
         if (derived.isEmpty()) {
             trace.add("offer_confidence", "base and price penalties; no derived price where the card is likely", c,
                     "FLV-only penalties (fallback sigma, the stress) left out");
@@ -243,12 +245,69 @@ public final class CardValuator {
         return dropped;
     }
 
-    /** Probability-weighted count of the observed sales behind the prices. */
-    private static BigDecimal weightedComps(Input in) {
+    /**
+     * Confidence from comps: the probability-weighted count, and from 1.3.0 the worse of that and the count
+     * behind the modal grade's price, so a deep neighbour can't hide a thin price where the card most
+     * likely grades (review B5).
+     */
+    private Confidence compsConfidence(Input in) {
+        Confidence weighted = params.fromCompCount(weightedComps(in));
+        if (!params.usesModalGradeConfidence()) {
+            return weighted;
+        }
+        return weighted.worse(params.fromCompCount(BigDecimal.valueOf(salesBehind(in.prices(), modalGrade(in)))));
+    }
+
+    /**
+     * The gradable grade with the most probability. Ties go to the grade with fewer sales behind its
+     * price, so a tie never hides the thinner one.
+     */
+    private static Grade modalGrade(Input in) {
+        Grade modal = null;
+        for (int g = 1; g <= 10; g++) {
+            Grade grade = Grade.of(g);
+            if (modal == null) {
+                modal = grade;
+                continue;
+            }
+            int cmp = in.distribution().p(grade).compareTo(in.distribution().p(modal));
+            if (cmp > 0 || (cmp == 0 && salesBehind(in.prices(), grade) < salesBehind(in.prices(), modal))) {
+                modal = grade;
+            }
+        }
+        return modal;
+    }
+
+    /**
+     * Sales behind one grade's price: its own count when observed (thin or not), else the thinnest of the
+     * grades it was derived from; zero with no sales or no recorded basis.
+     */
+    private static int salesBehind(GradePriceTable prices, Grade grade) {
+        GradePrice price = prices.get(grade);
+        if (price.method() == GradePrice.Method.OBSERVED) {
+            return price.salesInWindow();
+        }
+        if (!price.derived() || price.basis().isEmpty()) {
+            return 0;
+        }
+        int thinnest = Integer.MAX_VALUE;
+        for (Grade from : price.basis()) {
+            thinnest = Math.min(thinnest, salesBehind(prices, from));
+        }
+        return thinnest;
+    }
+
+    private static String modalDetail(Input in) {
+        Grade modal = modalGrade(in);
+        return "; modal grade " + modal + " with " + salesBehind(in.prices(), modal) + " sales behind its price";
+    }
+
+    /** Probability-weighted count of the observed sales behind the prices; from 1.3.0, thin grades don't count. */
+    private BigDecimal weightedComps(Input in) {
         BigDecimal weighted = BigDecimal.ZERO;
         for (Grade grade : Grade.values()) {
             GradePrice price = in.prices().get(grade);
-            if (price.method() == GradePrice.Method.OBSERVED) {
+            if (price.method() == GradePrice.Method.OBSERVED && !params.isThin(price)) {
                 weighted = weighted.add(in.distribution().p(grade).multiply(BigDecimal.valueOf(price.salesInWindow()), Money.MC));
             }
         }
@@ -267,12 +326,17 @@ public final class CardValuator {
         return c;
     }
 
-    /** The grades in play whose price is derived, as "G9, G10", or empty if none. */
-    private static String derivedGrades(Input in, Predicate<Grade> inPlay) {
+    /**
+     * The grades in play whose price is derived, as "G9, G10", or empty if none. From 1.3.0 a thin observed
+     * price counts, marked "(thin)".
+     */
+    private static String derivedGrades(Input in, ParameterSet params, Predicate<Grade> inPlay) {
         StringBuilder derived = new StringBuilder();
         for (Grade grade : Grade.values()) {
-            if (inPlay.test(grade) && in.prices().get(grade).derived()) {
-                derived.append(derived.isEmpty() ? "" : ", ").append(grade);
+            GradePrice price = in.prices().get(grade);
+            boolean thin = params.isThin(price);
+            if (inPlay.test(grade) && (price.derived() || thin)) {
+                derived.append(derived.isEmpty() ? "" : ", ").append(grade).append(thin ? " (thin)" : "");
             }
         }
         return derived.toString();

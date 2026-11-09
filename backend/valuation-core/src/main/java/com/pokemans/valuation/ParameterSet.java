@@ -64,7 +64,12 @@ public record ParameterSet(
         // Instant offers: the buyer's margin by the card's confidence (null in sets before 1.2.0)
         BigDecimal offerMarginA,
         BigDecimal offerMarginB,
-        BigDecimal offerMarginC) {
+        BigDecimal offerMarginC,
+        // Comps confidence (null in sets before 1.3.0, which means off; review B5): also no better than the
+        // count at the modal grade, and a grade with fewer than minSalesInWindow sale days in the extended
+        // window counts as derived, not observed
+        Boolean modalGradeConfidence,
+        Boolean thinGradesDerived) {
 
     public static final String DEFAULT_VERSION = "1.0.0";
 
@@ -138,7 +143,27 @@ public record ParameterSet(
                 optionalDecimal(p, "values.fallbackSigma"),
                 optionalDecimal(p, "offers.buyerMargin.A"),
                 optionalDecimal(p, "offers.buyerMargin.B"),
-                optionalDecimal(p, "offers.buyerMargin.C"));
+                optionalDecimal(p, "offers.buyerMargin.C"),
+                optionalBoolean(p, "confidence.modalGrade"),
+                optionalBoolean(p, "pricing.thinGradesDerived"));
+    }
+
+    /** Comps confidence is also no better than the count behind the modal grade's price (1.3.0 on). */
+    public boolean usesModalGradeConfidence() {
+        return Boolean.TRUE.equals(modalGradeConfidence);
+    }
+
+    /**
+     * True when an observed price from fewer than {@link #minSalesInWindow} sales in the extended window
+     * counts as derived for confidence (1.3.0 on). The price itself is unchanged.
+     */
+    public boolean thinGradesAreDerived() {
+        return Boolean.TRUE.equals(thinGradesDerived);
+    }
+
+    /** True for an observed price this set treats as derived because too few sales are behind it. */
+    public boolean isThin(GradePrice price) {
+        return thinGradesAreDerived() && price.method() == GradePrice.Method.OBSERVED && price.salesInWindow() < minSalesInWindow;
     }
 
     /** Liquidity tier for a card's monthly sales count. */
@@ -202,6 +227,18 @@ public record ParameterSet(
     private static BigDecimal optionalDecimal(Properties p, String key) {
         String value = p.getProperty(key);
         return value == null || value.isBlank() ? null : new BigDecimal(value.trim());
+    }
+
+    private static Boolean optionalBoolean(Properties p, String key) {
+        String value = p.getProperty(key);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return switch (value.trim()) {
+            case "true" -> Boolean.TRUE;
+            case "false" -> Boolean.FALSE;
+            default -> throw new IllegalArgumentException("Parameter " + key + " must be true or false: " + value);
+        };
     }
 
     private static int integer(Properties p, String key) {

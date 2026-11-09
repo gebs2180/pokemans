@@ -305,4 +305,23 @@ class ConditionRebuildTest {
 
         assertThat(saved.getBasis().get("centeringCap")).isNull();
     }
+
+    /** Review B2: the 10 cap and U floor shape system distributions only. */
+    @Test
+    void aSystemAssessmentGetsTheTenCapAndTheUngradableFloor() {
+        GradeDistribution built = rebuild(graded("A", 10.0, null), graded("B", 10.0, null)).orElseThrow().distribution();
+
+        assertThat(built.p(Grade.G10)).isLessThanOrEqualTo(new BigDecimal("0.25"));
+        assertThat(built.p(Grade.U)).isEqualByComparingTo("0.02");
+    }
+
+    @Test
+    void aHandDistributionGetsNeitherTheTenCapNorTheUngradableFloor() {
+        GradeDistribution allTen = GradeDistribution.certain(Grade.G10);
+
+        ConditionAssessment saved = byHand(allTen, false, graded("A", 10.0, null));
+
+        assertThat(saved.distribution()).isEqualTo(allTen);
+        assertThat(saved.distribution().p(Grade.U)).isZero();
+    }
 }
