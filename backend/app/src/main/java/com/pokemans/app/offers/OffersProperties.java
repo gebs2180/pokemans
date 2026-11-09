@@ -19,10 +19,15 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param showSoldPrices whether offers show what each grade recently sold for (UX review finding 11). A kill switch in
  *                       case the price data's licence doesn't allow showing them: turning it off needs an env change and a
  *                       restart, no new code
+ * @param repriceThreshold how far an offer's price may move, either way, before it can't be posted or taken: at post and
+ *                       at accept its ladder is re-run on the card's current prices, and past this share of the offer
+ *                       price the offer is voided ("The price has changed. Get a new offer."). Deep review 2026-11-09,
+ *                       B3. A property, not part of the parameter set: it guards the market, it doesn't price
  */
 @ConfigurationProperties("pokemans.offers")
 record OffersProperties(@DefaultValue("7d") Duration offerValidFor,
                         @DefaultValue("14d") Duration listingOpenFor,
                         @DefaultValue("5000") BigDecimal maxPrice,
-                        @DefaultValue("true") boolean showSoldPrices) {
+                        @DefaultValue("true") boolean showSoldPrices,
+                        @DefaultValue("0.10") BigDecimal repriceThreshold) {
 }

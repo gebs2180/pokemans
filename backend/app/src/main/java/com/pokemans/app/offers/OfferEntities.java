@@ -41,13 +41,27 @@ class CardOffer extends AssignedIdEntity<UUID> {
     private UUID createdBy;
     private Instant createdAt;
     private Instant expiresAt;
+    /** The card's raw near-mint sales when quoted: the lowest, how many, from when. Null before the check existed. */
+    private BigDecimal rawNmLow;
+    private Integer rawNmSales;
+    private java.time.LocalDate rawNmSince;
+    /** The price was below {@link #rawNmLow} when quoted. A flag, never a refusal. */
+    private boolean belowRawSales;
 
     protected CardOffer() {
     }
 
+    /** What the card recently sold for raw in near mint, when the offer was quoted. */
+    record RawCheck(BigDecimal lowest, int sales, java.time.LocalDate since) {
+    }
+
     CardOffer(UUID orgId, UUID cardItemId, UUID catalogCardId, UUID assessmentId, UUID snapshotSetId, boolean graded, String inputs,
               String parameterSet, BigDecimal buyerMargin, String ladder, BigDecimal price, BigDecimal fmv, String confidence,
-              boolean subjectToAuthentication, String trace, UUID createdBy, Instant createdAt, Instant expiresAt) {
+              boolean subjectToAuthentication, String trace, UUID createdBy, Instant createdAt, Instant expiresAt, RawCheck raw) {
+        this.rawNmLow = raw.lowest();
+        this.rawNmSales = raw.sales();
+        this.rawNmSince = raw.since();
+        this.belowRawSales = raw.lowest() != null && price.compareTo(raw.lowest()) < 0;
         this.id = UUID.randomUUID();
         this.orgId = orgId;
         this.cardItemId = cardItemId;
@@ -124,6 +138,26 @@ class CardOffer extends AssignedIdEntity<UUID> {
 
     Instant getExpiresAt() {
         return expiresAt;
+    }
+
+    UUID getCatalogCardId() {
+        return catalogCardId;
+    }
+
+    BigDecimal getRawNmLow() {
+        return rawNmLow;
+    }
+
+    Integer getRawNmSales() {
+        return rawNmSales;
+    }
+
+    java.time.LocalDate getRawNmSince() {
+        return rawNmSince;
+    }
+
+    boolean isBelowRawSales() {
+        return belowRawSales;
     }
 }
 

@@ -50,10 +50,21 @@ class ListingService {
     private final ListingLock lock;
     private final OrgAccess access;
     private final ListingViews views;
+    private final OfferService pricing;
+
+    /**
+     * 409 because the offer's price no longer holds on today's prices. Thrown after the void row is saved, and
+     * the transaction commits it anyway ({@code noRollbackFor}): the offer stays withdrawn whatever the caller does.
+     */
+    static final class PriceChanged extends ResponseStatusException {
+        PriceChanged() {
+            super(HttpStatus.CONFLICT, OfferService.PRICE_CHANGED);
+        }
+    }
 
     ListingService(CardOfferRepository offers, CardOfferVoidRepository voids, SaleListingRepository listings, ListingEventRepository events,
                    OffersProperties properties, Shipping shipping, CurrentUser currentUser, CardItems cardItems, ListingLock lock,
-                   OrgAccess access, ListingViews views) {
+                   OrgAccess access, ListingViews views, OfferService pricing) {
         this.offers = offers;
         this.voids = voids;
         this.listings = listings;
@@ -65,6 +76,7 @@ class ListingService {
         this.lock = lock;
         this.access = access;
         this.views = views;
+        this.pricing = pricing;
     }
 
     /** The seller's view: the latest offer on the card and its latest listing. */
@@ -79,9 +91,10 @@ class ListingService {
 
     /**
      * Posts the offer to every buyer. The seller needs an address on file, since the label is bought
-     * the moment a buyer accepts. One open or taken listing per card at a time.
+     * the moment a buyer accepts. One open or taken listing per card at a time. An offer whose price has moved
+     * more than {@code pokemans.offers.reprice-threshold} on today's prices is voided (a new row) and refused.
      */
-    @Transactional
+    @Transactional(noRollbackFor = PriceChanged.class)
     SaleListing post(UUID orgId, UUID cardItemId, UUID offerId) {
         // Serialize posting per card, so two clicks can't open two listings.
         lock.lock(cardItemId);
@@ -124,6 +137,11 @@ class ListingService {
             }
             requireNotHeld(cardItemId);
         }
+        // Last, so the reasons above (photos changed, already posted) win over a moved price.
+        if (pricing.reprice(offer).moved()) {
+            voids.saveAndFlush(new CardOfferVoid(offerId, OfferService.PRICE_CHANGED, currentUser.id()));
+            throw new PriceChanged();
+        }
         return listings.save(new SaleListing(offerId, orgId, cardItemId, currentUser.id(), now, now.plus(properties.listingOpenFor())));
     }
 
@@ -148,7 +166,7 @@ class ListingService {
         for (SaleListing l : open) {
             CardOffer offer = byId.get(l.getOfferId());
             CardInputs in = OfferService.inputs(offer);
-            items.add(new MarketItem(l.getId(), card(in).forBuyer(), views.offerView(offer, null), views.photos(in), l.getCreatedAt(), l.getExpiresAt()));
+            items.add(new MarketItem(l.getId(), card(in).forBuyer(), views.offerView(offer, null).forBuyer(), views.photos(in), l.getCreatedAt(), l.getExpiresAt()));
         }
         return items;
     }
@@ -169,11 +187,13 @@ class ListingService {
     /**
      * First come, first served: the first buyer to accept takes the card at the offer price, everyone
      * after gets 409. The buyer needs an address on file for the label. Accepting again is how a double
-     * click or a retry after a lost answer looks, so the buyer who holds the card just gets it back.
+     * click or a retry after a lost answer looks, so the buyer who holds the card just gets it back. An offer
+     * whose price has moved more than {@code pokemans.offers.reprice-threshold} on today's prices comes off the
+     * market (a VOIDED listing event and an offer void, both new rows) and the buyer is refused.
      *
      * @return the listing taken, for the label purchase that follows the commit
      */
-    @Transactional
+    @Transactional(noRollbackFor = PriceChanged.class)
     SaleListing accept(UUID buyerOrgId, UUID listingId) {
         SaleListing listing = listings.findById(listingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
@@ -192,6 +212,14 @@ class ListingService {
         }
         if (shipping.address(buyerOrgId).isEmpty()) {
             throw conflict("Add the address cards should ship to first.");
+        }
+        CardOffer offer = offers.findById(listing.getOfferId()).orElseThrow();
+        if (pricing.reprice(offer).moved()) {
+            close(ListingEvent.voided(listingId, currentUser.id(), OfferService.PRICE_CHANGED), "Another buyer took this card first.");
+            if (voids.findByOfferId(offer.getId()).isEmpty()) {
+                voids.saveAndFlush(new CardOfferVoid(offer.getId(), OfferService.PRICE_CHANGED, currentUser.id()));
+            }
+            throw new PriceChanged();
         }
         close(ListingEvent.accepted(listingId, buyerOrgId, currentUser.id()), "Another buyer took this card first.");
         return listing;

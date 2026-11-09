@@ -17,6 +17,9 @@ interface SoldCompRepository extends JpaRepository<SoldComp, UUID> {
 
     List<SoldComp> findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID catalogCardId);
 
+    List<SoldComp> findByCatalogCardIdAndRawConditionAndSoldOnGreaterThanEqual(UUID catalogCardId, PriceSource.RawCondition rawCondition,
+                                                                             LocalDate since);
+
     @Query("select distinct c.catalogCardId from SoldComp c where c.soldOn between :from and :to")
     List<UUID> findCatalogCardIdsSoldBetween(LocalDate from, LocalDate to);
 }

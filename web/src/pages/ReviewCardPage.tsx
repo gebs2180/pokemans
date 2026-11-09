@@ -133,6 +133,20 @@ export function OfferPreviewPanel({ cardId }: { cardId: string }) {
             {data.confidence && ` (confidence ${data.confidence})`}
           </p>
         ))}
+      {data?.rawSales &&
+        (data.rawSales.below && data.rawSales.lowest != null ? (
+          <p className="warn" role="status">
+            Below recent raw sales of {money(data.rawSales.lowest)}: the lowest of {data.rawSales.sales} raw near-mint{' '}
+            {data.rawSales.sales === 1 ? 'comp' : 'comps'} since {data.rawSales.since}. A flag only: the seller still gets the offer and
+            is told.
+          </p>
+        ) : (
+          <p className="muted small">
+            {data.rawSales.lowest == null
+              ? `No raw near-mint sales since ${data.rawSales.since} to check the offer against.`
+              : `At or above recent raw sales: lowest ${money(data.rawSales.lowest)} of ${data.rawSales.sales} raw near-mint ${data.rawSales.sales === 1 ? 'comp' : 'comps'} since ${data.rawSales.since}.`}
+          </p>
+        ))}
       {data && data.why.length > 0 && (
         <>
           <h3>How the confidence was set</h3>

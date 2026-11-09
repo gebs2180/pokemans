@@ -834,7 +834,15 @@ export type Offer = {
   sold: SoldPrice[] | null
   /** Why the confidence isn't an A, in the order they weigh; empty at an A. */
   lessSureBecause: LessSure[]
+  /** The raw sanity check: for the seller and the admin only (null to buyers, for offers before it, or with sold prices off). */
+  rawSales?: RawSales | null
 }
+
+/**
+ * The card's raw near-mint sales of the 90 days before the quote. `below` flags an offer under the lowest of them:
+ * a flag only, the offer stands (deep review 2026-11-09, B1).
+ */
+export type RawSales = { lowest: number | null; sales: number; since: string; below: boolean }
 
 /** One grade's sold price as the offer used it: the recency-weighted median of so many sales over the window. */
 export type SoldPrice = { gradingCompany: string; grade: string; price: number; sales: number; windowDays: number }
@@ -1027,6 +1035,8 @@ export type OfferPreview = {
   buyerMargin: number | null
   /** The steps that set the confidence: parameters, σ fallback, base, penalties, derived grades. */
   why: TraceStep[]
+  /** The raw sanity check, or null when there's no offer. */
+  rawSales?: RawSales | null
 }
 
 /** @param labelPending why the label didn't come with the accept, or null */
