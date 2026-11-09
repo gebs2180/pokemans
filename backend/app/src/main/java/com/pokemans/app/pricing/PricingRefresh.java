@@ -2,6 +2,7 @@ package com.pokemans.app.pricing;
 
 import com.pokemans.app.catalog.Catalog;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -20,10 +21,12 @@ class PricingRefresh {
     private final Catalog catalog;
     private final PricingProperties properties;
     private final PricingLock lock;
+    private final PricingHealthcheck healthcheck;
 
     PricingRefresh(ObjectProvider<PriceSource> sources, CompIngestionService ingestion, PriceSnapshotService snapshots, Catalog catalog,
-                   PricingProperties properties, PricingLock lock) {
+                   PricingProperties properties, PricingLock lock, PricingHealthcheck healthcheck) {
         this.lock = lock;
+        this.healthcheck = healthcheck;
         this.sources = sources.orderedStream().toList();
         this.ingestion = ingestion;
         this.snapshots = snapshots;
@@ -32,19 +35,58 @@ class PricingRefresh {
     }
 
     /**
-     * Ingests, then snapshots, holding the pricing lock.
+     * Ingests, then snapshots, holding the pricing lock. Then pings the pricing healthcheck, when one is
+     * set: success with the rows inserted, or fail when the run threw or an enabled source inserted
+     * nothing (a dead feed otherwise only shows as tables going stale). A busy skip sends nothing, so the
+     * check's missed-ping alert covers it.
      *
      * @throws PricingLock.Busy if another refresh is running
      */
     PriceSnapshotService.Result runOnce(LocalDate asOf) {
-        return lock.run(() -> {
-            List<Catalog.CardSummary> cards = catalog.identifiedCards();
-            LocalDate from = asOf.minusDays(properties.ingestion().lookback().toDays());
-            for (PriceSource source : sources) {
-                ingestion.ingest(source, cards, from, asOf);
+        List<CompIngestRun> runs = new ArrayList<>();
+        PriceSnapshotService.Result result;
+        try {
+            result = lock.run(() -> {
+                List<Catalog.CardSummary> cards = catalog.identifiedCards();
+                LocalDate from = asOf.minusDays(properties.ingestion().lookback().toDays());
+                for (PriceSource source : sources) {
+                    runs.add(ingestion.ingest(source, cards, from, asOf));
+                }
+                return snapshots.snapshotAll(asOf);
+            });
+        } catch (PricingLock.Busy e) {
+            throw e;
+        } catch (RuntimeException | Error e) {
+            healthcheck.fail("Pricing run " + asOf + " failed: " + e);
+            throw e;
+        }
+        reportHealth(asOf, runs, result);
+        return result;
+    }
+
+    private void reportHealth(LocalDate asOf, List<CompIngestRun> runs, PriceSnapshotService.Result result) {
+        StringBuilder summary = new StringBuilder("Pricing run ").append(asOf).append(": ");
+        int inserted = runs.stream().mapToInt(CompIngestRun::getInserted).sum();
+        summary.append(inserted).append(" rows inserted");
+        List<String> empty = new ArrayList<>();
+        for (CompIngestRun run : runs) {
+            summary.append("; ").append(run.getSource()).append(" fetched ").append(run.getFetched())
+                    .append(", inserted ").append(run.getInserted()).append(", duplicates ").append(run.getDuplicates())
+                    .append(", rejected ").append(run.getRejected()).append(", errors ").append(run.getErrors().size());
+            if (run.getInserted() == 0) {
+                empty.add(run.getSource());
             }
-            return snapshots.snapshotAll(asOf);
-        });
+        }
+        if (runs.isEmpty()) {
+            summary.append(" (no price source enabled: re-snapshot only)");
+        }
+        summary.append("; ").append(result.snapshotSets().size()).append(" cards priced, ")
+                .append(result.skipped().size()).append(" skipped");
+        if (empty.isEmpty()) {
+            healthcheck.success(summary.toString());
+        } else {
+            healthcheck.fail(summary.append("; no rows inserted from ").append(String.join(", ", empty)).toString());
+        }
     }
 
     /**
