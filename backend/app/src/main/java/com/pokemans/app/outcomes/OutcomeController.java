@@ -103,7 +103,10 @@ class OutcomeController {
     @Transactional(readOnly = true)
     List<OutcomeView> forCard(@PathVariable UUID orgId, @PathVariable UUID cardId) {
         CardItems.CardItemRef card = cardItems.requireAccessible(orgId, cardId);
-        List<GradeOutcome> list = outcomes.findByCardItemIdOrderByCreatedAtDesc(cardId);
+        // A grade a buyer recorded after buying the card is between the buyer and us; the seller doesn't see it.
+        List<GradeOutcome> list = outcomes.findByCardItemIdOrderByCreatedAtDesc(cardId).stream()
+                .filter(o -> o.getSource() != GradeOutcome.Source.BUYER || currentUser.isAdmin())
+                .toList();
         Map<UUID, OutcomeVerification> latest = latestVerifications(list);
         return list.stream().map(o -> view(o, card.label(), latest.get(o.getId()))).toList();
     }

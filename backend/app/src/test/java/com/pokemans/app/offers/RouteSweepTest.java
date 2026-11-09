@@ -70,7 +70,8 @@ class RouteSweepTest {
             Map.entry("/api/orgs/{orgId}/deals/{listingId}/received", "{\"pricePaid\":1}"),
             Map.entry("/api/orgs/{orgId}/deals/{listingId}/paid", "{\"pricePaid\":1}"),
             Map.entry("/api/orgs/{orgId}/listings/{listingId}/dispute", "{\"note\":\"x\"}"),
-            Map.entry("/api/orgs/{orgId}/deals/{listingId}/returned", "{\"reason\":\"NOT_GENUINE\"}"));
+            Map.entry("/api/orgs/{orgId}/deals/{listingId}/returned", "{\"reason\":\"NOT_GENUINE\"}"),
+            Map.entry("/api/orgs/{orgId}/deals/{listingId}/outcomes", "{\"kind\":\"KEPT\"}"));
 
     @Autowired
     private MockMvc mvc;
@@ -192,6 +193,7 @@ class RouteSweepTest {
                 select concat_ws('/',
                   (select count(*) from listing_event where listing_id = ?::uuid),
                   (select count(*) from shipping_label where listing_id = ?::uuid),
+                  (select count(*) from deal_outcome where listing_id = ?::uuid),
                   (select count(*) from photo where card_item_id = ?::uuid),
                   (select count(*) from card_offer where card_item_id = ?::uuid),
                   (select count(*) from sale_listing where card_item_id = ?::uuid),
@@ -201,7 +203,7 @@ class RouteSweepTest {
                   (select count(*) from card_item where org_id = ?::uuid),
                   (select count(*) from membership where org_id = ?::uuid),
                   (select count(*) from membership where org_id = ?::uuid))""", String.class,
-                sold.listingId(), sold.listingId(), sold.cardId(), sold.cardId(), sold.cardId(), sold.cardId(),
+                sold.listingId(), sold.listingId(), sold.listingId(), sold.cardId(), sold.cardId(), sold.cardId(), sold.cardId(),
                 victimSeller.orgId(), victimBuyer.orgId(), victimSeller.orgId(), victimSeller.orgId(), victimBuyer.orgId());
     }
 

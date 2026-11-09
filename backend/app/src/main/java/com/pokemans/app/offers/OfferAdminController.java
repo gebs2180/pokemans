@@ -36,9 +36,12 @@ class OfferAdminController {
     private final DealService deals;
     private final ShippingBilling billing;
     private final CardItems cardItems;
+    private final DealOutcomeService outcomes;
 
-    OfferAdminController(OfferAdminService admin, OfferService offers, DealService deals, ShippingBilling billing, CardItems cardItems) {
+    OfferAdminController(OfferAdminService admin, OfferService offers, DealService deals, ShippingBilling billing, CardItems cardItems,
+                         DealOutcomeService outcomes) {
         this.admin = admin;
+        this.outcomes = outcomes;
         this.offers = offers;
         this.deals = deals;
         this.billing = billing;
@@ -122,6 +125,12 @@ class OfferAdminController {
     @PostMapping("/api/admin/deals/{listingId}/label/refund")
     OfferAdminService.Offer refundLabel(@PathVariable UUID listingId, @Valid @RequestBody ReasonBody body) {
         return admin.refundLabel(listingId, body.reason().strip());
+    }
+
+    /** What buyers say happened to their cards, against each offer's predicted condition, newest first. */
+    @GetMapping("/api/admin/deal-outcomes")
+    DealOutcomeService.AdminCalibration dealOutcomes() {
+        return outcomes.calibration();
     }
 
     // Billing

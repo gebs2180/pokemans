@@ -39,6 +39,20 @@ public class OrgAccess {
         return org;
     }
 
+    /**
+     * Like {@link #require}, but only for the org's own members: the admin gets no pass. For things only the
+     * org can say about itself, such as what a buyer did with a card it bought.
+     */
+    @Transactional(readOnly = true)
+    public Org requireMember(UUID orgId, OrgType... expectedTypes) {
+        Org org = orgs.findById(orgId).orElseThrow(OrgAccess::notFound);
+        if (!Arrays.asList(expectedTypes).contains(org.getType())
+                || memberships.findByOrgIdAndUserId(orgId, currentUser.id()).isEmpty()) {
+            throw notFound();
+        }
+        return org;
+    }
+
     /** Whether one login is a member of both orgs, so a sale between them would be a person selling to themself. */
     @Transactional(readOnly = true)
     public boolean shareMember(UUID orgId, UUID otherOrgId) {

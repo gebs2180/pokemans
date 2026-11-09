@@ -275,6 +275,21 @@ test('a raw card goes from photos to an offer, a sale, its arrival and its payme
   await buyer.reload()
   await expect(deal.getByText(/seller confirmed they got paid/i)).toBeVisible()
 
+  // The buyer says what grade it came back with; the admin sees it against the offer's prediction.
+  const cert = `${Date.now()}${Math.floor(Math.random() * 1000)}`
+  await expect(deal.getByText('What happened to this card?')).toBeVisible()
+  await deal.getByRole('radio', { name: 'I had it graded' }).check()
+  await deal.getByRole('spinbutton', { name: 'Grade' }).fill('8.5')
+  await deal.getByRole('textbox', { name: 'Cert number' }).fill(cert)
+  await deal.getByRole('button', { name: 'Record what happened' }).click()
+  await deal.getByRole('button', { name: 'Confirm: record what happened' }).click()
+  await expect(deal.getByText(new RegExp(`You said it came back PSA 8\\.5, cert ${cert}`))).toBeVisible()
+  await expectNoSideScroll(buyer)
+  await admin.goto('/admin/deal-outcomes')
+  const graded = admin.getByRole('region', { name: CARD.name }).filter({ hasText: cert })
+  await expect(graded.getByText(/Predicted median/)).toBeVisible()
+  await expect(graded.getByText(/Counts as 8/)).toBeVisible()
+
   // 7. The track record counts one more card bought, labelled and paid at the offer.
   const after = await trackRecord(admin)
   expect(after.taken).toBe(before.taken + 1)

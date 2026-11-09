@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import { likelyRungs, type CardStatus, type Deal, type MarketItem, type DealProgress, type Listing, type Offer, type PostageEstimate, type Sale, type ShipAddress } from '../api'
+import { likelyRungs, type BuyerOutcomeRecord, type CardStatus, type Deal, type MarketItem, type DealProgress, type Listing, type Offer, type PostageEstimate, type Sale, type ShipAddress } from '../api'
 import { respond } from '../test/auth0'
 import { ArrivalForm, DealsPage, MarketPage, PaidForm } from './MarketPage'
 import { OfferPanel } from './OfferPanel'
@@ -799,8 +799,21 @@ describe('DealsPage', () => {
     progress: null,
   }
 
-  function renderDeals(deals: Deal[]) {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(respond(200, deals))))
+  const noOutcomes: BuyerOutcomeRecord = { graded: 0, withinOne: 0, verified: 0, resold: 0, kept: 0, outcomes: [] }
+
+  /** Answers the deals and the org's outcome record by path; POSTs are recorded and answered with {@code after}. */
+  function renderDeals(deals: Deal[], record: BuyerOutcomeRecord = noOutcomes, after: BuyerOutcomeRecord = record) {
+    const posts: { url: string; body: unknown }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') {
+          posts.push({ url, body: JSON.parse(String(init.body)) })
+          return Promise.resolve(respond(201, after))
+        }
+        return Promise.resolve(respond(200, url.endsWith('/deal-outcomes') ? (posts.length ? after : record) : deals))
+      }),
+    )
     render(
       <MemoryRouter initialEntries={['/orgs/b1/deals']}>
         <Routes>
@@ -808,6 +821,7 @@ describe('DealsPage', () => {
         </Routes>
       </MemoryRouter>,
     )
+    return posts
   }
 
   it("shows the listed photos, and no arrival form before there's a label", async () => {
@@ -865,6 +879,44 @@ describe('DealsPage', () => {
     expect(await screen.findByText("Returned: doesn't match its photos.")).toBeInTheDocument()
     expect(screen.getByText(/Send it back tracked, at your cost/).closest('.alert')).toHaveClass('alert-warning')
     expect(screen.queryByText(/hasn't said how to pay/)).not.toBeInTheDocument()
+    expect(screen.queryByText('What happened to this card?')).not.toBeInTheDocument()
+  })
+
+  it('asks what happened to a card once it arrived, and records a grade', async () => {
+    const user = userEvent.setup()
+    const recorded = {
+      id: 'd1', listingId: 'l1', offerId: 'offer1', cardItemId: 'card1', buyerOrgId: 'b1', kind: 'GRADED' as const, gradeOutcomeId: 'g1',
+      grader: 'PSA' as const, certNumber: '12345678', grade: 8.5, gradeLabel: null, gradedOn: null, certStatus: 'UNVERIFIED' as const,
+      lookupUrl: 'https://psa.example/12345678', resalePrice: null, note: null, recordedAt: '2026-11-08T10:00:00Z', earlier: 0,
+    }
+    const posts = renderDeals([{ ...deal, outcome, progress }], noOutcomes, { ...noOutcomes, graded: 1, withinOne: 1, outcomes: [recorded] })
+
+    expect(await screen.findByText('What happened to this card?')).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'I had it graded' }))
+    await user.type(screen.getByRole('spinbutton', { name: 'Grade' }), '8.5')
+    await user.type(screen.getByRole('textbox', { name: 'Cert number' }), '12345678')
+    await user.click(screen.getByRole('button', { name: 'Record what happened' }))
+    expect(posts).toHaveLength(0)
+    expect(screen.getByText(/Record it as PSA 8\.5, cert 12345678\?/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirm: record what happened' }))
+
+    await waitFor(() => expect(posts).toHaveLength(1))
+    expect(posts[0].url).toContain('/api/orgs/b1/deals/l1/outcomes')
+    expect(posts[0].body).toEqual({ kind: 'GRADED', grader: 'PSA', certNumber: '12345678', grade: 8.5, gradeLabel: null, gradedOn: null, note: null })
+    expect(await screen.findByText(/You said it came back PSA 8\.5, cert 12345678: waiting for Zach to check the cert/)).toBeInTheDocument()
+    expect(screen.getByText(/Of the 1 card you had graded/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Correct it' })).toBeInTheDocument()
+  })
+
+  it('needs a price for a card resold raw', async () => {
+    const user = userEvent.setup()
+    const posts = renderDeals([{ ...deal, outcome, progress }])
+    await user.click(await screen.findByRole('radio', { name: 'I resold it raw' }))
+    await user.type(screen.getByRole('textbox', { name: 'Sold for' }), '120.50')
+    await user.click(screen.getByRole('button', { name: 'Record what happened' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm: record what happened' }))
+    await waitFor(() => expect(posts).toHaveLength(1))
+    expect(posts[0].body).toEqual({ kind: 'RESOLD_RAW', resalePrice: 120.5, note: null })
   })
 })
 
@@ -883,7 +935,12 @@ describe('DealsPage', () => {
       payTo: null,
       progress: null,
     }
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(respond(200, [cancelled]))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        Promise.resolve(respond(200, url.endsWith('/deal-outcomes') ? { graded: 0, withinOne: 0, verified: 0, resold: 0, kept: 0, outcomes: [] } : [cancelled])),
+      ),
+    )
     render(
       <MemoryRouter initialEntries={['/orgs/b1/deals']}>
         <Routes>

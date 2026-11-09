@@ -19,7 +19,8 @@ import java.util.UUID;
 @Table(name = "grade_outcome")
 class GradeOutcome extends AssignedIdEntity<UUID> {
 
-    enum Source { CONTRIBUTOR, PARTNER, ADMIN }
+    /** BUYER: a buyer org graded a card it bought through an instant offer ({@link DealOutcome}). */
+    enum Source { CONTRIBUTOR, PARTNER, ADMIN, BUYER }
 
     @Id
     private UUID id;
