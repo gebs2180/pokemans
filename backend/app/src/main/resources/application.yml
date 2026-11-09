@@ -98,6 +98,9 @@ pokemans:
       enabled: ${PRICING_INGESTION_ENABLED:false}
       cron: "0 30 6 * * *"
       lookback: 400d
+      # Optional healthchecks.io ping URL (deep review A6): pinged after each nightly run with the rows
+      # inserted, and at <url>/fail when the run fails or an enabled source inserts nothing. Empty = off.
+      healthcheck-url: ${PRICING_HEALTHCHECK_URL:}
     poketrace:
       # PokeTrace Pro (written permission 2026-11-07): one comp per sale day at the day's average,
       # only for cards an admin has mapped. A card's first pull goes a year back, later ones 30 days.
