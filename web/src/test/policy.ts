@@ -1,6 +1,6 @@
 import type { Policy } from '../policy'
 
-/** The beta's numbers, as parameter set 1.2.0 and the default offers properties give them. */
+/** The beta's numbers, as parameter set 1.4.0 and the default offers properties give them. */
 export const testPolicy: Policy = {
   minFmv: 25,
   maxPrice: 5000,

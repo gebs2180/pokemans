@@ -67,7 +67,7 @@ class PokeTraceFlowTest {
         private Map<String, Object> detail(String id) {
             return Map.of("id", id, "name", "Flow Charizard", "cardNumber", id.equals("pt-a") ? "004/102" : "5/102",
                     "variant", "Holofoil", "currency", "USD", "set", Map.of("slug", "s", "name", setName),
-                    "gradedOptions", List.of("PSA_8", "PSA_10", "CGC_10"), "conditionOptions", List.of("NEAR_MINT"));
+                    "gradedOptions", List.of("PSA_6", "PSA_8", "PSA_10", "CGC_10"), "conditionOptions", List.of("NEAR_MINT"));
         }
 
         @Override
@@ -76,7 +76,7 @@ class PokeTraceFlowTest {
             if (!id.equals("pt-a")) {
                 return List.of();
             }
-            int avg = tier.equals("PSA_10") ? 1000 : tier.equals("PSA_8") ? 400 : 150;
+            int avg = tier.equals("PSA_10") ? 1000 : tier.equals("PSA_8") ? 400 : tier.equals("PSA_6") ? 300 : 150;
             List<Map<String, Object>> rows = new ArrayList<>();
             rows.add(Map.of("date", TODAY.toString(), "source", "ebay", "saleCount", 3, "avg", 9999));
             for (int d = 1; d <= 5; d++) {
@@ -192,17 +192,17 @@ class PokeTraceFlowTest {
                 .andExpect(jsonPath("$.overrideReason").doesNotExist())
                 .andExpect(jsonPath("$.poketraceCard.cardNumber").value("004/102"));
 
-        // The admin's pull now, the first one: a year back. PSA 8, PSA 10 and near mint, 5 sale days each; today,
+        // The admin's pull now, the first one: a year back. PSA 6, PSA 8, PSA 10 and near mint, 5 sale days each; today,
         // no-sale days and listings are left out. It re-prices straight after.
         api.postJson(url + "/pull", "", api.user("auth0|nope-" + UUID.randomUUID(), List.of())).andExpect(status().isForbidden());
         api.postJson(url + "/pull", "", api.admin()).andExpect(status().isOk())
-                .andExpect(jsonPath("$.fetched").value(15))
-                .andExpect(jsonPath("$.inserted").value(15))
+                .andExpect(jsonPath("$.fetched").value(20))
+                .andExpect(jsonPath("$.inserted").value(20))
                 .andExpect(jsonPath("$.repriced").value(true));
-        assertThat(fake.asked).filteredOn(a -> a.startsWith("pt-a:")).containsExactly("pt-a:PSA_8@1y", "pt-a:PSA_10@1y",
+        assertThat(fake.asked).filteredOn(a -> a.startsWith("pt-a:")).containsExactly("pt-a:PSA_6@1y", "pt-a:PSA_8@1y", "pt-a:PSA_10@1y",
                 "pt-a:NEAR_MINT@1y");
         List<SoldComp> stored = comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card));
-        assertThat(stored).hasSize(15).allSatisfy(c -> {
+        assertThat(stored).hasSize(20).allSatisfy(c -> {
             assertThat(c.getSource()).isEqualTo(PokeTraceSource.NAME);
             assertThat(c.getSoldOn()).isBefore(TODAY);
         });
@@ -217,7 +217,7 @@ class PokeTraceFlowTest {
         fake.asked.clear();
         ingest(card);
         assertThat(fake.asked).filteredOn(a -> a.startsWith("pt-a:")).allMatch(a -> a.endsWith("@30d"));
-        assertThat(comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card))).hasSize(15);
+        assertThat(comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card))).hasSize(20);
 
         // Remapped (with a reason, since pt-b disagrees): pt-a's comps are kept but no longer price the card.
         putJson(url, "{\"poketraceId\":\"pt-b\",\"overrideReason\":\"PokeTrace numbers it 5\"}", api.admin()).andExpect(status().isOk())
@@ -226,7 +226,7 @@ class PokeTraceFlowTest {
         PriceSnapshotService.Result remapped = snapshots.snapshotAll(TODAY);
         assertThat(remapped.snapshotSets()).doesNotContainKey(UUID.fromString(card));
         assertThat(remapped.skipped().get(UUID.fromString(card))).contains("No graded sales");
-        assertThat(comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card))).hasSize(15);
+        assertThat(comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card))).hasSize(20);
 
         // Unmapped: nothing is asked for, and a pull is refused.
         mvc.perform(delete(url).with(api.admin())).andExpect(status().isOk()).andExpect(jsonPath("$.poketraceId").doesNotExist());

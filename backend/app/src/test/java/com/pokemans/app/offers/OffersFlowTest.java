@@ -101,7 +101,7 @@ class OffersFlowTest {
         List<Double> rungs = JsonPath.read(offer, "$.ladder[*].price");
         double price = ((Number) JsonPath.read(offer, "$.price")).doubleValue();
         assertThat(price).isCloseTo((rungs.get(0) + rungs.get(1)) / 2, Offset.offset(0.01)).isLessThan(300);
-        // The buyer's margin follows the card's confidence (parameter set 1.2.0).
+        // The buyer's margin follows the card's confidence (parameter set 1.2.0 on).
         String confidence = JsonPath.read(offer, "$.confidence");
         double margin = ((Number) JsonPath.read(offer, "$.buyerMargin")).doubleValue();
         assertThat(margin).isEqualTo(Map.of("A", 0.10, "B", 0.13, "C", 0.17).get(confidence));

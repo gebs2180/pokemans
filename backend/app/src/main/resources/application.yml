@@ -24,8 +24,10 @@ spring:
 
 pokemans:
   # The one valuation parameter set, for price snapshots, valuation runs and offers alike (review finding 10).
-  # 1.2.0 is 1.1.0 (1.0.0 plus the fallback sigma) plus the offer margin by confidence; its pricing rules are 1.0.0's.
-  parameter-set: 1.2.0
+  # 1.4.0 (Zach, 2026-11-09) is 1.3.0 plus the offer's 10 rung capped at 2.5x its 9 rung and the step up to 10 left out
+  # of a card's own step-down ladder. 1.3.0 is 1.2.0 plus the comps-confidence rules of review B5 (modal-grade
+  # confidence, thin grades counted as derived); 1.2.0 is 1.1.0 plus the offer margin by confidence.
+  parameter-set: 1.4.0
   security:
     # Custom claim the provider adds to access tokens with the user's roles. Only ADMIN is read from it;
     # PARTNER and COLLECTOR come from org membership in the database.
@@ -110,7 +112,7 @@ pokemans:
       recent: 30d
   offers:
     # Instant offers (Zach, 2026-10-19): one firm price, the expected value over the card's grades of the
-    # quick-sale value less the buyer's margin, which the parameter set sets by confidence (1.2.0: A 10%,
+    # quick-sale value less the buyer's margin, which the parameter set sets by confidence (1.2.0 on: A 10%,
     # B 13%, C 17%). An offer stands for a week; a posted offer waits two weeks.
     offer-valid-for: 7d
     listing-open-for: 14d
