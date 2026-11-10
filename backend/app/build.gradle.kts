@@ -24,7 +24,7 @@ dependencies {
     implementation("io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.100")
     // Error reports to Sentry (docs/hosting.md). Does nothing unless SENTRY_DSN is set.
     implementation("io.sentry:sentry-spring-boot-4-starter:8.63.0")
-    implementation("io.sentry:sentry-logback:8.62.0")
+    implementation("io.sentry:sentry-logback:8.63.0")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
