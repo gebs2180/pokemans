@@ -254,7 +254,14 @@ class PredictionWorker {
         if (photo == null) {
             throw new IllegalStateException("A photo in this request no longer passes its checks");
         }
-        return new PreGradeProvider.Image(blobs.read(storage.photoBucket(), photo.storageKey()), photo.contentType());
+        // The exact copy: the upload's pixels without its metadata, so a provider never gets the EXIF location
+        // (security review 2026-10-26, #7). Photos that passed before these copies were kept get one written here.
+        cardItems.ensureExactCopy(photo.storageKey(), photo.contentType());
+        String key = CardItems.exactKey(photo.storageKey());
+        BlobStore.StoredObject copy = blobs.head(storage.photoBucket(), key)
+                .orElseThrow(() -> new IllegalStateException("A photo in this request has no copy without its metadata"));
+        String contentType = copy.contentType() != null ? copy.contentType() : photo.contentType();
+        return new PreGradeProvider.Image(blobs.read(storage.photoBucket(), key), contentType);
     }
 
     /** Drops any echoed image data from a provider response before it is stored. */

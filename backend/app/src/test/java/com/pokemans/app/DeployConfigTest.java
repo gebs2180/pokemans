@@ -70,6 +70,21 @@ class DeployConfigTest {
         assertThat(runtime).containsPattern("(?m)^USER (?!root)\\w+");
     }
 
+    @Test
+    void caddyAndTheBackupRunnerDoNotRunAsRootEither() throws Exception {
+        // Security review 2026-10-26, #8. Caddy is the process facing the internet.
+        for (String path : new String[] {"web/Dockerfile", "deploy/backup/Dockerfile"}) {
+            String dockerfile = Files.readString(REPO.resolve(path));
+            String runtime = dockerfile.substring(dockerfile.lastIndexOf("FROM "));
+            assertThat(runtime).as(path).containsPattern("(?m)^USER (?!root|0\\b)\\w+");
+        }
+        String compose = Files.readString(REPO.resolve("deploy/compose.prod.yml"));
+        String caddy = compose.substring(compose.indexOf("\n  caddy:"), compose.indexOf("\n  backup:"));
+        assertThat(caddy).contains("cap_drop: [ALL]", "cap_add: [NET_BIND_SERVICE]").doesNotContain("user: root");
+        // The deploy's chown of the existing caddy volumes names this uid.
+        assertThat(Files.readString(REPO.resolve("web/Dockerfile"))).contains("-u 10001");
+    }
+
     private static String directive(String policy, String name) {
         for (String d : policy.split(";")) {
             if (d.strip().startsWith(name + " ")) {

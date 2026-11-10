@@ -19,5 +19,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 COPY backup.sh restore-test.sh schedule.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/restore-test.sh /usr/local/bin/schedule.sh
+# The image's own postgres user, not root (security review 2026-10-26, #8): the dumps go over the network, the
+# restore test's throwaway server runs as postgres anyway, and nothing here is kept on a volume.
+USER postgres
 ENTRYPOINT []
 CMD ["schedule.sh"]

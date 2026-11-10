@@ -59,7 +59,7 @@ class EasyPostShippingProvider implements ShippingProvider {
      */
     private static ClientHttpRequestFactory requests(ShippingProperties.EasyPost config) {
         JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder().connectTimeout(config.timeout()).build());
+                HttpClient.newBuilder().connectTimeout(config.connectTimeout()).build());
         requests.setReadTimeout(config.timeout());
         return new BufferingClientHttpRequestFactory(requests);
     }

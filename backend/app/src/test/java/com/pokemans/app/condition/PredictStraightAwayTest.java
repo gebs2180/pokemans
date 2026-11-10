@@ -8,10 +8,15 @@ import com.pokemans.app.TestApi;
 import com.pokemans.app.TestcontainersConfiguration;
 import com.pokemans.app.identity.SecurityProperties;
 import com.pokemans.app.intake.TestImages;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -41,6 +46,7 @@ class PredictStraightAwayTest {
     static class QuickProvider implements PreGradeProvider {
 
         final AtomicInteger submits = new AtomicInteger();
+        final List<Photos> sent = new CopyOnWriteArrayList<>();
 
         @Override
         public String name() {
@@ -50,6 +56,7 @@ class PredictStraightAwayTest {
         @Override
         public String submit(Photos photos, String idempotencyKey) {
             submits.incrementAndGet();
+            sent.add(photos);
             return "quick-" + idempotencyKey;
         }
 
@@ -81,6 +88,7 @@ class PredictStraightAwayTest {
 
     @Test
     void aCompletedCaptureIsSentWithinSeconds() throws Exception {
+        int before = provider.submits.get();
         TestApi api = new TestApi(mvc, security);
         JwtRequestPostProcessor collector = api.user("auth0|predict-straight-away", List.of());
         String orgId = api.collectorOrg("Predict Straight Away", "auth0|predict-straight-away");
@@ -90,6 +98,33 @@ class PredictStraightAwayTest {
 
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(jdbc.queryForObject(
                 "select status from prediction_request where card_item_id = ?::uuid", String.class, cardId)).isNotEqualTo("PENDING"));
-        assertThat(provider.submits).hasValue(1);
+        assertThat(provider.submits.get() - before).isEqualTo(1);
+    }
+
+    @Test
+    void providersGetThePhotosWithoutTheirLocation() throws Exception {
+        // Security review 2026-10-26, #7: a phone photo's EXIF says where it was taken, and the provider needs only the pixels.
+        TestApi api = new TestApi(mvc, security);
+        JwtRequestPostProcessor collector = api.user("auth0|predict-no-exif", List.of());
+        String orgId = api.collectorOrg("Predict Without Exif", "auth0|predict-no-exif");
+        String cardId = api.card(orgId, "Card", collector);
+        byte[] front = TestImages.geotaggedJpeg(TestImages.goodRetake(1));
+        api.uploadPhoto(orgId, cardId, "FRONT", front, "image/jpeg", collector).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, cardId, "BACK", TestImages.geotaggedJpeg(TestImages.goodRetake(2)), "image/jpeg", collector)
+                .andExpect(jsonPath("$.status").value("PASSED"));
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(provider.sent).anySatisfy(photos ->
+                assertThat(photos.front().bytes()).hasSizeLessThan(front.length)));
+        PreGradeProvider.Photos photos = provider.sent.stream()
+                .filter(p -> p.front().bytes().length < front.length).findFirst().orElseThrow();
+        for (PreGradeProvider.Image image : List.of(photos.front(), photos.back())) {
+            String text = new String(image.bytes(), StandardCharsets.ISO_8859_1);
+            assertThat(text).doesNotContain(TestImages.GPS_SECRET).doesNotContain("Exif");
+            assertThat(ImageIO.read(new ByteArrayInputStream(image.bytes()))).as("an image").isNotNull();
+        }
+        // The same pixels as uploaded: only the EXIF segment is cut out.
+        byte[] sentFront = photos.front().bytes();
+        assertThat(Arrays.copyOfRange(front, front.length - (sentFront.length - 2), front.length))
+                .isEqualTo(Arrays.copyOfRange(sentFront, 2, sentFront.length));
     }
 }
