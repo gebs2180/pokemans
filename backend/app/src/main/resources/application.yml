@@ -22,6 +22,15 @@ spring:
   # and SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES (the API identifier) in the environment.
   # Without an issuer the API rejects every bearer token.
 
+# The OpenAPI description the web app's types are generated from (docs/api-types.md). Off here: the running app
+# serves no spec. OpenApiSpecTest turns it on to write web/openapi.json.
+springdoc:
+  api-docs:
+    enabled: false
+  writer-with-order-by-keys: true
+  # Only the errors an operation declares, not ApiErrorHandler's on every one.
+  override-with-generic-response: false
+
 pokemans:
   # The one valuation parameter set, for price snapshots, valuation runs and offers alike (review finding 10).
   # 1.5.0 (review B4, 2026-11-09) is 1.4.0 plus guards that leave untrustworthy PokeTrace day averages out of pricing,

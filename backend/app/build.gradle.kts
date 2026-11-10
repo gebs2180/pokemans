@@ -25,6 +25,9 @@ dependencies {
     // Error reports to Sentry (docs/hosting.md). Does nothing unless SENTRY_DSN is set.
     implementation("io.sentry:sentry-spring-boot-4-starter:8.63.0")
     implementation("io.sentry:sentry-logback:8.63.0")
+    // The API's OpenAPI description, which the web app's types are generated from (docs/api-types.md). The
+    // endpoint is off in the running app; OpenApiSpecTest writes web/openapi.json from it.
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.2.0")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
@@ -47,6 +50,8 @@ tasks.withType<Test>().configureEach {
     maxHeapSize = "1g"
     // ./gradlew test -Dgolden.update=true rewrites the golden report files (GoldenReportTest).
     systemProperty("golden.update", System.getProperty("golden.update") ?: "false")
+    // ./gradlew test -Dopenapi.update=true rewrites web/openapi.json (OpenApiSpecTest); then npm run api:types in web/.
+    systemProperty("openapi.update", System.getProperty("openapi.update") ?: "false")
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
