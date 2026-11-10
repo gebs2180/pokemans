@@ -100,7 +100,8 @@ class PricingRefresh {
         LocalDate from = asOf.minusDays(properties.ingestion().lookback().toDays());
         CompIngestRun run = ingestion.ingest(source, List.of(card), from, asOf);
         try {
-            snapshotOnly(asOf);
+            // A fresh run, not a resumed one: a resumed run could skip this card as already done.
+            lock.run(() -> snapshots.snapshotAll(asOf, false));
             return new Pull(run, true);
         } catch (PricingLock.Busy e) {
             return new Pull(run, false);
@@ -111,7 +112,8 @@ class PricingRefresh {
     }
 
     /**
-     * Re-snapshots the stored comps (no ingestion), holding the pricing lock: the admin's refresh.
+     * Re-snapshots the stored comps (no ingestion), holding the pricing lock: the admin's refresh. It
+     * resumes the day's run if that didn't finish.
      *
      * @throws PricingLock.Busy if another refresh is running
      */

@@ -98,7 +98,7 @@ class ParameterSetTest {
                 v130.compsForB(), v130.compsForC(), v130.minFmv(), v130.singleCardCap(), v130.topFiveCap(),
                 v130.correlationThreshold(), v130.correlationHaircut(), v130.suggestedAlphaLow(), v130.suggestedAlphaHigh(),
                 v130.gradeFirstMinLift(), v130.gradeFirstTopN(), v130.fallbackSigma(), v130.offerMarginA(),
-                v130.offerMarginB(), v130.offerMarginC(), null, null, null, null)).isEqualTo(v120);
+                v130.offerMarginB(), v130.offerMarginC(), null, null, null, null, null, null, null, null, null)).isEqualTo(v120);
 
         java.util.Properties p = new java.util.Properties();
         try (var in = ParameterSet.class.getResourceAsStream("/parameter-sets/1.3.0.properties")) {
@@ -108,6 +108,28 @@ class ParameterSetTest {
         assertThatThrownBy(() -> ParameterSet.fromProperties(p)).isInstanceOf(IllegalArgumentException.class);
         p.setProperty("confidence.modalGrade", "false");
         assertThat(ParameterSet.fromProperties(p).usesModalGradeConfidence()).isFalse();
+    }
+
+    @Test
+    void version150AddsTheDayGuardsAndTheSigmaCap() {
+        ParameterSet v140 = ParameterSet.load("1.4.0");
+        ParameterSet v150 = ParameterSet.load("1.5.0");
+
+        assertThat(v150.dayMaxSpread()).isEqualByComparingTo("3");
+        assertThat(v150.dayMaxMultipleOfTier()).isEqualByComparingTo("3");
+        assertThat(v150.dayGuardMinOtherDays()).isEqualTo(2);
+        assertThat(v150.dayGuardNeighbourhoodDays()).isEqualTo(90);
+        assertThat(v150.maxSigma()).isEqualByComparingTo("1.0");
+        assertThat(v150.sigmaTooHigh(new BigDecimal("1.0"))).isFalse();
+        assertThat(v150.sigmaTooHigh(new BigDecimal("1.01"))).isTrue();
+        assertThat(v140.dayMaxSpread()).isNull();
+        assertThat(v140.maxSigma()).isNull();
+        assertThat(v140.sigmaTooHigh(new BigDecimal("50"))).isFalse();
+        // Everything else is 1.4.0's.
+        assertThat(v150.offerMaxTenToNineMultiple()).isEqualByComparingTo(v140.offerMaxTenToNineMultiple());
+        assertThat(v150.cardLadderExcludesTen()).isEqualTo(v140.cardLadderExcludesTen());
+        assertThat(v150.fallbackSigma()).isEqualByComparingTo(v140.fallbackSigma());
+        assertThat(v150.offerMargin(Confidence.C)).isEqualByComparingTo(v140.offerMargin(Confidence.C));
     }
 
     @Test

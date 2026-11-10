@@ -61,6 +61,13 @@ public final class ValuationFixtures {
         return detail(cards);
     }
 
+    /** One verified, eligible raw Charizard whose stored sigma is {@code sigma}. */
+    static CardInputs cardWithSigma(String sigma) {
+        next = 0;
+        return raw("Charizard", "Base Set", "4", "1999-01-09", "VINTAGE_HOLO", "HOLO", "1000", 12, dist(5, "0.3", 6, "0.4", 7, "0.3"),
+                verified(), custody(), sigma, 22);
+    }
+
     static Valuations.RunDetail detail(List<CardInputs> cards) {
         ParameterSet params = ParameterSet.load("1.1.0");
         ValuationEngine.Result result = new ValuationEngine(params, COST).value(cards);

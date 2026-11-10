@@ -40,7 +40,19 @@ class ParameterSetJsonTest {
 
         String json = ValuationService.JSON.writeValueAsString(v140);
 
-        assertThat(json).contains("\"cardLadderExcludesTen\":true").contains("\"offerMaxTenToNineMultiple\":2.5");
+        assertThat(json).contains("\"cardLadderExcludesTen\":true").contains("\"offerMaxTenToNineMultiple\":2.5")
+                .doesNotContain("dayMaxSpread").doesNotContain("maxSigma");
         assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v140);
+    }
+
+    @Test
+    void version150KeepsItsDayGuardsAndSigmaCap() throws Exception {
+        ParameterSet v150 = ParameterSet.load("1.5.0");
+
+        String json = ValuationService.JSON.writeValueAsString(v150);
+
+        assertThat(json).contains("\"dayMaxSpread\":3").contains("\"dayMaxMultipleOfTier\":3")
+                .contains("\"dayGuardMinOtherDays\":2").contains("\"dayGuardNeighbourhoodDays\":90").contains("\"maxSigma\":1.0");
+        assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v150);
     }
 }

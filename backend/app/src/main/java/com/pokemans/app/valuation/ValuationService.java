@@ -43,7 +43,7 @@ class ValuationService {
 
     /**
      * Canonical JSON: sorted map keys, so equal inputs always hash the same. Parameter-set fields added in
-     * 1.3.0 and 1.4.0 are left out while null, so a stored older run re-serializes, and hashes, exactly as it did.
+     * 1.3.0, 1.4.0 and 1.5.0 are left out while null, so a stored older run re-serializes, and hashes, exactly as it did.
      */
     static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
             .addMixIn(ParameterSet.class, ParameterSetJson.class).build();
@@ -61,6 +61,21 @@ class ValuationService {
 
         @JsonInclude(JsonInclude.Include.NON_NULL)
         abstract BigDecimal offerMaxTenToNineMultiple();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract BigDecimal dayMaxSpread();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract BigDecimal dayMaxMultipleOfTier();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract Integer dayGuardMinOtherDays();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract Integer dayGuardNeighbourhoodDays();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract BigDecimal maxSigma();
     }
 
     static final String LOT = "photographed lot: lots aren't valued";
