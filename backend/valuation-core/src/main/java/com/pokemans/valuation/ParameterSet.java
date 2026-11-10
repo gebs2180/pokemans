@@ -74,7 +74,18 @@ public record ParameterSet(
         // steepest step-down ratio leaves out the step up to 10, and an offer's 10 rung is at most this
         // multiple of its 9 rung
         Boolean cardLadderExcludesTen,
-        BigDecimal offerMaxTenToNineMultiple) {
+        BigDecimal offerMaxTenToNineMultiple,
+        // PokeTrace day guards (null in sets before 1.5.0, which means off; review B4): a day whose high is more
+        // than dayMaxSpread times its low, or whose average is more than dayMaxMultipleOfTier times the median of
+        // at least dayGuardMinOtherDays other sale days of its tier within dayGuardNeighbourhoodDays either side,
+        // is left out of pricing. Never shifted, and a low day is never left out, since that would push prices up
+        BigDecimal dayMaxSpread,
+        BigDecimal dayMaxMultipleOfTier,
+        Integer dayGuardMinOtherDays,
+        Integer dayGuardNeighbourhoodDays,
+        // A measured monthly σ above this is not used: the valuation takes the fallback σ and its confidence drop
+        // (null before 1.5.0; review B4)
+        BigDecimal maxSigma) {
 
     public static final String DEFAULT_VERSION = "1.0.0";
 
@@ -152,7 +163,12 @@ public record ParameterSet(
                 optionalBoolean(p, "confidence.modalGrade"),
                 optionalBoolean(p, "pricing.thinGradesDerived"),
                 optionalBoolean(p, "pricing.cardLadder.excludeTen"),
-                optionalDecimal(p, "offers.maxTenToNineMultiple"));
+                optionalDecimal(p, "offers.maxTenToNineMultiple"),
+                optionalDecimal(p, "pricing.pokeTraceDay.maxSpread"),
+                optionalDecimal(p, "pricing.pokeTraceDay.maxMultipleOfTier"),
+                optionalInteger(p, "pricing.pokeTraceDay.minOtherDays"),
+                optionalInteger(p, "pricing.pokeTraceDay.neighbourhoodDays"),
+                optionalDecimal(p, "values.maxSigma"));
     }
 
     /** Comps confidence is also no better than the count behind the modal grade's price (1.3.0 on). */
@@ -247,6 +263,16 @@ public record ParameterSet(
     private static BigDecimal optionalDecimal(Properties p, String key) {
         String value = p.getProperty(key);
         return value == null || value.isBlank() ? null : new BigDecimal(value.trim());
+    }
+
+    private static Integer optionalInteger(Properties p, String key) {
+        String value = p.getProperty(key);
+        return value == null || value.isBlank() ? null : Integer.valueOf(value.trim());
+    }
+
+    /** True when a measured σ is above this set's cap and must not be used (1.5.0 on). */
+    public boolean sigmaTooHigh(BigDecimal sigma) {
+        return maxSigma != null && sigma != null && sigma.compareTo(maxSigma) > 0;
     }
 
     private static Boolean optionalBoolean(Properties p, String key) {

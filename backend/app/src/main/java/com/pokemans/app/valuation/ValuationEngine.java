@@ -176,6 +176,13 @@ final class ValuationEngine {
             // σ only feeds the FLV's volatility shock, so an instant offer doesn't take this drop (Zach, 2026-10-21).
             penalties.add(new ConfidencePenalty("fallback sigma " + sigma, 1, true));
             trace.add("sigma", "fallback: too few 30-day price changes to measure", sigma, card.prices().sigmaChanges() + " changes");
+        } else if (params.sigmaTooHigh(sigma)) {
+            // A monthly σ above the cap is bad data, not a market (review B4): fall back the same way.
+            BigDecimal measured = sigma;
+            sigma = params.fallbackSigma();
+            penalties.add(new ConfidencePenalty("fallback sigma " + sigma, 1, true));
+            trace.add("sigma", "fallback: measured sigma " + measured + " is above the cap of " + params.maxSigma(), sigma,
+                    card.prices().sigmaChanges() + " changes");
         }
         GradeDistribution distribution;
         Confidence photo;

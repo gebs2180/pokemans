@@ -28,6 +28,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -84,6 +85,14 @@ class PokeTraceFlowTest {
             }
             rows.add(Map.of("date", TODAY.minusDays(6).toString(), "source", "ebay", "saleCount", 0, "avg", avg));
             rows.add(Map.of("date", TODAY.minusDays(7).toString(), "source", "cardmarket_unsold", "saleCount", 4, "avg", avg));
+            // Days the 1.5.0 guards leave out of pricing: a PSA 10 day five times its tier, a PSA 8 day nine times as wide as its low.
+            if (tier.equals("PSA_10")) {
+                rows.add(Map.of("date", TODAY.minusDays(8).toString(), "source", "ebay", "saleCount", 1, "avg", 5000,
+                        "low", 5000, "high", 5000));
+            } else if (tier.equals("PSA_8")) {
+                rows.add(Map.of("date", TODAY.minusDays(9).toString(), "source", "ebay", "saleCount", 2, "avg", 500,
+                        "low", 100, "high", 900));
+            }
             return rows;
         }
     }
@@ -122,6 +131,9 @@ class PokeTraceFlowTest {
 
     @Autowired
     private Catalog catalog;
+
+    @Autowired
+    private JdbcClient jdbc;
 
     private TestApi api;
     private String orgId;
@@ -196,28 +208,37 @@ class PokeTraceFlowTest {
         // no-sale days and listings are left out. It re-prices straight after.
         api.postJson(url + "/pull", "", api.user("auth0|nope-" + UUID.randomUUID(), List.of())).andExpect(status().isForbidden());
         api.postJson(url + "/pull", "", api.admin()).andExpect(status().isOk())
-                .andExpect(jsonPath("$.fetched").value(20))
-                .andExpect(jsonPath("$.inserted").value(20))
+                .andExpect(jsonPath("$.fetched").value(22))
+                .andExpect(jsonPath("$.inserted").value(22))
                 .andExpect(jsonPath("$.repriced").value(true));
         assertThat(fake.asked).filteredOn(a -> a.startsWith("pt-a:")).containsExactly("pt-a:PSA_6@1y", "pt-a:PSA_8@1y", "pt-a:PSA_10@1y",
                 "pt-a:NEAR_MINT@1y");
         List<SoldComp> stored = comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card));
-        assertThat(stored).hasSize(20).allSatisfy(c -> {
+        assertThat(stored).hasSize(22).allSatisfy(c -> {
             assertThat(c.getSource()).isEqualTo(PokeTraceSource.NAME);
             assertThat(c.getSoldOn()).isBefore(TODAY);
         });
 
         PriceSnapshotService.Result priced = snapshots.snapshotAll(TODAY);
         assertThat(priced.snapshotSets().get(UUID.fromString(card))).containsOnlyKeys(PriceSource.GradingCompany.PSA);
+        // The guarded days price nothing, and each run stores them with the rule that caught them.
         api.get("/api/admin/catalog-cards/" + card + "/prices", api.admin()).andExpect(status().isOk())
                 .andExpect(jsonPath("$.tables[0].grades[10].n").value(5))
-                .andExpect(jsonPath("$.tables[0].grades[10].price").value(1000));
+                .andExpect(jsonPath("$.tables[0].grades[10].price").value(1000))
+                .andExpect(jsonPath("$.tables[0].grades[8].n").value(5))
+                .andExpect(jsonPath("$.tables[0].grades[8].price").value(400));
+        assertThat(jdbc.sql("select distinct rule from comp_exclusion where catalog_card_id = :c order by rule")
+                .param("c", UUID.fromString(card)).query(String.class).list())
+                .containsExactly(PokeTraceDayGuard.HIGH_DAY, PokeTraceDayGuard.WIDE_DAY);
+        assertThat(jdbc.sql("select trace::text from price_snapshot where snapshot_set_id = :s and grade = '10'")
+                .param("s", priced.snapshotSets().get(UUID.fromString(card)).get(PriceSource.GradingCompany.PSA))
+                .query(String.class).single()).contains("left out by the PokeTrace day guard HIGH_DAY");
 
         // Later pulls: the last 30 days, and a day already stored isn't stored again.
         fake.asked.clear();
         ingest(card);
         assertThat(fake.asked).filteredOn(a -> a.startsWith("pt-a:")).allMatch(a -> a.endsWith("@30d"));
-        assertThat(comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card))).hasSize(20);
+        assertThat(comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card))).hasSize(22);
 
         // Remapped (with a reason, since pt-b disagrees): pt-a's comps are kept but no longer price the card.
         putJson(url, "{\"poketraceId\":\"pt-b\",\"overrideReason\":\"PokeTrace numbers it 5\"}", api.admin()).andExpect(status().isOk())
@@ -226,7 +247,7 @@ class PokeTraceFlowTest {
         PriceSnapshotService.Result remapped = snapshots.snapshotAll(TODAY);
         assertThat(remapped.snapshotSets()).doesNotContainKey(UUID.fromString(card));
         assertThat(remapped.skipped().get(UUID.fromString(card))).contains("No graded sales");
-        assertThat(comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card))).hasSize(20);
+        assertThat(comps.findByCatalogCardIdOrderBySoldOnDescCreatedAtDesc(UUID.fromString(card))).hasSize(22);
 
         // Unmapped: nothing is asked for, and a pull is refused.
         mvc.perform(delete(url).with(api.admin())).andExpect(status().isOk()).andExpect(jsonPath("$.poketraceId").doesNotExist());
