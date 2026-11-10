@@ -95,9 +95,10 @@ class OfferService {
      * @param confidence the confidence the offer would be priced at, or null
      * @param why        the trace steps that set the offer's confidence (base, price penalties, derived grades) and the parameter set
      * @param rawSales   the card's raw near-mint sales of the last 90 days, or null when it gets no offer
+     * @param tenCap     the 10 rung's cap when it bound (parameter set 1.4.0 on): the uncapped rung, the cap and M; else null
      */
     record Preview(boolean offered, String refusal, BigDecimal price, BigDecimal fmv, String confidence, BigDecimal buyerMargin,
-                   List<Trace.Step> why, ListingViews.RawSalesView rawSales) {
+                   List<Trace.Step> why, ListingViews.RawSalesView rawSales, OfferLadder.TenCap tenCap) {
     }
 
     @Transactional(readOnly = true)
@@ -142,7 +143,8 @@ class OfferService {
                 .toList();
         return new Preview(q.refusal() == null, q.refusal(), q.offer() == null ? null : q.offer().price(), v == null ? null : v.fmv(),
                 v == null ? null : v.offerConfidence().name(), q.margin(), why,
-                q.raw() == null ? null : new ListingViews.RawSalesView(q.raw().lowest(), q.raw().sales(), q.raw().since(), q.belowRawSales()));
+                q.raw() == null ? null : new ListingViews.RawSalesView(q.raw().lowest(), q.raw().sales(), q.raw().since(), q.belowRawSales()),
+                q.offer() == null ? null : q.offer().tenCap());
     }
 
     /** A new offer on the card, or 409 with the reason it gets none. */

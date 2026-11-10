@@ -69,7 +69,12 @@ public record ParameterSet(
         // count at the modal grade, and a grade with fewer than minSalesInWindow sale days in the extended
         // window counts as derived, not observed
         Boolean modalGradeConfidence,
-        Boolean thinGradesDerived) {
+        Boolean thinGradesDerived,
+        // The PSA 10 premium (null in sets before 1.4.0, which means off; Zach, 2026-11-09): the card's own
+        // steepest step-down ratio leaves out the step up to 10, and an offer's 10 rung is at most this
+        // multiple of its 9 rung
+        Boolean cardLadderExcludesTen,
+        BigDecimal offerMaxTenToNineMultiple) {
 
     public static final String DEFAULT_VERSION = "1.0.0";
 
@@ -145,7 +150,9 @@ public record ParameterSet(
                 optionalDecimal(p, "offers.buyerMargin.B"),
                 optionalDecimal(p, "offers.buyerMargin.C"),
                 optionalBoolean(p, "confidence.modalGrade"),
-                optionalBoolean(p, "pricing.thinGradesDerived"));
+                optionalBoolean(p, "pricing.thinGradesDerived"),
+                optionalBoolean(p, "pricing.cardLadder.excludeTen"),
+                optionalDecimal(p, "offers.maxTenToNineMultiple"));
     }
 
     /** Comps confidence is also no better than the count behind the modal grade's price (1.3.0 on). */
@@ -164,6 +171,19 @@ public record ParameterSet(
     /** True for an observed price this set treats as derived because too few sales are behind it. */
     public boolean isThin(GradePrice price) {
         return thinGradesAreDerived() && price.method() == GradePrice.Method.OBSERVED && price.salesInWindow() < minSalesInWindow;
+    }
+
+    /**
+     * True when the card's own steepest step-down ratio leaves out the step up to grade 10 (1.4.0 on): a PSA 10
+     * is its own market, like a PSA 1, and its jump over the 9 would drag every lower grade far down.
+     */
+    public boolean cardLadderLeavesOutTen() {
+        return Boolean.TRUE.equals(cardLadderExcludesTen);
+    }
+
+    /** The most an offer's 10 rung pays as a multiple of its 9 rung, or empty for no cap (before 1.4.0). */
+    public java.util.Optional<BigDecimal> offerTenToNineCap() {
+        return java.util.Optional.ofNullable(offerMaxTenToNineMultiple);
     }
 
     /** Liquidity tier for a card's monthly sales count. */

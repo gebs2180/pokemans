@@ -27,7 +27,10 @@ import java.util.Objects;
  *       down from grade 2 with the era's 2-to-3 ratio, else the card's own ladder.
  *   <li>Below the lowest observed grade with no era ratio yet: the card's own ladder. With sales in
  *       enough grades across enough of a spread, the steepest per-grade ratio between its observed
- *       grades steps the lower grades down. Otherwise the card is refused rather than guessed.
+ *       grades steps the lower grades down. Otherwise the card is refused rather than guessed. From
+ *       parameter set 1.4.0 a step up to grade 10 is left out of the steepest ratio: a PSA 10 is its own
+ *       market, like a PSA 1, and a steep 9-to-10 jump would drag every lower grade far down. Grade 10
+ *       still counts towards the grades and spread the ladder needs.
  *   <li>U from damaged/altered raw sales, else zero. There is no bulk floor: low-value cards are
  *       kept out by the portfolio's FMV minimum, not propped up here.
  *   <li>No graded sales in any grade: refused, so the caller leaves the card unpriced.
@@ -256,7 +259,10 @@ public final class GradePricer {
     /**
      * The card's own per-grade step-down: between each pair of neighbouring observed grades, the
      * per-grade ratio (lower price / higher price) ^ (1 / grades apart); the steepest (smallest) wins,
-     * capped at 1 so it never steps up. Null without enough grades across enough of a spread.
+     * capped at 1 so it never steps up. Null without enough grades across enough of a spread. Grade 1 is
+     * never among them (the caller passes anchors). From 1.4.0 the step up to grade 10 is left out of the
+     * steepest ratio, since the PSA 10 premium is its own market and says nothing about the lower grades;
+     * grade 10 still counts towards the grades and spread needed. Null if the step to 10 is the only one.
      */
     private BigDecimal cardLadderRatio(Map<Grade, BigDecimal> observed) {
         List<Grade> grades = observed.keySet().stream().filter(g -> !g.isUngradable()).sorted().toList();
@@ -264,13 +270,22 @@ public final class GradePricer {
                 || grades.getLast().number() - grades.getFirst().number() < params.cardLadderMinSpan()) {
             return null;
         }
+        boolean leaveOutTen = params.cardLadderLeavesOutTen();
         double steepest = 1;
+        boolean anyStep = false;
         for (int i = 1; i < grades.size(); i++) {
             Grade lo = grades.get(i - 1);
             Grade hi = grades.get(i);
+            if (leaveOutTen && hi == Grade.G10) {
+                continue;
+            }
+            anyStep = true;
             double perGrade = Math.pow(observed.get(lo).doubleValue() / observed.get(hi).doubleValue(),
                     1.0 / (hi.number() - lo.number()));
             steepest = Math.min(steepest, perGrade);
+        }
+        if (!anyStep) {
+            return null;
         }
         return BigDecimal.valueOf(steepest).setScale(6, RoundingMode.FLOOR);
     }

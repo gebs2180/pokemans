@@ -29,7 +29,18 @@ class ParameterSetJsonTest {
 
         String json = ValuationService.JSON.writeValueAsString(v130);
 
-        assertThat(json).contains("\"modalGradeConfidence\":true").contains("\"thinGradesDerived\":true");
+        assertThat(json).contains("\"modalGradeConfidence\":true").contains("\"thinGradesDerived\":true")
+                .doesNotContain("cardLadderExcludesTen").doesNotContain("offerMaxTenToNineMultiple");
         assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v130);
+    }
+
+    @Test
+    void version140KeepsItsTenRules() throws Exception {
+        ParameterSet v140 = ParameterSet.load("1.4.0");
+
+        String json = ValuationService.JSON.writeValueAsString(v140);
+
+        assertThat(json).contains("\"cardLadderExcludesTen\":true").contains("\"offerMaxTenToNineMultiple\":2.5");
+        assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v140);
     }
 }
