@@ -1,8 +1,10 @@
 package com.pokemans.app.offers;
 
+import com.pokemans.app.api.ApiException;
 import com.pokemans.app.identity.CurrentUser;
 import com.pokemans.app.pricing.Prices;
 import com.pokemans.app.valuation.CardInputs;
+import com.pokemans.app.valuation.UnvaluedReason;
 import com.pokemans.app.valuation.Valuations;
 import com.pokemans.valuation.CardValuation;
 import com.pokemans.valuation.Confidence;
@@ -24,7 +26,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -41,12 +42,6 @@ class OfferService {
 
     static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
 
-    /** Why a card gets no offer, in words for the seller. */
-    private static final Map<String, String> UNVALUED = Map.of(
-            "photographed lot: lots aren't valued", "Lots don't get offers: add the cards one by one.",
-            "not identified", "We haven't identified this card yet.",
-            "no condition assessment", "Its condition hasn't been assessed yet.",
-            "photos retaken since its condition was assessed", "Its photos changed, so we're checking its condition again.");
 
     /** How far back the raw sanity band looks: the comp window. */
     static final int RAW_SALES_DAYS = 90;
@@ -72,14 +67,16 @@ class OfferService {
      * What an offer on the card would be right now, or why it gets none: one place for both, so the
      * admin's preview and the seller's offer can't disagree.
      *
-     * @param refusal why the card gets no offer, in words for the seller, or null
+     * @param refused why the card gets no offer, as a code, or null
+     * @param refusal the same in words for the seller, or null
      * @param offer   the firm price and its ladder, or null when refused
      * @param raw     the card's raw near-mint sales of the last 90 days, or null when refused
      */
-    record Quote(Valuations.CurrentValue value, String refusal, BigDecimal margin, OfferLadder.Offer offer, CardOffer.RawCheck raw) {
+    record Quote(Valuations.CurrentValue value, OfferRefusal refused, String refusal, BigDecimal margin, OfferLadder.Offer offer,
+                 CardOffer.RawCheck raw) {
 
-        Quote(Valuations.CurrentValue value, String refusal) {
-            this(value, refusal, null, null, null);
+        Quote(Valuations.CurrentValue value, OfferRefusal refused, String refusal) {
+            this(value, refused, refusal, null, null, null);
         }
 
         /** The firm price is under what the card recently sold for raw in near mint: a flag, not a refusal. */
@@ -97,7 +94,7 @@ class OfferService {
      * @param rawSales   the card's raw near-mint sales of the last 90 days, or null when it gets no offer
      * @param tenCap     the 10 rung's cap when it bound (parameter set 1.4.0 on): the uncapped rung, the cap and M; else null
      */
-    record Preview(boolean offered, String refusal, BigDecimal price, BigDecimal fmv, String confidence, BigDecimal buyerMargin,
+    record Preview(boolean offered, String refusal, OfferRefusal refusalCode, BigDecimal price, BigDecimal fmv, String confidence, BigDecimal buyerMargin,
                    List<Trace.Step> why, ListingViews.RawSalesView rawSales, OfferLadder.TenCap tenCap) {
     }
 
@@ -106,32 +103,36 @@ class OfferService {
         Valuations.CurrentValue value = valuations.current(cardItemId);
         CardInputs in = value.inputs();
         if (in.unvaluedReason() != null) {
-            String reason = in.unvaluedReason().startsWith("no ") && in.unvaluedReason().endsWith(" price table")
-                    ? "We don't have enough sold comps to price this card yet."
-                    : UNVALUED.getOrDefault(in.unvaluedReason(), "This card can't be priced: " + in.unvaluedReason() + ".");
-            return new Quote(value, reason);
+            return switch (UnvaluedReason.of(in.unvaluedReason())) {
+                case LOT -> new Quote(value, OfferRefusal.LOT, "Lots don't get offers: add the cards one by one.");
+                case NOT_IDENTIFIED -> new Quote(value, OfferRefusal.NOT_IDENTIFIED, "We haven't identified this card yet.");
+                case NO_ASSESSMENT -> new Quote(value, OfferRefusal.NOT_ASSESSED, "Its condition hasn't been assessed yet.");
+                case PHOTOS_CHANGED -> new Quote(value, OfferRefusal.PHOTOS_CHANGED, "Its photos changed, so we're checking its condition again.");
+                case NO_PRICE_TABLE -> new Quote(value, OfferRefusal.NO_PRICE_TABLE, "We don't have enough sold comps to price this card yet.");
+                case OTHER -> new Quote(value, OfferRefusal.UNPRICED, "This card can't be priced: " + in.unvaluedReason() + ".");
+            };
         }
         if (in.doubted()) {
-            return new Quote(value, "Its authenticity is in doubt, so it gets no offer.");
+            return new Quote(value, OfferRefusal.DOUBTED, "Its authenticity is in doubt, so it gets no offer.");
         }
         CardValuation v = value.valuation();
         // The offer's own confidence: the FLV-only penalties (fallback σ, the stress) don't apply.
         if (v.offerConfidence() == Confidence.D) {
-            return new Quote(value, "There isn't enough sales data to make a firm offer on this card yet.");
+            return new Quote(value, OfferRefusal.THIN_SALES, "There isn't enough sales data to make a firm offer on this card yet.");
         }
         if (v.fmv().compareTo(value.params().minFmv()) < 0) {
-            return new Quote(value, "Its value is under the $" + value.params().minFmv().stripTrailingZeros().toPlainString()
+            return new Quote(value, OfferRefusal.UNDER_MINIMUM, "Its value is under the $" + value.params().minFmv().stripTrailingZeros().toPlainString()
                     + " minimum for an offer.");
         }
         BigDecimal margin = value.params().offerMargin(v.offerConfidence());
         OfferLadder.Offer offer = new OfferLadder(value.params(), margin)
                 .offer(value.distribution(), value.prices(), in.prices().salesPerMonth());
         if (offer.price().compareTo(properties.maxPrice()) > 0) {
-            return new Quote(value, "Instant offers go up to $" + String.format(Locale.US, "%,d", properties.maxPrice().longValue())
+            return new Quote(value, OfferRefusal.OVER_MAXIMUM, "Instant offers go up to $" + String.format(Locale.US, "%,d", properties.maxPrice().longValue())
                     + ", the most a shipping label can insure, and this card is worth more than that, so it gets no offer.");
         }
         Prices.RawSales raw = prices.rawNearMint(in.identity().catalogCardId(), RAW_SALES_DAYS);
-        return new Quote(value, null, margin, offer, new CardOffer.RawCheck(raw.lowest(), raw.sales(), raw.since()));
+        return new Quote(value, null, null, margin, offer, new CardOffer.RawCheck(raw.lowest(), raw.sales(), raw.since()));
     }
 
     @Transactional(readOnly = true)
@@ -141,7 +142,7 @@ class OfferService {
         List<Trace.Step> why = q.value().trace().stream()
                 .filter(st -> st.subject().equals("parameters") || st.subject().equals("confidence_base") || st.subject().startsWith("offer_confidence"))
                 .toList();
-        return new Preview(q.refusal() == null, q.refusal(), q.offer() == null ? null : q.offer().price(), v == null ? null : v.fmv(),
+        return new Preview(q.refused() == null, q.refusal(), q.refused(), q.offer() == null ? null : q.offer().price(), v == null ? null : v.fmv(),
                 v == null ? null : v.offerConfidence().name(), q.margin(), why,
                 q.raw() == null ? null : new ListingViews.RawSalesView(q.raw().lowest(), q.raw().sales(), q.raw().since(), q.belowRawSales()),
                 q.offer() == null ? null : q.offer().tenCap());
@@ -151,8 +152,8 @@ class OfferService {
     @Transactional
     CardOffer price(UUID orgId, UUID cardItemId) {
         Quote q = quote(cardItemId);
-        if (q.refusal() != null) {
-            throw refused(q.refusal());
+        if (q.refused() != null) {
+            throw new ApiException(HttpStatus.CONFLICT, q.refused(), q.refusal());
         }
         Valuations.CurrentValue value = q.value();
         CardInputs in = value.inputs();
@@ -228,7 +229,4 @@ class OfferService {
         return JSON.readValue(offer.getInputs(), CardInputs.class);
     }
 
-    private static ResponseStatusException refused(String reason) {
-        return new ResponseStatusException(HttpStatus.CONFLICT, reason);
-    }
 }

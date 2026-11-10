@@ -56,8 +56,8 @@ public final class ValuationFixtures {
         cards.add(graded("Lugia", "Neo Genesis", "9", "2000-12-16", "1200", custody()));
         cards.add(raw("Mewtwo", "Base Set", "10", "1999-01-09", "VINTAGE_HOLO", "HOLO", "300", 12, dist(5, "0.5", 6, "0.5"),
                 doubted(), custody(), "0.07", 8));
-        cards.add(unvalued("Binder page, mixed commons", false, ValuationService.NOT_IDENTIFIED));
-        cards.add(unvalued("Bulk lot", true, ValuationService.LOT));
+        cards.add(unvalued("Binder page, mixed commons", false, UnvaluedReason.NOT_IDENTIFIED.text()));
+        cards.add(unvalued("Bulk lot", true, UnvaluedReason.LOT.text()));
         return detail(cards);
     }
 

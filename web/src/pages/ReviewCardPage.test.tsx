@@ -199,7 +199,7 @@ describe('OfferPreviewPanel', () => {
 
   it('shows the offer the seller would get, and how its confidence was set', async () => {
     stub({
-      offered: true, refusal: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13,
+      offered: true, refusal: null, refusalCode: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13,
       why: [{ subject: 'confidence_base', rule: 'worse of photo and comps', value: 'B', detail: 'photo A, comps B' }],
     })
     render(<OfferPreviewPanel cardId="card1" />)
@@ -209,7 +209,7 @@ describe('OfferPreviewPanel', () => {
 
   it('shows why a card gets no offer, with the steps that caused it', async () => {
     stub({
-      offered: false, refusal: "There isn't enough sales data to make a firm offer on this card yet.", price: null, fmv: 300, confidence: 'D', buyerMargin: null,
+      offered: false, refusal: "There isn't enough sales data to make a firm offer on this card yet.", refusalCode: 'THIN_SALES', price: null, fmv: 300, confidence: 'D', buyerMargin: null,
       why: [
         { subject: 'confidence_penalty', rule: 'fallback sigma, drop 1', value: 'C', detail: '' },
         { subject: 'confidence', rule: 'derived price in play, drop one level', value: 'D', detail: 'derived grades [5, 6, 7]' },
@@ -223,7 +223,7 @@ describe('OfferPreviewPanel', () => {
 
   it('says when the 10 rung was capped at M times the 9', async () => {
     stub({
-      offered: true, refusal: null, price: 344.25, fmv: 750, confidence: 'A', buyerMargin: 0.1, why: [],
+      offered: true, refusal: null, refusalCode: null, price: 344.25, fmv: 750, confidence: 'A', buyerMargin: 0.1, why: [],
       tenCap: { uncapped: 1377, cap: 688.5, multiple: 2.5 },
     })
     render(<OfferPreviewPanel cardId="card1" />)
@@ -231,7 +231,7 @@ describe('OfferPreviewPanel', () => {
   })
 
   it('says nothing about the 10 when the cap did not bind', async () => {
-    stub({ offered: true, refusal: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [], tenCap: null })
+    stub({ offered: true, refusal: null, refusalCode: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [], tenCap: null })
     render(<OfferPreviewPanel cardId="card1" />)
     expect(await screen.findByText(/Offer \$100.54/)).toBeInTheDocument()
     expect(screen.queryByText(/grade 10 rung is capped/)).not.toBeInTheDocument()
@@ -239,7 +239,7 @@ describe('OfferPreviewPanel', () => {
 
   it('flags an offer below recent raw near-mint sales', async () => {
     stub({
-      offered: true, refusal: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [],
+      offered: true, refusal: null, refusalCode: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [],
       rawSales: { lowest: 140, sales: 3, since: '2026-08-11', below: true },
     })
     render(<OfferPreviewPanel cardId="card1" />)
@@ -248,7 +248,7 @@ describe('OfferPreviewPanel', () => {
 
   it('says the offer clears recent raw sales, or that there were none to check', async () => {
     stub({
-      offered: true, refusal: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [],
+      offered: true, refusal: null, refusalCode: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [],
       rawSales: { lowest: 90, sales: 1, since: '2026-08-11', below: false },
     })
     const { unmount } = render(<OfferPreviewPanel cardId="card1" />)
@@ -257,7 +257,7 @@ describe('OfferPreviewPanel', () => {
     unmount()
 
     stub({
-      offered: true, refusal: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [],
+      offered: true, refusal: null, refusalCode: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [],
       rawSales: { lowest: null, sales: 0, since: '2026-08-11', below: false },
     })
     render(<OfferPreviewPanel cardId="card1" />)
@@ -272,7 +272,7 @@ describe('ReviewCardPage', () => {
       if (url.endsWith('/condition')) return respond(200, card)
       if (url.endsWith('/provenance')) return respond(200, provenance('NOT_IDENTIFIED'))
       if (url.endsWith('/prices')) return respond(200, { catalogCardId: 'cat1', comps: [], tables: [], skipped: [] })
-      if (url.endsWith('/offer-preview')) return respond(200, { offered: false, refusal: 'x', price: null, fmv: null, confidence: null, buyerMargin: null, why: [] })
+      if (url.endsWith('/offer-preview')) return respond(200, { offered: false, refusal: 'x', refusalCode: 'UNPRICED', price: null, fmv: null, confidence: null, buyerMargin: null, why: [] })
       return respond(200, { cardId: 'card1', current: null, recognition: false, reading: null, suggestions: [] })
     }))
     render(
@@ -327,7 +327,7 @@ describe('ReviewCardPage', () => {
         if (url.includes('/catalog/search')) return Promise.resolve(respond(200, hits))
         if (url.includes('/catalog/cards/')) return Promise.resolve(respond(200, picked))
         if (url.endsWith('/prices')) return Promise.resolve(respond(200, { catalogCardId: 'cat1', comps: [], tables: [], skipped: [] }))
-        if (url.endsWith('/offer-preview')) return Promise.resolve(respond(200, { offered: false, refusal: "We haven't identified this card yet.", price: null, fmv: null, confidence: null, buyerMargin: null, why: [] }))
+        if (url.endsWith('/offer-preview')) return Promise.resolve(respond(200, { offered: false, refusal: "We haven't identified this card yet.", refusalCode: 'NOT_IDENTIFIED', price: null, fmv: null, confidence: null, buyerMargin: null, why: [] }))
         return Promise.resolve(respond(200, { cardId: 'card1', current: null, recognition: false, reading: null, suggestions: [] }))
       }),
     )

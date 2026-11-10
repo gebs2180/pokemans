@@ -145,7 +145,8 @@ class OfferStalenessTest {
 
         api.postJson(listings(seller, card), "{\"offerId\":\"" + card.offerId() + "\"}", seller.who())
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value(OfferService.PRICE_CHANGED));
+                .andExpect(jsonPath("$.detail").value(OfferService.PRICE_CHANGED))
+                .andExpect(jsonPath("$.code").value("PRICE_CHANGED"));
         api.get(sale(seller, card), seller.who())
                 .andExpect(jsonPath("$.listing").value(nullValue()))
                 .andExpect(jsonPath("$.offer.voided.reason").value(OfferService.PRICE_CHANGED));
@@ -170,7 +171,8 @@ class OfferStalenessTest {
 
         api.postJson(TestMarket.accept(buyer, card), "", buyer.who())
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value(OfferService.PRICE_CHANGED));
+                .andExpect(jsonPath("$.detail").value(OfferService.PRICE_CHANGED))
+                .andExpect(jsonPath("$.code").value("PRICE_CHANGED"));
         api.get(sale(seller, card), seller.who())
                 .andExpect(jsonPath("$.listing.status").value("VOIDED"))
                 .andExpect(jsonPath("$.offer.voided.reason").value(OfferService.PRICE_CHANGED));

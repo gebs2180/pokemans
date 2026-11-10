@@ -78,12 +78,6 @@ class ValuationService {
         abstract BigDecimal maxSigma();
     }
 
-    static final String LOT = "photographed lot: lots aren't valued";
-    static final String NOT_IDENTIFIED = "not identified";
-    static final String NO_ASSESSMENT = "no condition assessment";
-    /** The front or back was retaken since the card's condition was assessed: it waits to be assessed again. */
-    static final String PHOTOS_CHANGED = "photos retaken since its condition was assessed";
-
     private final CardItems cardItems;
     private final Catalog catalog;
     private final Assessments assessments;
@@ -241,16 +235,16 @@ class ValuationService {
             String reason = null;
             CardInputs.Prices table = null;
             if (item.lot()) {
-                reason = LOT;
+                reason = UnvaluedReason.LOT.text();
             } else if (identity == null) {
-                reason = NOT_IDENTIFIED;
+                reason = UnvaluedReason.NOT_IDENTIFIED.text();
             } else if (graded == null && assessment == null) {
-                reason = a == null ? NO_ASSESSMENT : PHOTOS_CHANGED;
+                reason = (a == null ? UnvaluedReason.NO_ASSESSMENT : UnvaluedReason.PHOTOS_CHANGED).text();
             } else {
                 String company = graded == null ? properties.gradingCompany() : graded.gradingCompany();
                 Optional<Prices.CardPrices> found = prices.latest(identity.catalogCardId(), company);
                 if (found.isEmpty()) {
-                    reason = "no " + company + " price table";
+                    reason = UnvaluedReason.noPriceTable(company);
                 } else {
                     table = prices(found.get());
                 }

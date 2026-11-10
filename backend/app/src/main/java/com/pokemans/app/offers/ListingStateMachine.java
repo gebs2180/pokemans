@@ -4,8 +4,11 @@ import com.pokemans.app.offers.ListingViews.UndoView;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -29,7 +32,36 @@ final class ListingStateMachine {
      * 2026-10-21). BACK: a buyer took it and sent it back, and the seller has it again, so it's free for
      * a new offer.
      */
-    enum Status { OPEN, ACCEPTED, WITHDRAWN, EXPIRED, VOIDED, CANCELLED, BACK }
+    enum Status {
+        OPEN, ACCEPTED, WITHDRAWN, EXPIRED, VOIDED, CANCELLED, BACK;
+
+        /** A buyer took the card, whatever happened after: the track record counts these as accepted. */
+        boolean taken() {
+            return this == ACCEPTED || this == BACK;
+        }
+    }
+
+    /**
+     * The one definition of a listing's status (architecture review #26): the first of these events in its
+     * history decides it, in this order; with none of them it is OPEN until it expires, then EXPIRED.
+     * {@code SaleListingRepository.findOpen} takes its event types from here, and {@code ListingStatusParityTest}
+     * holds the {@code v_offer_outcomes} view and the {@code listing_event_closed_once} index to it.
+     */
+    static final Map<ListingEvent.Type, Status> DECIDED_BY = decidedBy();
+
+    /** Events that end an open listing. Each can happen once per listing ({@code listing_event_closed_once}). */
+    static final Set<ListingEvent.Type> CLOSES = Collections.unmodifiableSet(
+            EnumSet.of(ListingEvent.Type.ACCEPTED, ListingEvent.Type.WITHDRAWN, ListingEvent.Type.VOIDED));
+
+    private static Map<ListingEvent.Type, Status> decidedBy() {
+        Map<ListingEvent.Type, Status> m = new LinkedHashMap<>();
+        m.put(ListingEvent.Type.CANCELLED, Status.CANCELLED);
+        m.put(ListingEvent.Type.CARD_BACK, Status.BACK);
+        m.put(ListingEvent.Type.ACCEPTED, Status.ACCEPTED);
+        m.put(ListingEvent.Type.WITHDRAWN, Status.WITHDRAWN);
+        m.put(ListingEvent.Type.VOIDED, Status.VOIDED);
+        return Collections.unmodifiableMap(m);
+    }
 
     /** Where a deal is, after Sold (UX review, 2026-11-01). Each has its own next step. */
     enum DealStage { SOLD, SHIPPED, ARRIVED, PAID, RETURNED, BACK }
@@ -61,20 +93,10 @@ final class ListingStateMachine {
     static Status status(SaleListing listing, List<ListingEvent> history, Instant now) {
         Set<ListingEvent.Type> types = history.stream().map(ListingEvent::getType)
                 .collect(Collectors.toCollection(() -> EnumSet.noneOf(ListingEvent.Type.class)));
-        if (types.contains(ListingEvent.Type.CANCELLED)) {
-            return Status.CANCELLED;
-        }
-        if (types.contains(ListingEvent.Type.CARD_BACK)) {
-            return Status.BACK;
-        }
-        if (types.contains(ListingEvent.Type.ACCEPTED)) {
-            return Status.ACCEPTED;
-        }
-        if (types.contains(ListingEvent.Type.WITHDRAWN)) {
-            return Status.WITHDRAWN;
-        }
-        if (types.contains(ListingEvent.Type.VOIDED)) {
-            return Status.VOIDED;
+        for (Map.Entry<ListingEvent.Type, Status> rule : DECIDED_BY.entrySet()) {
+            if (types.contains(rule.getKey())) {
+                return rule.getValue();
+            }
         }
         return listing.getExpiresAt().isAfter(now) ? Status.OPEN : Status.EXPIRED;
     }

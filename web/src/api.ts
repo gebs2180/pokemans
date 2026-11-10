@@ -153,9 +153,12 @@ export type UploadSlot = {
 
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  /** The problem detail's `code`, when the API gave one: branch on this, never on the message. */
+  code: string | undefined
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -219,13 +222,15 @@ export function useApi() {
             : response.status === 404
               ? "We couldn't find that."
               : `${method} ${path} failed: ${response.status}`
+        let code: string | undefined
         try {
           const problem = await response.json()
           detail = problem.detail ?? problem.title ?? detail
+          code = typeof problem.code === 'string' ? problem.code : undefined
         } catch {
           // not JSON
         }
-        throw new ApiError(response.status, detail)
+        throw new ApiError(response.status, detail, code)
       }
       const text = await response.text()
       return (text ? JSON.parse(text) : undefined) as T
@@ -1093,6 +1098,8 @@ export type AwaitingLabel = {
 export type OfferPreview = {
   offered: boolean
   refusal: string | null
+  /** Why there's no offer, as a code; `refusal` is the words. */
+  refusalCode: string | null
   price: number | null
   fmv: number | null
   confidence: Confidence | null

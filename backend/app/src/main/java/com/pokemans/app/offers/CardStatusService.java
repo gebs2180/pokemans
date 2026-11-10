@@ -3,6 +3,7 @@ package com.pokemans.app.offers;
 import com.pokemans.app.condition.Assessments;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.valuation.CardInputs;
+import com.pokemans.app.valuation.UnvaluedReason;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumSet;
@@ -167,16 +168,16 @@ class CardStatusService {
         if (!captured) {
             return new CardStatus(cardId, Stage.PHOTOS, identity, "Take the front and back photos. We review the card from them.", false);
         }
-        String reason = in.unvaluedReason();
+        UnvaluedReason reason = UnvaluedReason.of(in.unvaluedReason());
         if (in.identity() == null) {
             return new CardStatus(cardId, Stage.IDENTIFYING, null,
                     "We identify each card by hand from its photos, usually within a couple of days." + NO_NOTIFICATIONS, false);
         }
-        if (reason != null && reason.equals("no condition assessment")) {
+        if (reason == UnvaluedReason.NO_ASSESSMENT) {
             return new CardStatus(cardId, Stage.ASSESSING, identity,
                     "We're reviewing its condition from the photos." + NO_NOTIFICATIONS, false);
         }
-        if (reason != null && reason.equals("photos retaken since its condition was assessed")) {
+        if (reason == UnvaluedReason.PHOTOS_CHANGED) {
             return new CardStatus(cardId, Stage.ASSESSING, identity,
                     "Your photos changed, so we're checking its condition again." + NO_NOTIFICATIONS, false);
         }
@@ -185,8 +186,8 @@ class CardStatusService {
                     "We don't have enough sold prices for this card yet. We add them by hand, so it may take a while, "
                             + "and some cards won't get an offer. You're free to sell it elsewhere." + NO_NOTIFICATIONS, false);
         }
-        if (quote.refusal() != null) {
-            return new CardStatus(cardId, Stage.NO_OFFER, identity, quote.refusal() + nextStep(quote.refusal()), false);
+        if (quote.refused() != null) {
+            return new CardStatus(cardId, Stage.NO_OFFER, identity, quote.refusal() + nextStep(quote.refused()), false);
         }
         return new CardStatus(cardId, Stage.READY, identity, "Ready for an instant offer.", true);
     }
@@ -213,14 +214,12 @@ class CardStatusService {
         };
     }
 
-    private String nextStep(String refusal) {
-        if (refusal.contains("sales data")) {
-            return " We add sold prices by hand, and it may qualify then." + NO_NOTIFICATIONS;
-        }
-        if (refusal.contains("minimum")) {
-            return " Instant offers are for cards worth " + policy.minFmvText() + " or more.";
-        }
-        return "";
+    private String nextStep(OfferRefusal refused) {
+        return switch (refused) {
+            case THIN_SALES -> " We add sold prices by hand, and it may qualify then." + NO_NOTIFICATIONS;
+            case UNDER_MINIMUM -> " Instant offers are for cards worth " + policy.minFmvText() + " or more.";
+            default -> "";
+        };
     }
 
     static String identity(CardInputs.Identity id) {

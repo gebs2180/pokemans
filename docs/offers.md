@@ -178,7 +178,7 @@ The realized sales are the evidence for the later lender and insurer pitch: our 
 
 - **`v_offer_outcomes` (V16)** has one row per listing:
   - the card's identity, the offer date, the price and FMV;
-  - the status (open, accepted, withdrawn, expired) and time to accept;
+  - the status (open, accepted, withdrawn, expired, voided, cancelled, and from the 2026-11 architecture cleanup back for a card returned to its seller, which still counts as accepted) and time to accept. It's `ListingStateMachine.status` in SQL, and `ListingStatusParityTest` keeps them equal;
   - the label (carrier, postage, insurance);
   - the outcome (received, or returned with the reason), the price paid, and the time from label to outcome;
   - from V20, when it shipped, when the buyer says they paid, when the seller confirmed it, and whether the seller raised anything.

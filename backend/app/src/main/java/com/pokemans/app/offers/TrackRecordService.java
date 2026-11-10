@@ -83,6 +83,11 @@ class TrackRecordService {
 
     private record Row(String status, BigDecimal price, BigDecimal hoursToAccept, boolean labelled, BigDecimal postage,
                        BigDecimal insurance, String outcome, BigDecimal pricePaid, String returnedReason, BigDecimal hoursToOutcome) {
+
+        /** The view writes the state machine's status names. */
+        boolean taken() {
+            return ListingStateMachine.Status.valueOf(status).taken();
+        }
     }
 
     private final JdbcTemplate jdbc;
@@ -110,18 +115,18 @@ class TrackRecordService {
     private static Acceptance acceptance(String label, List<Row> all, Predicate<Row> in) {
         List<Row> rows = all.stream().filter(in).toList();
         int open = count(rows, "OPEN");
-        int accepted = count(rows, "ACCEPTED");
+        int accepted = (int) rows.stream().filter(Row::taken).count();
         int withdrawn = count(rows, "WITHDRAWN");
         int expired = count(rows, "EXPIRED");
         int closed = accepted + withdrawn + expired;
-        BigDecimal medianHours = median(rows.stream().filter(r -> "ACCEPTED".equals(r.status())).map(Row::hoursToAccept)
+        BigDecimal medianHours = median(rows.stream().filter(Row::taken).map(Row::hoursToAccept)
                 .filter(h -> h != null).toList());
         return new Acceptance(label, rows.size(), open, accepted, withdrawn, expired, closed, share(accepted, closed),
                 medianHours == null ? null : medianHours.setScale(1, RoundingMode.HALF_UP), count(rows, "VOIDED"), count(rows, "CANCELLED"));
     }
 
     private static Deliveries deliveries(List<Row> rows) {
-        List<Row> taken = rows.stream().filter(r -> "ACCEPTED".equals(r.status())).toList();
+        List<Row> taken = rows.stream().filter(Row::taken).toList();
         int earlier = (int) taken.stream().filter(r -> "INSPECTED".equals(r.outcome())).count();
         List<Row> firm = taken.stream().filter(r -> !"INSPECTED".equals(r.outcome())).toList();
         int received = (int) firm.stream().filter(r -> "RECEIVED".equals(r.outcome())).count();
