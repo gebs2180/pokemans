@@ -25,9 +25,14 @@ if [[ -n "${OFFSITE_REMOTE:-}" || -n "${OFFSITE_PATH:-}" ]]; then
 fi
 
 work=$(mktemp -d)
-chown postgres "$work"
 port=55432
-as_pg() { gosu postgres "$@"; }
+# The image runs as postgres; a run started as root (`run --user root`) drops to it for the server.
+if (( EUID == 0 )); then
+  chown postgres "$work"
+  as_pg() { gosu postgres "$@"; }
+else
+  as_pg() { "$@"; }
+fi
 trap 'as_pg pg_ctl --pgdata="$work/data" --mode=immediate stop > /dev/null 2>&1 || true; rm -rf "$work"' EXIT
 trap 'hc /fail' ERR
 hc /start
@@ -36,7 +41,7 @@ latest=$(rclone lsf "backups:${BACKUP_BUCKET}/postgres" --include 'pokemans-*.du
 [[ -n "$latest" ]] || fail "no dumps in ${BACKUP_BUCKET}/postgres"
 echo "restore-test: restoring ${latest}"
 rclone copyto "backups:${BACKUP_BUCKET}/postgres/${latest}" "$work/restore.dump"
-chown postgres "$work/restore.dump"
+if (( EUID == 0 )); then chown postgres "$work/restore.dump"; fi
 
 as_pg initdb --pgdata="$work/data" --username=postgres --auth=trust > /dev/null
 as_pg pg_ctl --pgdata="$work/data" --options="-p ${port} -k ${work}" --log="$work/pg.log" --wait start > /dev/null

@@ -76,6 +76,9 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    # The image runs as the caddy user (uid 10001); binding 80 and 443 is the only privilege it keeps.
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}

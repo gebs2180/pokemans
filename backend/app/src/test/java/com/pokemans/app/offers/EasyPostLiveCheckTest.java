@@ -28,7 +28,7 @@ class EasyPostLiveCheckTest {
     void aRetryGetsTheLabelAlreadyBought() {
         // The constructor production uses, so its HTTP client is the one checked.
         ShippingProperties properties = new ShippingProperties(new ShippingProperties.EasyPost(true, System.getenv("EASYPOST_TEST_KEY"),
-                URI.create("https://api.easypost.com/v2"), "USPS", Duration.ofSeconds(20)), new ShippingProperties.Parcel(PARCEL.length(),
+                URI.create("https://api.easypost.com/v2"), "USPS", Duration.ofSeconds(5), Duration.ofSeconds(20)), new ShippingProperties.Parcel(PARCEL.length(),
                 PARCEL.width(), PARCEL.height(), PARCEL.weightOz()), null);
         EasyPostShippingProvider easyPost = new EasyPostShippingProvider(properties);
         String reference = UUID.randomUUID().toString();

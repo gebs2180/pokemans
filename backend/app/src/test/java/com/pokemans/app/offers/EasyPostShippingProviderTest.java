@@ -30,7 +30,7 @@ import org.springframework.web.client.RestClient;
 class EasyPostShippingProviderTest {
 
     private static final ShippingProperties.EasyPost CONFIG = new ShippingProperties.EasyPost(true, "EZTK_test", URI.create("https://ep.test/v2"),
-            "USPS", Duration.ofSeconds(5));
+            "USPS", Duration.ofSeconds(5), Duration.ofSeconds(5));
     private static final ShippingProvider.Address FROM = new ShippingProvider.Address("Sam", null, "1 Main St", null, "Springfield", "IL",
             "62701", "US", null);
     private static final ShippingProvider.Address TO = new ShippingProvider.Address("Card Shop", "Card Shop LLC", "9 Elm St", "Suite 2",
@@ -163,7 +163,7 @@ class EasyPostShippingProviderTest {
         try {
             URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v2");
             ShippingProperties properties = new ShippingProperties(new ShippingProperties.EasyPost(true, "EZTK_test", base, "USPS",
-                    Duration.ofSeconds(5)), new ShippingProperties.Parcel(new BigDecimal("7"), new BigDecimal("5"), BigDecimal.ONE, new BigDecimal("3")), null);
+                    Duration.ofSeconds(5), Duration.ofSeconds(5)), new ShippingProperties.Parcel(new BigDecimal("7"), new BigDecimal("5"), BigDecimal.ONE, new BigDecimal("3")), null);
 
             assertThatThrownBy(() -> new EasyPostShippingProvider(properties).buy(FROM, TO, PARCEL, BigDecimal.TEN, "listing-1"))
                     .isInstanceOf(RuntimeException.class);
@@ -172,6 +172,39 @@ class EasyPostShippingProviderTest {
         }
         assertThat(posts).hasSize(1);
         assertThat(posts.getFirst()).matches("\\d+ null");
+    }
+
+    @Test
+    void aSlowAnswerFailsWithinTheTimeoutAndBuysNothing() throws Exception {
+        // Deep review 2026-11-09, A4: the purchase runs with the card's lock and a database connection held, so a provider
+        // that stops answering must not hold them for long. Here the look-up for an earlier purchase hangs: the call fails
+        // fast, and since we can't tell whether a label was bought, nothing is bought.
+        List<String> requests = new CopyOnWriteArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
+        server.createContext("/", exchange -> {
+            requests.add(exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath());
+            try {
+                Thread.sleep(5_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            exchange.close();
+        });
+        server.start();
+        try {
+            URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v2");
+            ShippingProperties properties = new ShippingProperties(new ShippingProperties.EasyPost(true, "EZTK_test", base, "USPS",
+                    Duration.ofSeconds(1), Duration.ofMillis(300)), null, null);
+            long started = System.nanoTime();
+
+            assertThatThrownBy(() -> new EasyPostShippingProvider(properties).buy(FROM, TO, PARCEL, BigDecimal.TEN, "listing-1"))
+                    .isInstanceOf(org.springframework.web.client.ResourceAccessException.class);
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(3));
+        } finally {
+            server.stop(0);
+        }
+        assertThat(requests).containsExactly("GET /v2/shipments/listing-1");
     }
 
     @Test
@@ -204,7 +237,7 @@ class EasyPostShippingProviderTest {
         assertThatThrownBy(() -> easyPost.buy(FROM, TO, PARCEL, BigDecimal.TEN, "x")).hasMessageContaining("no rates");
         assertThatThrownBy(() -> easyPost.buy(FROM, TO, PARCEL, BigDecimal.TEN, "x")).isInstanceOf(RuntimeException.class);
         assertThatThrownBy(() -> new EasyPostShippingProvider(new ShippingProperties.EasyPost(true, " ", CONFIG.baseUrl(), "USPS",
-                Duration.ofSeconds(1)), RestClient.builder())).hasMessageContaining("api-key");
+                Duration.ofSeconds(1), Duration.ofSeconds(1)), RestClient.builder())).hasMessageContaining("api-key");
         assertThat(CONFIG.toString()).doesNotContain("EZTK_test");
     }
 }

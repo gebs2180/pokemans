@@ -51,6 +51,25 @@ public class TestcontainersConfiguration {
         return name;
     }
 
+    /**
+     * Runs a psql script inside the Postgres container against a test database, the way an admin runs one on the
+     * server (deploy/forget-org.sql). Variables are {@code name=value} pairs passed with {@code -v}.
+     */
+    public static org.testcontainers.containers.Container.ExecResult psql(String database, java.nio.file.Path script,
+            String... variables) throws Exception {
+        startOnce();
+        String inContainer = "/tmp/" + script.getFileName();
+        POSTGRES.copyFileToContainer(org.testcontainers.utility.MountableFile.forHostPath(script), inContainer);
+        java.util.List<String> command = new java.util.ArrayList<>(java.util.List.of("psql", "-U", POSTGRES.getUsername(), "-d", database));
+        for (String variable : variables) {
+            command.add("-v");
+            command.add(variable);
+        }
+        command.add("-f");
+        command.add(inContainer);
+        return POSTGRES.execInContainer(command.toArray(String[]::new));
+    }
+
     @Bean
     DynamicPropertyRegistrar containerProperties() {
         return registry -> {

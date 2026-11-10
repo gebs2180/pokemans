@@ -19,18 +19,23 @@ record ShippingProperties(@DefaultValue EasyPost easypost, @DefaultValue Parcel 
      * <a href="https://docs.easypost.com">EasyPost</a>. Off until a key is set in the environment; a test
      * key buys test labels.
      *
-     * @param carrier the carrier whose cheapest rate is bought; the cheapest of any carrier if it has none
+     * @param carrier        the carrier whose cheapest rate is bought; the cheapest of any carrier if it has none
+     * @param connectTimeout how long to wait for a connection: short, since nothing is sent before it
+     * @param timeout        how long to wait for each answer. A label is bought with the card's listing lock and a database
+     *                       connection held (deep review 2026-11-09, A4), so this bounds that hold. A purchase whose answer
+     *                       times out is found by its reference on the retry, never bought twice.
      */
     record EasyPost(@DefaultValue("false") boolean enabled, String apiKey,
                     @DefaultValue("https://api.easypost.com/v2") URI baseUrl,
                     @DefaultValue("USPS") String carrier,
+                    @DefaultValue("5s") Duration connectTimeout,
                     @DefaultValue("20s") Duration timeout) {
 
         /** Never prints the key. */
         @Override
         public String toString() {
             return "EasyPost[enabled=" + enabled + ", apiKey=" + (apiKey == null || apiKey.isBlank() ? "unset" : "***")
-                    + ", baseUrl=" + baseUrl + ", carrier=" + carrier + "]";
+                    + ", baseUrl=" + baseUrl + ", carrier=" + carrier + ", connectTimeout=" + connectTimeout + ", timeout=" + timeout + "]";
         }
     }
 

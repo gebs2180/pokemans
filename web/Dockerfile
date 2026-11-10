@@ -16,4 +16,12 @@ RUN test -n "$VITE_AUTH0_DOMAIN" && test -n "$VITE_AUTH0_CLIENT_ID" && test -n "
 RUN npm run build
 
 FROM caddy:2.10
+# Caddy faces the internet, so it runs as its own user (security review 2026-10-26, #8). It still binds 80 and 443:
+# the image gives the binary cap_net_bind_service, and compose.prod.yml keeps only that capability. A fixed uid so
+# the deploy's chown of the existing caddy-data and caddy-config volumes can name it (10001:10001).
+RUN addgroup -S -g 10001 caddy \
+    && adduser -S -D -H -u 10001 -G caddy -s /sbin/nologin caddy \
+    && mkdir -p /data/caddy /config/caddy \
+    && chown -R caddy:caddy /data /config
 COPY --from=build /src/dist /srv
+USER caddy
