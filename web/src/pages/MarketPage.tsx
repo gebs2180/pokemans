@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link, NavLink, useParams } from 'react-router'
 import {
+  ApiError,
   apiPath,
   money,
   parseMoney,
@@ -179,8 +180,8 @@ function BuyerNav({ orgId }: { orgId: string }) {
   )
 }
 
-/** "Add the address cards should ship to first." is the one refusal the buyer fixes elsewhere: link there. */
-const NO_ADDRESS = 'Add the address cards should ship to first.'
+/** The one refusal the buyer fixes elsewhere, a missing ship-to address: link there. */
+const NO_ADDRESS = 'NO_BUYER_ADDRESS'
 
 /** Buyers: raw cards posted at one firm price. The first buyer to accept buys the card at it. */
 export function MarketPage() {
@@ -198,7 +199,7 @@ export function MarketPage() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   // A refusal shows by the card it's about: on a phone the top of the list is off-screen.
-  const [failed, setFailed] = useState<{ listingId: string; message: string } | null>(null)
+  const [failed, setFailed] = useState<{ listingId: string; message: string; code?: string } | null>(null)
 
   async function accept(listingId: string) {
     setMessage(null)
@@ -212,7 +213,7 @@ export function MarketPage() {
           : 'Bought: the seller has a prepaid label to you. It is in Your deals.',
       )
     } catch (e) {
-      setFailed({ listingId, message: errorText(e) })
+      setFailed({ listingId, message: errorText(e), code: e instanceof ApiError ? e.code : undefined })
     } finally {
       setBusy(false)
       setConfirming(null)
@@ -321,7 +322,7 @@ export function MarketPage() {
               {failed?.listingId === item.listingId && (
                 <p className="error" role="alert">
                   {failed.message}
-                  {failed.message === NO_ADDRESS && (
+                  {failed.code === NO_ADDRESS && (
                     <>
                       {' '}
                       <Link to={`/orgs/${orgId}`}>Add your address</Link>

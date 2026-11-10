@@ -128,7 +128,8 @@ class OffersFlowTest {
         assertThat(JsonPath.<List<Object>>read(market, "$[?(@.listingId == '" + listingId + "')]")).hasSize(1);
         assertThat(market).doesNotContain(sellerName); // who is selling stays private until a buyer commits
         api.postJson(accept(firstOrg, listingId), "", first).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail", containsString("address")));
+                .andExpect(jsonPath("$.detail", containsString("address")))
+                .andExpect(jsonPath("$.code").value("NO_BUYER_ADDRESS"));
         address(firstOrg, first, "First Buyer");
         JwtRequestPostProcessor second = buyer("Second Buyer");
         String secondOrg = lastBuyerOrg;
@@ -580,9 +581,9 @@ class OffersFlowTest {
         api.postJson(listings(card), "{\"offerId\":\"" + fresh + "\"}", seller).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.listing.status").value("OPEN"));
 
-        // The deal stays a returned deal in the track record.
+        // The deal stays a returned deal in the track record: back with the seller, as the state machine says, and still taken.
         Map<String, Object> row = jdbc.queryForMap("select status, outcome from v_offer_outcomes where listing_id = ?::uuid", UUID.fromString(listingId));
-        assertThat(row).containsEntry("status", "ACCEPTED").containsEntry("outcome", "RETURNED");
+        assertThat(row).containsEntry("status", "BACK").containsEntry("outcome", "RETURNED");
     }
 
     @Test
@@ -691,11 +692,13 @@ class OffersFlowTest {
                 "{\"distribution\":{\"9\":0.5,\"10\":0.5},\"confidence\":\"D\",\"reason\":\"blurry\"}", api.admin())
                 .andExpect(status().isCreated());
         api.postJson(offers(unsure), "", seller).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value("There isn't enough sales data to make a firm offer on this card yet."));
+                .andExpect(jsonPath("$.detail").value("There isn't enough sales data to make a firm offer on this card yet."))
+                .andExpect(jsonPath("$.code").value("THIN_SALES"));
 
         String cheap = pricedCard("Cheap Pidgey", 60);
         api.postJson(offers(cheap), "", seller).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value("Its value is under the $25 minimum for an offer."));
+                .andExpect(jsonPath("$.detail").value("Its value is under the $25 minimum for an offer."))
+                .andExpect(jsonPath("$.code").value("UNDER_MINIMUM"));
         assertThat(jdbc.queryForObject("select count(*) from card_offer where card_item_id in (?::uuid, ?::uuid)", Integer.class,
                 unsure, cheap)).isZero();
     }
@@ -1026,6 +1029,7 @@ class OffersFlowTest {
         String preview = api.get("/api/admin/cards/" + priced + "/offer-preview", api.admin()).andExpect(status().isOk())
                 .andExpect(jsonPath("$.offered").value(true))
                 .andExpect(jsonPath("$.refusal").isEmpty())
+                .andExpect(jsonPath("$.refusalCode").isEmpty())
                 .andExpect(jsonPath("$.why[?(@.subject == 'confidence_base')]").isNotEmpty())
                 .andExpect(jsonPath("$.why[?(@.subject == 'parameters')]").isNotEmpty())
                 .andReturn().getResponse().getContentAsString();
@@ -1040,6 +1044,7 @@ class OffersFlowTest {
         api.get("/api/admin/cards/" + unknown + "/offer-preview", api.admin()).andExpect(status().isOk())
                 .andExpect(jsonPath("$.offered").value(false))
                 .andExpect(jsonPath("$.refusal", containsString("identified")))
+                .andExpect(jsonPath("$.refusalCode").value("NOT_IDENTIFIED"))
                 .andExpect(jsonPath("$.confidence").isEmpty());
         api.get("/api/admin/cards/" + UUID.randomUUID() + "/offer-preview", api.admin()).andExpect(status().isNotFound());
     }

@@ -32,7 +32,15 @@ describe('useApi', () => {
     const error = await api()('GET', '/api/things').catch((e: unknown) => e)
 
     expect(error).toBeInstanceOf(ApiError)
-    expect(error).toMatchObject({ status: 409, message: 'Already identified' })
+    expect(error).toMatchObject({ status: 409, message: 'Already identified', code: undefined })
+  })
+
+  it("keeps the problem detail's code, to branch on instead of the words", async () => {
+    vi.stubGlobal('fetch', async () => respond(409, { detail: 'Add the address cards should ship to first.', code: 'NO_BUYER_ADDRESS' }))
+
+    const error = await api()('POST', '/api/things').catch((e: unknown) => e)
+
+    expect(error).toMatchObject({ status: 409, code: 'NO_BUYER_ADDRESS' })
   })
 
   it('returns undefined for an empty 2xx body', async () => {

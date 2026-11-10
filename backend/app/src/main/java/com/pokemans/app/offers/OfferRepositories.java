@@ -42,14 +42,17 @@ interface SaleListingRepository extends JpaRepository<SaleListing, UUID> {
 
     List<SaleListing> findByOfferIdIn(Collection<UUID> offerIds);
 
-    /** Listings not yet expired and never accepted or withdrawn, newest first. */
+    /** Open listings, newest first: not expired, and none of the events that decide a status ({@link ListingStateMachine#DECIDED_BY}). */
+    default List<SaleListing> findOpen(Instant now) {
+        return findUndecided(now, ListingStateMachine.DECIDED_BY.keySet());
+    }
+
+    /** Listings not expired at {@code now} with none of these events, newest first. Use {@link #findOpen}. */
     @Query("""
             select l from SaleListing l where l.expiresAt > :now and not exists (
-              select e from ListingEvent e where e.listingId = l.id
-              and e.type in (com.pokemans.app.offers.ListingEvent.Type.ACCEPTED, com.pokemans.app.offers.ListingEvent.Type.WITHDRAWN,
-                           com.pokemans.app.offers.ListingEvent.Type.VOIDED))
+              select e from ListingEvent e where e.listingId = l.id and e.type in :decided)
             order by l.createdAt desc""")
-    List<SaleListing> findOpen(Instant now);
+    List<SaleListing> findUndecided(Instant now, Collection<ListingEvent.Type> decided);
 
     /** Listings this buyer org accepted, newest first. */
     @Query("""

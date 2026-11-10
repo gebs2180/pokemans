@@ -1,7 +1,10 @@
 -- The instant-offer track record, one row per listing: the admin page (TrackRecordService) and the
 -- analysis notebooks both read it, so they can't disagree. Repeatable (review finding 42): Flyway runs
 -- it again whenever this file changes, after the versioned migrations, so the view lives in one place.
--- V15 to V20 built it; this is V20's definition. New columns go last (create or replace can only add).
+-- V15 to V20 built it; this is V20's definition, plus BACK (architecture review #26). New columns go
+-- last (create or replace can only add). status is ListingStateMachine.status in SQL: change them
+-- together (ListingStatusParityTest checks). A card that came back is BACK, not ACCEPTED; it was still
+-- taken, so count both as accepted.
 -- A versioned migration that changes a column this reads must drop the view first; this file then
 -- recreates it.
 create or replace view v_offer_outcomes as
@@ -26,6 +29,7 @@ select l.id                                                        as listing_id
        l.expires_at                                                as listing_expires_at,
        case
            when cx.id is not null then 'CANCELLED'
+           when exists (select 1 from listing_event bk where bk.listing_id = l.id and bk.type = 'CARD_BACK') then 'BACK'
            when acc.id is not null then 'ACCEPTED'
            when wd.id is not null then 'WITHDRAWN'
            when vd.id is not null then 'VOIDED'

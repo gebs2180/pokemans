@@ -496,7 +496,7 @@ describe('MarketPage', () => {
         { side: 'BACK' as const, url: 'https://photos.example/b.jpg', fullUrl: 'https://photos.example/b-full.jpg' },
       ],
     }
-    stubMarket([photographed], () => respond(409, { detail: 'Add the address cards should ship to first.' }))
+    stubMarket([photographed], () => respond(409, { detail: 'Add the address cards should ship to first.', code: 'NO_BUYER_ADDRESS' }))
     renderMarket()
 
     expect(await screen.findByRole('img', { name: 'Front photo' })).toBeInTheDocument()

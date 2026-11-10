@@ -7,6 +7,7 @@ import static com.pokemans.app.offers.ListingStateMachine.status;
 import static com.pokemans.app.offers.ListingViews.card;
 import static com.pokemans.app.offers.ListingViews.current;
 
+import com.pokemans.app.api.ApiException;
 import com.pokemans.app.identity.CurrentUser;
 import com.pokemans.app.identity.OrgAccess;
 import com.pokemans.app.intake.CardItems;
@@ -56,9 +57,9 @@ class ListingService {
      * 409 because the offer's price no longer holds on today's prices. Thrown after the void row is saved, and
      * the transaction commits it anyway ({@code noRollbackFor}): the offer stays withdrawn whatever the caller does.
      */
-    static final class PriceChanged extends ResponseStatusException {
+    static final class PriceChanged extends ApiException {
         PriceChanged() {
-            super(HttpStatus.CONFLICT, OfferService.PRICE_CHANGED);
+            super(HttpStatus.CONFLICT, OfferRefusal.PRICE_CHANGED, OfferService.PRICE_CHANGED);
         }
     }
 
@@ -211,7 +212,7 @@ class ListingService {
             throw conflict("You can't buy your own card.");
         }
         if (shipping.address(buyerOrgId).isEmpty()) {
-            throw conflict("Add the address cards should ship to first.");
+            throw new ApiException(HttpStatus.CONFLICT, OfferRefusal.NO_BUYER_ADDRESS, "Add the address cards should ship to first.");
         }
         CardOffer offer = offers.findById(listing.getOfferId()).orElseThrow();
         if (pricing.reprice(offer).moved()) {
