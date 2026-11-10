@@ -1101,7 +1101,12 @@ export type OfferPreview = {
   why: TraceStep[]
   /** The raw sanity check, or null when there's no offer. */
   rawSales?: RawSales | null
+  /** Set when the offer's 10 rung was capped at M times its 9 rung (parameter set 1.4.0 on). */
+  tenCap?: TenCap | null
 }
+
+/** The offer's 10 rung, capped: what it would have paid, what it pays (M x the 9 rung), and M. */
+export type TenCap = { uncapped: number; cap: number; multiple: number }
 
 /** @param labelPending why the label didn't come with the accept, or null */
 export type AcceptResult = { deals: Deal[]; labelPending: string | null }

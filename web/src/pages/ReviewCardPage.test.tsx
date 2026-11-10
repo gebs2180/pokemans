@@ -221,6 +221,22 @@ describe('OfferPreviewPanel', () => {
     expect(screen.getByText(/derived grades \[5, 6, 7\]/)).toBeInTheDocument()
   })
 
+  it('says when the 10 rung was capped at M times the 9', async () => {
+    stub({
+      offered: true, refusal: null, price: 344.25, fmv: 750, confidence: 'A', buyerMargin: 0.1, why: [],
+      tenCap: { uncapped: 1377, cap: 688.5, multiple: 2.5 },
+    })
+    render(<OfferPreviewPanel cardId="card1" />)
+    expect(await screen.findByText(/grade 10 rung is capped at 2\.5× the grade 9 rung: \$688\.50 instead of \$1,?377\.00/)).toBeInTheDocument()
+  })
+
+  it('says nothing about the 10 when the cap did not bind', async () => {
+    stub({ offered: true, refusal: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [], tenCap: null })
+    render(<OfferPreviewPanel cardId="card1" />)
+    expect(await screen.findByText(/Offer \$100.54/)).toBeInTheDocument()
+    expect(screen.queryByText(/grade 10 rung is capped/)).not.toBeInTheDocument()
+  })
+
   it('flags an offer below recent raw near-mint sales', async () => {
     stub({
       offered: true, refusal: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [],

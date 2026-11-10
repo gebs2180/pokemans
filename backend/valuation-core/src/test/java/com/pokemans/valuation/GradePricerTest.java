@@ -226,6 +226,47 @@ class GradePricerTest {
     }
 
     @Test
+    void from140TheStepUpToTenIsLeftOutOfTheCardsOwnLadder() {
+        // A steep 9-to-10 jump (5x) over a gentle lower step (the 8 is 0.8 of the 9). Grade 10 still counts
+        // towards the grades and spread the ladder needs.
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G10, List.of(comp(1, "5000"), comp(2, "5000")));
+        comps.put(Grade.G9, List.of(comp(1, "1000"), comp(2, "1000")));
+        comps.put(Grade.G8, List.of(comp(1, "800"), comp(2, "800")));
+        GradePricer.Input input = new GradePricer.Input(AS_OF, comps, List.of(), Map.of(), NO_COST, Map.of());
+
+        GradePriceTable before = new GradePricer(ParameterSet.load("1.3.0")).price(input);
+        GradePriceTable after = new GradePricer(ParameterSet.load("1.4.0")).price(input);
+
+        // Before: the 9-to-10 ratio of 0.2 was the steepest, so the 7 came out at a fifth of the 8.
+        assertThat(before.get(Grade.G7).stepDownRatio()).isEqualByComparingTo("0.2");
+        assertThat(before.gross(Grade.G7)).isEqualByComparingTo("160.00");
+        // Now the 8-to-9 step sets it.
+        GradePrice g7 = after.get(Grade.G7);
+        assertThat(g7.method()).isEqualTo(GradePrice.Method.CARD_STEP_DOWN);
+        assertThat(g7.stepDownRatio()).isEqualByComparingTo("0.8");
+        assertThat(g7.gross()).isEqualByComparingTo("640.00");
+        assertThat(after.gross(Grade.G6)).isEqualByComparingTo("512.00");
+        // Observed grades keep their prices.
+        assertThat(after.gross(Grade.G10)).isEqualByComparingTo("5000");
+    }
+
+    @Test
+    void from140AStepUpToTenAloneGivesNoLadder() {
+        // Sales in 8 and 10 only: the one step ends at 10, so there is no ladder to step the 7 down with.
+        Map<Grade, List<Comp>> comps = new EnumMap<>(Grade.class);
+        comps.put(Grade.G10, List.of(comp(1, "5000"), comp(2, "5000")));
+        comps.put(Grade.G8, List.of(comp(1, "800"), comp(2, "800")));
+        GradePricer.Input input = new GradePricer.Input(AS_OF, comps, List.of(), Map.of(), NO_COST, Map.of());
+
+        assertThat(new GradePricer(ParameterSet.load("1.3.0")).price(input).get(Grade.G7).method())
+                .isEqualTo(GradePrice.Method.CARD_STEP_DOWN);
+        assertThatThrownBy(() -> new GradePricer(ParameterSet.load("1.4.0")).price(input))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("step-down ratio");
+    }
+
+    @Test
     void anEraRatioStillWinsOverTheCardsOwnLadder() {
         GradePriceTable table = pricer.price(new GradePricer.Input(AS_OF, spread(), List.of(), ratios("0.78"), NO_COST, Map.of()));
 

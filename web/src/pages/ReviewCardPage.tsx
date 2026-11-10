@@ -133,6 +133,12 @@ export function OfferPreviewPanel({ cardId }: { cardId: string }) {
             {data.confidence && ` (confidence ${data.confidence})`}
           </p>
         ))}
+      {data?.offered && data.tenCap && (
+        <p className="muted small" role="status">
+          The grade 10 rung is capped at {data.tenCap.multiple}× the grade 9 rung: {money(data.tenCap.cap)} instead of{' '}
+          {money(data.tenCap.uncapped)}.
+        </p>
+      )}
       {data?.rawSales &&
         (data.rawSales.below && data.rawSales.lowest != null ? (
           <p className="warn" role="status">

@@ -98,7 +98,7 @@ class ParameterSetTest {
                 v130.compsForB(), v130.compsForC(), v130.minFmv(), v130.singleCardCap(), v130.topFiveCap(),
                 v130.correlationThreshold(), v130.correlationHaircut(), v130.suggestedAlphaLow(), v130.suggestedAlphaHigh(),
                 v130.gradeFirstMinLift(), v130.gradeFirstTopN(), v130.fallbackSigma(), v130.offerMarginA(),
-                v130.offerMarginB(), v130.offerMarginC(), null, null)).isEqualTo(v120);
+                v130.offerMarginB(), v130.offerMarginC(), null, null, null, null)).isEqualTo(v120);
 
         java.util.Properties p = new java.util.Properties();
         try (var in = ParameterSet.class.getResourceAsStream("/parameter-sets/1.3.0.properties")) {

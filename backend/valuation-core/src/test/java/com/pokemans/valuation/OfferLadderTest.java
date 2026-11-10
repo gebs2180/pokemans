@@ -79,6 +79,107 @@ class OfferLadderTest {
         assertThatThrownBy(() -> ladder.offer(null, prices(), d("1"))).isInstanceOf(NullPointerException.class);
     }
 
+    // Rule 1 (Zach, 2026-11-09): from 1.4.0 an offer's 10 rung is at most M = 2.5 times its 9 rung.
+
+    private static final ParameterSet V130 = ParameterSet.load("1.3.0");
+    private static final ParameterSet V140 = ParameterSet.load("1.4.0");
+
+    /** Net prices with the 9 at {@code nine}, the 10 at {@code ten} and the 8 at 200; 100 below, U 20. */
+    private static GradePriceTable tenPremium(String nine, String ten) {
+        Map<Grade, GradePrice> p = new EnumMap<>(Grade.class);
+        for (Grade g : Grade.values()) {
+            String net = switch (g) {
+                case G10 -> ten;
+                case G9 -> nine;
+                case G8 -> "200";
+                case U -> "20";
+                default -> "100";
+            };
+            p.put(g, GradePrice.given(g, d(net), GradePrice.Method.OBSERVED, 10));
+        }
+        return new GradePriceTable(p, new Trace());
+    }
+
+    /** 25% grade 10, 50% grade 9, 25% grade 8. */
+    private static GradeDistribution cleanCard() {
+        return GradeDistribution.of(Map.of(Grade.G10, d("0.25"), Grade.G9, d("0.5"), Grade.G8, d("0.25")));
+    }
+
+    @Test
+    void aTenAtFiveTimesTheNineIsCappedAtTwoAndAHalf() {
+        // The 10 is 5x the 9 and the 8 is half of it. Factor 0.6885: rungs 10 1377.00, 9 275.40, 8 137.70.
+        GradePriceTable prices = tenPremium("400", "2000");
+
+        OfferLadder.Offer before = new OfferLadder(V130, d("0.10")).offer(cleanCard(), prices, d("10"));
+        OfferLadder.Offer after = new OfferLadder(V140, d("0.10")).offer(cleanCard(), prices, d("10"));
+
+        BigDecimal nine = rung(after, Grade.G9).price();
+        assertThat(nine).isEqualByComparingTo("275.40");
+        // Uncapped: 0.25 x 5 + 0.5 x 1 + 0.25 x 0.5 = 1.875 nine rungs (516.375).
+        assertThat(rung(before, Grade.G10).price()).isEqualByComparingTo("1377.00");
+        assertThat(before.price()).isBetween(d("516.37"), d("516.38"));
+        assertThat(before.tenCap()).isNull();
+        assertThat(before.trace().stepsFor("offer_ten_cap")).isEmpty();
+        // Capped: 0.25 x 2.5 + 0.5 x 1 + 0.25 x 0.5 = 1.25 nine rungs.
+        assertThat(rung(after, Grade.G10).price()).isEqualByComparingTo("688.50");
+        assertThat(after.price()).isEqualByComparingTo("344.25");
+        assertThat(after.price()).isEqualByComparingTo(nine.multiply(d("1.25")));
+        assertThat(after.tenCap()).isEqualTo(new OfferLadder.TenCap(d("1377.00"), d("688.50"), d("2.5")));
+        Trace.Step step = after.trace().stepsFor("offer_ten_cap").getFirst();
+        assertThat(step.detail()).contains("M 2.5").contains("1377.00").contains("275.40");
+        // The rest of the ladder is untouched.
+        assertThat(rung(after, Grade.G8).price()).isEqualByComparingTo(rung(before, Grade.G8).price());
+    }
+
+    @Test
+    void theCapDoesNotBindWhenTheTenIsWithinTwoAndAHalfNines() {
+        // Exactly 2.5x the 9, then under it.
+        for (String ten : new String[] {"1000", "900"}) {
+            GradePriceTable prices = tenPremium("400", ten);
+            OfferLadder.Offer before = new OfferLadder(V130, d("0.10")).offer(cleanCard(), prices, d("10"));
+            OfferLadder.Offer after = new OfferLadder(V140, d("0.10")).offer(cleanCard(), prices, d("10"));
+
+            assertThat(after.tenCap()).as(ten).isNull();
+            assertThat(after.price()).as(ten).isEqualByComparingTo(before.price());
+            assertThat(after.rungs()).as(ten).isEqualTo(before.rungs());
+        }
+    }
+
+    @Test
+    void aNineWithNoPriceLeavesTheTenAlone() {
+        // A 9 that nets to nothing (grading costs more than it sells for) gives the 10 nothing to be measured against.
+        GradePriceTable prices = tenPremium("0", "2000");
+
+        OfferLadder.Offer after = new OfferLadder(V140, d("0.10")).offer(cleanCard(), prices, d("10"));
+
+        assertThat(rung(after, Grade.G9).price()).isEqualByComparingTo("0");
+        assertThat(rung(after, Grade.G10).price()).isEqualByComparingTo("1377.00");
+        assertThat(after.tenCap()).isNull();
+    }
+
+    @Test
+    void setsBefore140HaveNoCap() {
+        assertThat(V130.offerTenToNineCap()).isEmpty();
+        assertThat(ParameterSet.load("1.2.0").offerTenToNineCap()).isEmpty();
+        assertThat(V140.offerTenToNineCap()).contains(d("2.5"));
+    }
+
+    @Test
+    void theCapLeavesTheValuesAlone() {
+        // FMV, RV, QSV and FLV keep the full ladder: same inputs, same values under 1.3.0 and 1.4.0.
+        CardValuator.Input in = new CardValuator.Input("c", cleanCard(), tenPremium("400", "2000"), d("0.08"), d("10"), 1, Confidence.A);
+
+        CardValuation before = new CardValuator(V130).value(in);
+        CardValuation after = new CardValuator(V140).value(in);
+
+        assertThat(after.fmv()).isEqualByComparingTo(before.fmv());
+        assertThat(after.fmv()).isEqualByComparingTo("750"); // 0.25 x 2000 + 0.5 x 400 + 0.25 x 200, uncapped
+        assertThat(after.rv()).isEqualByComparingTo(before.rv());
+        assertThat(after.qsv()).isEqualByComparingTo(before.qsv());
+        assertThat(after.stressedFmv()).isEqualByComparingTo(before.stressedFmv());
+        assertThat(after.flv()).isEqualByComparingTo(before.flv());
+    }
+
     private static OfferLadder.Rung rung(OfferLadder.Offer offer, Grade grade) {
         return offer.rungs().stream().filter(r -> r.grade() == grade).findFirst().orElseThrow();
     }
