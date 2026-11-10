@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "api:types": "npx --yes openapi-typescript@7.13.0 openapi.json -o src/api.gen.ts"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.30.0",
