@@ -35,7 +35,7 @@ interface PreGradeProvider {
         }
     }
 
-    /** Stable name stored with every request and prediction, e.g. "XIMILAR". */
+    /** Stable name stored with every request and prediction, e.g. "CARDGRADE". */
     String name();
 
     /**

@@ -104,7 +104,7 @@ These are slower but cheaper per pair, and they're where the long-run volume com
 
 **Next steps**
 1. Pick a 100-card mix: about a third modern holo or full art (where the surface shift matters), a third mid-2000s, and a third played cards bought to land at grades 3–7. Prefer cards whose slabbed value covers the fee.
-2. Photograph each card three times with the capture standard (doubles as the centering scoreboard's same-card test in `docs/centering-training-plan.md`), and run Ximilar on it so its prediction is stored before the grade is known.
+2. Photograph each card three times with the capture standard (doubles as the centering scoreboard's same-card test in `docs/centering-training-plan.md`), and run CardGrade on it so its prediction is stored before the grade is known (Ximilar was removed on 2026-11-10).
 3. Submit in batches of 20+ so the first grades come back early.
 4. Consider one batch through CGC Bulk as well (cheaper per guides, about $15–25), to learn whether CGC grades are worth having for pretraining.
 
@@ -227,7 +227,7 @@ The proxy question is moot for now, since no slab source is licensable today.
 | Re-photograph cards that collectors already had graded, by cracking slabs | Paid for | Ours | Exact, from the old slab | Card value at risk, and a cracked card may no longer match its grade | — | None, but a cracked card's grade is stale. Not recommended except for cheap slabs as a sanity check |
 | Photograph *graded* cards through the slab with our own capture rig | Easy: buy cheap PSA slabs | Ours, through plastic | Exact | Low; slabs resell | Weeks | None: our own photos of cards we own. **Useful slab-proxy pretraining with no licensing problem**, and it measures how much the slab hurts the model |
 | Synthetic data: catalog scans with simulated whitening, scratches, dents, off-centre crops; or damage our own bulk cards, as Ximilar says it did | Unlimited | Synthetic, or ours | Defect labels we set, not grades | Low | Weeks | Catalog image rights need checking (the card art is The Pokémon Company's); our own bulk cards are fine. Good for defect detectors and centering, useless for grade calibration |
-| Pseudo-labels from Ximilar on unlabelled photos | Whatever we photograph | Ours | Teacher outputs, not grades | Credits | Weeks | Allowed in writing. Pretraining only |
+| Pseudo-labels from Ximilar on unlabelled photos | Only what's already stored | Ours | Teacher outputs, not grades | — | Weeks | Allowed in writing, but Ximilar was removed on 2026-11-10 as too inaccurate: at most the predictions already stored, pretraining only |
 | Public datasets (e.g. GitHub PSA-Baseball-Grades: 11,500 images, 150×200 px, scraped, no licence, baseball, includes slabs) | — | Tiny | Noisy | — | — | Unlicensed and scraped. Don't use. No licensable Pokémon raw-to-grade dataset was found on Kaggle, Hugging Face or GitHub |
 | Academic contacts: DeepCornerNet (University of Newcastle) and TCG-AI (Research Square preprint, robotic imaging rig) | Their datasets, if shared | Rig | Defect labels | Free if they share | Months | Ask the authors for data and its licence; likely research-only |
 

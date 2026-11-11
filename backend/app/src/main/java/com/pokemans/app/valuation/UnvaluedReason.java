@@ -15,6 +15,8 @@ public enum UnvaluedReason {
     NO_ASSESSMENT,
     /** The front or back was retaken since the card's condition was assessed: it waits to be assessed again. */
     PHOTOS_CHANGED,
+    /** Its condition was built partly on a grading provider we no longer use (Ximilar, 2026-11-10): it waits to be assessed again. */
+    PROVIDER_RETIRED,
     /** No price table from the card's grader (PSA for a raw card). */
     NO_PRICE_TABLE,
     /** Text this enum didn't write: kept so an unknown reason is never mistaken for a known one. */
@@ -30,6 +32,7 @@ public enum UnvaluedReason {
             case NOT_IDENTIFIED -> "not identified";
             case NO_ASSESSMENT -> "no condition assessment";
             case PHOTOS_CHANGED -> "photos retaken since its condition was assessed";
+            case PROVIDER_RETIRED -> "condition assessed with a grading provider we no longer use";
             case NO_PRICE_TABLE, OTHER -> throw new IllegalStateException(name() + " has no fixed text");
         };
     }

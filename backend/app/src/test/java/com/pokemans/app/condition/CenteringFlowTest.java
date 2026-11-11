@@ -165,6 +165,49 @@ class CenteringFlowTest {
         api.get(seller, collector).andExpect(jsonPath("$.condition.mostLikely").value(org.hamcrest.Matchers.greaterThan(0)));
     }
 
+    /** Ximilar was removed on 2026-11-10: a system assessment that took in its grade holds the card until asked again. */
+    @Test
+    void anAssessmentBuiltOnXimilarHoldsTheCardUntilAskedAgain() throws Exception {
+        JwtRequestPostProcessor collector = api.user("auth0|retired-hold", List.of());
+        String orgId = api.collectorOrg("Retired Hold", "auth0|retired-hold");
+        String cardId = api.card(orgId, "Ximilar card", collector);
+        api.uploadPhoto(orgId, cardId, "FRONT", TestImages.goodFront(), collector).andExpect(jsonPath("$.status").value("PASSED"));
+        api.uploadPhoto(orgId, cardId, "BACK", TestImages.goodBack(), collector).andExpect(jsonPath("$.status").value("PASSED"));
+        runWorker();
+        runWorker();
+        runWorker();
+        // As an assessment from before the removal looks: Ximilar's grade beside the other provider's. The table
+        // is append-only, so the append-only trigger is skipped for this one setup statement.
+        jdbc.execute("""
+                do $$ begin
+                  set local session_replication_role = replica;
+                  update condition_assessment set basis = jsonb_set(basis, '{providerGrades,XIMILAR}', '7.0')
+                  where card_item_id = '%s'::uuid and is_current;
+                end $$
+                """.formatted(java.util.UUID.fromString(cardId)));
+        String base = "/api/admin/orgs/" + orgId + "/cards/" + cardId;
+        String seller = "/api/orgs/" + orgId + "/cards/" + cardId + "/status";
+
+        api.get(base + "/condition", api.admin())
+                .andExpect(jsonPath("$.providerRetired").value(true))
+                .andExpect(jsonPath("$.photosChanged").value(false));
+        api.get("/api/admin/review-queue", api.admin())
+                .andExpect(jsonPath("$[?(@.cardId == '" + cardId + "')].assessment").value(org.hamcrest.Matchers.contains("PROVIDER_RETIRED")));
+        String held = api.get(seller, collector).andExpect(jsonPath("$.condition.mostLikely").value(0))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(held).doesNotContain("XIMILAR", "photos changed");
+
+        api.postJson(base + "/prediction-requests", "{}", api.admin()).andExpect(status().is2xxSuccessful());
+        runWorker();
+        runWorker();
+        runWorker();
+
+        api.get(base + "/condition", api.admin())
+                .andExpect(jsonPath("$.providerRetired").value(false))
+                .andExpect(jsonPath("$.assessments[0].basis.providerGrades.XIMILAR").doesNotExist());
+        api.get(seller, collector).andExpect(jsonPath("$.condition.mostLikely").value(org.hamcrest.Matchers.greaterThan(0)));
+    }
+
     @Test
     void aRetakeThatPassesWhileCenteringIsOpenIsMeasuredOnceThatFinishes() throws Exception {
         JwtRequestPostProcessor collector = api.user("auth0|centering-race", List.of());

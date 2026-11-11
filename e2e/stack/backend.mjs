@@ -44,7 +44,6 @@ const env = {
   // and labels come from the fake provider.
   CATALOG_TCGDEX_ENABLED: 'false',
   CARD_READER_ENABLED: 'false',
-  XIMILAR_ENABLED: 'false',
   CARDGRADE_ENABLED: 'false',
   EASYPOST_ENABLED: 'false',
   PRICING_INGESTION_ENABLED: 'false',

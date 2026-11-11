@@ -1994,6 +1994,7 @@ export interface components {
             photos: components["schemas"]["ConditionControllerPhotoLink"][];
             photosChanged: boolean;
             predictions: components["schemas"]["ConditionControllerPredictionView"][];
+            providerRetired: boolean;
             requests: components["schemas"]["ConditionControllerRequestView"][];
         };
         ConditionControllerPhotoLink: {
@@ -2660,7 +2661,7 @@ export interface components {
             rawSales: components["schemas"]["ListingViewsRawSalesView"];
             refusal: string;
             /** @enum {string} */
-            refusalCode: "LOT" | "NOT_IDENTIFIED" | "NOT_ASSESSED" | "PHOTOS_CHANGED" | "NO_PRICE_TABLE" | "UNPRICED" | "DOUBTED" | "THIN_SALES" | "UNDER_MINIMUM" | "OVER_MAXIMUM" | "PRICE_CHANGED" | "NO_BUYER_ADDRESS";
+            refusalCode: "LOT" | "NOT_IDENTIFIED" | "NOT_ASSESSED" | "PHOTOS_CHANGED" | "PROVIDER_RETIRED" | "NO_PRICE_TABLE" | "UNPRICED" | "DOUBTED" | "THIN_SALES" | "UNDER_MINIMUM" | "OVER_MAXIMUM" | "PRICE_CHANGED" | "NO_BUYER_ADDRESS";
             tenCap: components["schemas"]["OfferLadderTenCap"];
             why: components["schemas"]["TraceStep"][];
         };

@@ -10,60 +10,6 @@ import org.junit.jupiter.api.Test;
 class ProviderReadingTest {
 
     @Test
-    void ximilarFinishedJobUsesTheCombinedGradeWhenGiven() {
-        Map<String, Object> job = Map.of("id", "job-1", "status", "DONE", "response", Map.of(
-                "grades", Map.of("final", 7.8),
-                "records", List.of(
-                        Map.of("_status", Map.of("code", 200, "text", "OK"),
-                                "_base64", "AAAA",
-                                "grades", Map.of("corners", 8.0, "edges", 8.0, "surface", 6.0, "centering", 9.0, "final", 7.5,
-                                        "condition", "Near Mint"),
-                                "card", List.of(Map.of(
-                                        "centering", Map.of("left/right", "46/54", "top/bottom", "54/46", "grade", 9.0),
-                                        "_tags", Map.of("Damaged", List.of(Map.of("name", "OK", "prob", 0.95))))),
-                                "versions", Map.of("final", "m-123")),
-                        Map.of("grades", Map.of("final", 8.5)))));
-
-        PreGradeProvider.Done done = (PreGradeProvider.Done) XimilarPreGradeProvider.read(job);
-
-        assertThat(done.reading().overallGrade()).isEqualTo(7.8);
-        assertThat(done.reading().surface()).isEqualTo(6.0);
-        assertThat(done.reading().modelVersion()).isEqualTo("m-123");
-        assertThat(done.reading().details()).containsKey("backGrades")
-                .containsEntry("frontCentering", Map.of("leftRight", "46/54", "topBottom", "54/46"));
-        assertThat(PredictionWorker.withoutImages(done.raw()).toString()).doesNotContain("_base64");
-    }
-
-    @Test
-    void ximilarWithoutACombinedGradeWeightsFront70Back30() {
-        Map<String, Object> job = Map.of("status", "DONE", "response", Map.of("records", List.of(
-                Map.of("grades", Map.of("final", 8.0)), Map.of("grades", Map.of("final", 9.0)))));
-
-        assertThat(((PreGradeProvider.Done) XimilarPreGradeProvider.read(job)).reading().overallGrade()).isEqualTo(8.3, org.assertj.core.data.Offset.offset(1e-9));
-    }
-
-    @Test
-    void ximilarWithOnlyABackFinalIsStoredWithNoOverallAndCapsNothing() {
-        Map<String, Object> job = Map.of("status", "DONE", "response", Map.of("records", List.of(
-                Map.of("grades", Map.of("centering", 6.0)), Map.of("grades", Map.of("final", 9.0)))));
-
-        PreGradeProvider.Reading reading = ((PreGradeProvider.Done) XimilarPreGradeProvider.read(job)).reading();
-        assertThat(reading.overallGrade()).isNull();
-
-        PredictionRequest request = new PredictionRequest(java.util.UUID.randomUUID(), java.util.UUID.randomUUID(), XimilarPreGradeProvider.NAME,
-                List.of(java.util.UUID.randomUUID()), null);
-        assertThat(ProviderPrediction.succeeded(request, reading, Map.of(), 1).centeringCap()).isNull();
-    }
-
-    @Test
-    void ximilarRecordWithoutGradesIsARefusal() {
-        Map<String, Object> job = Map.of("status", "DONE", "response", Map.of("records", List.of(
-                Map.of("_status", Map.of("code", 400, "text", "No card found")))));
-
-        assertThat(XimilarPreGradeProvider.read(job)).isInstanceOf(PreGradeProvider.Failed.class);
-    }
-
-    @Test
     void cardGradeCompletedUsesPsaPrediction() {
         Map<String, Object> grading = Map.of("id", "g-1", "status", "completed", "cardName", "Charizard", "results", Map.of(
                 "overallGrade", 8.4, "psaPrediction", 8.0, "centering", 9.1, "corners", 8.2, "edges", 8.6, "surface", 7.9,

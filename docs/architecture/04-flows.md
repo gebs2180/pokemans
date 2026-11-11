@@ -32,7 +32,7 @@ sequenceDiagram
     Rec->>DB: card_identification SUGGESTED
   and pre-grade providers
     API-)Pred: PredictionsQueued → prediction_request rows
-    Pred->>Pred: Ximilar / CardGrade.io / CenteringMeasurer (each optional)
+    Pred->>Pred: CardGrade.io / CenteringMeasurer (each optional)
     Pred->>DB: provider_prediction
     Pred->>DB: condition_assessment v(n) SYSTEM via DistributionBuilder
   end

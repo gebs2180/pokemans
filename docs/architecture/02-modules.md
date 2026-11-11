@@ -91,7 +91,7 @@ There is no job framework. Three modules poll with `@Scheduled`:
 | Scheduler | What it does | Default |
 |---|---|---|
 | `catalog.RecognitionScheduler` | Works the `card_reading` queue (Claude card reader), and sweeps stuck rows | every 15 s; sweep 5 min |
-| `condition.PredictionScheduler` | Works the provider prediction queue (Ximilar, CardGrade.io, centering), and sweeps | every 15 s; sweep 5 min |
+| `condition.PredictionScheduler` | Works the provider prediction queue (CardGrade.io, centering), and sweeps | every 15 s; sweep 5 min |
 | `pricing.PricingScheduler` | Ingests comps from every `PriceSource` and snapshots prices | 06:30 UTC, only with ingestion enabled |
 
 Each queue is also kicked straight after commit by a `@TransactionalEventListener`, so the poll is the retry path. Offer and listing expiry isn't a job: status is computed from `expires_at` when read.

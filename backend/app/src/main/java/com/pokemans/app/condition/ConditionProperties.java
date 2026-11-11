@@ -32,7 +32,6 @@ record ConditionProperties(
         @DefaultValue("0.25") BigDecimal maxTenProbability,
         @DefaultValue("0.02") BigDecimal ungradableFloor,
         @DefaultValue Worker worker,
-        @DefaultValue Ximilar ximilar,
         @DefaultValue CardGrade cardgrade,
         @DefaultValue Centering centering) {
 
@@ -76,19 +75,6 @@ record ConditionProperties(
                   @DefaultValue("10") int claimBatch,
                   @DefaultValue("7d") Duration sweepWindow,
                   @DefaultValue("2m") Duration sweepMinAge) {
-    }
-
-    /** Off until a key is set. Its terms were confirmed in writing on 2026-10-30. */
-    record Ximilar(@DefaultValue("false") boolean enabled,
-                   String apiKey,
-                   @DefaultValue("https://api.ximilar.com") URI baseUrl,
-                   @DefaultValue("30s") Duration timeout) {
-
-        /** Never prints the key. */
-        @Override
-        public String toString() {
-            return "Ximilar[enabled=" + enabled + ", apiKey=" + redacted(apiKey) + ", baseUrl=" + baseUrl + "]";
-        }
     }
 
     /**

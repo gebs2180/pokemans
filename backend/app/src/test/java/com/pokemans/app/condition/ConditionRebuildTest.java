@@ -299,6 +299,27 @@ class ConditionRebuildTest {
         assertThat(Assessments.photosChanged(made, List.of(FRONT, retake, BACK), () -> List.of(grade))).isTrue();
     }
 
+    /** Ximilar was removed on 2026-11-10 (too inaccurate): its stored grades never build a distribution. */
+    @Test
+    void aRetiredProvidersGradesBuildNothing() {
+        assertThat(rebuild(graded("XIMILAR", 9.0, null))).isEmpty();
+
+        ConditionAssessment built = rebuild(graded("XIMILAR", 9.0, null), graded("CARDGRADE", 7.0, null)).orElseThrow();
+        assertThat(built.getBasis().get("providerGrades")).isEqualTo(Map.of("CARDGRADE", 7.0));
+        assertThat(Assessments.builtOnRetiredProvider(built)).isFalse();
+    }
+
+    @Test
+    void aSystemAssessmentThatTookInARetiredProviderNeedsAssessingAgainButAReviewersStands() {
+        ConditionAssessment system = rebuild(graded("CARDGRADE", 7.0, null)).orElseThrow();
+        system.getBasis().put("providerGrades", Map.of("XIMILAR", 9.0, "CARDGRADE", 7.0));
+        ConditionAssessment reviewed = byHand(even(Grade.of(7), Grade.of(8)), false);
+        reviewed.getBasis().put("providerGrades", Map.of("XIMILAR", 9.0));
+
+        assertThat(Assessments.builtOnRetiredProvider(system)).isTrue();
+        assertThat(Assessments.builtOnRetiredProvider(reviewed)).isFalse();
+    }
+
     @Test
     void withNothingMeasuredThereIsNoCap() {
         ConditionAssessment saved = byHand(even(Grade.of(9), Grade.of(10)), false);

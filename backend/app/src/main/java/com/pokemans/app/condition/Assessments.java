@@ -30,9 +30,16 @@ public class Assessments {
      * @param confidence    photo confidence
      * @param photosChanged true when the front or back was retaken since: the assessment no longer
      *                      describes the photos in use, so it doesn't count until the card is assessed again
+     * @param providerRetired true when it's a system assessment built partly on a provider we've stopped
+     *                      using (ProviderPrediction#RETIRED): it doesn't count until the card is assessed again
      */
     public record Current(UUID assessmentId, UUID cardItemId, int version, GradeDistribution distribution, Confidence confidence,
-                          boolean photosChanged) {
+                          boolean photosChanged, boolean providerRetired) {
+
+        /** Whether the assessment counts: neither its photos nor its providers have been replaced. */
+        public boolean counts() {
+            return !photosChanged && !providerRetired;
+        }
     }
 
     /**
@@ -95,7 +102,26 @@ public class Assessments {
         return assessments.findByCardItemIdInAndIsCurrentTrue(cardItemIds).stream()
                 .collect(Collectors.toMap(ConditionAssessment::getCardItemId,
                         a -> new Current(a.getId(), a.getCardItemId(), a.getVersion(), a.distribution(), a.getConfidence(),
-                                photosChanged(a))));
+                                photosChanged(a), builtOnRetiredProvider(a))));
+    }
+
+    /**
+     * True for a system assessment whose distribution took in a provider we've stopped using
+     * (ProviderPrediction#RETIRED). Like a retake, it holds the card until it's assessed again ("Ask
+     * again" or a reviewer); the predictions themselves stay stored. A reviewer's assessment is their
+     * own judgement and stays.
+     */
+    static boolean builtOnRetiredProvider(ConditionAssessment assessment) {
+        if (assessment.getAuthorType() != ConditionAssessment.AuthorType.SYSTEM || assessment.getBasis() == null) {
+            return false;
+        }
+        return assessment.getBasis().get("providerGrades") instanceof Map<?, ?> grades
+                && grades.keySet().stream().anyMatch(provider -> ProviderPrediction.RETIRED.contains(String.valueOf(provider)));
+    }
+
+    /** True when the assessment doesn't count until the card is assessed again: photos retaken or a provider retired. */
+    boolean needsAssessingAgain(ConditionAssessment assessment) {
+        return builtOnRetiredProvider(assessment) || photosChanged(assessment);
     }
 
     /** True when the card's front or back was retaken since this assessment was made. */
@@ -144,9 +170,10 @@ public class Assessments {
     @Transactional(readOnly = true)
     public Optional<Summary> summary(UUID cardItemId) {
         List<ProviderPrediction> latest = shownToSeller(cardItemId);
-        // An assessment of photos since replaced says nothing about the ones the seller sees.
+        // An assessment of photos since replaced says nothing about the ones the seller sees, and one built
+        // on a retired provider is being redone.
         Optional<Summary> assessed = assessments.findByCardItemIdAndIsCurrentTrue(cardItemId)
-                .filter(a -> !photosChanged(a))
+                .filter(a -> !needsAssessingAgain(a))
                 .map(a -> summarize(a.distribution(), latest));
         if (assessed.isPresent()) {
             return assessed;

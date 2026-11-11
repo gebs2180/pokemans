@@ -177,6 +177,10 @@ class CardStatusService {
             return new CardStatus(cardId, Stage.ASSESSING, identity,
                     "We're reviewing its condition from the photos." + NO_NOTIFICATIONS, false);
         }
+        if (reason == UnvaluedReason.PROVIDER_RETIRED) {
+            return new CardStatus(cardId, Stage.ASSESSING, identity,
+                    "We changed how we check condition, so we're checking this card again." + NO_NOTIFICATIONS, false);
+        }
         if (reason == UnvaluedReason.PHOTOS_CHANGED) {
             return new CardStatus(cardId, Stage.ASSESSING, identity,
                     "Your photos changed, so we're checking its condition again." + NO_NOTIFICATIONS, false);

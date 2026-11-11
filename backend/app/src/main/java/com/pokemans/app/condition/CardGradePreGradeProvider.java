@@ -34,7 +34,7 @@ import org.springframework.web.client.RestClientResponseException;
  *
  * <p>Limits are kept on our side ({@link RateWindow}): the plan's grades and reads per minute. A 429
  * waits for its Retry-After. Out of credits (402), a bad key or a plan without API access fails the
- * request without retrying, so the card is built from Ximilar alone; after a 402, submits stop for
+ * request without retrying, so the card waits for Ask again or a reviewer; after a 402, submits stop for
  * {@code outOfCreditsPause} so the rest of the queue doesn't each call CardGrade to hear the same.
  *
  * <p>Its terms let it train on uploads unless the account opts out in Settings: opt out before

@@ -226,7 +226,7 @@ class ValuationService {
                     id.number(), id.language(), id.setReleaseDate(), id.edition().name(), id.variant().name(), id.promo(),
                     id.authenticityRisk().name(), id.dexIds());
             Assessments.Current a = current.get(item.id());
-            CardInputs.Assessment assessment = a == null || a.photosChanged() ? null
+            CardInputs.Assessment assessment = a == null || !a.counts() ? null
                     : new CardInputs.Assessment(a.assessmentId(), a.version(), a.distribution().asMap(), a.confidence());
             Outcomes.VerifiedGrade g = verified.get(item.id());
             CardInputs.Graded graded = g == null ? null : new CardInputs.Graded(g.outcomeId(), g.gradingCompany(), g.grade(),
@@ -239,7 +239,8 @@ class ValuationService {
             } else if (identity == null) {
                 reason = UnvaluedReason.NOT_IDENTIFIED.text();
             } else if (graded == null && assessment == null) {
-                reason = (a == null ? UnvaluedReason.NO_ASSESSMENT : UnvaluedReason.PHOTOS_CHANGED).text();
+                reason = (a == null ? UnvaluedReason.NO_ASSESSMENT
+                        : a.photosChanged() ? UnvaluedReason.PHOTOS_CHANGED : UnvaluedReason.PROVIDER_RETIRED).text();
             } else {
                 String company = graded == null ? properties.gradingCompany() : graded.gradingCompany();
                 Optional<Prices.CardPrices> found = prices.latest(identity.catalogCardId(), company);

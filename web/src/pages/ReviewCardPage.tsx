@@ -722,6 +722,12 @@ export function AssessmentPanel({
               Ask again to grade the new photos, or enter the distribution by hand.
             </p>
           )}
+          {data.providerRetired && !data.photosChanged && (
+            <p className="warn">
+              This distribution took in Ximilar's grade, which we no longer use, so it doesn't count and the card gets no
+              offer. Press Ask again to grade it with CardGrade, or enter the distribution by hand.
+            </p>
+          )}
           <Bars distribution={current.distribution} />
         </>
       ) : (

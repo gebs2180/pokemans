@@ -38,7 +38,7 @@ class CardGradeLiveCheck {
     void gradeFolder() throws Exception {
         String key = System.getenv("CARDGRADE_API_KEY").trim();
         ConditionProperties properties = new ConditionProperties(null, 1.5, new BigDecimal("0.10"), new BigDecimal("0.25"),
-                new BigDecimal("0.25"), new BigDecimal("0.02"), null, null,
+                new BigDecimal("0.25"), new BigDecimal("0.02"), null,
                 new ConditionProperties.CardGrade(true, key, URI.create("https://cardgrade.io"), "PSA",
                         Duration.ofSeconds(60), 10, 50, Duration.ofHours(1)), null);
         CardGradePreGradeProvider provider = new CardGradePreGradeProvider(properties);

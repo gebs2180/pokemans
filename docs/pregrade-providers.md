@@ -7,7 +7,9 @@ We need three rights from a provider (HLD §3, CLAUDE.md "store everything"):
 2. **Train and evaluate** our own condition model on those predictions (calibration, comparison against returned PSA grades).
 3. **Show** derived results to third parties: lenders and insurers who get PDF reports, not app logins.
 
-## Ximilar (Czech Republic): usable, confirmed in writing
+## Ximilar (Czech Republic): removed 2026-11-10
+
+**Removed (Zach, 2026-11-10): its grades were too inaccurate.** The adapter and its settings are gone. Its stored predictions stay (store everything) and still show on the review page, but never build a distribution or reach the seller. A system assessment that took in a Ximilar grade no longer counts: the card gets no offer until the admin presses Ask again (CardGrade) or a reviewer enters a distribution. Reviewers' assessments stand. The terms review below is kept as history.
 
 - **API:** `/v2/grade` gives 1–10 grades per corner, edge, surface and centering, plus a final grade (geometric mean, 70/30 front/back by default) and a condition label. `/v2/centering` gives L/R and T/B ratios and margins. It reports detection and tag probabilities, but no probability distribution over grades. It wants a short side of at least 2000 px, unedited, and no sleeve or slab.
 - **Storing results:** confirmed. Ximilar wrote on 2026-10-30 that the results are ours, and we can keep them as long as we want, with our own photos and any later grades.
@@ -42,7 +44,7 @@ Sources: [API terms](https://cardgrader.ai/api-terms), [API data policy](https:/
 
 - **How we call it (checked live on Pro, 2026-11-10):** `POST /api/v1/grade` with `frontImage` and `backImage` (multipart, 10 MB each, bearer key, an `Idempotency-Key` per request), then `GET /api/v1/grade/{id}` until `completed` or `failed`. Front plus back costs one credit (80 → 79). A Metagross δ came back PSA 9 in about 30 seconds. A failed grading is refunded and carries `rejection.message`. The first try failed with `analyzing` ("try again in a moment"). Our worker doesn't retry a failed grading, and the admin's "Ask again" sends a fresh one.
 - **What we take from it:** `psaPrediction` (else `overallGrade`) goes into the distribution like any provider's grade. Its sub-grades, centering percentages (`providerFrontCentering`, `providerBackCentering`), BGS/CGC predictions, limiting factor, image-quality warnings and what it identified the card as are stored as details and never move the distribution. Its pipeline version and commit are stored as the model version. The whole response is stored too.
-- **Limits:** we keep to 10 grades and 50 reads a minute on our side (`pokemans.condition.cardgrade.grades-per-minute`, `reads-per-minute`), and a 429 waits for its Retry-After without using up an attempt. Out of credits (402), or with `creditsRemaining` at 0, the CardGrade request fails at once with no retry, the card is built from Ximilar alone, and no submit goes out for an hour (`out-of-credits-pause`). A bad key or a plan without API access (401, 403) also fails at once.
+- **Limits:** we keep to 10 grades and 50 reads a minute on our side (`pokemans.condition.cardgrade.grades-per-minute`, `reads-per-minute`), and a 429 waits for its Retry-After without using up an attempt. Out of credits (402), or with `creditsRemaining` at 0, the CardGrade request fails at once with no retry, the card waits for Ask again or a reviewer, and no submit goes out for an hour (`out-of-credits-pause`). A bad key or a plan without API access (401, 403) also fails at once.
 
 Sources: [terms](https://cardgrade.io/terms), [API announcement](https://cardgrade.io/blog/introducing-cardgrade-api), [API docs](https://cardgrade.io/api-docs).
 
@@ -69,7 +71,7 @@ Every accuracy figure below is self-reported on the vendor's own blog. There is 
 
 ## Recommendation
 
-- **Provider A: Ximilar.** Its terms fit, and it removes our photos after a week. It's being turned off on prod (Zach, 2026-10-31).
+- **Provider A: Ximilar.** Removed on 2026-11-10: its grades were too inaccurate (Zach). CardGrade.io is now the only provider, so a system distribution tops out at confidence B.
 - **Provider B: CardGrade.io.** Its terms don't restrict our use of results, and it gives the richest output (PSA/BGS/CGC predictions, limiting factor, zone scores). Opt out of training before sending partner photos. Start on Pro ($24.99) for the controlled set before paying for an API tier.
 - **Before M2 stores production data:** email both to confirm the rights listed above. Ximilar confirmed on 2026-10-30; CardGrade.io has not replied yet.
 - **Dropped:** CardGrader.AI (§4 bans storing and training). CardMintAI unless it clarifies output rights in writing.

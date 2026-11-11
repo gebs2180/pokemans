@@ -108,6 +108,7 @@ class OfferService {
                 case NOT_IDENTIFIED -> new Quote(value, OfferRefusal.NOT_IDENTIFIED, "We haven't identified this card yet.");
                 case NO_ASSESSMENT -> new Quote(value, OfferRefusal.NOT_ASSESSED, "Its condition hasn't been assessed yet.");
                 case PHOTOS_CHANGED -> new Quote(value, OfferRefusal.PHOTOS_CHANGED, "Its photos changed, so we're checking its condition again.");
+                case PROVIDER_RETIRED -> new Quote(value, OfferRefusal.PROVIDER_RETIRED, "We're checking its condition again.");
                 case NO_PRICE_TABLE -> new Quote(value, OfferRefusal.NO_PRICE_TABLE, "We don't have enough sold comps to price this card yet.");
                 case OTHER -> new Quote(value, OfferRefusal.UNPRICED, "This card can't be priced: " + in.unvaluedReason() + ".");
             };
