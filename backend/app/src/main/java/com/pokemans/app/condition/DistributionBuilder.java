@@ -32,8 +32,8 @@ import java.util.TreeMap;
  *       own to the average, since a card centred for a 10 can still have the corners of a 4.</li>
  *   <li>Confidence comes from how many providers answered, how far apart they are, and whether every
  *       photo showed the whole card. Providers disagreeing or a photo not showing the whole card moves
- *       probability down. A single provider is labelled B (so the offer margin is B's) but moves nothing
- *       for that alone (Zach, 2026-11-10).</li>
+ *       probability down. A single provider answering on whole-card photos is A; a valuation caps that A
+ *       at B for a card above the parameter set's FMV threshold (Zach, 2026-11-10).</li>
  *   <li>U gets at least {@link ConditionProperties#ungradableFloor()}, taken proportionally from the other
  *       grades: a photo model can't see a trimmed or recoloured card (review B2).</li>
  * </ol>
@@ -116,17 +116,16 @@ final class DistributionBuilder {
         Confidence confidence;
         if (!input.wholeCardInPhotos() || gap > properties.disagreementForB()) {
             confidence = Confidence.C;
-        } else if (input.providerGrades().size() < 2 || gap > 1.0) {
+        } else if (gap > 1.0) {
             confidence = Confidence.B;
         } else {
             confidence = Confidence.A;
         }
-        // B's penalty is for providers more than a grade apart. One provider alone keeps the B label (and its
-        // offer margin) but moves nothing down for it (Zach, 2026-11-10).
-        boolean disagreeing = gap > 1.0;
+        // B is providers more than a grade apart. One provider alone is A and moves nothing down; the valuation
+        // caps that A at B for a card above the FMV threshold (Zach, 2026-11-10).
         BigDecimal confidencePenalty = switch (confidence) {
             case A -> BigDecimal.ZERO;
-            case B -> disagreeing ? properties.confidencePenaltyB() : BigDecimal.ZERO;
+            case B -> properties.confidencePenaltyB();
             case C, D -> properties.confidencePenaltyC();
         };
         if (confidencePenalty.signum() > 0) {

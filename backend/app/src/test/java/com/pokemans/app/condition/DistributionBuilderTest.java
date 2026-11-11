@@ -68,12 +68,13 @@ class DistributionBuilderTest {
         assertThat(result.distribution().p(Grade.G10)).isEqualByComparingTo("0.10");
     }
 
-    /** Zach, 2026-11-10: one provider is labelled B for the offer margin, but moves nothing down for it. */
+    /** Zach, 2026-11-10: one provider is A and moves nothing down; the valuation caps it at B above $1,000 FMV. */
     @Test
-    void oneProviderIsConfidenceBWithoutAPenalty() {
+    void oneProviderOnWholeCardPhotosIsConfidenceA() {
+        // Zach, 2026-11-10: a CardGrade answer alone is A; the valuation caps it at B above the FMV threshold.
         DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 8.0), true, null));
 
-        assertThat(result.confidence()).isEqualTo(Confidence.B);
+        assertThat(result.confidence()).isEqualTo(Confidence.A);
         assertThat(result.distribution().asMap()).isEqualTo(builder.spread(8).asMap());
         assertThat(result.basis()).containsEntry("confidencePenalty", BigDecimal.ZERO);
     }
@@ -102,7 +103,7 @@ class DistributionBuilderTest {
         var result = guarded.build(new DistributionBuilder.Input(grades("CARDGRADE", 9.0), true, 10, Map.of("CARDGRADE", minSub)));
         var d = result.distribution();
 
-        assertThat(result.confidence()).isEqualTo(Confidence.B);
+        assertThat(result.confidence()).isEqualTo(Confidence.A);
         assertThat(d.p(Grade.G10)).isEqualByComparingTo("0.098");
         assertThat(d.p(Grade.G9)).isEqualByComparingTo("0.588");
         assertThat(d.p(Grade.G8)).isEqualByComparingTo("0.245");

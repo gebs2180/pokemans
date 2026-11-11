@@ -43,7 +43,7 @@ class ValuationService {
 
     /**
      * Canonical JSON: sorted map keys, so equal inputs always hash the same. Parameter-set fields added in
-     * 1.3.0, 1.4.0 and 1.5.0 are left out while null, so a stored older run re-serializes, and hashes, exactly as it did.
+     * 1.3.0, 1.4.0, 1.5.0 and 1.6.0 are left out while null, so a stored older run re-serializes, and hashes, exactly as it did.
      */
     static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
             .addMixIn(ParameterSet.class, ParameterSetJson.class).build();
@@ -76,6 +76,9 @@ class ValuationService {
 
         @JsonInclude(JsonInclude.Include.NON_NULL)
         abstract BigDecimal maxSigma();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract BigDecimal oneProviderMaxFmvForA();
     }
 
     private final CardItems cardItems;
@@ -227,7 +230,7 @@ class ValuationService {
                     id.authenticityRisk().name(), id.dexIds());
             Assessments.Current a = current.get(item.id());
             CardInputs.Assessment assessment = a == null || !a.counts() ? null
-                    : new CardInputs.Assessment(a.assessmentId(), a.version(), a.distribution().asMap(), a.confidence());
+                    : new CardInputs.Assessment(a.assessmentId(), a.version(), a.distribution().asMap(), a.confidence(), a.oneProvider());
             Outcomes.VerifiedGrade g = verified.get(item.id());
             CardInputs.Graded graded = g == null ? null : new CardInputs.Graded(g.outcomeId(), g.gradingCompany(), g.grade(),
                     Grade.of(g.grade().setScale(0, RoundingMode.FLOOR).intValueExact()), g.certNumber());

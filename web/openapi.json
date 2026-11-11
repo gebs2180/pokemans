@@ -184,6 +184,9 @@
             },
             "type" : "object"
           },
+          "oneProvider" : {
+            "type" : "boolean"
+          },
           "photoConfidence" : {
             "enum" : [ "A", "B", "C", "D" ],
             "type" : "string"
@@ -193,7 +196,7 @@
             "type" : "integer"
           }
         },
-        "required" : [ "assessmentId", "distribution", "photoConfidence", "version" ]
+        "required" : [ "assessmentId", "distribution", "oneProvider", "photoConfidence", "version" ]
       },
       "CardInputsGraded" : {
         "properties" : {

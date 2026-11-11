@@ -225,6 +225,50 @@ class CardValuatorTest {
         assertThat(v.stressedFmv()).isEqualByComparingTo(v.fmv());
     }
 
+    /** A card certain at 10, every grade priced the same with plenty of sales: FMV is the price. */
+    private static CardValuator.Input oneProvider(String price, Confidence photo, boolean oneProvider) {
+        return new CardValuator.Input("card", GradeDistribution.certain(Grade.G10), prices(price), d("0.05"), d("30"), 1, photo,
+                List.of(), false, oneProvider);
+    }
+
+    @Test
+    void oneProviderKeepsAUpToTheFmvThreshold() {
+        // Zach, 2026-11-10: a CardGrade-only condition is A for a card up to $1,000 (parameter set 1.6.0).
+        CardValuation v = new CardValuator(ParameterSet.load("1.6.0")).value(oneProvider("999", Confidence.A, true));
+
+        assertThat(v.fmv()).isEqualByComparingTo("999");
+        assertThat(v.confidence()).isEqualTo(Confidence.A);
+        assertThat(v.offerConfidence()).isEqualTo(Confidence.A);
+        assertThat(v.trace().stepsFor("photo_confidence_value_gate")).isEmpty();
+    }
+
+    @Test
+    void oneProviderAboveTheFmvThresholdIsCappedAtB() {
+        CardValuation v = new CardValuator(ParameterSet.load("1.6.0")).value(oneProvider("1001", Confidence.A, true));
+
+        assertThat(v.fmv()).isEqualByComparingTo("1001");
+        assertThat(v.confidence()).isEqualTo(Confidence.B);
+        assertThat(v.offerConfidence()).isEqualTo(Confidence.B);
+        assertThat(v.trace().stepsFor("photo_confidence_value_gate")).singleElement()
+                .satisfies(st -> assertThat(st.detail()).contains("FMV 1001").contains("threshold 1000"));
+        assertThat(v.trace().stepsFor("confidence_base").getFirst().detail()).startsWith("photo B, comps A");
+    }
+
+    @Test
+    void theFmvGateOnlyTouchesAOneProviderA() {
+        CardValuator v160 = new CardValuator(ParameterSet.load("1.6.0"));
+
+        // Not one provider (a reviewer, or two providers): the value doesn't matter.
+        assertThat(v160.value(oneProvider("5000", Confidence.A, false)).confidence()).isEqualTo(Confidence.A);
+        // It only lowers: a C stays C, with no gate step.
+        CardValuation c = v160.value(oneProvider("5000", Confidence.C, true));
+        assertThat(c.confidence()).isEqualTo(Confidence.C);
+        assertThat(c.trace().stepsFor("photo_confidence_value_gate")).isEmpty();
+        // Before 1.6.0 there's no threshold, so one provider is never A, as it was labelled before.
+        assertThat(new CardValuator(ParameterSet.load("1.5.0")).value(oneProvider("999", Confidence.A, true)).confidence())
+                .isEqualTo(Confidence.B);
+    }
+
     @Test
     void penaltiesCantRaiseConfidence() {
         assertThatThrownBy(() -> new ConfidencePenalty("up", -1)).isInstanceOf(IllegalArgumentException.class);

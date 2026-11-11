@@ -159,7 +159,7 @@ class ProviderRefusalFlowTest {
         String base = "/api/admin/orgs/" + orgId + "/cards/" + cardId;
         api.postJson(base + "/assessments/rebuild", "", api.admin())
                 .andExpect(jsonPath("$.authorType").value("SYSTEM"))
-                .andExpect(jsonPath("$.confidence").value("B"));
+                .andExpect(jsonPath("$.confidence").value("A")); // one provider answered: A (Zach, 2026-11-10)
         api.get(base + "/condition", api.admin())
                 .andExpect(jsonPath("$.assessments[0].basis.providerGrades.ANSWERS").value(8.0))
                 .andExpect(jsonPath("$.assessments[0].basis.providerGrades.BROKE").doesNotExist());

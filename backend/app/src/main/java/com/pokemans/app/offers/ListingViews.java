@@ -84,9 +84,10 @@ class ListingViews {
     /**
      * Why an offer's confidence is below A, for the seller in words (UX review finding 11), read from the offer's stored
      * trace: PHOTOS (the photos left the condition less certain), FEW_SALES (few sold comps), OLD_SALES (the price table
-     * hasn't been refreshed lately), ESTIMATED_GRADES (a grade the card is likely to be has no sales of its own).
+     * hasn't been refreshed lately), ESTIMATED_GRADES (a grade the card is likely to be has no sales of its own),
+     * HIGH_VALUE (one photo grading isn't enough for a card worth this much; Zach, 2026-11-10).
      */
-    enum LessSure { PHOTOS, FEW_SALES, OLD_SALES, ESTIMATED_GRADES }
+    enum LessSure { PHOTOS, FEW_SALES, OLD_SALES, ESTIMATED_GRADES, HIGH_VALUE }
 
     record Party(String orgName, String email) {
     }
@@ -267,14 +268,18 @@ class ListingViews {
     /** Why the offer's confidence is below A, from the steps its stored trace took to reach it. */
     static List<String> lessSureBecause(CardOffer o) {
         List<String> reasons = new ArrayList<>();
+        boolean valueGate = false;
         for (JsonNode step : OfferService.JSON.readTree(o.getTrace())) {
             String subject = step.path("subject").asString("");
             String rule = step.path("rule").asString("");
-            if (subject.equals("confidence_base")) {
+            if (subject.equals("photo_confidence_value_gate")) {
+                // The photos were good enough for A; the card's value capped it (it comes before confidence_base).
+                valueGate = true;
+            } else if (subject.equals("confidence_base")) {
                 Matcher m = BASE_DETAIL.matcher(step.path("detail").asString(""));
                 if (m.find()) {
                     if (!m.group(1).equals("A")) {
-                        reasons.add(LessSure.PHOTOS.name());
+                        reasons.add((valueGate ? LessSure.HIGH_VALUE : LessSure.PHOTOS).name());
                     }
                     if (!m.group(2).equals("A")) {
                         reasons.add(LessSure.FEW_SALES.name());

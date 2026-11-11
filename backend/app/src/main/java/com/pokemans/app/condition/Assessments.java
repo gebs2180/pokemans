@@ -32,9 +32,11 @@ public class Assessments {
      *                      describes the photos in use, so it doesn't count until the card is assessed again
      * @param providerRetired true when it's a system assessment built partly on a provider we've stopped
      *                      using (ProviderPrediction#RETIRED): it doesn't count until the card is assessed again
+     * @param oneProvider   true when it's a system assessment built from a single provider's grade: its confidence
+     *                      A holds only up to the parameter set's FMV threshold (Zach, 2026-11-10)
      */
     public record Current(UUID assessmentId, UUID cardItemId, int version, GradeDistribution distribution, Confidence confidence,
-                          boolean photosChanged, boolean providerRetired) {
+                          boolean photosChanged, boolean providerRetired, boolean oneProvider) {
 
         /** Whether the assessment counts: neither its photos nor its providers have been replaced. */
         public boolean counts() {
@@ -102,7 +104,7 @@ public class Assessments {
         return assessments.findByCardItemIdInAndIsCurrentTrue(cardItemIds).stream()
                 .collect(Collectors.toMap(ConditionAssessment::getCardItemId,
                         a -> new Current(a.getId(), a.getCardItemId(), a.getVersion(), a.distribution(), a.getConfidence(),
-                                photosChanged(a), builtOnRetiredProvider(a))));
+                                photosChanged(a), builtOnRetiredProvider(a), builtOnOneProvider(a))));
     }
 
     /**
@@ -117,6 +119,16 @@ public class Assessments {
         }
         return assessment.getBasis().get("providerGrades") instanceof Map<?, ?> grades
                 && grades.keySet().stream().anyMatch(provider -> ProviderPrediction.RETIRED.contains(String.valueOf(provider)));
+    }
+
+    /**
+     * True for a system assessment built from a single provider's grade. The valuation caps its confidence A
+     * at B for a card above the parameter set's FMV threshold (Zach, 2026-11-10). A reviewer's confidence is
+     * their own judgement and isn't capped.
+     */
+    static boolean builtOnOneProvider(ConditionAssessment assessment) {
+        return assessment.getAuthorType() == ConditionAssessment.AuthorType.SYSTEM && assessment.getBasis() != null
+                && assessment.getBasis().get("providerGrades") instanceof Map<?, ?> grades && grades.size() == 1;
     }
 
     /** True when the assessment doesn't count until the card is assessed again: photos retaken or a provider retired. */

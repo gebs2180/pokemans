@@ -128,9 +128,9 @@ class ConditionFlowTest {
                 .andExpect(jsonPath("$.predictions[0].psaGrade").value(8.0))
                 .andExpect(jsonPath("$.assessments[0].version").value(1))
                 .andExpect(jsonPath("$.assessments[0].authorType").value("SYSTEM"))
-                // One provider: confidence B, which moves some probability down. There is no default
-                // surface shift (review D5), so the median stays on the provider's PSA 8.
-                .andExpect(jsonPath("$.assessments[0].confidence").value("B"))
+                // One provider on whole-card photos: confidence A (Zach, 2026-11-10; a valuation caps it at B above
+                // $1,000 FMV). There is no default surface shift (review D5), so the median stays on the provider's PSA 8.
+                .andExpect(jsonPath("$.assessments[0].confidence").value("A"))
                 .andExpect(jsonPath("$.assessments[0].median").value("8"))
                 .andExpect(jsonPath("$.assessments[0].basis.modernHolo").doesNotExist());
         assertThat(jdbc.queryForObject("select raw::text from provider_prediction where card_item_id = ?::uuid", String.class, cardId))
@@ -172,7 +172,7 @@ class ConditionFlowTest {
                 Integer.class, cardId)).isEqualTo(1);
 
         // Only stepping down may change a stored version (review finding 40).
-        assertThatThrownBy(() -> jdbc.update("update condition_assessment set confidence = 'A' where card_item_id = ?::uuid and version = 1",
+        assertThatThrownBy(() -> jdbc.update("update condition_assessment set confidence = 'C' where card_item_id = ?::uuid and version = 1",
                 cardId)).hasMessageContaining("append-only");
         assertThatThrownBy(() -> jdbc.update("update condition_assessment set is_current = true where card_item_id = ?::uuid and version = 1",
                 cardId)).hasMessageContaining("append-only");

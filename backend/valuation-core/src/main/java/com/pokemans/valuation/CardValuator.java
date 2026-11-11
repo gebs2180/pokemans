@@ -36,6 +36,8 @@ public final class CardValuator {
      *                          is chosen, each with its reason (a stale price table, a fallback σ)
      * @param knownGrade        true for a graded card whose grade is known: its distribution is certain
      *                          and gets no condition stress shift
+     * @param oneProvider       true when the condition was built from a single pre-grade provider: its A
+     *                          holds only up to the parameter set's FMV threshold (Zach, 2026-11-10)
      */
     public record Input(
             String cardId,
@@ -46,7 +48,16 @@ public final class CardValuator {
             int copiesHeld,
             Confidence photoConfidence,
             List<ConfidencePenalty> penalties,
-            boolean knownGrade) {
+            boolean knownGrade,
+            boolean oneProvider) {
+
+        /** A card whose condition isn't from a single pre-grade provider. */
+        public Input(String cardId, GradeDistribution distribution, GradePriceTable prices, BigDecimal monthlyVolatility,
+                     BigDecimal salesPerMonth, int copiesHeld, Confidence photoConfidence, List<ConfidencePenalty> penalties,
+                     boolean knownGrade) {
+            this(cardId, distribution, prices, monthlyVolatility, salesPerMonth, copiesHeld, photoConfidence, penalties,
+                    knownGrade, false);
+        }
 
         /** A raw card with no confidence penalties. */
         public Input(String cardId, GradeDistribution distribution, GradePriceTable prices, BigDecimal monthlyVolatility,
@@ -82,8 +93,9 @@ public final class CardValuator {
         BigDecimal fmv = expectedValue(in.distribution(), in.prices());
         trace.add("FMV", "sum p x net price", Money.cents(fmv), describe(in.distribution(), in.prices()));
 
-        Confidence confidence = confidence(in, trace);
-        Confidence offerConfidence = offerConfidence(in, trace);
+        Confidence photo = photoConfidence(in, fmv, trace);
+        Confidence confidence = confidence(in, photo, trace);
+        Confidence offerConfidence = offerConfidence(in, photo, trace);
 
         ParameterSet.LiquidityTier tier = params.liquidityTier(in.salesPerMonth());
         BigDecimal s = params.searchPremium(tier);
@@ -203,12 +215,12 @@ public final class CardValuator {
      * gets (3 grades at C or D, else 2): a drop from B to C deepens the stress, but by then it has
      * already dropped, so checking the base's stress is enough.
      */
-    private Confidence confidence(Input in, Trace trace) {
+    private Confidence confidence(Input in, Confidence photo, Trace trace) {
         BigDecimal weightedComps = weightedComps(in);
         Confidence fromComps = compsConfidence(in);
-        Confidence base = in.photoConfidence().worse(fromComps);
+        Confidence base = photo.worse(fromComps);
         trace.add("confidence_base", "worse of photo and comps", base,
-                "photo " + in.photoConfidence() + ", comps " + fromComps + " (weighted sales " + Money.cents(weightedComps)
+                "photo " + photo + ", comps " + fromComps + " (weighted sales " + Money.cents(weightedComps)
                         + (params.usesModalGradeConfidence() ? modalDetail(in) : "") + ")");
         base = applyPenalties(base, in, false, "confidence_penalty", trace);
 
@@ -224,14 +236,33 @@ public final class CardValuator {
     }
 
     /**
+     * The condition's confidence for this valuation: a single pre-grade provider's A is capped at B when the
+     * card's FMV is above the parameter set's threshold, since one photo grading is enough to be sure of a
+     * cheaper card but not a dear one (Zach, 2026-11-10). FMV is the central distribution at net prices, which
+     * doesn't depend on confidence. Only ever lowers it.
+     */
+    private Confidence photoConfidence(Input in, BigDecimal fmv, Trace trace) {
+        Confidence photo = in.photoConfidence();
+        if (!in.oneProvider() || photo != Confidence.A || !params.oneProviderAboveA(fmv)) {
+            return photo;
+        }
+        BigDecimal threshold = params.oneProviderMaxFmvForA();
+        trace.add("photo_confidence_value_gate", "one pre-grade provider and FMV above the threshold for A: capped at B",
+                Confidence.B, "FMV " + Money.cents(fmv) + (threshold == null
+                        ? "; this parameter set has no threshold, so one provider is never A"
+                        : ", threshold " + Money.cents(threshold)));
+        return Confidence.B;
+    }
+
+    /**
      * The confidence an instant offer is priced at. The offer uses the central
      * distribution and net prices, never σ or the stressed distribution, so it starts from the same
      * base (photo and comps) and takes the penalties that bear on prices (a stale table), but not a
      * fallback σ, and it drops a level for a derived price only where the central distribution puts
      * probability.
      */
-    private Confidence offerConfidence(Input in, Trace trace) {
-        Confidence c = in.photoConfidence().worse(compsConfidence(in));
+    private Confidence offerConfidence(Input in, Confidence photo, Trace trace) {
+        Confidence c = photo.worse(compsConfidence(in));
         c = applyPenalties(c, in, true, "offer_confidence_penalty", trace);
         String derived = derivedGrades(in, params, g -> in.distribution().p(g).signum() > 0);
         if (derived.isEmpty()) {

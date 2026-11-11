@@ -85,7 +85,11 @@ public record ParameterSet(
         Integer dayGuardNeighbourhoodDays,
         // A measured monthly σ above this is not used: the valuation takes the fallback σ and its confidence drop
         // (null before 1.5.0; review B4)
-        BigDecimal maxSigma) {
+        BigDecimal maxSigma,
+        // A condition built from a single pre-grade provider keeps confidence A only while the card's FMV (central
+        // distribution, net prices) is at most this; above it the condition counts as B. Null before 1.6.0, where a
+        // one-provider condition is never better than B (Zach, 2026-11-10)
+        BigDecimal oneProviderMaxFmvForA) {
 
     public static final String DEFAULT_VERSION = "1.0.0";
 
@@ -168,7 +172,8 @@ public record ParameterSet(
                 optionalDecimal(p, "pricing.pokeTraceDay.maxMultipleOfTier"),
                 optionalInteger(p, "pricing.pokeTraceDay.minOtherDays"),
                 optionalInteger(p, "pricing.pokeTraceDay.neighbourhoodDays"),
-                optionalDecimal(p, "values.maxSigma"));
+                optionalDecimal(p, "values.maxSigma"),
+                optionalDecimal(p, "confidence.oneProviderMaxFmvForA"));
     }
 
     /** Comps confidence is also no better than the count behind the modal grade's price (1.3.0 on). */
@@ -200,6 +205,14 @@ public record ParameterSet(
     /** The most an offer's 10 rung pays as a multiple of its 9 rung, or empty for no cap (before 1.4.0). */
     public java.util.Optional<BigDecimal> offerTenToNineCap() {
         return java.util.Optional.ofNullable(offerMaxTenToNineMultiple);
+    }
+
+    /**
+     * True when a condition from a single pre-grade provider can't stay at A for a card of this FMV: above
+     * {@link #oneProviderMaxFmvForA}, or always before 1.6.0, which has no threshold (Zach, 2026-11-10).
+     */
+    public boolean oneProviderAboveA(BigDecimal fmv) {
+        return oneProviderMaxFmvForA == null || fmv.compareTo(oneProviderMaxFmvForA) > 0;
     }
 
     /** Liquidity tier for a card's monthly sales count. */
