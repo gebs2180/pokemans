@@ -19,7 +19,10 @@ import java.util.TreeMap;
  *
  * <ol>
  *   <li>Each provider grade is folded down to a whole grade (half grades fold down) and spread over
- *       neighbouring grades, more below than above.</li>
+ *       neighbouring grades, more below than above. When the provider's lowest of corners, edges and
+ *       surface (folded) is at or above that grade, the tighter {@link ConditionProperties#tightSpread()} is
+ *       used; a lower subgrade, or none given, keeps {@link ConditionProperties#spread()}. The provider's
+ *       centering subgrade is never read: only our own measurement caps (Zach, 2026-11-10).</li>
  *   <li>Providers are averaged.</li>
  *   <li>P(10) is capped ({@link ConditionProperties#maxTenProbability()}): the excess moves down to 9. A
  *       provider 10 would otherwise put 0.60 on 10 (its own 0.50 plus the +1 mass the edge keeps), and the
@@ -28,7 +31,9 @@ import java.util.TreeMap;
  *       above the best grade the centering allows moves onto that grade. It never adds a grade of its
  *       own to the average, since a card centred for a 10 can still have the corners of a 4.</li>
  *   <li>Confidence comes from how many providers answered, how far apart they are, and whether every
- *       photo showed the whole card. Lower confidence moves probability down.</li>
+ *       photo showed the whole card. Providers disagreeing or a photo not showing the whole card moves
+ *       probability down. A single provider is labelled B (so the offer margin is B's) but moves nothing
+ *       for that alone (Zach, 2026-11-10).</li>
  *   <li>U gets at least {@link ConditionProperties#ungradableFloor()}, taken proportionally from the other
  *       grades: a photo model can't see a trimmed or recoloured card (review B2).</li>
  * </ol>
@@ -49,8 +54,27 @@ final class DistributionBuilder {
      * @param providerGrades     one grade per provider that answered (provider name to grade), 1–10 scale
      * @param wholeCardInPhotos  every photo used had the whole card detected
      * @param centeringCap       the best grade measured centering allows, or null when it wasn't measured
+     * @param minSubgrades       per provider, the lowest of its corners, edges and surface grades, present only
+     *                           when it gave all three; never its centering
      */
-    record Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, Integer centeringCap) {
+    record Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, Integer centeringCap,
+                 Map<String, Double> minSubgrades) {
+
+        Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, Integer centeringCap) {
+            this(providerGrades, wholeCardInPhotos, centeringCap, Map.of());
+        }
+
+        Input {
+            minSubgrades = minSubgrades == null ? Map.of() : minSubgrades;
+        }
+    }
+
+    /** The lowest of corners, edges and surface, or null unless all three are given. Centering is left out. */
+    static Double minSubgrade(Double corners, Double edges, Double surface) {
+        if (corners == null || edges == null || surface == null) {
+            return null;
+        }
+        return Math.min(corners, Math.min(edges, surface));
     }
 
     record Result(GradeDistribution distribution, Confidence confidence, Map<String, Object> basis) {
@@ -69,10 +93,17 @@ final class DistributionBuilder {
         }
         List<GradeDistribution> perProvider = new ArrayList<>();
         Map<String, Integer> folded = new LinkedHashMap<>();
+        Map<String, Integer> foldedMinSub = new LinkedHashMap<>();
+        Map<String, String> spreadUsed = new LinkedHashMap<>();
         input.providerGrades().forEach((provider, grade) -> {
-            int whole = Math.max(1, Math.min(10, (int) Math.floor(grade)));
+            int whole = fold(grade);
             folded.put(provider, whole);
-            perProvider.add(spread(whole));
+            Double minSub = input.minSubgrades().get(provider);
+            Integer wholeMinSub = minSub == null ? null : fold(minSub);
+            foldedMinSub.put(provider, wholeMinSub);
+            boolean tight = wholeMinSub != null && wholeMinSub >= whole;
+            spreadUsed.put(provider, tight ? "tight" : "default");
+            perProvider.add(spread(whole, tight ? properties.tightSpread() : properties.spread()));
         });
         GradeDistribution distribution = capTen(average(perProvider), properties.maxTenProbability());
         // Before the confidence shift, so it still moves mass below the cap.
@@ -90,9 +121,12 @@ final class DistributionBuilder {
         } else {
             confidence = Confidence.A;
         }
+        // B's penalty is for providers more than a grade apart. One provider alone keeps the B label (and its
+        // offer margin) but moves nothing down for it (Zach, 2026-11-10).
+        boolean disagreeing = gap > 1.0;
         BigDecimal confidencePenalty = switch (confidence) {
             case A -> BigDecimal.ZERO;
-            case B -> properties.confidencePenaltyB();
+            case B -> disagreeing ? properties.confidencePenaltyB() : BigDecimal.ZERO;
             case C, D -> properties.confidencePenaltyC();
         };
         if (confidencePenalty.signum() > 0) {
@@ -104,11 +138,14 @@ final class DistributionBuilder {
         Map<String, Object> basis = new LinkedHashMap<>();
         basis.put("providerGrades", input.providerGrades());
         basis.put("foldedGrades", folded);
+        basis.put("minSubgrades", foldedMinSub);
+        basis.put("spreadUsed", spreadUsed);
         basis.put("providerGap", gap);
         basis.put("centeringCap", input.centeringCap());
         basis.put("wholeCardInPhotos", input.wholeCardInPhotos());
         basis.put("confidencePenalty", confidencePenalty);
         basis.put("spread", new TreeMap<>(properties.spread()));
+        basis.put("tightSpread", new TreeMap<>(properties.tightSpread()));
         basis.put("maxTenProbability", properties.maxTenProbability());
         basis.put("ungradableFloor", properties.ungradableFloor());
         return new Result(distribution, confidence, basis);
@@ -119,12 +156,20 @@ final class DistributionBuilder {
      * {@link #build} then caps P(10), so the edge can't pile mass onto 10.
      */
     GradeDistribution spread(int grade) {
+        return spread(grade, properties.spread());
+    }
+
+    private static GradeDistribution spread(int grade, Map<Integer, BigDecimal> weights) {
         EnumMap<Grade, BigDecimal> p = new EnumMap<>(Grade.class);
-        properties.spread().forEach((offset, weight) -> {
+        weights.forEach((offset, weight) -> {
             Grade target = Grade.of(Math.max(1, Math.min(10, grade + offset)));
             p.merge(target, weight, BigDecimal::add);
         });
         return GradeDistribution.of(p);
+    }
+
+    private static int fold(double grade) {
+        return Math.max(1, Math.min(10, (int) Math.floor(grade)));
     }
 
     /** Moves whatever probability on 10 exceeds {@code max} down to 9. Downward only. */

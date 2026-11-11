@@ -27,6 +27,7 @@ import { ProvenancePanel } from './ProvenancePanel'
 import { Loading, PageError } from '../ui'
 import { message, percent } from '../format'
 import { COLLATERAL } from '../flags'
+import { spreadLine } from '../spreadLine'
 
 const EDITIONS: Edition[] = ['UNLIMITED', 'FIRST_EDITION', 'SHADOWLESS']
 const VARIANTS: Variant[] = ['NORMAL', 'HOLO', 'REVERSE_HOLO']
@@ -714,6 +715,7 @@ export function AssessmentPanel({
             <p className="muted small">
               Built from the providers' grades with a spread, a cap on 10 and a floor on U. All of these are starting guesses,
               uncalibrated until returned grades exist to check them against.
+              {spreadLine(current.basis) && <> {spreadLine(current.basis)}</>}
             </p>
           )}
           {data.photosChanged && (
