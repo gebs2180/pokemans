@@ -13,6 +13,11 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *
  * @param spread               how one provider grade becomes a distribution: probability per offset from the
  *                             (half-folded) grade, e.g. {-1: 0.25}. Must sum to 1.
+ * @param tightSpread          the spread used instead when the provider's corners, edges and surface (folded)
+ *                             are all at or above its overall grade: nothing it saw pulls the card down, so
+ *                             less mass goes below. Its centering sub-grade is never read (only our own
+ *                             measurement caps). Must sum to 1 and put no more above the grade than
+ *                             {@code spread} does (Zach, 2026-11-10; weights are defaults to confirm)
  * @param disagreementForB     largest gap between provider grades that still allows confidence B
  * @param confidencePenaltyB   share of each grade's probability moved one grade down at confidence B
  * @param confidencePenaltyC   the same at confidence C
@@ -26,6 +31,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties("pokemans.condition")
 record ConditionProperties(
         Map<Integer, BigDecimal> spread,
+        Map<Integer, BigDecimal> tightSpread,
         @DefaultValue("1.5") double disagreementForB,
         @DefaultValue("0.10") BigDecimal confidencePenaltyB,
         @DefaultValue("0.25") BigDecimal confidencePenaltyC,
@@ -40,11 +46,19 @@ record ConditionProperties(
             1, new BigDecimal("0.10"), 0, new BigDecimal("0.50"), -1, new BigDecimal("0.25"),
             -2, new BigDecimal("0.10"), -3, new BigDecimal("0.05"));
 
+    /** For a card whose subgrades are no lower than its overall grade; still more below than above. */
+    static final Map<Integer, BigDecimal> DEFAULT_TIGHT_SPREAD = Map.of(
+            1, new BigDecimal("0.10"), 0, new BigDecimal("0.60"), -1, new BigDecimal("0.25"), -2, new BigDecimal("0.05"));
+
     ConditionProperties {
         spread = spread == null || spread.isEmpty() ? DEFAULT_SPREAD : Map.copyOf(spread);
-        BigDecimal sum = spread.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (sum.compareTo(BigDecimal.ONE) != 0) {
-            throw new IllegalArgumentException("pokemans.condition.spread must sum to 1, got " + sum);
+        tightSpread = tightSpread == null || tightSpread.isEmpty() ? DEFAULT_TIGHT_SPREAD : Map.copyOf(tightSpread);
+        requireSumsToOne("spread", spread);
+        requireSumsToOne("tight-spread", tightSpread);
+        // Never more probability above the provider's grade than the default spread allows.
+        if (above(tightSpread).compareTo(above(spread)) > 0) {
+            throw new IllegalArgumentException("pokemans.condition.tight-spread puts " + above(tightSpread)
+                    + " above the grade, more than spread's " + above(spread));
         }
         if (maxTenProbability == null || maxTenProbability.signum() < 0 || maxTenProbability.compareTo(BigDecimal.ONE) > 0) {
             throw new IllegalArgumentException("pokemans.condition.max-ten-probability must be in [0, 1], got " + maxTenProbability);
@@ -115,6 +129,17 @@ record ConditionProperties(
      */
     record Centering(@DefaultValue("false") boolean enabled,
                      @DefaultValue("1.0") double measurementMargin) {
+    }
+
+    private static void requireSumsToOne(String name, Map<Integer, BigDecimal> weights) {
+        BigDecimal sum = weights.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (sum.compareTo(BigDecimal.ONE) != 0) {
+            throw new IllegalArgumentException("pokemans.condition." + name + " must sum to 1, got " + sum);
+        }
+    }
+
+    private static BigDecimal above(Map<Integer, BigDecimal> weights) {
+        return weights.entrySet().stream().filter(e -> e.getKey() > 0).map(Map.Entry::getValue).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private static String redacted(String secret) {

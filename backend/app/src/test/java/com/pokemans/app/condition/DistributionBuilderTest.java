@@ -18,7 +18,7 @@ class DistributionBuilderTest {
     }
 
     static ConditionProperties properties(BigDecimal maxTenProbability, BigDecimal ungradableFloor) {
-        return new ConditionProperties(null, 1.5, new BigDecimal("0.10"), new BigDecimal("0.25"), maxTenProbability, ungradableFloor,
+        return new ConditionProperties(null, null, 1.5, new BigDecimal("0.10"), new BigDecimal("0.25"), maxTenProbability, ungradableFloor,
                 new ConditionProperties.Worker(false, Duration.ofSeconds(15), 8, Duration.ofHours(24), Duration.ofMinutes(10), 10,
                         Duration.ofDays(7), Duration.ofMinutes(2)),
                 new ConditionProperties.CardGrade(false, null, null, "PSA", Duration.ofSeconds(30), 10, 50, Duration.ofHours(1)),
@@ -68,14 +68,96 @@ class DistributionBuilderTest {
         assertThat(result.distribution().p(Grade.G10)).isEqualByComparingTo("0.10");
     }
 
+    /** Zach, 2026-11-10: one provider is labelled B for the offer margin, but moves nothing down for it. */
     @Test
-    void oneProviderIsConfidenceBAndMovesSomeMassDown() {
+    void oneProviderIsConfidenceBWithoutAPenalty() {
         DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 8.0), true, null));
 
         assertThat(result.confidence()).isEqualTo(Confidence.B);
-        // 10% of each grade's mass moves one down: 8 keeps 0.45 and gains 0.01 from 9.
-        assertThat(result.distribution().p(Grade.G8)).isEqualByComparingTo("0.46");
-        assertThat(result.distribution().p(Grade.G9)).isEqualByComparingTo("0.09");
+        assertThat(result.distribution().asMap()).isEqualTo(builder.spread(8).asMap());
+        assertThat(result.basis()).containsEntry("confidencePenalty", BigDecimal.ZERO);
+    }
+
+    @Test
+    void providersMoreThanAGradeApartAreConfidenceBAndMoveSomeMassDown() {
+        // 8 and 9.5 (folds to 9) are 1.5 apart: B, and B's penalty applies.
+        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades("A", 8.0, "B", 9.5), true, null));
+        var unpenalised = com.pokemans.valuation.GradeDistribution.of(new java.util.EnumMap<>(Map.of(
+                Grade.G10, new BigDecimal("0.05"), Grade.G9, new BigDecimal("0.30"), Grade.G8, new BigDecimal("0.375"),
+                Grade.G7, new BigDecimal("0.175"), Grade.G6, new BigDecimal("0.075"), Grade.G5, new BigDecimal("0.025"))));
+
+        assertThat(result.confidence()).isEqualTo(Confidence.B);
+        assertThat(result.basis()).containsEntry("confidencePenalty", new BigDecimal("0.10"));
+        assertThat(result.distribution()).isEqualTo(unpenalised.applyPhotoConfidencePenalty(new BigDecimal("0.10")));
+    }
+
+    /**
+     * The worked check (Zach, 2026-11-10): CardGrade 9 overall, corners 9, edges 10, surface 10 (its
+     * centering 10 is ignored), our centering allows 10. Tight spread 10 10%, 9 60%, 8 25%, 7 5%; the caps
+     * do nothing; no one-provider penalty; the U floor scales the grades by 0.98.
+     */
+    @Test
+    void cardGradeNineWithSubgradesAtOrAboveNineGetsTheTightSpread() {
+        double minSub = DistributionBuilder.minSubgrade(9.0, 10.0, 10.0);
+        var result = guarded.build(new DistributionBuilder.Input(grades("CARDGRADE", 9.0), true, 10, Map.of("CARDGRADE", minSub)));
+        var d = result.distribution();
+
+        assertThat(result.confidence()).isEqualTo(Confidence.B);
+        assertThat(d.p(Grade.G10)).isEqualByComparingTo("0.098");
+        assertThat(d.p(Grade.G9)).isEqualByComparingTo("0.588");
+        assertThat(d.p(Grade.G8)).isEqualByComparingTo("0.245");
+        assertThat(d.p(Grade.G7)).isEqualByComparingTo("0.049");
+        assertThat(d.p(Grade.U)).isEqualByComparingTo("0.02");
+        for (int g = 1; g <= 6; g++) {
+            assertThat(d.p(Grade.of(g))).isZero();
+        }
+        assertThat(sum(d)).isEqualByComparingTo("1");
+        assertThat(result.basis()).containsEntry("spreadUsed", Map.of("CARDGRADE", "tight"))
+                .containsEntry("minSubgrades", Map.of("CARDGRADE", 9))
+                .containsEntry("confidencePenalty", BigDecimal.ZERO);
+    }
+
+    @Test
+    void aSubgradeBelowTheOverallKeepsTheDefaultSpread() {
+        // Corners 8.5 folds to 8, below the overall 9.
+        var result = builder.build(new DistributionBuilder.Input(grades("A", 9.0), true, null,
+                Map.of("A", DistributionBuilder.minSubgrade(8.5, 10.0, 10.0))));
+
+        assertThat(result.distribution().asMap()).isEqualTo(builder.spread(9).asMap());
+        assertThat(result.basis()).containsEntry("spreadUsed", Map.of("A", "default"))
+                .containsEntry("minSubgrades", Map.of("A", 8));
+    }
+
+    @Test
+    void halfSubgradesFoldDownBeforeTheComparison() {
+        // Overall 9.5 folds to 9 and surface 9.5 folds to 9: equal, so tight.
+        var result = builder.build(new DistributionBuilder.Input(grades("A", 9.5), true, null,
+                Map.of("A", DistributionBuilder.minSubgrade(10.0, 10.0, 9.5))));
+
+        assertThat(result.basis()).containsEntry("spreadUsed", Map.of("A", "tight"));
+        assertThat(result.distribution().p(Grade.G9)).isEqualByComparingTo("0.60");
+        assertThat(result.distribution().p(Grade.G10)).isEqualByComparingTo("0.10");
+    }
+
+    @Test
+    void missingSubgradesKeepTheDefaultSpread() {
+        assertThat(DistributionBuilder.minSubgrade(10.0, null, 10.0)).isNull();
+        var result = builder.build(new DistributionBuilder.Input(grades("A", 9.0), true, null));
+
+        assertThat(result.distribution().asMap()).isEqualTo(builder.spread(9).asMap());
+        assertThat(result.basis()).containsEntry("spreadUsed", Map.of("A", "default"));
+    }
+
+    @Test
+    void theTightSpreadNeverPutsMoreAboveTheGradeThanTheDefault() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ConditionProperties(null,
+                        Map.of(1, new BigDecimal("0.20"), 0, new BigDecimal("0.80")), 1.5, new BigDecimal("0.10"),
+                        new BigDecimal("0.25"), BigDecimal.ONE, BigDecimal.ZERO, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ConditionProperties(null,
+                        Map.of(1, new BigDecimal("0.10"), 0, new BigDecimal("0.80")), 1.5, new BigDecimal("0.10"),
+                        new BigDecimal("0.25"), BigDecimal.ONE, BigDecimal.ZERO, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

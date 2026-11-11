@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CardCondition, CatalogHit, IdentifiedCard, OfferPreview, Prediction, ProvenanceView, ProviderCard } from '../api'
 import { respond } from '../test/auth0'
 import { searchFromLabel } from '../searchFromLabel'
+import { spreadLine } from '../spreadLine'
 import { AssessmentPanel, OfferPreviewPanel, Predictions, ReviewCardPage } from './ReviewCardPage'
 
 const card: CardCondition = {
@@ -353,5 +354,23 @@ describe('ReviewCardPage', () => {
     await waitFor(() => expect(screen.getAllByRole('heading', { name: 'Authenticity' })).toHaveLength(1))
     expect(screen.queryByText('Not identified yet: no offer until it is.')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Offer preview' })).toBeInTheDocument()
+  })
+})
+
+describe('spreadLine', () => {
+  it('says which spread the grade got and why', () => {
+    expect(
+      spreadLine({ spreadUsed: { CARDGRADE: 'tight' }, foldedGrades: { CARDGRADE: 9 }, minSubgrades: { CARDGRADE: 9 } }),
+    ).toBe('Cardgrade: tight spread (lowest of corners, edges and surface 9 ≥ grade 9).')
+    expect(
+      spreadLine({ spreadUsed: { CARDGRADE: 'default' }, foldedGrades: { CARDGRADE: 9 }, minSubgrades: { CARDGRADE: 8 } }),
+    ).toBe('Cardgrade: default spread (lowest of corners, edges and surface 8 < grade 9).')
+    expect(spreadLine({ spreadUsed: { CARDGRADE: 'default' }, foldedGrades: { CARDGRADE: 9 }, minSubgrades: { CARDGRADE: null } })).toBe(
+      'Cardgrade: default spread (no corners, edges and surface given).',
+    )
+  })
+
+  it('is empty for assessments built before it was recorded', () => {
+    expect(spreadLine({ foldedGrades: { CARDGRADE: 9 } })).toBeNull()
   })
 })
