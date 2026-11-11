@@ -35,7 +35,9 @@ Not chosen: **Render**, unless your time matters more than ~$30/mo; it is the si
 |---|---|
 | `backend/Dockerfile` | Builds the boot jar (tests run in CI, not here) and runs it on a Temurin 25 JRE as a non-root user, with the `prod` profile and a health check |
 | `web/Dockerfile` | Builds the PWA with the Auth0 build args and puts it in a Caddy image |
-| `deploy/compose.prod.yml` | Caddy (ports 80/443), backend, Postgres 18 and backup, with log rotation. Only Caddy is reachable from outside |
+| `.github/workflows/images.yml` | On every push to main, builds the backend, web and backup images and pushes them to GHCR (private) as `ghcr.io/gebs2180/pokemans-<name>:<commit SHA>` and `:main` |
+| `deploy/compose.prod.yml` | Caddy (ports 80/443), backend, Postgres 18 and backup, with log rotation. Only Caddy is reachable from outside. Runs the images tagged `deployed` |
+| `deploy/deploy.sh` | Deploys one commit's images (latest main by default), with a backup first and a health wait; also rolls back. See [Day to day](#day-to-day) |
 | `deploy/Caddyfile` | HTTPS, `/api/*` and `/actuator/health` proxied to the backend, other actuator paths answer 404, SPA fallback, cache headers, and a Content-Security-Policy naming `R2_ENDPOINT` (photos) and `AUTH0_DOMAIN` (login) |
 | `deploy/.env.example` | Every variable the stack reads. Copy it to `deploy/.env` on the server; `.env` is git-ignored |
 | `deploy/backup/` | Backup image (Postgres 18 tools + rclone), `schedule.sh` (daily), `backup.sh`, `restore-test.sh` |
@@ -60,7 +62,7 @@ Compose sets these from `deploy/.env`; another host would set them directly.
 | `SENTRY_DSN`, `SENTRY_ENVIRONMENT` | no | Without a DSN, Sentry is off |
 | `CARD_READER_ENABLED` + `ANTHROPIC_API_KEY`, `EASYPOST_ENABLED` + `EASYPOST_API_KEY`, `CARDGRADE_*`, `CENTERING_ENABLED`, `POKETRACE_ENABLED` + `POKETRACE_API_KEY`, `PRICING_INGESTION_ENABLED` | no | Feature switches, all off by default (`docs/local-dev.md`). `deploy/compose.prod.yml` passes only these to the backend, so a new switch needs a line there too. `COLLATERAL_ENABLED` exists in the app but compose doesn't forward it, so it stays off on prod until it does |
 
-Web build args (baked into the bundle, not secrets): `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`. Compose sets `VITE_COLLATERAL_ENABLED` to `false`.
+Web build args (baked into the bundle, not secrets): `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`. `VITE_COLLATERAL_ENABLED` is always `false`. CI takes the first three from the repository variables `AUTH0_DOMAIN`, `AUTH0_SPA_CLIENT_ID` and `AUTH0_AUDIENCE` (GitHub → Settings → Secrets and variables → Actions → Variables), and the images workflow fails until they are set. They must match the server's `.env`. Only `deploy.sh --build` reads them from `.env`.
 
 ## First deploy, step by step
 
@@ -92,7 +94,7 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
    mkdir -p /home/deploy/.ssh && cp ~/.ssh/authorized_keys /home/deploy/.ssh/ && chown -R deploy:deploy /home/deploy/.ssh
    sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && systemctl reload ssh
    ```
-   Add 2 GB of swap: the first build compiles Java and the web app on the box.
+   Add 2 GB of swap. Deploys pull built images, but the `--build` fallback compiles Java and the web app on the box.
    ```bash
    fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
    ```
@@ -126,10 +128,13 @@ The current tenant works for a beta. In the dashboard:
 ssh deploy@<server-ip>
 git clone https://github.com/gebs2180/pokemans.git && cd pokemans/deploy
 cp .env.example .env && chmod 600 .env && nano .env      # fill every value; see the comments
-docker compose -f compose.prod.yml up -d --build          # first build takes ~10 minutes on a CX23
+docker login ghcr.io -u gebs2180                          # once: paste the read-only token (below)
+bash ~/pokemans/deploy/deploy.sh                          # pulls the latest main's images and starts everything
 docker compose -f compose.prod.yml ps                     # all four should be "running" / backend "healthy"
 docker compose -f compose.prod.yml logs -f backend        # Flyway migrations, then "Started ..."
 ```
+
+**The GHCR token.** The images are private, so the server logs in once with a read-only token. On GitHub → Settings → Developer settings → Personal access tokens → **Tokens (classic)**, create one with only the `read:packages` scope and an expiry you'll notice (GHCR doesn't accept fine-grained tokens). Keep it in the Bitwarden note, never in chat or the repo, and paste it at the `docker login` password prompt. Docker keeps it in `~/.docker/config.json` on the server. When it expires, deploys stop at "No backend image": create a new one and run `docker login ghcr.io -u gebs2180` again.
 
 Generate `POSTGRES_PASSWORD` with `openssl rand -base64 32 | tr -d '/+='`. Keep a copy of `.env` in your password manager: the backups are no use without the R2 keys.
 
@@ -159,13 +164,23 @@ docker compose -f compose.prod.yml run --rm backup bash -c "backup.sh && restore
 
 ## Day to day
 
-**Deploy a new version.** `deploy/deploy.sh` pulls main, backs up, builds and restarts. Start it with `nohup` from the home directory, so a dropped SSH connection can't stop it:
+**Deploy a new version.** Every push to main builds images in CI (GitHub → Actions → **Images**, a few minutes after the merge). `deploy/deploy.sh` then pulls that commit's images, moves the checkout to it, backs up the database, restarts, and waits up to 5 minutes for the backend to report healthy. Nothing is built on the server. Start it with `nohup` from the home directory, so a dropped SSH connection can't stop it:
 
 ```bash
 nohup bash ~/pokemans/deploy/deploy.sh > ~/deploy.log 2>&1 & tail -f ~/deploy.log
 ```
 
-Logins and uploads fail for about 30–60 s while the backend restarts. Tell Discord before deploying.
+Logins and uploads fail for about 30–60 s while the backend restarts. Tell Discord before deploying. If the images aren't built yet, the script stops before changing anything; wait for the Images run and start it again. Each deploy is appended to `~/deploy-history` (time and SHA), and the images of the last three stay on the server.
+
+**Roll back.** Pass the commit to go back to. The end of every deploy prints the previous one, and `~/deploy-history` lists them all:
+
+```bash
+nohup bash ~/pokemans/deploy/deploy.sh <sha> > ~/deploy.log 2>&1 & tail -f ~/deploy.log
+```
+
+It's the same deploy for an older commit: backup, restart, health wait. The checkout is left on that commit (detached), and the next plain `deploy.sh` goes back to the latest main. **Database migrations don't roll back.** Flyway only runs forward, so going back past a commit that changed `db/migration` leaves the newer schema under the older code. The script refuses that unless you add `--force`. Only force it when the migration only added things the older code ignores (a new table, column with a default, or index). Otherwise fix forward, or restore the pre-deploy backup the deploy took (see the restore steps below), which loses anything written since.
+
+**Fallback: build on the server.** If GHCR or the Images workflow is down, `deploy.sh --build` (optionally with a SHA) builds the three images on the box from that commit, as deploys used to, then deploys them the same way. It takes about 10 minutes on a CX23 and competes with the running backend for memory. The web image then takes its Auth0 settings from `.env`.
 
 **Check prod without changing anything.** Run this from a checkout. It reports the commit, services, health and recent backend errors:
 
@@ -175,21 +190,21 @@ ssh deploy@beta.rawmark.app 'bash -s' < deploy/prod-check.sh
 
 **Restore after a disaster** (lost server or a bad migration):
 
-1. New server: steps 2 and 5, but run `docker compose -f compose.prod.yml up -d postgres` only.
+1. New server: steps 2 and 5 up to `docker login`, then run only `docker compose -f compose.prod.yml up -d postgres`. Until the first deploy there are no `deployed` images, so the commands in steps 2 and 3 use the latest main's (`IMAGE_TAG=main`).
 2. Restore the newest dump into it (`--clean` drops what's there):
    ```bash
-   docker compose -f compose.prod.yml run --rm backup bash -c '
+   IMAGE_TAG=main docker compose -f compose.prod.yml run --rm backup bash -c '
      f=$(rclone lsf backups:$BACKUP_BUCKET/postgres | sort | tail -n 1) &&
      rclone copyto backups:$BACKUP_BUCKET/postgres/$f /tmp/restore.dump &&
      pg_restore --clean --if-exists --no-owner -d pokemans /tmp/restore.dump'
    ```
 3. Lost photos: copy them back with the app token, which can write to the photo bucket (the backup read token can't):
    ```bash
-   docker compose -f compose.prod.yml run --rm \
+   IMAGE_TAG=main docker compose -f compose.prod.yml run --rm \
      -e RCLONE_CONFIG_PHOTOS_ACCESS_KEY_ID=<app key id> -e RCLONE_CONFIG_PHOTOS_SECRET_ACCESS_KEY=<app secret> \
      backup rclone copy backups:pokemans-backups/photos photos:pokemans-photos
    ```
-4. `docker compose -f compose.prod.yml up -d`, then the smoke test.
+4. `bash ~/pokemans/deploy/deploy.sh`, then the smoke test.
 
 At most a day of data is lost (the last nightly backup), plus whatever Hetzner's weekly snapshot doesn't cover if you use it.
 

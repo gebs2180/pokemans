@@ -29,6 +29,14 @@ ssh deploy@beta.rawmark.app
 nohup bash ~/pokemans/deploy/deploy.sh > ~/deploy.log 2>&1 & tail -f ~/deploy.log
 ```
 
-The first deploy that adds `deploy.sh` needs `cd ~/pokemans && git pull` first.
+The script deploys the images CI built for the latest main (GitHub → Actions → **Images** must have finished for that commit). If it says there's no image yet, wait for that run.
+
+**Roll back.** The end of each deploy prints the previous SHA, and `~/deploy-history` on the server lists them. Give Zach:
+
+```bash
+nohup bash ~/pokemans/deploy/deploy.sh <sha> > ~/deploy.log 2>&1 & tail -f ~/deploy.log
+```
+
+It refuses to go back past a changed `db/migration` unless `--force`; check the migration with Zach before suggesting that (`docs/hosting.md`, Roll back). `deploy.sh --build` builds on the server when GHCR is unavailable.
 
 **After Zach says it finished:** run the check with a window covering the deploy and report it in five lines. If SSH dropped, the script keeps running, so read `~/deploy.log` before suggesting anything else.

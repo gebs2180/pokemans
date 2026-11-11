@@ -55,7 +55,7 @@ flowchart LR
 - **No email.** There is no notifier; contact between buyer and seller is the email from the Auth0 token, shown on a deal.
 - **One flat Docker network.** All four containers share the default Compose network; Postgres isn't published but is reachable from Caddy and the backup container.
 - **TLS** is Caddy's automatic Let's Encrypt. Uptime is checked from outside on `/actuator/health`; the backup job pings a healthchecks URL when it finishes.
-- **Deploys are manual.** `deploy/deploy.sh` on the server: `git pull`, a backup, `docker compose build` on the box (no `--pull`, no image tags), `up -d`. CI builds and tests but doesn't publish images. The Caddyfile is bind-mounted as a single file, so a Caddyfile-only change may not reach the running container ([review finding 2](../review-architecture-2026-11.md#fix-now-cheap-and-worth-it)).
+- **Deploys are manual.** CI pushes images to GHCR tagged by commit (`.github/workflows/images.yml`); `deploy/deploy.sh [sha]` on the server pulls them, backs up, runs `up -d` and waits for health, and an earlier SHA rolls back (deep review A2, 2026-11-10). Before that it built on the box with no image tags. The Caddyfile is bind-mounted as a single file, so a Caddyfile-only change may not reach the running container ([review finding 2](../review-architecture-2026-11.md#fix-now-cheap-and-worth-it)).
 
 ## Differences from `docs/hld.md`
 
