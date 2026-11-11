@@ -1,5 +1,6 @@
 package com.pokemans.app.identity;
 
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,10 +18,24 @@ public class Directory {
 
     private final OrgRepository orgs;
     private final AppUserRepository users;
+    private final MembershipRepository memberships;
 
-    Directory(OrgRepository orgs, AppUserRepository users) {
+    Directory(OrgRepository orgs, AppUserRepository users, MembershipRepository memberships) {
         this.orgs = orgs;
         this.users = users;
+        this.memberships = memberships;
+    }
+
+    /** Every org of the type, by name. */
+    @Transactional(readOnly = true)
+    public List<UUID> orgsOfType(OrgType type) {
+        return orgs.findAllByOrderByNameAsc().stream().filter(o -> o.getType() == type).map(Org::getId).toList();
+    }
+
+    /** The users who are members of the org. */
+    @Transactional(readOnly = true)
+    public List<UUID> members(UUID orgId) {
+        return memberships.findByOrgId(orgId).stream().map(Membership::getUserId).distinct().toList();
     }
 
     @Transactional(readOnly = true)
