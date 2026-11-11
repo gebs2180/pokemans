@@ -643,6 +643,26 @@ export type PokeTraceQueue = { enabled: boolean; searching: boolean; items: Poke
 
 export type PokeTraceApproval = { mapped: string[]; failures: { catalogCardId: string; error: string }[] }
 
+/**
+ * A mapped card with no successful PokeTrace pull for gapDays or more. lastPulledAt is null when it was never
+ * pulled since its mapping; lastError is the newest pull's error when that pull failed.
+ */
+export type PokeTracePullGap = {
+  catalogCardId: string
+  orgId: string
+  cardItemId: string
+  name: string
+  number: string | null
+  setName: string | null
+  poketraceId: string
+  mappedAt: string
+  lastPulledAt: string | null
+  lastError: string | null
+  daysSince: number
+}
+
+export type PokeTracePullGaps = { enabled: boolean; gapDays: number; gaps: PokeTracePullGap[] }
+
 // Provenance: authenticity findings and custody
 
 export type Finding = 'VERIFIED_AUTHENTIC' | 'SUSPECTED_COUNTERFEIT' | 'COUNTERFEIT'

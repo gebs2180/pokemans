@@ -33,6 +33,8 @@ springdoc:
 
 pokemans:
   # The one valuation parameter set, for price snapshots, valuation runs and offers alike (review finding 10).
+  # 1.7.0 (2026-11-10, a PR #114 follow-up) is 1.6.0 plus revised PokeTrace days: a day PokeTrace revised is priced at
+  # its newest revision, and the older rows are kept and traced as superseded.
   # 1.6.0 (Zach, 2026-11-10) is 1.5.0 plus a $1,000 FMV threshold: a condition from one pre-grade provider is A up to
   # it and B above it.
   # 1.5.0 (review B4, 2026-11-09) is 1.4.0 plus guards that leave untrustworthy PokeTrace day averages out of pricing,
@@ -40,7 +42,7 @@ pokemans:
   # 1.4.0 (Zach, 2026-11-09) is 1.3.0 plus the offer's 10 rung capped at 2.5x its 9 rung and the step up to 10 left out
   # of a card's own step-down ladder. 1.3.0 is 1.2.0 plus the comps-confidence rules of review B5 (modal-grade
   # confidence, thin grades counted as derived); 1.2.0 is 1.1.0 plus the offer margin by confidence.
-  parameter-set: 1.6.0
+  parameter-set: 1.7.0
   security:
     # Custom claim the provider adds to access tokens with the user's roles. Only ADMIN is read from it;
     # PARTNER and COLLECTOR come from org membership in the database.
@@ -120,6 +122,9 @@ pokemans:
       api-key: ${POKETRACE_API_KEY:}
       backfill: 1y
       recent: 30d
+      # A mapped card with no successful pull for this many days (since it was mapped) is flagged on the
+      # admin PokeTrace page and fails the pricing healthcheck (a PR #114 follow-up). Default to confirm.
+      pull-gap-days: 2
   offers:
     # Instant offers (Zach, 2026-10-19): one firm price, the expected value over the card's grades of the
     # quick-sale value less the buyer's margin, which the parameter set sets by confidence (1.2.0 on: A 10%,

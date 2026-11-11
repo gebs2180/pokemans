@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { useApi, type PokeTraceApproval, type PokeTraceQueue, type PokeTraceQueueItem } from '../api'
+import { useApi, type PokeTraceApproval, type PokeTracePullGaps, type PokeTraceQueue, type PokeTraceQueueItem } from '../api'
 import { message } from '../format'
 import { useLoad } from '../useLoad'
 
@@ -24,6 +24,61 @@ function suggestion(item: PokeTraceQueueItem) {
       {n === 0 ? 'PokeTrace has no card by this name' : `no clean match (${n} candidate${n === 1 ? '' : 's'})`}: decide it on the card
       page
     </span>
+  )
+}
+
+/**
+ * Mapped cards whose PokeTrace pulls have stopped: no successful pull for the gap days since the last one (or
+ * since the mapping). The nightly healthcheck fails while any are listed.
+ */
+function PullsStopped() {
+  const api = useApi()
+  const { data, error } = useLoad(() => api<PokeTracePullGaps>('GET', '/api/admin/poketrace/pull-gaps'), [api])
+  if (error) return <p className="error" role="alert">{error}</p>
+  if (!data?.enabled) return null
+  const gaps = data.gaps ?? []
+  return (
+    <section className="panel">
+      <h2>Pulls stopped</h2>
+      {gaps.length === 0 ? (
+        <p className="muted">Every mapped card has been pulled in the last {data.gapDays} days.</p>
+      ) : (
+        <>
+          <p className="muted small">
+            Mapped cards with no successful PokeTrace pull for {data.gapDays}+ days. Their prices age until a pull works again.
+          </p>
+          <div className="scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Card</th>
+                  <th>Last pulled</th>
+                  <th>Last error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gaps.map((g) => (
+                  <tr key={g.catalogCardId}>
+                    <td>
+                      <Link to={`/admin/review/${g.orgId}/${g.cardItemId}`}>
+                        {g.name}
+                        {g.number ? ` #${g.number}` : ''}
+                      </Link>
+                      <div className="muted small">{[g.setName, g.poketraceId].filter(Boolean).join(' · ')}</div>
+                    </td>
+                    <td className="small">
+                      {g.lastPulledAt ? new Date(g.lastPulledAt).toLocaleDateString() : 'never since mapped'} ({g.daysSince} day
+                      {g.daysSince === 1 ? '' : 's'})
+                    </td>
+                    <td className="small">{g.lastError ? <span className="error">{g.lastError}</span> : <span className="muted">none</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 
@@ -172,6 +227,7 @@ export function PokeTraceQueuePage() {
           )}
         </section>
       )}
+      <PullsStopped />
     </>
   )
 }

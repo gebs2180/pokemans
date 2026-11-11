@@ -28,6 +28,14 @@ interface PriceSource {
     /** Sold sales of one catalog card with a sold date in {@code [from, to]}. */
     List<Sale> soldSales(Catalog.CardSummary card, LocalDate from, LocalDate to);
 
+    /**
+     * True when the source can send different values for a sale it sent before (PokeTrace revises a day's
+     * average, low and high). Ingestion then appends a changed sale as a revision instead of skipping it.
+     */
+    default boolean revisesSales() {
+        return false;
+    }
+
     enum GradingCompany { PSA, BGS, CGC, SGC, TAG, ACE }
 
     /** Condition of a raw (ungraded) sale. DAMAGED and ALTERED price the U outcome. */

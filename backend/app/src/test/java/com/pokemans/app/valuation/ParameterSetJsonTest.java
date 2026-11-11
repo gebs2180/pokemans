@@ -63,8 +63,18 @@ class ParameterSetJsonTest {
 
         String json = ValuationService.JSON.writeValueAsString(v160);
 
-        assertThat(json).contains("\"oneProviderMaxFmvForA\":1000");
+        assertThat(json).contains("\"oneProviderMaxFmvForA\":1000").doesNotContain("pokeTraceLatestRevision");
         assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v160);
+    }
+
+    @Test
+    void version170KeepsItsRevisedDayRule() throws Exception {
+        ParameterSet v170 = ParameterSet.load("1.7.0");
+
+        String json = ValuationService.JSON.writeValueAsString(v170);
+
+        assertThat(json).contains("\"pokeTraceLatestRevision\":true");
+        assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v170);
     }
 
     /** A stored run's assessment input re-serializes as before unless it is a one-provider condition. */

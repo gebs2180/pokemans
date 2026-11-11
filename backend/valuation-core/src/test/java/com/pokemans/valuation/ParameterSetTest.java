@@ -98,7 +98,7 @@ class ParameterSetTest {
                 v130.compsForB(), v130.compsForC(), v130.minFmv(), v130.singleCardCap(), v130.topFiveCap(),
                 v130.correlationThreshold(), v130.correlationHaircut(), v130.suggestedAlphaLow(), v130.suggestedAlphaHigh(),
                 v130.gradeFirstMinLift(), v130.gradeFirstTopN(), v130.fallbackSigma(), v130.offerMarginA(),
-                v130.offerMarginB(), v130.offerMarginC(), null, null, null, null, null, null, null, null, null, null)).isEqualTo(v120);
+                v130.offerMarginB(), v130.offerMarginC(), null, null, null, null, null, null, null, null, null, null, null)).isEqualTo(v120);
 
         java.util.Properties p = new java.util.Properties();
         try (var in = ParameterSet.class.getResourceAsStream("/parameter-sets/1.3.0.properties")) {
@@ -130,6 +130,22 @@ class ParameterSetTest {
         assertThat(v150.cardLadderExcludesTen()).isEqualTo(v140.cardLadderExcludesTen());
         assertThat(v150.fallbackSigma()).isEqualByComparingTo(v140.fallbackSigma());
         assertThat(v150.offerMargin(Confidence.C)).isEqualByComparingTo(v140.offerMargin(Confidence.C));
+    }
+
+    @Test
+    void version170PricesRevisedPokeTraceDays() {
+        ParameterSet v160 = ParameterSet.load("1.6.0");
+        ParameterSet v170 = ParameterSet.load("1.7.0");
+
+        assertThat(v170.pricesPokeTraceRevisions()).isTrue();
+        assertThat(v160.pricesPokeTraceRevisions()).isFalse();
+        assertThat(v160.pokeTraceLatestRevision()).isNull();
+        // Everything else is 1.6.0's.
+        assertThat(v170.oneProviderMaxFmvForA()).isEqualByComparingTo(v160.oneProviderMaxFmvForA());
+        assertThat(v170.dayMaxSpread()).isEqualByComparingTo(v160.dayMaxSpread());
+        assertThat(v170.maxSigma()).isEqualByComparingTo(v160.maxSigma());
+        assertThat(v170.offerMargin(Confidence.B)).isEqualByComparingTo(v160.offerMargin(Confidence.B));
+        assertThat(v170.compsForA()).isEqualByComparingTo(v160.compsForA());
     }
 
     @Test

@@ -67,6 +67,7 @@ public class Prices {
     private final SoldCompRepository comps;
     private final PricingProperties properties;
     private final Staleness staleness;
+    private final ParameterSet params;
 
     Prices(PriceSnapshotRepository snapshots, PriceStatsRepository stats, SoldCompRepository comps, PricingProperties properties,
            ParameterSet params) {
@@ -75,16 +76,18 @@ public class Prices {
         this.comps = comps;
         this.properties = properties;
         this.staleness = new Staleness(params);
+        this.params = params;
     }
 
     /** The card's raw near-mint sales from the last {@code days} days, today included, in our currency only. */
     @Transactional(readOnly = true)
     public RawSales rawNearMint(UUID catalogCardId, int days) {
         LocalDate since = LocalDate.now(ZoneOffset.UTC).minusDays(days);
-        List<SoldComp> sold = comps.findByCatalogCardIdAndRawConditionAndSoldOnGreaterThanEqual(catalogCardId,
+        // A revised PokeTrace day counts once, at the revision the parameter set prices.
+        List<SoldComp> sold = PokeTraceRevisions.apply(comps.findByCatalogCardIdAndRawConditionAndSoldOnGreaterThanEqual(catalogCardId,
                         PriceSource.RawCondition.NEAR_MINT, since).stream()
                 .filter(c -> properties.currency().equals(c.getCurrency()))
-                .toList();
+                .toList(), params).current();
         BigDecimal lowest = sold.stream().map(SoldComp::getPrice).min(BigDecimal::compareTo).orElse(null);
         return new RawSales(lowest, sold.size(), since, sold.stream().map(SoldComp::getId).toList());
     }

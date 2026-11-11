@@ -55,6 +55,12 @@ class PokeTraceSource implements PriceSource {
         return LICENCE;
     }
 
+    /** PokeTrace can send a different average, low or high for a day it sent before. */
+    @Override
+    public boolean revisesSales() {
+        return true;
+    }
+
     @Override
     public List<Sale> soldSales(Catalog.CardSummary card, LocalDate from, LocalDate to) {
         Optional<String> mapped = mappings.poketraceId(card.catalogCardId());

@@ -3213,6 +3213,68 @@
         },
         "required" : [ "duplicates", "errors", "fetched", "inserted", "rejected", "repriced" ]
       },
+      "PokeTracePullGapControllerPullGapsView" : {
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "gapDays" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "gaps" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PokeTracePullGapsGap"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "enabled", "gapDays", "gaps" ]
+      },
+      "PokeTracePullGapsGap" : {
+        "properties" : {
+          "cardItemId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "catalogCardId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "daysSince" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "lastError" : {
+            "type" : "string"
+          },
+          "lastPulledAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "mappedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "number" : {
+            "type" : "string"
+          },
+          "orgId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "poketraceId" : {
+            "type" : "string"
+          },
+          "setName" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "cardItemId", "catalogCardId", "daysSince", "lastError", "lastPulledAt", "mappedAt", "name", "number", "orgId", "poketraceId", "setName" ]
+      },
       "PokeTraceQueueControllerApproveRequest" : {
         "properties" : {
           "catalogCardIds" : {
@@ -5886,6 +5948,24 @@
           }
         },
         "tags" : [ "outcome-controller" ]
+      }
+    },
+    "/api/admin/poketrace/pull-gaps" : {
+      "get" : {
+        "operationId" : "gaps",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PokeTracePullGapControllerPullGapsView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "poke-trace-pull-gap-controller" ]
       }
     },
     "/api/admin/poketrace/queue" : {

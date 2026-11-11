@@ -79,6 +79,7 @@ record PricingProperties(
                      @DefaultValue("https://api.poketrace.com/v1") java.net.URI baseUrl,
                      @DefaultValue("20s") Duration timeout,
                      @DefaultValue("1y") String backfill,
-                     @DefaultValue("30d") String recent) {
+                     @DefaultValue("30d") String recent,
+                     @DefaultValue("2") int pullGapDays) {
     }
 }
