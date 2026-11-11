@@ -49,10 +49,9 @@ Browsers only allow camera capture and PWA install on `https` or `localhost`. Ov
 
 ### Pre-grading providers
 
-Both are off by default. Turn one on only after its terms are confirmed in writing ([pregrade-providers.md](pregrade-providers.md)). Set its key in the environment, never in a file:
+CardGrade.io is the one provider (Ximilar was removed on 2026-11-10). It is off by default. Turn it on only after its terms are confirmed in writing ([pregrade-providers.md](pregrade-providers.md)). Set its key in the environment, never in a file:
 
 ```powershell
-$env:XIMILAR_ENABLED = "true"; $env:XIMILAR_API_KEY = "<token>"
 $env:CARDGRADE_ENABLED = "true"; $env:CARDGRADE_API_KEY = "cgrd_<full-access key>"   # opt the account out of AI training first
 ```
 

@@ -165,7 +165,7 @@ class ConditionSummaryTest {
     /** An allowlist: no provider's centering counts but our own, including one nobody has named yet. */
     @Test
     void noOtherProvidersCenteringEverHoldsTheCardBack() {
-        for (String provider : List.of(XimilarPreGradeProvider.NAME, CardGradePreGradeProvider.NAME, "SOME_NEW_PROVIDER")) {
+        for (String provider : List.of("XIMILAR", CardGradePreGradeProvider.NAME, "SOME_NEW_PROVIDER")) {
             List<ProviderPrediction> latest = List.of(prediction(provider, 7.0, 9.0, 9.0, 9.0), measured(10, UNMEASURED, EVEN));
 
             assertThat(Assessments.summarize(dist(Grade.G8, "1"), latest).holdingBack()).as(provider).isEmpty();
@@ -176,7 +176,7 @@ class ConditionSummaryTest {
     /** Nor does any other provider's centering cap the distribution: only our measurement gives a cap. */
     @Test
     void noOtherProvidersCenteringCapsTheDistribution() {
-        for (String provider : List.of(XimilarPreGradeProvider.NAME, CardGradePreGradeProvider.NAME, "SOME_NEW_PROVIDER")) {
+        for (String provider : List.of("XIMILAR", CardGradePreGradeProvider.NAME, "SOME_NEW_PROVIDER")) {
             ProviderPrediction theirs = prediction(provider, 3.0, 9.0, 9.0, 9.0);
 
             assertThat(theirs.centeringCap()).as(provider).isNull();

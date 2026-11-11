@@ -12,6 +12,8 @@ enum OfferRefusal {
     NOT_IDENTIFIED,
     NOT_ASSESSED,
     PHOTOS_CHANGED,
+    /** Its condition is being assessed again: it rested on a grading provider we no longer use. */
+    PROVIDER_RETIRED,
     NO_PRICE_TABLE,
     /** Unvalued for a reason the valuation module didn't code. */
     UNPRICED,

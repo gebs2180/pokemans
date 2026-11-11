@@ -65,7 +65,7 @@ class CardGradeCallsTest {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         ConditionProperties properties = new ConditionProperties(null, 1.5, new BigDecimal("0.10"), new BigDecimal("0.25"),
-                new BigDecimal("0.25"), new BigDecimal("0.02"), null, null,
+                new BigDecimal("0.25"), new BigDecimal("0.02"), null,
                 new ConditionProperties.CardGrade(true, "cgrd_test", URI.create("https://cardgrade.test"), "PSA",
                         Duration.ofSeconds(30), gradesPerMinute, 50, Duration.ofHours(1)), null);
         provider = new CardGradePreGradeProvider(properties, builder, clock);

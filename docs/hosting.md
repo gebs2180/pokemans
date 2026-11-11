@@ -58,7 +58,7 @@ Compose sets these from `deploy/.env`; another host would set them directly.
 | `STORAGE_PUBLIC_ENDPOINT` | no | Only if browsers must use a different endpoint than the app. Then set the Caddy container's `PHOTO_ORIGIN` to it too, or the Content-Security-Policy blocks photos |
 | `STORAGE_REGION` | no | Default `auto` (R2) |
 | `SENTRY_DSN`, `SENTRY_ENVIRONMENT` | no | Without a DSN, Sentry is off |
-| `CARD_READER_ENABLED` + `ANTHROPIC_API_KEY`, `EASYPOST_ENABLED` + `EASYPOST_API_KEY`, `XIMILAR_*`, `CARDGRADE_*`, `CENTERING_ENABLED`, `POKETRACE_ENABLED` + `POKETRACE_API_KEY`, `PRICING_INGESTION_ENABLED` | no | Feature switches, all off by default (`docs/local-dev.md`). `deploy/compose.prod.yml` passes only these to the backend, so a new switch needs a line there too. `COLLATERAL_ENABLED` exists in the app but compose doesn't forward it, so it stays off on prod until it does |
+| `CARD_READER_ENABLED` + `ANTHROPIC_API_KEY`, `EASYPOST_ENABLED` + `EASYPOST_API_KEY`, `CARDGRADE_*`, `CENTERING_ENABLED`, `POKETRACE_ENABLED` + `POKETRACE_API_KEY`, `PRICING_INGESTION_ENABLED` | no | Feature switches, all off by default (`docs/local-dev.md`). `deploy/compose.prod.yml` passes only these to the backend, so a new switch needs a line there too. `COLLATERAL_ENABLED` exists in the app but compose doesn't forward it, so it stays off on prod until it does |
 
 Web build args (baked into the bundle, not secrets): `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`. Compose sets `VITE_COLLATERAL_ENABLED` to `false`.
 

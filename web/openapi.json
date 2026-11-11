@@ -1298,6 +1298,9 @@
             },
             "type" : "array"
           },
+          "providerRetired" : {
+            "type" : "boolean"
+          },
           "requests" : {
             "items" : {
               "$ref" : "#/components/schemas/ConditionControllerRequestView"
@@ -1305,7 +1308,7 @@
             "type" : "array"
           }
         },
-        "required" : [ "assessments", "cardId", "centeringCap", "enabledProviders", "identification", "label", "orgId", "photos", "photosChanged", "predictions", "requests" ]
+        "required" : [ "assessments", "cardId", "centeringCap", "enabledProviders", "identification", "label", "orgId", "photos", "photosChanged", "predictions", "providerRetired", "requests" ]
       },
       "ConditionControllerPhotoLink" : {
         "properties" : {
@@ -3009,7 +3012,7 @@
             "type" : "string"
           },
           "refusalCode" : {
-            "enum" : [ "LOT", "NOT_IDENTIFIED", "NOT_ASSESSED", "PHOTOS_CHANGED", "NO_PRICE_TABLE", "UNPRICED", "DOUBTED", "THIN_SALES", "UNDER_MINIMUM", "OVER_MAXIMUM", "PRICE_CHANGED", "NO_BUYER_ADDRESS" ],
+            "enum" : [ "LOT", "NOT_IDENTIFIED", "NOT_ASSESSED", "PHOTOS_CHANGED", "PROVIDER_RETIRED", "NO_PRICE_TABLE", "UNPRICED", "DOUBTED", "THIN_SALES", "UNDER_MINIMUM", "OVER_MAXIMUM", "PRICE_CHANGED", "NO_BUYER_ADDRESS" ],
             "type" : "string"
           },
           "tenCap" : {

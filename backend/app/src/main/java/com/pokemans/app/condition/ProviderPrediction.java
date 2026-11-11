@@ -90,10 +90,18 @@ class ProviderPrediction extends AssignedIdEntity<UUID> {
         return psaGrade != null ? psaGrade : overallGrade;
     }
 
-    /** Each provider's newest successful answer, from predictions newest first. */
+    /**
+     * Providers we've stopped using. Their predictions stay stored (calibration data) and on the review
+     * page, but never build a distribution or reach the seller again. Ximilar was removed on 2026-11-10
+     * because its grades were too inaccurate (Zach).
+     */
+    static final java.util.Set<String> RETIRED = java.util.Set.of("XIMILAR");
+
+    /** Each provider's newest successful answer, from predictions newest first, leaving out retired providers. */
     static Map<String, ProviderPrediction> latestSucceeded(List<ProviderPrediction> newestFirst) {
         Map<String, ProviderPrediction> latest = new LinkedHashMap<>();
-        newestFirst.stream().filter(ProviderPrediction::isSucceeded).forEach(p -> latest.putIfAbsent(p.provider, p));
+        newestFirst.stream().filter(ProviderPrediction::isSucceeded).filter(p -> !RETIRED.contains(p.provider))
+                .forEach(p -> latest.putIfAbsent(p.provider, p));
         return latest;
     }
 

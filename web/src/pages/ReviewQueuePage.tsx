@@ -8,6 +8,7 @@ const ASSESSMENT_LABEL: Record<QueueItem['assessment'], string> = {
   SYSTEM: 'System distribution, not reviewed',
   REVIEWER: 'Reviewed',
   PHOTOS_CHANGED: 'Photos retaken: assess again',
+  PROVIDER_RETIRED: 'Built on Ximilar: ask again',
 }
 
 /** Admin: cards whose photos are all in, and what each still needs. */
