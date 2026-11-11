@@ -1141,6 +1141,9 @@ export type TenCap = { uncapped: number; cap: number; multiple: number }
 /** @param labelPending why the label didn't come with the accept, or null */
 export type AcceptResult = { deals: Deal[]; labelPending: string | null }
 
+/** Which optional emails the user wants. Emails about their own sales always go. */
+export type EmailPreferences = { digest: boolean }
+
 export type ShipAddress = {
   name: string
   company: string | null

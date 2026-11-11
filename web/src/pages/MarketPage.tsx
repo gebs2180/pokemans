@@ -13,6 +13,7 @@ import {
   type BuyerOutcomeRecord,
   type Deal,
   type DeclinedReason,
+  type EmailPreferences,
   type MarketItem,
   type Offer,
   type OfferCard,
@@ -180,6 +181,43 @@ function BuyerNav({ orgId }: { orgId: string }) {
   )
 }
 
+/** The daily email of new cards: on until the buyer turns it off. */
+function DigestToggle() {
+  const api = useApi()
+  const { data, error, reload } = useLoad(() => api<EmailPreferences>('GET', '/api/me/email-preferences'), [api])
+  const [saving, setSaving] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
+
+  async function change(digest: boolean) {
+    setSaving(true)
+    setFailed(null)
+    try {
+      await api<EmailPreferences>('PUT', '/api/me/email-preferences', { digest })
+    } catch (e) {
+      setFailed(errorText(e))
+    } finally {
+      setSaving(false)
+      reload()
+    }
+  }
+
+  if (error || !data) return null
+  return (
+    <p className="small">
+      <label>
+        <input type="checkbox" checked={data.digest} disabled={saving} onChange={(e) => change(e.target.checked)} /> Email me new
+        cards once a day, only on days there are some
+      </label>
+      {failed && (
+        <span className="error" role="alert">
+          {' '}
+          {failed}
+        </span>
+      )}
+    </p>
+  )
+}
+
 /** The one refusal the buyer fixes elsewhere, a missing ship-to address: link there. */
 const NO_ADDRESS = 'NO_BUYER_ADDRESS'
 
@@ -256,6 +294,7 @@ export function MarketPage() {
         Each raw card has one firm price, based on the grade it's likely to be. Accepting buys it at that price, whatever it grades;
         we send the seller a prepaid label to you, billed to you monthly.
       </p>
+      <DigestToggle />
       {message && (
         <p role="status" className={message.startsWith('Bought:') ? 'alert alert-success' : 'alert alert-warning'}>
           {message}

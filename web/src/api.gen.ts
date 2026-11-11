@@ -884,6 +884,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/email-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get"];
+        put: operations["put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{orgId}/batches": {
         parameters: {
             query?: never;
@@ -2187,6 +2203,12 @@ export interface components {
             /** Format: date-time */
             recordedAt: string;
             resalePrice: number;
+        };
+        EmailPreferencesControllerEmailPreferencesBody: {
+            digest: boolean;
+        };
+        EmailPreferencesControllerEmailPreferencesView: {
+            digest: boolean;
         };
         GradingCost: {
             fee: number;
@@ -4631,6 +4653,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["MeControllerMe"];
+                };
+            };
+        };
+    };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailPreferencesControllerEmailPreferencesView"];
+                };
+            };
+        };
+    };
+    put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailPreferencesControllerEmailPreferencesBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailPreferencesControllerEmailPreferencesView"];
                 };
             };
         };

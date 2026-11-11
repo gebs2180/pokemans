@@ -1735,6 +1735,22 @@
         },
         "required" : [ "buyerOrgId", "cardItemId", "certNumber", "certStatus", "earlier", "grade", "gradeLabel", "gradeOutcomeId", "gradedOn", "grader", "id", "kind", "listingId", "lookupUrl", "note", "offerId", "recordedAt", "resalePrice" ]
       },
+      "EmailPreferencesControllerEmailPreferencesBody" : {
+        "properties" : {
+          "digest" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "digest" ]
+      },
+      "EmailPreferencesControllerEmailPreferencesView" : {
+        "properties" : {
+          "digest" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "digest" ]
+      },
       "GradingCost" : {
         "properties" : {
           "fee" : {
@@ -6314,6 +6330,50 @@
           }
         },
         "tags" : [ "me-controller" ]
+      }
+    },
+    "/api/me/email-preferences" : {
+      "get" : {
+        "operationId" : "get",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EmailPreferencesControllerEmailPreferencesView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "email-preferences-controller" ]
+      },
+      "put" : {
+        "operationId" : "put",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EmailPreferencesControllerEmailPreferencesBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EmailPreferencesControllerEmailPreferencesView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "email-preferences-controller" ]
       }
     },
     "/api/orgs/{orgId}/batches" : {
