@@ -235,11 +235,21 @@ class CardGradePreGradeProvider implements PreGradeProvider {
         details.put("providerBackCentering", map(map(results.get("backCvMetrics")).get("centering")));
         details.put("marketValueLow", results.get("marketValueLow"));
         details.put("marketValueHigh", results.get("marketValueHigh"));
-        details.put("identifiedAs", Map.of(
-                "name", String.valueOf(grading.get("cardName")),
-                "set", String.valueOf(grading.get("cardSet")),
-                "number", String.valueOf(grading.get("cardNumber"))));
-        return Poll.done(new Reading(null, overall, psa, number(results.get("centering")),
+        // What CardGrade thought the card was, kept for comparison; our catalog ID is never taken from it.
+        Map<String, Object> pipeline = map(results.get("details"));
+        Map<String, Object> identified = new LinkedHashMap<>();
+        identified.put("name", grading.get("cardName"));
+        identified.put("set", grading.get("cardSet"));
+        identified.put("number", grading.get("cardNumber"));
+        identified.put("confidence", pipeline.get("identificationConfidence"));
+        identified.put("reviewReason", pipeline.get("reviewReason"));
+        details.put("identifiedAs", identified);
+        details.put("imageQualityWarnings", pipeline.get("imageQualityWarnings"));
+        Object version = pipeline.get("pipelineVersion");
+        Object commit = pipeline.get("pipelineCommit");
+        String modelVersion = version == null && commit == null ? null
+                : (version == null ? "" : version.toString()) + (commit == null ? "" : "@" + commit);
+        return Poll.done(new Reading(modelVersion, overall, psa, number(results.get("centering")),
                 number(results.get("corners")), number(results.get("edges")), number(results.get("surface")), details), grading);
     }
 
