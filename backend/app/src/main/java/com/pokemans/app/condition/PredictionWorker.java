@@ -62,6 +62,14 @@ class PredictionWorker {
     private record CallFailed(String error) implements Outcome {
     }
 
+    /** The provider turned the call away for good (out of credits, bad key): fail without retrying. */
+    private record CallRefused(String reason) implements Outcome {
+    }
+
+    /** The provider is busy (rate limit): ask again later, not counted as a failed attempt. */
+    private record CallDeferred(String reason, Duration retryAfter) implements Outcome {
+    }
+
     /** Requests leased to this worker until {@code until}; the lease doubles as the claim's token. */
     private record Claim(List<UUID> ids, Instant until) {
     }
@@ -185,6 +193,10 @@ class PredictionWorker {
                 return new Submitted(provider.submit(photos(request), request.getId().toString()));
             }
             return new Polled(provider.poll(request.getExternalRequestId()), elapsedMs(started));
+        } catch (PreGradeProvider.Refused e) {
+            return new CallRefused(e.getMessage());
+        } catch (PreGradeProvider.Busy e) {
+            return new CallDeferred(e.getMessage(), e.retryAfter());
         } catch (RuntimeException e) {
             return new CallFailed(e.getClass().getSimpleName() + ": " + e.getMessage());
         }
@@ -215,6 +227,16 @@ class PredictionWorker {
         switch (outcome) {
             case Submitted submitted -> request.submitted(submitted.externalRequestId());
             case CallFailed failed -> request.callFailed(failed.error(), properties.worker().maxAttempts());
+            case CallRefused refused -> {
+                log.warn("{} refused prediction request {}; failed without retrying, the card is built from the other providers: {}",
+                        request.getProvider(), id, refused.reason());
+                request.rejected(refused.reason());
+            }
+            case CallDeferred deferred -> {
+                log.info("{} is busy; prediction request {} waits {}: {}", request.getProvider(), id, deferred.retryAfter(),
+                        deferred.reason());
+                request.stillPending(deferred.retryAfter(), properties.worker().maxPending());
+            }
             case Polled polled -> {
                 switch (polled.poll()) {
                     case PreGradeProvider.Pending pending -> request.stillPending(Duration.ofSeconds(10), properties.worker().maxPending());

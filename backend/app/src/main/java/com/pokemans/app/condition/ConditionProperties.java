@@ -95,19 +95,28 @@ record ConditionProperties(
      * Off until the account's terms are confirmed in writing, AI training is opted out in its
      * settings, and a full-access key is set.
      *
-     * @param gradingCompany grading standard to grade against; PSA matches the outcomes we collect
+     * @param gradingCompany  the label CardGrade prints on its certificate; it doesn't change the scale. PSA
+     *                        matches the outcomes we collect, and {@code psaPrediction} is read either way
+     * @param gradesPerMinute submits allowed per minute: the plan's limit (Pro 10, Business 30)
+     * @param readsPerMinute  polls allowed per minute: the plan's read limit (Pro 50, Business 150)
+     * @param outOfCreditsPause how long submits stop after CardGrade says the credits have run out, so
+     *                        queued cards fail without each calling it
      */
     record CardGrade(@DefaultValue("false") boolean enabled,
                      String apiKey,
                      @DefaultValue("https://cardgrade.io") URI baseUrl,
                      @DefaultValue("PSA") String gradingCompany,
-                     @DefaultValue("30s") Duration timeout) {
+                     @DefaultValue("30s") Duration timeout,
+                     @DefaultValue("10") int gradesPerMinute,
+                     @DefaultValue("50") int readsPerMinute,
+                     @DefaultValue("1h") Duration outOfCreditsPause) {
 
         /** Never prints the key. */
         @Override
         public String toString() {
             return "CardGrade[enabled=" + enabled + ", apiKey=" + redacted(apiKey) + ", baseUrl=" + baseUrl
-                    + ", gradingCompany=" + gradingCompany + "]";
+                    + ", gradingCompany=" + gradingCompany + ", gradesPerMinute=" + gradesPerMinute
+                    + ", readsPerMinute=" + readsPerMinute + "]";
         }
     }
 

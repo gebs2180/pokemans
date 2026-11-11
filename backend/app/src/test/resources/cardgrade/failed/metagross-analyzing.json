@@ -1,0 +1,18 @@
+{
+  "id" : "e4d4a372-912d-4dc5-9e37-d980516d5ca1",
+  "status" : "failed",
+  "cardName" : null,
+  "cardYear" : null,
+  "cardSet" : null,
+  "cardNumber" : null,
+  "gradingCompany" : "PSA",
+  "overallGrade" : null,
+  "frontImageUrl" : "https://images.cardgrade.io/gradings/fdf03521-8440-4a48-984e-549af9236d30/e4d4a372-912d-4dc5-9e37-d980516d5ca1/front.jpg",
+  "backImageUrl" : "https://images.cardgrade.io/gradings/fdf03521-8440-4a48-984e-549af9236d30/e4d4a372-912d-4dc5-9e37-d980516d5ca1/back.jpg",
+  "createdAt" : "2026-11-11T02:35:18.610Z",
+  "updatedAt" : "2026-11-11T02:35:20.947Z",
+  "rejection" : {
+    "code" : "analyzing",
+    "message" : "We were unable to grade this card — your credit has been refunded. Please try again in a moment."
+  }
+}

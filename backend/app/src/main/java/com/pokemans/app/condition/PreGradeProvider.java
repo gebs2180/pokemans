@@ -48,6 +48,38 @@ interface PreGradeProvider {
 
     Poll poll(String externalRequestId);
 
+    /**
+     * The provider turned the call away for a reason that asking again won't fix (out of credits, a
+     * bad key, a plan without API access). The request fails at once with no retries, so nothing burns
+     * credits, and the card is built from the other providers' answers. Not an answer about the card:
+     * no prediction is stored.
+     */
+    class Refused extends RuntimeException {
+
+        Refused(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * The provider is busy (its rate limit): ask again after {@code retryAfter}. Not counted as a
+     * failed attempt, since nothing went wrong; the request still gives up once it has been open for
+     * the worker's {@code maxPending}.
+     */
+    class Busy extends RuntimeException {
+
+        private final java.time.Duration retryAfter;
+
+        Busy(String message, java.time.Duration retryAfter) {
+            super(message);
+            this.retryAfter = retryAfter;
+        }
+
+        java.time.Duration retryAfter() {
+            return retryAfter;
+        }
+    }
+
     /** Original front (required) and back (may be null) photos. */
     record Photos(Image front, Image back) {
     }

@@ -40,7 +40,11 @@ Sources: [API terms](https://cardgrader.ai/api-terms), [API data policy](https:/
 - **Other:** Pennsylvania law, with arbitration.
 - **Confirm in writing:** that API use is the permitted automated access, that we can store and train on results, that our account is opted out of training, and that we can use results in lender reports.
 
-Sources: [terms](https://cardgrade.io/terms), [API announcement](https://cardgrade.io/blog/introducing-cardgrade-api).
+- **How we call it (checked live on Pro, 2026-11-10):** `POST /api/v1/grade` with `frontImage` and `backImage` (multipart, 10 MB each, bearer key, an `Idempotency-Key` per request), then `GET /api/v1/grade/{id}` until `completed` or `failed`. Front plus back costs one credit (80 → 79). A Metagross δ came back PSA 9 in about 30 seconds. A failed grading is refunded and carries `rejection.message`. The first try failed with `analyzing` ("try again in a moment"). Our worker doesn't retry a failed grading, and the admin's "Ask again" sends a fresh one.
+- **What we take from it:** `psaPrediction` (else `overallGrade`) goes into the distribution like any provider's grade. Its sub-grades, centering percentages (`providerFrontCentering`, `providerBackCentering`), BGS/CGC predictions, limiting factor, image-quality warnings and what it identified the card as are stored as details and never move the distribution. Its pipeline version and commit are stored as the model version. The whole response is stored too.
+- **Limits:** we keep to 10 grades and 50 reads a minute on our side (`pokemans.condition.cardgrade.grades-per-minute`, `reads-per-minute`), and a 429 waits for its Retry-After without using up an attempt. Out of credits (402), or with `creditsRemaining` at 0, the CardGrade request fails at once with no retry, the card is built from Ximilar alone, and no submit goes out for an hour (`out-of-credits-pause`). A bad key or a plan without API access (401, 403) also fails at once.
+
+Sources: [terms](https://cardgrade.io/terms), [API announcement](https://cardgrade.io/blog/introducing-cardgrade-api), [API docs](https://cardgrade.io/api-docs).
 
 ## Market scan: top pre-grading tools (consumer apps, Oct 2026)
 
@@ -74,7 +78,7 @@ Every accuracy figure below is self-reported on the vendor's own blog. There is 
 ## Cost (list prices, 2026-10-16)
 
 - **Ximilar:** "Grade a card" costs 100 credits, and front plus back in one request counts as one card. The free plan has 1,000 credits a month (about 10 cards). Business 100K is $69/mo (about 1,000 cards, roughly 7¢ each). Top-up packs that never expire start at 10,000 credits for $11 (about 100 cards).
-- **CardGrade.io:** Pro is $24.99/mo for 80 grades at 10 requests per minute. Business is $74.99/mo for 300 grades at 30 per minute. API Starter is $149.99/mo for 1,000 (15¢ each). It doesn't say whether front plus back is one credit. Confirm that.
+- **CardGrade.io:** Pro is $24.99/mo for 80 grades at 10 requests per minute. Business is $74.99/mo for 300 grades at 30 per minute. API Starter is $149.99/mo for 1,000 (15¢ each). Front plus back is one credit (checked 2026-11-10).
 - **Controlled set (30 cards):** about $11 on a Ximilar top-up (or its free plan over a few months) plus one month of CardGrade.io Pro ($24.99), so about $36 in all.
 - **Per 1,000 partner cards:** about $69 (Ximilar) + $150 (CardGrade.io API Starter), so about $220. That's about 22¢ per card for both opinions. Only cards that pass quality checks and are worth over $25 get sent, and each card is sent once.
 

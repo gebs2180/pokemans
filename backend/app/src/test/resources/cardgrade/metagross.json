@@ -1,0 +1,2054 @@
+{
+  "id" : "25c40415-4d2d-4b5e-a071-fca237411fda",
+  "status" : "completed",
+  "cardName" : "Metagross δ",
+  "cardYear" : null,
+  "cardSet" : null,
+  "cardNumber" : null,
+  "gradingCompany" : "PSA",
+  "overallGrade" : 9,
+  "frontImageUrl" : "https://images.cardgrade.io/gradings/fdf03521-8440-4a48-984e-549af9236d30/25c40415-4d2d-4b5e-a071-fca237411fda/front.jpg",
+  "backImageUrl" : "https://images.cardgrade.io/gradings/fdf03521-8440-4a48-984e-549af9236d30/25c40415-4d2d-4b5e-a071-fca237411fda/back.jpg",
+  "createdAt" : "2026-11-11T02:37:33.321Z",
+  "updatedAt" : "2026-11-11T02:38:00.805Z",
+  "results" : {
+    "centering" : 10,
+    "corners" : 9,
+    "edges" : 10,
+    "surface" : 10,
+    "overallGrade" : 9,
+    "psaPrediction" : 9,
+    "bgsPrediction" : 9.5,
+    "cgcPrediction" : 10,
+    "cvMetrics" : {
+      "edges" : {
+        "top" : {
+          "esw" : 1000,
+          "rim" : 1000,
+          "fill" : 1000,
+          "fray" : 1000
+        },
+        "left" : {
+          "esw" : 1000,
+          "rim" : 1000,
+          "fill" : 1000,
+          "fray" : 1000
+        },
+        "right" : {
+          "esw" : 1000,
+          "rim" : 1000,
+          "fill" : 1000,
+          "fray" : 1000
+        },
+        "bottom" : {
+          "esw" : 1000,
+          "rim" : 1000,
+          "fill" : 1000,
+          "fray" : 1000
+        }
+      },
+      "corners" : {
+        "topLeft" : {
+          "csw" : 1000,
+          "fill" : 1000,
+          "fray" : 1000,
+          "angle" : 1000,
+          "rounding" : 1000,
+          "whitening" : 1000
+        },
+        "topRight" : {
+          "csw" : 1000,
+          "fill" : 1000,
+          "fray" : 1000,
+          "angle" : 1000,
+          "rounding" : 1000,
+          "whitening" : 1000
+        },
+        "bottomLeft" : {
+          "csw" : 1000,
+          "fill" : 1000,
+          "fray" : 1000,
+          "angle" : 1000,
+          "rounding" : 1000,
+          "whitening" : 1000
+        },
+        "bottomRight" : {
+          "csw" : 1000,
+          "fill" : 1000,
+          "fray" : 1000,
+          "angle" : 1000,
+          "rounding" : 1000,
+          "whitening" : 1000
+        }
+      },
+      "foilness" : {
+        "foil" : true,
+        "lstd" : 18.61
+      },
+      "centering" : {
+        "score" : 10,
+        "top_pct" : 46,
+        "left_pct" : 49,
+        "inner_box" : {
+          "h" : 0.9319727891156463,
+          "w" : 0.9130044843049328,
+          "x" : 0.042600896860986545,
+          "y" : 0.031098153547133137
+        },
+        "outer_box" : {
+          "h" : 1.0008,
+          "w" : 1.003,
+          "x" : -0.001,
+          "y" : -8.0E-4
+        },
+        "right_pct" : 51,
+        "bottom_pct" : 54,
+        "lr_measurable" : true,
+        "tb_measurable" : true
+      },
+      "borderFace" : {
+        "l" : 154,
+        "chroma" : 61
+      },
+      "cardEdgeBox" : {
+        "h" : 1.0008,
+        "w" : 1.003,
+        "x" : -0.001,
+        "y" : -8.0E-4
+      },
+      "edgeGeometryShadow" : {
+        "edges" : {
+          "top" : {
+            "dings" : 3,
+            "defects" : [ {
+              "kind" : "fray",
+              "span" : 12,
+              "depthMm" : 0.225
+            }, {
+              "kind" : "fray",
+              "span" : 17,
+              "depthMm" : 0.282
+            }, {
+              "kind" : "fray",
+              "span" : 6,
+              "depthMm" : 0.46
+            } ]
+          },
+          "left" : {
+            "dings" : 6,
+            "defects" : [ {
+              "kind" : "fray",
+              "span" : 8,
+              "depthMm" : 0.537
+            }, {
+              "kind" : "fray",
+              "span" : 6,
+              "depthMm" : 0.654
+            }, {
+              "kind" : "fray",
+              "span" : 5,
+              "depthMm" : 0.484
+            }, {
+              "kind" : "fray",
+              "span" : 5,
+              "depthMm" : 0.479
+            }, {
+              "kind" : "fray",
+              "span" : 12,
+              "depthMm" : 0.751
+            }, {
+              "kind" : "fray",
+              "span" : 5,
+              "depthMm" : 0.778
+            } ]
+          },
+          "right" : {
+            "dings" : 0,
+            "defects" : [ ]
+          },
+          "bottom" : {
+            "dings" : 0,
+            "defects" : [ ]
+          }
+        },
+        "corners" : {
+          "BL" : {
+            "pt" : [ 583.135874087197, 3353.084778007409 ],
+            "angle" : 87.69
+          },
+          "BR" : {
+            "pt" : [ 2619.086916761899, 3173.929899153021 ],
+            "angle" : 84.14
+          },
+          "TL" : {
+            "pt" : [ 436.62102010808553, 265.3385096169594 ],
+            "angle" : 86.57
+          },
+          "TR" : {
+            "pt" : [ 2660.9085855228245, 293.1673116963691 ],
+            "angle" : 89.89
+          }
+        },
+        "pxPerMm" : 35.4,
+        "totalDings" : 9
+      },
+      "cornerGeometryShadow" : {
+        "corners" : {
+          "topLeft" : {
+            "trusted" : true,
+            "radiusPx" : 102,
+            "wearTcgPx" : 0,
+            "radiusPctW" : 4.57,
+            "edgeFitValid" : true,
+            "wearSportsPx" : 102,
+            "liveRoundingScore" : 1000
+          },
+          "topRight" : {
+            "trusted" : true,
+            "radiusPx" : 104.2,
+            "wearTcgPx" : 0,
+            "radiusPctW" : 4.67,
+            "edgeFitValid" : true,
+            "wearSportsPx" : 104.2,
+            "liveRoundingScore" : 1000
+          },
+          "bottomLeft" : {
+            "trusted" : true,
+            "radiusPx" : 31.7,
+            "wearTcgPx" : 0,
+            "radiusPctW" : 1.42,
+            "edgeFitValid" : true,
+            "wearSportsPx" : 31.7,
+            "liveRoundingScore" : 1000
+          },
+          "bottomRight" : {
+            "trusted" : true,
+            "radiusPx" : 34.3,
+            "wearTcgPx" : 0,
+            "radiusPctW" : 1.54,
+            "edgeFitValid" : true,
+            "wearSportsPx" : 34.3,
+            "liveRoundingScore" : 1000
+          }
+        },
+        "r0TcgPx" : 112.6,
+        "r0SportsPx" : 0,
+        "cardWidthPx" : 2230,
+        "resolutionOk" : true
+      },
+      "cornerWhiteningShadow" : {
+        "corners" : {
+          "topLeft" : {
+            "cw" : 1000,
+            "cov" : 4.0E-4,
+            "cref" : 23.5,
+            "lref" : 139,
+            "rimPx" : 10015,
+            "candPx" : 4,
+            "intensity" : 0.461
+          },
+          "topRight" : {
+            "cw" : 795,
+            "cov" : 0.0452,
+            "cref" : 10.8,
+            "lref" : 139,
+            "rimPx" : 19865,
+            "candPx" : 897,
+            "intensity" : 0.24
+          },
+          "bottomLeft" : {
+            "cw" : 1000,
+            "cov" : 0,
+            "cref" : 6.3,
+            "lref" : 48,
+            "rimPx" : 10221,
+            "candPx" : 0,
+            "intensity" : 0
+          },
+          "bottomRight" : {
+            "cw" : 1000,
+            "cov" : 0,
+            "cref" : null,
+            "lref" : null,
+            "rimPx" : 0,
+            "candPx" : 0,
+            "intensity" : 0
+          }
+        }
+      }
+    },
+    "backCvMetrics" : {
+      "edges" : {
+        "top" : {
+          "esw" : 1000,
+          "rim" : 1000,
+          "fill" : 1000,
+          "fray" : 1000
+        },
+        "left" : {
+          "esw" : 1000,
+          "rim" : 1000,
+          "fill" : 1000,
+          "fray" : 1000
+        },
+        "right" : {
+          "esw" : 1000,
+          "rim" : 1000,
+          "fill" : 1000,
+          "fray" : 1000
+        },
+        "bottom" : {
+          "esw" : 1000,
+          "rim" : 1000,
+          "fill" : 1000,
+          "fray" : 1000
+        }
+      },
+      "corners" : {
+        "topLeft" : {
+          "csw" : 1000,
+          "fill" : 1000,
+          "fray" : 1000,
+          "angle" : 1000,
+          "rounding" : 1000,
+          "whitening" : 1000
+        },
+        "topRight" : {
+          "csw" : 1000,
+          "fill" : 1000,
+          "fray" : 1000,
+          "angle" : 1000,
+          "rounding" : 1000,
+          "whitening" : 1000
+        },
+        "bottomLeft" : {
+          "csw" : 1000,
+          "fill" : 1000,
+          "fray" : 1000,
+          "angle" : 1000,
+          "rounding" : 1000,
+          "whitening" : 1000
+        },
+        "bottomRight" : {
+          "csw" : 1000,
+          "fill" : 1000,
+          "fray" : 1000,
+          "angle" : 1000,
+          "rounding" : 1000,
+          "whitening" : 1000
+        }
+      },
+      "backDiff" : {
+        "corr" : 0.956,
+        "edges" : {
+          "top" : 0.0197,
+          "left" : 3.7123,
+          "right" : 0.0614,
+          "bottom" : 0.7542
+        },
+        "corners" : {
+          "topLeft" : 0,
+          "topRight" : 0.1228,
+          "bottomLeft" : 2.726,
+          "bottomRight" : 0.2874
+        },
+        "surface" : 0.2954,
+        "coverage" : 0.5358,
+        "template" : "pokemon-cards"
+      },
+      "foilness" : {
+        "foil" : false,
+        "lstd" : 6.67
+      },
+      "centering" : {
+        "score" : 10,
+        "top_pct" : 47,
+        "left_pct" : 52,
+        "inner_box" : {
+          "h" : 0.9209612044006948,
+          "w" : 0.9001623376623377,
+          "x" : 0.05154220779220779,
+          "y" : 0.037348002316155184
+        },
+        "outer_box" : {
+          "h" : 1,
+          "w" : 1.0026,
+          "x" : -0.0025,
+          "y" : -3.0E-4
+        },
+        "right_pct" : 48,
+        "bottom_pct" : 53,
+        "lr_measurable" : true,
+        "tb_measurable" : true
+      },
+      "borderFace" : {
+        "l" : 40,
+        "chroma" : 24
+      },
+      "cardEdgeBox" : {
+        "h" : 1,
+        "w" : 1.0026,
+        "x" : -0.0025,
+        "y" : -3.0E-4
+      },
+      "edgeGeometryShadow" : {
+        "edges" : {
+          "top" : {
+            "dings" : 7,
+            "defects" : [ {
+              "kind" : "fray",
+              "span" : 11,
+              "depthMm" : 0.213
+            }, {
+              "kind" : "fray",
+              "span" : 24,
+              "depthMm" : 0.208
+            }, {
+              "kind" : "fray",
+              "span" : 8,
+              "depthMm" : 0.234
+            }, {
+              "kind" : "fray",
+              "span" : 20,
+              "depthMm" : 0.227
+            }, {
+              "kind" : "fray",
+              "span" : 10,
+              "depthMm" : 0.263
+            }, {
+              "kind" : "fill",
+              "span" : 9,
+              "depthMm" : 0.625
+            }, {
+              "kind" : "fill",
+              "span" : 7,
+              "depthMm" : 0.615
+            } ]
+          },
+          "left" : {
+            "dings" : 32,
+            "defects" : [ {
+              "kind" : "fill",
+              "span" : 5,
+              "depthMm" : 0.363
+            }, {
+              "kind" : "fill",
+              "span" : 19,
+              "depthMm" : 0.413
+            }, {
+              "kind" : "fill",
+              "span" : 10,
+              "depthMm" : 0.383
+            }, {
+              "kind" : "fill",
+              "span" : 8,
+              "depthMm" : 0.632
+            }, {
+              "kind" : "fill",
+              "span" : 6,
+              "depthMm" : 0.51
+            }, {
+              "kind" : "fill",
+              "span" : 11,
+              "depthMm" : 0.39
+            }, {
+              "kind" : "fill",
+              "span" : 13,
+              "depthMm" : 0.559
+            }, {
+              "kind" : "fill",
+              "span" : 5,
+              "depthMm" : 0.603
+            }, {
+              "kind" : "fill",
+              "span" : 11,
+              "depthMm" : 0.584
+            }, {
+              "kind" : "fray",
+              "span" : 8,
+              "depthMm" : 0.434
+            }, {
+              "kind" : "fill",
+              "span" : 9,
+              "depthMm" : 0.61
+            }, {
+              "kind" : "fill",
+              "span" : 11,
+              "depthMm" : 0.381
+            }, {
+              "kind" : "fray",
+              "span" : 10,
+              "depthMm" : 0.481
+            }, {
+              "kind" : "fray",
+              "span" : 7,
+              "depthMm" : 0.353
+            }, {
+              "kind" : "fill",
+              "span" : 16,
+              "depthMm" : 0.493
+            }, {
+              "kind" : "fill",
+              "span" : 9,
+              "depthMm" : 0.433
+            }, {
+              "kind" : "fill",
+              "span" : 29,
+              "depthMm" : 0.467
+            }, {
+              "kind" : "fill",
+              "span" : 6,
+              "depthMm" : 0.413
+            }, {
+              "kind" : "fill",
+              "span" : 9,
+              "depthMm" : 0.417
+            }, {
+              "kind" : "fill",
+              "span" : 16,
+              "depthMm" : 0.387
+            }, {
+              "kind" : "fill",
+              "span" : 27,
+              "depthMm" : 0.514
+            }, {
+              "kind" : "fill",
+              "span" : 27,
+              "depthMm" : 0.486
+            }, {
+              "kind" : "fill",
+              "span" : 8,
+              "depthMm" : 0.637
+            }, {
+              "kind" : "fray",
+              "span" : 12,
+              "depthMm" : 0.353
+            }, {
+              "kind" : "fill",
+              "span" : 11,
+              "depthMm" : 0.446
+            }, {
+              "kind" : "fill",
+              "span" : 17,
+              "depthMm" : 0.435
+            }, {
+              "kind" : "fray",
+              "span" : 10,
+              "depthMm" : 0.424
+            }, {
+              "kind" : "fray",
+              "span" : 12,
+              "depthMm" : 0.324
+            }, {
+              "kind" : "fill",
+              "span" : 7,
+              "depthMm" : 0.705
+            }, {
+              "kind" : "fray",
+              "span" : 9,
+              "depthMm" : 0.45
+            }, {
+              "kind" : "fill",
+              "span" : 15,
+              "depthMm" : 0.494
+            }, {
+              "kind" : "fray",
+              "span" : 34,
+              "depthMm" : 0.322
+            } ]
+          },
+          "right" : {
+            "dings" : 9,
+            "defects" : [ {
+              "kind" : "fill",
+              "span" : 15,
+              "depthMm" : 0.72
+            }, {
+              "kind" : "fill",
+              "span" : 20,
+              "depthMm" : 0.581
+            }, {
+              "kind" : "fray",
+              "span" : 7,
+              "depthMm" : 0.438
+            }, {
+              "kind" : "fill",
+              "span" : 11,
+              "depthMm" : 0.452
+            }, {
+              "kind" : "fill",
+              "span" : 5,
+              "depthMm" : 0.509
+            }, {
+              "kind" : "fray",
+              "span" : 20,
+              "depthMm" : 0.569
+            }, {
+              "kind" : "fray",
+              "span" : 20,
+              "depthMm" : 0.544
+            }, {
+              "kind" : "fray",
+              "span" : 6,
+              "depthMm" : 0.611
+            }, {
+              "kind" : "fray",
+              "span" : 15,
+              "depthMm" : 0.321
+            } ]
+          },
+          "bottom" : {
+            "dings" : 0,
+            "defects" : [ ]
+          }
+        },
+        "corners" : {
+          "BL" : {
+            "pt" : [ 348.1656671493831, 3816.9886905095905 ],
+            "angle" : 88.8
+          },
+          "BR" : {
+            "pt" : [ 2808.534050869872, 3748.8134970691303 ],
+            "angle" : 88.68
+          },
+          "TL" : {
+            "pt" : [ 324.53884776709083, 364.06612387240824 ],
+            "angle" : 89.12
+          },
+          "TR" : {
+            "pt" : [ 2793.02721696989, 385.2859151688147 ],
+            "angle" : 89.24
+          }
+        },
+        "pxPerMm" : 39.1,
+        "totalDings" : 48
+      },
+      "cornerGeometryShadow" : {
+        "corners" : {
+          "topLeft" : {
+            "trusted" : true,
+            "radiusPx" : 27.7,
+            "wearTcgPx" : 0,
+            "radiusPctW" : 1.12,
+            "edgeFitValid" : true,
+            "wearSportsPx" : 27.7,
+            "liveRoundingScore" : 1000
+          },
+          "topRight" : {
+            "trusted" : true,
+            "radiusPx" : 34.3,
+            "wearTcgPx" : 0,
+            "radiusPctW" : 1.39,
+            "edgeFitValid" : true,
+            "wearSportsPx" : 34.3,
+            "liveRoundingScore" : 1000
+          },
+          "bottomLeft" : {
+            "trusted" : true,
+            "radiusPx" : 34.3,
+            "wearTcgPx" : 0,
+            "radiusPctW" : 1.39,
+            "edgeFitValid" : true,
+            "wearSportsPx" : 34.3,
+            "liveRoundingScore" : 1000
+          },
+          "bottomRight" : {
+            "trusted" : true,
+            "radiusPx" : 34.3,
+            "wearTcgPx" : 0,
+            "radiusPctW" : 1.39,
+            "edgeFitValid" : true,
+            "wearSportsPx" : 34.3,
+            "liveRoundingScore" : 1000
+          }
+        },
+        "r0TcgPx" : 124.4,
+        "r0SportsPx" : 0,
+        "cardWidthPx" : 2464,
+        "resolutionOk" : true
+      },
+      "cornerWhiteningShadow" : {
+        "corners" : {
+          "topLeft" : {
+            "cw" : 1000,
+            "cov" : 0,
+            "cref" : 19.4,
+            "lref" : 89,
+            "rimPx" : 22855,
+            "candPx" : 0,
+            "intensity" : 0
+          },
+          "topRight" : {
+            "cw" : 1000,
+            "cov" : 0,
+            "cref" : null,
+            "lref" : null,
+            "rimPx" : 0,
+            "candPx" : 0,
+            "intensity" : 0
+          },
+          "bottomLeft" : {
+            "cw" : 1000,
+            "cov" : 0,
+            "cref" : null,
+            "lref" : null,
+            "rimPx" : 0,
+            "candPx" : 0,
+            "intensity" : 0
+          },
+          "bottomRight" : {
+            "cw" : 1000,
+            "cov" : 0,
+            "cref" : 13,
+            "lref" : 16,
+            "rimPx" : 1584,
+            "candPx" : 0,
+            "intensity" : 0
+          }
+        }
+      }
+    },
+    "frontLlmObservations" : {
+      "edges" : {
+        "top" : {
+          "dents" : "none",
+          "lifting" : "none",
+          "notches" : "none",
+          "chipping" : "none",
+          "_examStatus" : "assessed",
+          "surfaceWear" : "none"
+        },
+        "left" : {
+          "dents" : "none",
+          "lifting" : "none",
+          "notches" : "none",
+          "chipping" : "none",
+          "_examStatus" : "assessed",
+          "surfaceWear" : "none"
+        },
+        "right" : {
+          "dents" : "none",
+          "lifting" : "none",
+          "notches" : "none",
+          "chipping" : "none",
+          "_examStatus" : "assessed",
+          "surfaceWear" : "none"
+        },
+        "bottom" : {
+          "dents" : "none",
+          "lifting" : "none",
+          "notches" : "none",
+          "chipping" : "none",
+          "_examStatus" : "assessed",
+          "surfaceWear" : "none"
+        }
+      },
+      "_guards" : {
+        "backFoil" : false,
+        "frontFoil" : true,
+        "backCreaseCvConfirmed" : null,
+        "frontCreaseCvConfirmed" : null
+      },
+      "corners" : {
+        "topLeft" : {
+          "damage" : "none",
+          "fraying" : "minor",
+          "rounding" : "minor",
+          "whitening" : "minor",
+          "_examStatus" : "assessed",
+          "cornerTouches" : "none"
+        },
+        "topRight" : {
+          "damage" : "none",
+          "fraying" : "none",
+          "rounding" : "minor",
+          "whitening" : "minor",
+          "_examStatus" : "assessed",
+          "cornerTouches" : "none"
+        },
+        "bottomLeft" : {
+          "damage" : "none",
+          "fraying" : "none",
+          "rounding" : "none",
+          "whitening" : "minor",
+          "_examStatus" : "assessed",
+          "cornerTouches" : "none"
+        },
+        "bottomRight" : {
+          "damage" : "none",
+          "fraying" : "minor",
+          "rounding" : "minor",
+          "whitening" : "minor",
+          "_examStatus" : "assessed",
+          "cornerTouches" : "none"
+        }
+      },
+      "surface" : {
+        "pits" : "none",
+        "dents" : "none",
+        "creasing" : "none",
+        "scuffing" : "none",
+        "staining" : "none",
+        "wrinkles" : "none",
+        "scratches" : "minor",
+        "visibility" : "clear",
+        "printDefects" : "none",
+        "foreignMaterial" : "none"
+      }
+    },
+    "backLlmObservations" : {
+      "edges" : {
+        "top" : {
+          "dents" : "none",
+          "lifting" : "none",
+          "notches" : "none",
+          "chipping" : "none",
+          "_examStatus" : "assessed",
+          "surfaceWear" : "none"
+        },
+        "left" : {
+          "dents" : "none",
+          "lifting" : "none",
+          "notches" : "none",
+          "chipping" : "none",
+          "_examStatus" : "assessed",
+          "surfaceWear" : "none"
+        },
+        "right" : {
+          "dents" : "none",
+          "lifting" : "none",
+          "notches" : "none",
+          "chipping" : "none",
+          "_examStatus" : "assessed",
+          "surfaceWear" : "none"
+        },
+        "bottom" : {
+          "dents" : "none",
+          "lifting" : "none",
+          "notches" : "none",
+          "chipping" : "none",
+          "_examStatus" : "assessed",
+          "surfaceWear" : "none"
+        }
+      },
+      "corners" : {
+        "topLeft" : {
+          "damage" : "none",
+          "fraying" : "none",
+          "rounding" : "none",
+          "whitening" : "minor",
+          "_examStatus" : "assessed",
+          "cornerTouches" : "none"
+        },
+        "topRight" : {
+          "damage" : "none",
+          "fraying" : "none",
+          "rounding" : "none",
+          "whitening" : "minor",
+          "_examStatus" : "assessed",
+          "cornerTouches" : "none"
+        },
+        "bottomLeft" : {
+          "damage" : "none",
+          "fraying" : "none",
+          "rounding" : "none",
+          "whitening" : "minor",
+          "_examStatus" : "assessed",
+          "cornerTouches" : "none"
+        },
+        "bottomRight" : {
+          "damage" : "none",
+          "fraying" : "none",
+          "rounding" : "none",
+          "whitening" : "minor",
+          "_examStatus" : "assessed",
+          "cornerTouches" : "none"
+        }
+      },
+      "surface" : {
+        "pits" : "none",
+        "dents" : "none",
+        "creasing" : "none",
+        "scuffing" : "none",
+        "staining" : "none",
+        "wrinkles" : "none",
+        "scratches" : "none",
+        "visibility" : "clear",
+        "printDefects" : "none",
+        "foreignMaterial" : "none"
+      }
+    },
+    "zoneCropUrls" : {
+      "back-full" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/back-full.jpg",
+      "front-full" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/front-full.jpg",
+      "back-topLeft" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/back-topLeft.jpg",
+      "back-top-edge" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/back-top-edge.jpg",
+      "back-topRight" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/back-topRight.jpg",
+      "front-topLeft" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/front-topLeft.jpg",
+      "back-left-edge" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/back-left-edge.jpg",
+      "front-top-edge" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/front-top-edge.jpg",
+      "front-topRight" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/front-topRight.jpg",
+      "back-bottomLeft" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/back-bottomLeft.jpg",
+      "back-right-edge" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/back-right-edge.jpg",
+      "front-left-edge" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/front-left-edge.jpg",
+      "back-bottom-edge" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/back-bottom-edge.jpg",
+      "back-bottomRight" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/back-bottomRight.jpg",
+      "back-damage-mask" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/back-damage-mask.png",
+      "front-bottomLeft" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/front-bottomLeft.jpg",
+      "front-right-edge" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/front-right-edge.jpg",
+      "front-bottom-edge" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/front-bottom-edge.jpg",
+      "front-bottomRight" : "/api/images/cardgrade/gradings/25c40415-4d2d-4b5e-a071-fca237411fda/crops/front-bottomRight.jpg"
+    },
+    "gradeLabel" : "MINT",
+    "limitingFactor" : "corners",
+    "gradeDrivers" : [ {
+      "zone" : "front-topLeft-corner",
+      "source" : "llm",
+      "attribute" : "rounding",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "front-topLeft-corner",
+      "source" : "llm",
+      "attribute" : "whitening",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "front-topLeft-corner",
+      "source" : "llm",
+      "attribute" : "fraying",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "front-topRight-corner",
+      "source" : "llm",
+      "attribute" : "rounding",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "front-topRight-corner",
+      "source" : "llm",
+      "attribute" : "whitening",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "front-bottomLeft-corner",
+      "source" : "llm",
+      "attribute" : "whitening",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "front-bottomRight-corner",
+      "source" : "llm",
+      "attribute" : "rounding",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "front-bottomRight-corner",
+      "source" : "llm",
+      "attribute" : "whitening",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "front-bottomRight-corner",
+      "source" : "llm",
+      "attribute" : "fraying",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "back-topLeft-corner",
+      "source" : "llm",
+      "attribute" : "whitening",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "back-topRight-corner",
+      "source" : "llm",
+      "attribute" : "whitening",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "back-bottomLeft-corner",
+      "source" : "llm",
+      "attribute" : "whitening",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "back-bottomRight-corner",
+      "source" : "llm",
+      "attribute" : "whitening",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    }, {
+      "zone" : "front-surface",
+      "source" : "llm",
+      "attribute" : "scratches",
+      "llmSeverity" : "minor",
+      "finalSeverity" : "minor"
+    } ],
+    "gradeJustification" : "Your card has been assigned an overall grade of 9 (Mint). This strong grade reflects the card's excellent condition across most zones, with only minor imperfections detected. The subgrade for corners was the primary limiting factor, preventing a higher overall assessment.",
+    "overallAnalysis" : "Your card presents in excellent condition, highlighted by perfect centering, edges, and surface. The AI vision analysis noted only minor scratches on the front surface, which did not impact its perfect subgrade. The corners, however, exhibited several minor imperfections including rounding, whitening, and fraying across multiple points, which limited the overall grade to a Mint 9.",
+    "zoneAnalysis" : {
+      "edges" : "Your card's edges achieved a subgrade of 10, as no defects were detected by the AI vision analysis on any of the card's edges.",
+      "corners" : "The front top-left corner shows minor rounding. The front top-left corner shows minor whitening. The front top-left corner shows minor fraying. The front top-right corner shows minor rounding. The front top-right corner shows minor whitening. The front bottom-left corner shows minor whitening. The front bottom-right corner shows minor rounding. The front bottom-right corner shows minor whitening. The front bottom-right corner shows minor fraying. The back top-left corner shows minor whitening. The back top-right corner shows minor whitening. The back bottom-left corner shows minor whitening. The back bottom-right corner shows minor whitening.",
+      "surface" : "The AI vision analysis identified minor scratches on the front surface of your card. Despite this, the overall surface condition earned a subgrade of 10.",
+      "centering" : "Your card's centering received a perfect subgrade of 10, indicating exceptional alignment of the image within the card borders on both the front and back."
+    },
+    "frontCornerScores" : {
+      "topLeft" : 9.36,
+      "topRight" : 9.43,
+      "bottomLeft" : 9.8,
+      "bottomRight" : 9.36
+    },
+    "frontEdgeScores" : {
+      "top" : 10,
+      "left" : 10,
+      "right" : 10,
+      "bottom" : 10
+    },
+    "backCornerScores" : {
+      "topLeft" : 9.8,
+      "topRight" : 9.8,
+      "bottomLeft" : 9.8,
+      "bottomRight" : 9.8
+    },
+    "backEdgeScores" : {
+      "top" : 10,
+      "left" : 10,
+      "right" : 10,
+      "bottom" : 10
+    },
+    "details" : {
+      "exam" : "llm-focus-v3",
+      "setName" : null,
+      "cardName" : null,
+      "cardYear" : null,
+      "subgrades" : {
+        "edges" : 10,
+        "corners" : 9,
+        "surface" : 10,
+        "centering" : 10
+      },
+      "cardNumber" : null,
+      "gradeLabel" : "Mint",
+      "isPristine" : false,
+      "zoneScores" : {
+        "edges" : {
+          "top" : 10,
+          "left" : 10,
+          "right" : 10,
+          "bottom" : 10
+        },
+        "corners" : {
+          "topLeft" : 9.36,
+          "topRight" : 9.43,
+          "bottomLeft" : 9.8,
+          "bottomRight" : 9.36
+        },
+        "surface" : 9.9,
+        "centering" : 10
+      },
+      "cardCategory" : "tcg",
+      "gradeDrivers" : [ {
+        "zone" : "front-topLeft-corner",
+        "source" : "llm",
+        "attribute" : "rounding",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "front-topLeft-corner",
+        "source" : "llm",
+        "attribute" : "whitening",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "front-topLeft-corner",
+        "source" : "llm",
+        "attribute" : "fraying",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "front-topRight-corner",
+        "source" : "llm",
+        "attribute" : "rounding",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "front-topRight-corner",
+        "source" : "llm",
+        "attribute" : "whitening",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "front-bottomLeft-corner",
+        "source" : "llm",
+        "attribute" : "whitening",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "front-bottomRight-corner",
+        "source" : "llm",
+        "attribute" : "rounding",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "front-bottomRight-corner",
+        "source" : "llm",
+        "attribute" : "whitening",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "front-bottomRight-corner",
+        "source" : "llm",
+        "attribute" : "fraying",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "back-topLeft-corner",
+        "source" : "llm",
+        "attribute" : "whitening",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "back-topRight-corner",
+        "source" : "llm",
+        "attribute" : "whitening",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "back-bottomLeft-corner",
+        "source" : "llm",
+        "attribute" : "whitening",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "back-bottomRight-corner",
+        "source" : "llm",
+        "attribute" : "whitening",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      }, {
+        "zone" : "front-surface",
+        "source" : "llm",
+        "attribute" : "scratches",
+        "llmSeverity" : "minor",
+        "finalSeverity" : "minor"
+      } ],
+      "identifyPath" : "index",
+      "reviewReason" : "We could not check the edition mark that separates \"Delta Species\" / \"30th Celebration: Classic Collection\" — please confirm the printing.",
+      "zoneAnalysis" : {
+        "edges" : "Your card's edges achieved a subgrade of 10, as no defects were detected by the AI vision analysis on any of the card's edges.",
+        "corners" : "The front top-left corner shows minor rounding. The front top-left corner shows minor whitening. The front top-left corner shows minor fraying. The front top-right corner shows minor rounding. The front top-right corner shows minor whitening. The front bottom-left corner shows minor whitening. The front bottom-right corner shows minor rounding. The front bottom-right corner shows minor whitening. The front bottom-right corner shows minor fraying. The back top-left corner shows minor whitening. The back top-right corner shows minor whitening. The back bottom-left corner shows minor whitening. The back bottom-right corner shows minor whitening.",
+        "surface" : "The AI vision analysis identified minor scratches on the front surface of your card. Despite this, the overall surface condition earned a subgrade of 10.",
+        "centering" : "Your card's centering received a perfect subgrade of 10, indicating exceptional alignment of the image within the card borders on both the front and back."
+      },
+      "backCvMetrics" : {
+        "edges" : {
+          "top" : {
+            "esw" : 1000,
+            "rim" : 1000,
+            "fill" : 1000,
+            "fray" : 1000
+          },
+          "left" : {
+            "esw" : 1000,
+            "rim" : 1000,
+            "fill" : 1000,
+            "fray" : 1000
+          },
+          "right" : {
+            "esw" : 1000,
+            "rim" : 1000,
+            "fill" : 1000,
+            "fray" : 1000
+          },
+          "bottom" : {
+            "esw" : 1000,
+            "rim" : 1000,
+            "fill" : 1000,
+            "fray" : 1000
+          }
+        },
+        "corners" : {
+          "topLeft" : {
+            "csw" : 1000,
+            "fill" : 1000,
+            "fray" : 1000,
+            "angle" : 1000,
+            "rounding" : 1000,
+            "whitening" : 1000
+          },
+          "topRight" : {
+            "csw" : 1000,
+            "fill" : 1000,
+            "fray" : 1000,
+            "angle" : 1000,
+            "rounding" : 1000,
+            "whitening" : 1000
+          },
+          "bottomLeft" : {
+            "csw" : 1000,
+            "fill" : 1000,
+            "fray" : 1000,
+            "angle" : 1000,
+            "rounding" : 1000,
+            "whitening" : 1000
+          },
+          "bottomRight" : {
+            "csw" : 1000,
+            "fill" : 1000,
+            "fray" : 1000,
+            "angle" : 1000,
+            "rounding" : 1000,
+            "whitening" : 1000
+          }
+        },
+        "backDiff" : {
+          "corr" : 0.956,
+          "edges" : {
+            "top" : 0.0197,
+            "left" : 3.7123,
+            "right" : 0.0614,
+            "bottom" : 0.7542
+          },
+          "corners" : {
+            "topLeft" : 0,
+            "topRight" : 0.1228,
+            "bottomLeft" : 2.726,
+            "bottomRight" : 0.2874
+          },
+          "surface" : 0.2954,
+          "coverage" : 0.5358,
+          "template" : "pokemon-cards"
+        },
+        "foilness" : {
+          "foil" : false,
+          "lstd" : 6.67
+        },
+        "centering" : {
+          "score" : 10,
+          "top_pct" : 47,
+          "left_pct" : 52,
+          "inner_box" : {
+            "h" : 0.9209612044006948,
+            "w" : 0.9001623376623377,
+            "x" : 0.05154220779220779,
+            "y" : 0.037348002316155184
+          },
+          "outer_box" : {
+            "h" : 1,
+            "w" : 1.0026,
+            "x" : -0.0025,
+            "y" : -3.0E-4
+          },
+          "right_pct" : 48,
+          "bottom_pct" : 53,
+          "lr_measurable" : true,
+          "tb_measurable" : true
+        },
+        "borderFace" : {
+          "l" : 40,
+          "chroma" : 24
+        },
+        "cardEdgeBox" : {
+          "h" : 1,
+          "w" : 1.0026,
+          "x" : -0.0025,
+          "y" : -3.0E-4
+        },
+        "edgeGeometryShadow" : {
+          "edges" : {
+            "top" : {
+              "dings" : 7,
+              "defects" : [ {
+                "kind" : "fray",
+                "span" : 11,
+                "depthMm" : 0.213
+              }, {
+                "kind" : "fray",
+                "span" : 24,
+                "depthMm" : 0.208
+              }, {
+                "kind" : "fray",
+                "span" : 8,
+                "depthMm" : 0.234
+              }, {
+                "kind" : "fray",
+                "span" : 20,
+                "depthMm" : 0.227
+              }, {
+                "kind" : "fray",
+                "span" : 10,
+                "depthMm" : 0.263
+              }, {
+                "kind" : "fill",
+                "span" : 9,
+                "depthMm" : 0.625
+              }, {
+                "kind" : "fill",
+                "span" : 7,
+                "depthMm" : 0.615
+              } ]
+            },
+            "left" : {
+              "dings" : 32,
+              "defects" : [ {
+                "kind" : "fill",
+                "span" : 5,
+                "depthMm" : 0.363
+              }, {
+                "kind" : "fill",
+                "span" : 19,
+                "depthMm" : 0.413
+              }, {
+                "kind" : "fill",
+                "span" : 10,
+                "depthMm" : 0.383
+              }, {
+                "kind" : "fill",
+                "span" : 8,
+                "depthMm" : 0.632
+              }, {
+                "kind" : "fill",
+                "span" : 6,
+                "depthMm" : 0.51
+              }, {
+                "kind" : "fill",
+                "span" : 11,
+                "depthMm" : 0.39
+              }, {
+                "kind" : "fill",
+                "span" : 13,
+                "depthMm" : 0.559
+              }, {
+                "kind" : "fill",
+                "span" : 5,
+                "depthMm" : 0.603
+              }, {
+                "kind" : "fill",
+                "span" : 11,
+                "depthMm" : 0.584
+              }, {
+                "kind" : "fray",
+                "span" : 8,
+                "depthMm" : 0.434
+              }, {
+                "kind" : "fill",
+                "span" : 9,
+                "depthMm" : 0.61
+              }, {
+                "kind" : "fill",
+                "span" : 11,
+                "depthMm" : 0.381
+              }, {
+                "kind" : "fray",
+                "span" : 10,
+                "depthMm" : 0.481
+              }, {
+                "kind" : "fray",
+                "span" : 7,
+                "depthMm" : 0.353
+              }, {
+                "kind" : "fill",
+                "span" : 16,
+                "depthMm" : 0.493
+              }, {
+                "kind" : "fill",
+                "span" : 9,
+                "depthMm" : 0.433
+              }, {
+                "kind" : "fill",
+                "span" : 29,
+                "depthMm" : 0.467
+              }, {
+                "kind" : "fill",
+                "span" : 6,
+                "depthMm" : 0.413
+              }, {
+                "kind" : "fill",
+                "span" : 9,
+                "depthMm" : 0.417
+              }, {
+                "kind" : "fill",
+                "span" : 16,
+                "depthMm" : 0.387
+              }, {
+                "kind" : "fill",
+                "span" : 27,
+                "depthMm" : 0.514
+              }, {
+                "kind" : "fill",
+                "span" : 27,
+                "depthMm" : 0.486
+              }, {
+                "kind" : "fill",
+                "span" : 8,
+                "depthMm" : 0.637
+              }, {
+                "kind" : "fray",
+                "span" : 12,
+                "depthMm" : 0.353
+              }, {
+                "kind" : "fill",
+                "span" : 11,
+                "depthMm" : 0.446
+              }, {
+                "kind" : "fill",
+                "span" : 17,
+                "depthMm" : 0.435
+              }, {
+                "kind" : "fray",
+                "span" : 10,
+                "depthMm" : 0.424
+              }, {
+                "kind" : "fray",
+                "span" : 12,
+                "depthMm" : 0.324
+              }, {
+                "kind" : "fill",
+                "span" : 7,
+                "depthMm" : 0.705
+              }, {
+                "kind" : "fray",
+                "span" : 9,
+                "depthMm" : 0.45
+              }, {
+                "kind" : "fill",
+                "span" : 15,
+                "depthMm" : 0.494
+              }, {
+                "kind" : "fray",
+                "span" : 34,
+                "depthMm" : 0.322
+              } ]
+            },
+            "right" : {
+              "dings" : 9,
+              "defects" : [ {
+                "kind" : "fill",
+                "span" : 15,
+                "depthMm" : 0.72
+              }, {
+                "kind" : "fill",
+                "span" : 20,
+                "depthMm" : 0.581
+              }, {
+                "kind" : "fray",
+                "span" : 7,
+                "depthMm" : 0.438
+              }, {
+                "kind" : "fill",
+                "span" : 11,
+                "depthMm" : 0.452
+              }, {
+                "kind" : "fill",
+                "span" : 5,
+                "depthMm" : 0.509
+              }, {
+                "kind" : "fray",
+                "span" : 20,
+                "depthMm" : 0.569
+              }, {
+                "kind" : "fray",
+                "span" : 20,
+                "depthMm" : 0.544
+              }, {
+                "kind" : "fray",
+                "span" : 6,
+                "depthMm" : 0.611
+              }, {
+                "kind" : "fray",
+                "span" : 15,
+                "depthMm" : 0.321
+              } ]
+            },
+            "bottom" : {
+              "dings" : 0,
+              "defects" : [ ]
+            }
+          },
+          "corners" : {
+            "BL" : {
+              "pt" : [ 348.1656671493831, 3816.9886905095905 ],
+              "angle" : 88.8
+            },
+            "BR" : {
+              "pt" : [ 2808.534050869872, 3748.8134970691303 ],
+              "angle" : 88.68
+            },
+            "TL" : {
+              "pt" : [ 324.53884776709083, 364.06612387240824 ],
+              "angle" : 89.12
+            },
+            "TR" : {
+              "pt" : [ 2793.02721696989, 385.2859151688147 ],
+              "angle" : 89.24
+            }
+          },
+          "pxPerMm" : 39.1,
+          "totalDings" : 48
+        },
+        "cornerGeometryShadow" : {
+          "corners" : {
+            "topLeft" : {
+              "trusted" : true,
+              "radiusPx" : 27.7,
+              "wearTcgPx" : 0,
+              "radiusPctW" : 1.12,
+              "edgeFitValid" : true,
+              "wearSportsPx" : 27.7,
+              "liveRoundingScore" : 1000
+            },
+            "topRight" : {
+              "trusted" : true,
+              "radiusPx" : 34.3,
+              "wearTcgPx" : 0,
+              "radiusPctW" : 1.39,
+              "edgeFitValid" : true,
+              "wearSportsPx" : 34.3,
+              "liveRoundingScore" : 1000
+            },
+            "bottomLeft" : {
+              "trusted" : true,
+              "radiusPx" : 34.3,
+              "wearTcgPx" : 0,
+              "radiusPctW" : 1.39,
+              "edgeFitValid" : true,
+              "wearSportsPx" : 34.3,
+              "liveRoundingScore" : 1000
+            },
+            "bottomRight" : {
+              "trusted" : true,
+              "radiusPx" : 34.3,
+              "wearTcgPx" : 0,
+              "radiusPctW" : 1.39,
+              "edgeFitValid" : true,
+              "wearSportsPx" : 34.3,
+              "liveRoundingScore" : 1000
+            }
+          },
+          "r0TcgPx" : 124.4,
+          "r0SportsPx" : 0,
+          "cardWidthPx" : 2464,
+          "resolutionOk" : true
+        },
+        "cornerWhiteningShadow" : {
+          "corners" : {
+            "topLeft" : {
+              "cw" : 1000,
+              "cov" : 0,
+              "cref" : 19.4,
+              "lref" : 89,
+              "rimPx" : 22855,
+              "candPx" : 0,
+              "intensity" : 0
+            },
+            "topRight" : {
+              "cw" : 1000,
+              "cov" : 0,
+              "cref" : null,
+              "lref" : null,
+              "rimPx" : 0,
+              "candPx" : 0,
+              "intensity" : 0
+            },
+            "bottomLeft" : {
+              "cw" : 1000,
+              "cov" : 0,
+              "cref" : null,
+              "lref" : null,
+              "rimPx" : 0,
+              "candPx" : 0,
+              "intensity" : 0
+            },
+            "bottomRight" : {
+              "cw" : 1000,
+              "cov" : 0,
+              "cref" : 13,
+              "lref" : 16,
+              "rimPx" : 1584,
+              "candPx" : 0,
+              "intensity" : 0
+            }
+          }
+        }
+      },
+      "backEdgeScores" : {
+        "top" : 10,
+        "left" : 10,
+        "right" : 10,
+        "bottom" : 10
+      },
+      "limitingFactor" : "corners",
+      "pipelineCommit" : "c2666f1b2e696cbcc7d6008179a44c68c44f4c0c",
+      "borderDetection" : {
+        "back" : {
+          "badCrop" : false,
+          "cvCentering" : {
+            "rect" : {
+              "H" : [ 0.9752893788345961, -0.0051390381817885775, -200.8013245272778, -0.0095358342137314, 0.9953429303897623, -187.93416536537575, -8.339481170465836E-6, -5.80277117943055E-7, 1 ],
+              "h" : 3798,
+              "w" : 2710,
+              "mx" : 123,
+              "my" : 172
+            },
+            "sides" : {
+              "top" : {
+                "conf" : 0.85,
+                "n_in" : 8,
+                "inner" : 302.96,
+                "n_out" : 8,
+                "outer" : 175.76,
+                "se_in" : 0.76,
+                "se_out" : 0.44,
+                "spread" : 3,
+                "conf_in" : 0.85,
+                "refused" : null,
+                "conf_out" : 0.91,
+                "rf_inner" : 300.97,
+                "rf_outer" : 172
+              },
+              "left" : {
+                "conf" : 0,
+                "n_in" : 7,
+                "inner" : 261.8,
+                "n_out" : 6,
+                "outer" : 111.37,
+                "se_in" : 11.2,
+                "se_out" : 1.73,
+                "spread" : 11.7,
+                "conf_in" : 0,
+                "refused" : null,
+                "conf_out" : 0.49,
+                "rf_inner" : 251.96,
+                "rf_outer" : 123
+              },
+              "right" : {
+                "conf" : 0.7,
+                "n_in" : 8,
+                "inner" : 243.38,
+                "n_out" : 8,
+                "outer" : 121.19,
+                "se_in" : 1.4,
+                "se_out" : 1.49,
+                "spread" : 3,
+                "conf_in" : 0.72,
+                "refused" : null,
+                "conf_out" : 0.7,
+                "rf_inner" : 245.83,
+                "rf_outer" : 123
+              },
+              "bottom" : {
+                "conf" : 0.86,
+                "n_in" : 8,
+                "inner" : 321.85,
+                "n_out" : 8,
+                "outer" : 173.42,
+                "se_in" : 0.69,
+                "se_out" : 0.44,
+                "spread" : 1.4,
+                "conf_in" : 0.86,
+                "refused" : null,
+                "conf_out" : 0.91,
+                "rf_inner" : 320.17,
+                "rf_outer" : 172
+              }
+            },
+            "stale" : false,
+            "valid" : true,
+            "lr_pct" : [ 51.2, 48.8 ],
+            "method" : "color-trace-v1",
+            "source" : {
+              "lr" : "rf",
+              "tb" : "cv"
+            },
+            "tb_pct" : [ 46.1, 53.9 ],
+            "cv_axes" : 1,
+            "refused" : { },
+            "rfPipeline" : {
+              "lr" : [ 51.2, 48.8 ],
+              "tb" : [ 46.5, 53.5 ]
+            },
+            "sides_pass" : 1
+          },
+          "modelVersion" : "cardgrade-borders-v2/16",
+          "poseResidual" : {
+            "focalPx" : 1209.6,
+            "residual" : 0.004871,
+            "focalRatio" : 0.3,
+            "focalAtBound" : true
+          },
+          "polygonAspect" : 0.7168894978322324,
+          "cvOuterChecked" : true,
+          "innerConfidence" : 0.9796318411827087,
+          "outerConfidence" : 0.9861150979995728,
+          "rotationApplied" : 0,
+          "cvOuterCorrected" : { }
+        },
+        "front" : {
+          "badCrop" : false,
+          "cvCentering" : {
+            "rect" : {
+              "H" : [ 0.9186294892361687, -0.043149372034159535, -293.93472920817806, -0.01023852527977755, 0.8987284223185134, -102.21742753565741, -2.7911118319257293E-5, -2.5320444978828586E-5, 1 ],
+              "h" : 3395,
+              "w" : 2452,
+              "mx" : 111,
+              "my" : 154
+            },
+            "sides" : {
+              "top" : {
+                "conf" : 0.85,
+                "n_in" : 8,
+                "inner" : 237.4,
+                "n_out" : 8,
+                "outer" : 140.09,
+                "se_in" : 0.75,
+                "se_out" : 0.33,
+                "spread" : 17,
+                "conf_in" : 0.85,
+                "refused" : "no_clean_ribbon",
+                "conf_out" : 0.93,
+                "rf_inner" : 230.11,
+                "rf_outer" : 154
+              },
+              "left" : {
+                "conf" : 0.36,
+                "n_in" : 7,
+                "inner" : 203.42,
+                "n_out" : 8,
+                "outer" : 99.23,
+                "se_in" : 2.93,
+                "se_out" : 0.74,
+                "spread" : 17.5,
+                "conf_in" : 0.36,
+                "refused" : "no_clean_ribbon",
+                "conf_out" : 0.85,
+                "rf_inner" : 197.06,
+                "rf_outer" : 111
+              },
+              "right" : {
+                "conf" : 0.55,
+                "n_in" : 6,
+                "inner" : 226.26,
+                "n_out" : 8,
+                "outer" : 117.26,
+                "se_in" : 0.93,
+                "se_out" : 1.33,
+                "spread" : 21,
+                "conf_in" : 0.61,
+                "refused" : "no_clean_ribbon",
+                "conf_out" : 0.73,
+                "rf_inner" : 207.76,
+                "rf_outer" : 111
+              },
+              "bottom" : {
+                "conf" : 0,
+                "n_in" : 5,
+                "inner" : 307.69,
+                "n_out" : 8,
+                "outer" : 166.78,
+                "se_in" : 16.01,
+                "se_out" : 0.59,
+                "spread" : 23.3,
+                "conf_in" : 0,
+                "refused" : "no_clean_ribbon",
+                "conf_out" : 0.88,
+                "rf_inner" : 269.55,
+                "rf_outer" : 154
+              }
+            },
+            "stale" : false,
+            "valid" : false,
+            "lr_pct" : null,
+            "method" : "color-trace-v1",
+            "source" : {
+              "lr" : "rf",
+              "tb" : "rf"
+            },
+            "tb_pct" : null,
+            "cv_axes" : 0,
+            "refused" : {
+              "top" : "no_clean_ribbon",
+              "left" : "no_clean_ribbon",
+              "right" : "no_clean_ribbon",
+              "bottom" : "no_clean_ribbon"
+            },
+            "rfPipeline" : {
+              "lr" : [ 47.1, 52.9 ],
+              "tb" : [ 39.7, 60.3 ]
+            },
+            "sides_pass" : 1
+          },
+          "modelVersion" : "cardgrade-borders-v2/16",
+          "poseResidual" : {
+            "focalPx" : 5343.8,
+            "residual" : 0.003902,
+            "focalRatio" : 1.325,
+            "focalAtBound" : false
+          },
+          "polygonAspect" : 0.7232467504979773,
+          "cvOuterChecked" : true,
+          "innerConfidence" : 0.9782545566558838,
+          "outerConfidence" : 0.984544575214386,
+          "rotationApplied" : 0,
+          "cvOuterCorrected" : { }
+        }
+      },
+      "centeringShadow" : {
+        "v" : 1,
+        "ts" : "2026-11-11T02:37:47.937Z",
+        "back" : {
+          "cv" : {
+            "conf" : {
+              "top" : 0.85,
+              "left" : 0,
+              "right" : 0.7,
+              "bottom" : 0.86
+            },
+            "stale" : false,
+            "valid" : true,
+            "lr_pct" : [ 51.2, 48.8 ],
+            "source" : {
+              "lr" : "rf",
+              "tb" : "cv"
+            },
+            "tb_pct" : [ 46.1, 53.9 ],
+            "cv_axes" : 1,
+            "refused" : { }
+          },
+          "deltas" : {
+            "published" : {
+              "lr" : null,
+              "tb" : 0.9
+            },
+            "rfPipeline" : {
+              "lr" : null,
+              "tb" : 0.4
+            }
+          },
+          "rfRect" : {
+            "lr" : [ 51.2, 48.8 ],
+            "tb" : [ 46.5, 53.5 ]
+          },
+          "published" : {
+            "score" : 10,
+            "source" : "roboflow",
+            "top_pct" : 47,
+            "left_pct" : 52,
+            "inner_box" : {
+              "h" : 0.9209612044006948,
+              "w" : 0.9001623376623377,
+              "x" : 0.05154220779220779,
+              "y" : 0.037348002316155184
+            },
+            "outer_box" : {
+              "h" : 1,
+              "w" : 1.0026,
+              "x" : -0.0025,
+              "y" : -3.0E-4
+            },
+            "right_pct" : 48,
+            "bottom_pct" : 53,
+            "lr_measurable" : true,
+            "tb_measurable" : true
+          },
+          "n8nOriginal" : {
+            "score" : 10,
+            "top_pct" : 46.3,
+            "left_pct" : 53.2,
+            "right_pct" : 46.8,
+            "bottom_pct" : 53.7
+          }
+        },
+        "flags" : {
+          "stale" : false,
+          "bigDelta" : false,
+          "badCropBack" : false,
+          "badCropFront" : false,
+          "cvCorrectedSides" : [ ]
+        },
+        "front" : {
+          "cv" : {
+            "conf" : {
+              "top" : 0.85,
+              "left" : 0.36,
+              "right" : 0.55,
+              "bottom" : 0
+            },
+            "stale" : false,
+            "valid" : false,
+            "lr_pct" : null,
+            "source" : {
+              "lr" : "rf",
+              "tb" : "rf"
+            },
+            "tb_pct" : null,
+            "cv_axes" : 0,
+            "refused" : {
+              "top" : "no_clean_ribbon",
+              "left" : "no_clean_ribbon",
+              "right" : "no_clean_ribbon",
+              "bottom" : "no_clean_ribbon"
+            }
+          },
+          "deltas" : {
+            "published" : {
+              "lr" : null,
+              "tb" : null
+            },
+            "rfPipeline" : {
+              "lr" : null,
+              "tb" : null
+            }
+          },
+          "rfRect" : {
+            "lr" : [ 47.1, 52.9 ],
+            "tb" : [ 39.7, 60.3 ]
+          },
+          "published" : {
+            "score" : 10,
+            "source" : "roboflow",
+            "top_pct" : 46,
+            "left_pct" : 49,
+            "inner_box" : {
+              "h" : 0.9319727891156463,
+              "w" : 0.9130044843049328,
+              "x" : 0.042600896860986545,
+              "y" : 0.031098153547133137
+            },
+            "outer_box" : {
+              "h" : 1.0008,
+              "w" : 1.003,
+              "x" : -0.001,
+              "y" : -8.0E-4
+            },
+            "right_pct" : 51,
+            "bottom_pct" : 54,
+            "lr_measurable" : true,
+            "tb_measurable" : true
+          },
+          "n8nOriginal" : {
+            "score" : 10,
+            "top_pct" : 46.9,
+            "left_pct" : 52.5,
+            "right_pct" : 47.5,
+            "bottom_pct" : 53.1
+          }
+        },
+        "wouldBeScore" : {
+          "0.5" : 10,
+          "0.6" : 10
+        }
+      },
+      "frontEdgeScores" : {
+        "top" : 10,
+        "left" : 10,
+        "right" : 10,
+        "bottom" : 10
+      },
+      "overallAnalysis" : "Your card presents in excellent condition, highlighted by perfect centering, edges, and surface. The AI vision analysis noted only minor scratches on the front surface, which did not impact its perfect subgrade. The corners, however, exhibited several minor imperfections including rounding, whitening, and fraying across multiple points, which limited the overall grade to a Mint 9.",
+      "pipelineVersion" : "v2",
+      "backCornerScores" : {
+        "topLeft" : 9.8,
+        "topRight" : 9.8,
+        "bottomLeft" : 9.8,
+        "bottomRight" : 9.8
+      },
+      "frontCornerScores" : {
+        "topLeft" : 9.36,
+        "topRight" : 9.43,
+        "bottomLeft" : 9.8,
+        "bottomRight" : 9.36
+      },
+      "selfInconsistency" : {
+        "flagged" : false
+      },
+      "gradeJustification" : "Your card has been assigned an overall grade of 9 (Mint). This strong grade reflects the card's excellent condition across most zones, with only minor imperfections detected. The subgrade for corners was the primary limiting factor, preventing a higher overall assessment.",
+      "backLlmObservations" : {
+        "edges" : {
+          "top" : {
+            "dents" : "none",
+            "lifting" : "none",
+            "notches" : "none",
+            "chipping" : "none",
+            "_examStatus" : "assessed",
+            "surfaceWear" : "none"
+          },
+          "left" : {
+            "dents" : "none",
+            "lifting" : "none",
+            "notches" : "none",
+            "chipping" : "none",
+            "_examStatus" : "assessed",
+            "surfaceWear" : "none"
+          },
+          "right" : {
+            "dents" : "none",
+            "lifting" : "none",
+            "notches" : "none",
+            "chipping" : "none",
+            "_examStatus" : "assessed",
+            "surfaceWear" : "none"
+          },
+          "bottom" : {
+            "dents" : "none",
+            "lifting" : "none",
+            "notches" : "none",
+            "chipping" : "none",
+            "_examStatus" : "assessed",
+            "surfaceWear" : "none"
+          }
+        },
+        "corners" : {
+          "topLeft" : {
+            "damage" : "none",
+            "fraying" : "none",
+            "rounding" : "none",
+            "whitening" : "minor",
+            "_examStatus" : "assessed",
+            "cornerTouches" : "none"
+          },
+          "topRight" : {
+            "damage" : "none",
+            "fraying" : "none",
+            "rounding" : "none",
+            "whitening" : "minor",
+            "_examStatus" : "assessed",
+            "cornerTouches" : "none"
+          },
+          "bottomLeft" : {
+            "damage" : "none",
+            "fraying" : "none",
+            "rounding" : "none",
+            "whitening" : "minor",
+            "_examStatus" : "assessed",
+            "cornerTouches" : "none"
+          },
+          "bottomRight" : {
+            "damage" : "none",
+            "fraying" : "none",
+            "rounding" : "none",
+            "whitening" : "minor",
+            "_examStatus" : "assessed",
+            "cornerTouches" : "none"
+          }
+        },
+        "surface" : {
+          "pits" : "none",
+          "dents" : "none",
+          "creasing" : "none",
+          "scuffing" : "none",
+          "staining" : "none",
+          "wrinkles" : "none",
+          "scratches" : "none",
+          "visibility" : "clear",
+          "printDefects" : "none",
+          "foreignMaterial" : "none"
+        }
+      },
+      "imageQualityWarnings" : [ ],
+      "identificationConfidence" : 0.3,
+      "identificationRawConfidence" : 0.98
+    }
+  }
+}
