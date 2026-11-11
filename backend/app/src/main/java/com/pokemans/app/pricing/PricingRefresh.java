@@ -1,9 +1,11 @@
 package com.pokemans.app.pricing;
 
 import com.pokemans.app.catalog.Catalog;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -22,9 +24,11 @@ class PricingRefresh {
     private final PricingProperties properties;
     private final PricingLock lock;
     private final PricingHealthcheck healthcheck;
+    private final PokeTracePullGaps pullGaps;
 
     PricingRefresh(ObjectProvider<PriceSource> sources, CompIngestionService ingestion, PriceSnapshotService snapshots, Catalog catalog,
-                   PricingProperties properties, PricingLock lock, PricingHealthcheck healthcheck) {
+                   PricingProperties properties, PricingLock lock, PricingHealthcheck healthcheck, PokeTracePullGaps pullGaps) {
+        this.pullGaps = pullGaps;
         this.lock = lock;
         this.healthcheck = healthcheck;
         this.sources = sources.orderedStream().toList();
@@ -37,7 +41,8 @@ class PricingRefresh {
     /**
      * Ingests, then snapshots, holding the pricing lock. Then pings the pricing healthcheck, when one is
      * set: success with the rows inserted, or fail when the run threw or an enabled source inserted
-     * nothing (a dead feed otherwise only shows as tables going stale). A busy skip sends nothing, so the
+     * nothing (a dead feed otherwise only shows as tables going stale), or when PokeTrace ran and a mapped
+     * card's pulls have stopped ({@link PokeTracePullGaps}). A busy skip sends nothing, so the
      * check's missed-ping alert covers it.
      *
      * @throws PricingLock.Busy if another refresh is running
@@ -71,7 +76,8 @@ class PricingRefresh {
         List<String> empty = new ArrayList<>();
         for (CompIngestRun run : runs) {
             summary.append("; ").append(run.getSource()).append(" fetched ").append(run.getFetched())
-                    .append(", inserted ").append(run.getInserted()).append(", duplicates ").append(run.getDuplicates())
+                    .append(", inserted ").append(run.getInserted()).append(", revised ").append(run.getRevised())
+                    .append(", duplicates ").append(run.getDuplicates())
                     .append(", rejected ").append(run.getRejected()).append(", errors ").append(run.getErrors().size());
             if (run.getInserted() == 0) {
                 empty.add(run.getSource());
@@ -82,10 +88,23 @@ class PricingRefresh {
         }
         summary.append("; ").append(result.snapshotSets().size()).append(" cards priced, ")
                 .append(result.skipped().size()).append(" skipped");
-        if (empty.isEmpty()) {
+        List<String> problems = new ArrayList<>();
+        if (!empty.isEmpty()) {
+            problems.add("no rows inserted from " + String.join(", ", empty));
+        }
+        if (runs.stream().anyMatch(r -> PokeTraceSource.NAME.equals(r.getSource()))) {
+            List<PokeTracePullGaps.Gap> gaps = pullGaps.gaps(Instant.now());
+            if (!gaps.isEmpty()) {
+                problems.add(gaps.size() + " mapped card(s) with no PokeTrace pull for " + pullGaps.gapDays() + "+ days: "
+                        + gaps.stream().limit(5).map(g -> (g.name() == null ? g.catalogCardId().toString() : g.name())
+                                + " (" + g.daysSince() + " days)").collect(Collectors.joining(", "))
+                        + (gaps.size() > 5 ? ", ..." : ""));
+            }
+        }
+        if (problems.isEmpty()) {
             healthcheck.success(summary.toString());
         } else {
-            healthcheck.fail(summary.append("; no rows inserted from ").append(String.join(", ", empty)).toString());
+            healthcheck.fail(summary.append("; ").append(String.join("; ", problems)).toString());
         }
     }
 

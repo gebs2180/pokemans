@@ -660,6 +660,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/poketrace/pull-gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["gaps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/poketrace/queue": {
         parameters: {
             query?: never;
@@ -2736,6 +2752,31 @@ export interface components {
             rejected: number;
             repriced: boolean;
         };
+        PokeTracePullGapControllerPullGapsView: {
+            enabled: boolean;
+            /** Format: int32 */
+            gapDays: number;
+            gaps: components["schemas"]["PokeTracePullGapsGap"][];
+        };
+        PokeTracePullGapsGap: {
+            /** Format: uuid */
+            cardItemId: string;
+            /** Format: uuid */
+            catalogCardId: string;
+            /** Format: int64 */
+            daysSince: number;
+            lastError: string;
+            /** Format: date-time */
+            lastPulledAt: string;
+            /** Format: date-time */
+            mappedAt: string;
+            name: string;
+            number: string;
+            /** Format: uuid */
+            orgId: string;
+            poketraceId: string;
+            setName: string;
+        };
         PokeTraceQueueControllerApproveRequest: {
             catalogCardIds: string[];
         };
@@ -4266,6 +4307,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["OutcomeControllerOutcomeView"];
+                };
+            };
+        };
+    };
+    gaps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PokeTracePullGapControllerPullGapsView"];
                 };
             };
         };

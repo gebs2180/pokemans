@@ -58,7 +58,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>PokeTrace days go through {@link PokeTraceDayGuard} first (parameter set 1.5.0 on): a day it
  * leaves out prices nothing, and is stored in {@code comp_exclusion} with its reason and in the
- * trace of the grade it would have priced.
+ * trace of the grade it would have priced. Before them, from 1.7.0, a PokeTrace day PokeTrace revised is
+ * priced at its newest revision, and each older row of the day is stored the same way under
+ * {@link PokeTraceRevisions#SUPERSEDED} ({@link PokeTraceRevisions}).
  */
 @Service
 class PriceSnapshotService {
@@ -171,7 +173,7 @@ class PriceSnapshotService {
             }
             finish(run.id(), "COMPLETE");
             log.info("Price snapshots as of {} (run {}{}): {} cards, {} already done, {} priced, {} with something skipped, "
-                            + "{} failed; {} comps read, {} left out by the day guards; {} s",
+                            + "{} failed; {} comps read, {} left out by the day guards or as superseded revisions; {} s",
                     asOf, run.id(), run.resumedFrom() == null ? "" : ", resuming " + run.resumedFrom(), cards.size(),
                     run.done().size(), sets.size(), skipped.size(), failed, compsRead, excluded,
                     Duration.between(started, Instant.now()).toSeconds());
@@ -254,7 +256,8 @@ class PriceSnapshotService {
 
     /**
      * The card's comps in the window, PokeTrace ones only while the card is still mapped to the PokeTrace
-     * card they came from, through the day guards.
+     * card they came from, each PokeTrace day at its revision for the parameter set, through the day guards.
+     * Superseded rows join the guards' exclusions.
      */
     private PokeTraceDayGuard.Result guarded(UUID cardId, LocalDate from, LocalDate asOf, Map<UUID, String> poketrace) {
         String prefix = poketrace.getOrDefault(cardId, "\0") + "|";
@@ -262,10 +265,17 @@ class PriceSnapshotService {
                 .filter(c -> properties.currency().equals(c.getCurrency()))
                 .filter(c -> !PokeTraceSource.NAME.equals(c.getSource()) || c.getExternalSaleId().startsWith(prefix))
                 .toList();
-        return PokeTraceDayGuard.apply(sold, params);
+        PokeTraceRevisions.Result revisions = PokeTraceRevisions.apply(sold, params);
+        PokeTraceDayGuard.Result guarded = PokeTraceDayGuard.apply(revisions.current(), params);
+        if (revisions.superseded().isEmpty()) {
+            return guarded;
+        }
+        List<PokeTraceDayGuard.Excluded> excluded = new ArrayList<>(revisions.superseded());
+        excluded.addAll(guarded.excluded());
+        return new PokeTraceDayGuard.Result(guarded.kept(), excluded);
     }
 
-    /** Trace lines for the days the guards left out of one grade of one company's table (raw damaged ones go to U). */
+    /** Trace lines for the days the guards left out, or a newer revision superseded, of one grade of one company's table (raw damaged ones go to U). */
     private static List<String> guardTrace(List<PokeTraceDayGuard.Excluded> excluded, PriceSource.GradingCompany company, Grade grade) {
         return excluded.stream().filter(e -> {
             SoldComp c = e.comp();
@@ -273,7 +283,8 @@ class PriceSnapshotService {
                 return c.getRawCondition() == PriceSource.RawCondition.DAMAGED;
             }
             return c.getGradingCompany() == company && Grade.foldHalf(c.getGrade()) == grade;
-        }).map(e -> new Trace.Step("price[" + grade + "]", "left out by the PokeTrace day guard " + e.rule(),
+        }).map(e -> new Trace.Step("price[" + grade + "]", PokeTraceRevisions.SUPERSEDED.equals(e.rule())
+                        ? "superseded by PokeTrace's revision of the day" : "left out by the PokeTrace day guard " + e.rule(),
                 e.comp().getId().toString(), e.comp().getSoldOn() + ": " + e.reason()).toString()).toList();
     }
 

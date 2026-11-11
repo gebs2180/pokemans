@@ -89,7 +89,10 @@ public record ParameterSet(
         // A condition built from a single pre-grade provider keeps confidence A only while the card's FMV (central
         // distribution, net prices) is at most this; above it the condition counts as B. Null before 1.6.0, where a
         // one-provider condition is never better than B (Zach, 2026-11-10)
-        BigDecimal oneProviderMaxFmvForA) {
+        BigDecimal oneProviderMaxFmvForA,
+        // A PokeTrace day PokeTrace revised is priced at its newest revision, the older rows left out with the revision
+        // that replaced them. Null before 1.7.0, where revisions are ignored and the day's first row stays its comp
+        Boolean pokeTraceLatestRevision) {
 
     public static final String DEFAULT_VERSION = "1.0.0";
 
@@ -173,7 +176,8 @@ public record ParameterSet(
                 optionalInteger(p, "pricing.pokeTraceDay.minOtherDays"),
                 optionalInteger(p, "pricing.pokeTraceDay.neighbourhoodDays"),
                 optionalDecimal(p, "values.maxSigma"),
-                optionalDecimal(p, "confidence.oneProviderMaxFmvForA"));
+                optionalDecimal(p, "confidence.oneProviderMaxFmvForA"),
+                optionalBoolean(p, "pricing.pokeTraceDay.latestRevision"));
     }
 
     /** Comps confidence is also no better than the count behind the modal grade's price (1.3.0 on). */
@@ -213,6 +217,14 @@ public record ParameterSet(
      */
     public boolean oneProviderAboveA(BigDecimal fmv) {
         return oneProviderMaxFmvForA == null || fmv.compareTo(oneProviderMaxFmvForA) > 0;
+    }
+
+    /**
+     * True when a revised PokeTrace day is priced at its newest revision (1.7.0 on); before, revisions are ignored and
+     * the day's first row is its comp.
+     */
+    public boolean pricesPokeTraceRevisions() {
+        return Boolean.TRUE.equals(pokeTraceLatestRevision);
     }
 
     /** Liquidity tier for a card's monthly sales count. */

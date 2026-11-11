@@ -26,6 +26,8 @@ class CompIngestRun extends AssignedIdEntity<UUID> {
     private int fetched;
     private int inserted;
     private int duplicates;
+    /** PokeTrace days whose values changed since we stored them, appended as revisions (V30). */
+    private int revised;
     private int rejected;
     @JdbcTypeCode(SqlTypes.JSON)
     private List<String> errors;
@@ -55,6 +57,10 @@ class CompIngestRun extends AssignedIdEntity<UUID> {
 
     void duplicate() {
         duplicates++;
+    }
+
+    void revised() {
+        revised++;
     }
 
     void rejected(String reason) {
@@ -89,6 +95,10 @@ class CompIngestRun extends AssignedIdEntity<UUID> {
 
     int getDuplicates() {
         return duplicates;
+    }
+
+    int getRevised() {
+        return revised;
     }
 
     int getRejected() {

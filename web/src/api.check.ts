@@ -107,6 +107,8 @@ export type ApiTypesMatchTheBackend = {
   PokeTraceQueueItem: Ok<Covers<S['PokeTraceSuggestionsQueueItem'], A.PokeTraceQueueItem>>
   PokeTraceQueue: Ok<Covers<S['PokeTraceQueueControllerQueueView'], A.PokeTraceQueue>>
   PokeTraceApproval: Ok<Covers<S['PokeTraceSuggestionsApproval'], A.PokeTraceApproval>>
+  PokeTracePullGap: Ok<Covers<S['PokeTracePullGapsGap'], A.PokeTracePullGap>>
+  PokeTracePullGaps: Ok<Covers<S['PokeTracePullGapControllerPullGapsView'], A.PokeTracePullGaps>>
   VerificationView: Ok<Covers<S['ProvenanceControllerVerificationView'], A.VerificationView>>
   CustodyView: Ok<Covers<S['ProvenanceControllerCustodyView'], A.CustodyView>>
   ProvenanceView: Ok<Covers<S['ProvenanceControllerProvenanceView'], A.ProvenanceView>>

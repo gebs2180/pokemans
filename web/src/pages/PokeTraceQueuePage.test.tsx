@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import type { PokeTraceQueue, PokeTraceQueueItem } from '../api'
+import type { PokeTracePullGaps, PokeTraceQueue, PokeTraceQueueItem } from '../api'
 import { respond } from '../test/auth0'
 import { PokeTraceQueuePage } from './PokeTraceQueuePage'
 
@@ -24,6 +24,8 @@ const queue: PokeTraceQueue = {
   ],
 }
 
+const noGaps: PokeTracePullGaps = { enabled: true, gapDays: 2, gaps: [] }
+
 function page() {
   render(
     <MemoryRouter>
@@ -37,6 +39,7 @@ describe('PokeTraceQueuePage', () => {
     const user = userEvent.setup()
     const fetch = vi.fn(async (url: string) => {
       if (url.endsWith('/approve')) return respond(200, { mapped: ['c1'], failures: [] })
+      if (url.endsWith('/pull-gaps')) return respond(200, noGaps)
       return respond(200, queue)
     })
     vi.stubGlobal('fetch', fetch)
@@ -58,7 +61,11 @@ describe('PokeTraceQueuePage', () => {
 
   it('starts a search and says to come back', async () => {
     const user = userEvent.setup()
-    const fetch = vi.fn(async (url: string) => (url.endsWith('/search') ? respond(200, { started: 3, searching: true }) : respond(200, queue)))
+    const fetch = vi.fn(async (url: string) =>
+      url.endsWith('/search')
+        ? respond(200, { started: 3, searching: true })
+        : respond(200, url.endsWith('/pull-gaps') ? noGaps : queue),
+    )
     vi.stubGlobal('fetch', fetch)
     page()
     await user.click(await screen.findByRole('button', { name: 'Find suggestions' }))
@@ -66,9 +73,45 @@ describe('PokeTraceQueuePage', () => {
   })
 
   it('says when PokeTrace is off', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => respond(200, { enabled: false, searching: false, items: [] })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        respond(200, url.endsWith('/pull-gaps') ? { enabled: false, gapDays: 2, gaps: [] } : { enabled: false, searching: false, items: [] }),
+      ),
+    )
     page()
     expect(await screen.findByText("PokeTrace isn't enabled on this server.")).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Find suggestions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Pulls stopped' })).not.toBeInTheDocument()
+  })
+
+  it('lists mapped cards whose pulls have stopped, with the last error', async () => {
+    const gaps: PokeTracePullGaps = {
+      enabled: true,
+      gapDays: 2,
+      gaps: [
+        {
+          catalogCardId: 'c9', orgId: 'o1', cardItemId: 'i9', name: 'Lugia', number: '9', setName: 'Neo Genesis', poketraceId: 'pt-l',
+          mappedAt: '2026-11-01T00:00:00Z', lastPulledAt: '2026-11-05T12:00:00Z', lastError: 'PokeTrace timed out', daysSince: 5,
+        },
+        {
+          catalogCardId: 'c8', orgId: 'o1', cardItemId: 'i8', name: 'Ho-Oh', number: null, setName: null, poketraceId: 'pt-h',
+          mappedAt: '2026-11-07T00:00:00Z', lastPulledAt: null, lastError: null, daysSince: 3,
+        },
+      ],
+    }
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => respond(200, url.endsWith('/pull-gaps') ? gaps : queue)))
+    page()
+    expect(await screen.findByRole('heading', { name: 'Pulls stopped' })).toBeInTheDocument()
+    expect(screen.getByText(/no successful PokeTrace pull for 2\+ days/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Lugia #9' })).toHaveAttribute('href', '/admin/review/o1/i9')
+    expect(screen.getByText('PokeTrace timed out')).toBeInTheDocument()
+    expect(screen.getByText(/never since mapped \(3 days\)/)).toBeInTheDocument()
+  })
+
+  it('says when every mapped card has been pulled', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => respond(200, url.endsWith('/pull-gaps') ? noGaps : queue)))
+    page()
+    expect(await screen.findByText('Every mapped card has been pulled in the last 2 days.')).toBeInTheDocument()
   })
 })

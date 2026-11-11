@@ -1,13 +1,17 @@
 package com.pokemans.app.pricing;
 
 import com.pokemans.app.catalog.Catalog;
+import java.math.BigDecimal;
 import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +68,7 @@ class CompIngestionService {
                     // One card failing (timeout, unknown card at the vendor) doesn't stop the run.
                     log.warn("Price source {} failed for catalog card {}", source.name(), card.catalogCardId(), e);
                     run.failed(card.catalogCardId() + ": " + e.getMessage());
+                    logPull(run, card, false, 0, e.getMessage());
                     continue;
                 }
                 run.fetched(sales.size());
@@ -71,17 +76,19 @@ class CompIngestionService {
                 try {
                     CardTally tally = transactions.execute(status -> store(source, card, sales, today, retrievedAt, run.getId()));
                     tally.addTo(run);
+                    logPull(run, card, true, sales.size(), null);
                 } catch (RuntimeException e) {
                     log.warn("Storing comps from {} for catalog card {} failed", source.name(), card.catalogCardId(), e);
                     run.failed(card.catalogCardId() + ": storing failed: " + e.getMessage());
+                    logPull(run, card, false, sales.size(), "storing failed: " + e.getMessage());
                 }
             }
         } finally {
             run.finish();
             runs.save(run);
         }
-        log.info("Comp ingestion from {}: {} fetched, {} new, {} duplicates, {} rejected", source.name(), run.getFetched(),
-                run.getInserted(), run.getDuplicates(), run.getRejected());
+        log.info("Comp ingestion from {}: {} fetched, {} new, {} revised, {} duplicates, {} rejected", source.name(),
+                run.getFetched(), run.getInserted(), run.getRevised(), run.getDuplicates(), run.getRejected());
         return run;
     }
 
@@ -89,6 +96,7 @@ class CompIngestionService {
     private static final class CardTally {
         private int inserted;
         private int duplicates;
+        private int revised;
         private final List<String> rejected = new ArrayList<>();
 
         void addTo(CompIngestRun run) {
@@ -97,6 +105,9 @@ class CompIngestionService {
             }
             for (int i = 0; i < duplicates; i++) {
                 run.duplicate();
+            }
+            for (int i = 0; i < revised; i++) {
+                run.revised();
             }
             rejected.forEach(run::rejected);
         }
@@ -111,11 +122,72 @@ class CompIngestionService {
                 tally.rejected.add(sale.externalSaleId() + ": " + problem);
             } else if (insertIfNew(new SoldComp(sale, source.licence(), retrievedAt, runId))) {
                 tally.inserted++;
+            } else if (source.revisesSales() && appendRevision(source, sale, retrievedAt, runId)) {
+                tally.revised++;
             } else {
                 tally.duplicates++;
             }
         }
         return tally;
+    }
+
+    /**
+     * The day {@code sale} is for is already stored. If the source's values for it changed since (see
+     * {@link PokeTraceRevisions#changed}), appends them as the day's next revision; the stored rows are
+     * never edited. True if a revision was appended.
+     */
+    private boolean appendRevision(PriceSource source, PriceSource.Sale sale, Instant retrievedAt, UUID runId) {
+        String day = sale.externalSaleId();
+        // starts_with, not LIKE: '_' in a tier name would be a wildcard.
+        List<StoredRow> rows = jdbc.sql("""
+                        select external_sale_id, price, raw::text as raw from sold_comp
+                        where source = :source and (external_sale_id = :day or starts_with(external_sale_id, :prefix))""")
+                .param("source", source.name())
+                .param("day", day)
+                .param("prefix", day + "#r")
+                .query((rs, i) -> new StoredRow(rs.getString("external_sale_id"), rs.getBigDecimal("price"), rs.getString("raw")))
+                .list();
+        StoredRow latest = rows.stream().filter(r -> day.equals(PokeTraceRevisions.day(r.externalSaleId())))
+                .max(Comparator.comparingInt(r -> PokeTraceRevisions.revision(r.externalSaleId()))).orElse(null);
+        if (latest == null) {
+            return false;
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> storedRaw = latest.raw() == null ? null : json.readValue(latest.raw(), Map.class);
+        if (!PokeTraceRevisions.changed(latest.price(), storedRaw, sale)) {
+            return false;
+        }
+        int next = PokeTraceRevisions.revision(latest.externalSaleId()) + 1;
+        Map<String, Object> raw = new LinkedHashMap<>(sale.raw() == null ? Map.of() : sale.raw());
+        raw.put("revision", next);
+        raw.put("revises", latest.externalSaleId());
+        PriceSource.Sale revision = new PriceSource.Sale(sale.source(), PokeTraceRevisions.revisionId(day, next),
+                sale.catalogCardId(), sale.gradingCompany(), sale.grade(), sale.rawCondition(), sale.price(), sale.currency(),
+                sale.soldDate(), sale.url(), sale.listingType(), raw);
+        return insertIfNew(new SoldComp(revision, source.licence(), retrievedAt, runId));
+    }
+
+    private record StoredRow(String externalSaleId, BigDecimal price, String raw) {
+    }
+
+    /** One row per card per pull, so a mapped card whose pulls stopped can be flagged. Never fails the run. */
+    private void logPull(CompIngestRun run, Catalog.CardSummary card, boolean ok, int fetched, String error) {
+        try {
+            jdbc.sql("""
+                            insert into comp_pull (id, ingest_run_id, source, catalog_card_id, ok, fetched, error, pulled_at)
+                            values (:id, :runId, :source, :card, :ok, :fetched, :error, :at)""")
+                    .param("id", UUID.randomUUID())
+                    .param("runId", run.getId())
+                    .param("source", run.getSource())
+                    .param("card", card.catalogCardId())
+                    .param("ok", ok)
+                    .param("fetched", fetched)
+                    .param("error", error == null ? null : error.length() > 1000 ? error.substring(0, 1000) : error, Types.VARCHAR)
+                    .param("at", OffsetDateTime.now(ZoneOffset.UTC))
+                    .update();
+        } catch (RuntimeException e) {
+            log.warn("Logging the {} pull for catalog card {} failed", run.getSource(), card.catalogCardId(), e);
+        }
     }
 
     /** Inserts the comp unless its (source, external sale id) is already stored; true if inserted. */
