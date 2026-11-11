@@ -5,7 +5,7 @@ plugins {
 dependencies {
     implementation(platform(org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES))
     implementation(platform("org.springframework.modulith:spring-modulith-bom:2.1.2"))
-    implementation(platform("software.amazon.awssdk:bom:2.57.7"))
+    implementation(platform("software.amazon.awssdk:bom:2.57.11"))
 
     implementation(project(":valuation-core"))
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
