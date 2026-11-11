@@ -78,8 +78,33 @@ class ProviderReadingTest {
     }
 
     @Test
+    void cardGradeCenteringIsStoredButCapsNothing() {
+        Map<String, Object> grading = Map.of("status", "completed", "results", Map.of(
+                "overallGrade", 9.0, "psaPrediction", 9.0, "centering", 6.0,
+                "cvMetrics", Map.of("centering", Map.of("score", 600, "left_pct", 35, "right_pct", 65))));
+        PreGradeProvider.Reading reading = ((PreGradeProvider.Done) CardGradePreGradeProvider.read(grading)).reading();
+
+        assertThat(reading.centering()).isEqualTo(6.0);
+        assertThat(reading.details()).containsKey("providerFrontCentering").doesNotContainKeys("frontCentering", "backCentering");
+        PredictionRequest request = new PredictionRequest(java.util.UUID.randomUUID(), java.util.UUID.randomUUID(),
+                CardGradePreGradeProvider.NAME, List.of(java.util.UUID.randomUUID()), null);
+        ProviderPrediction prediction = ProviderPrediction.succeeded(request, reading, grading, 1);
+        assertThat(prediction.centeringCap()).isNull();
+        assertThat(ProviderPrediction.centeringCap(List.of(prediction))).isNull();
+        assertThat(prediction.gradeForDistribution()).isEqualTo(9.0);
+    }
+
+    @Test
+    void cardGradeCompletedWithoutAnyGradeIsAFailure() {
+        assertThat(CardGradePreGradeProvider.read(Map.of("status", "completed", "results", Map.of())))
+                .isInstanceOf(PreGradeProvider.Failed.class);
+    }
+
+    @Test
     void cardGradePendingAndRejected() {
         assertThat(CardGradePreGradeProvider.read(Map.of("status", "pending"))).isInstanceOf(PreGradeProvider.Pending.class);
+        assertThat(CardGradePreGradeProvider.read(Map.of("status", "processing"))).isInstanceOf(PreGradeProvider.Pending.class);
+        assertThat(CardGradePreGradeProvider.read(Map.of("status", "refunded"))).isInstanceOf(PreGradeProvider.Failed.class);
         PreGradeProvider.Failed failed = (PreGradeProvider.Failed) CardGradePreGradeProvider.read(Map.of("status", "failed",
                 "rejection", Map.of("code", "card_cropped", "message", "Take it out of the toploader")));
         assertThat(failed.reason()).contains("toploader");

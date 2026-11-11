@@ -22,7 +22,7 @@ class DistributionBuilderTest {
                 new ConditionProperties.Worker(false, Duration.ofSeconds(15), 8, Duration.ofHours(24), Duration.ofMinutes(10), 10,
                         Duration.ofDays(7), Duration.ofMinutes(2)),
                 new ConditionProperties.Ximilar(false, null, null, Duration.ofSeconds(30)),
-                new ConditionProperties.CardGrade(false, null, null, "PSA", Duration.ofSeconds(30)),
+                new ConditionProperties.CardGrade(false, null, null, "PSA", Duration.ofSeconds(30), 10, 50, Duration.ofHours(1)),
                 new ConditionProperties.Centering(false, 1.0));
     }
 
