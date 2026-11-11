@@ -169,6 +169,17 @@ pokemans:
       shipping: 5
       insurance: 2
       time-to-cash-rate: 0.02
+  notify:
+    # Emails to each side of a sale and a daily new-listings digest for buyers, sent through Resend
+    # (deep review C2, Zach 2026-11-10). Off until a key is set: with sending off, every email is still
+    # stored in email_message, as skipped.
+    email:
+      enabled: ${NOTIFY_EMAIL_ENABLED:false}
+      api-key: ${RESEND_API_KEY:}
+      from: ${NOTIFY_EMAIL_FROM:Rawmark <notify@rawmark.app>}
+      app-url: ${NOTIFY_APP_URL:https://beta.rawmark.app}
+      # The digest goes out daily at 14:00 UTC, on days with new cards.
+      digest-cron: ${NOTIFY_DIGEST_CRON:0 0 14 * * *}
   provenance:
     # A custody check (vault statement, in-person visit, ...) counts this long, then lapses and the
     # card gets no advance until it is checked again.

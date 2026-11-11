@@ -6,11 +6,15 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.springframework.data.domain.AfterDomainEventPublication;
+import org.springframework.data.domain.DomainEvents;
 
 /** Our firm offer on one card, valid until {@link #getExpiresAt()}. Append-only. */
 @Entity
@@ -254,8 +258,26 @@ class ListingEvent extends AssignedIdEntity<UUID> {
     private DeclinedReason declinedReason;
     private String note;
     private Instant createdAt;
+    /** Set only on a new event, so saving it tells other modules once; a loaded one never does. */
+    @Transient
+    private boolean announce;
 
     protected ListingEvent() {
+    }
+
+    /** What other modules hear when this event is saved: a deal step, after the save succeeds. */
+    @DomainEvents
+    List<Object> announcements() {
+        if (!announce) {
+            return List.of();
+        }
+        DealStepRecorded.Step step = DealStepRecorded.step(type);
+        return step == null ? List.of() : List.of(new DealStepRecorded(listingId, step, createdAt));
+    }
+
+    @AfterDomainEventPublication
+    void announced() {
+        announce = false;
     }
 
     @Override
@@ -270,6 +292,7 @@ class ListingEvent extends AssignedIdEntity<UUID> {
         this.actorOrgId = actorOrgId;
         this.actorUserId = actorUserId;
         this.createdAt = Instant.now();
+        this.announce = true;
     }
 
     static ListingEvent accepted(UUID listingId, UUID buyerOrgId, UUID userId) {

@@ -115,6 +115,7 @@ export type ApiTypesMatchTheBackend = {
   VerifyRequest: Ok<Covers<S['ProvenanceControllerVerifyRequest'], A.VerifyRequest>>
   CustodyRequest: Ok<Covers<S['ProvenanceControllerCustodyRequest'], A.CustodyRequest>>
   GradingCost: Ok<Covers<S['GradingCost'], A.GradingCost>>
+  EmailPreferences: Ok<Covers<S['EmailPreferencesControllerEmailPreferencesView'], A.EmailPreferences>>
   ValuationDefaults: Ok<Covers<S['ValuationControllerDefaults'], A.ValuationDefaults>>
   RunSummary: Ok<Covers<S['ValuationsRunSummary'], A.RunSummary>>
   TraceStep: Ok<Covers<S['TraceStep'], A.TraceStep>>
