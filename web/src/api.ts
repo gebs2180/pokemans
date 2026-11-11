@@ -854,7 +854,7 @@ export type RawSales = { lowest: number | null; sales: number; since: string; be
 /** One grade's sold price as the offer used it: the recency-weighted median of so many sales over the window. */
 export type SoldPrice = { gradingCompany: string; grade: string; price: number; sales: number; windowDays: number }
 
-export type LessSure = 'PHOTOS' | 'FEW_SALES' | 'OLD_SALES' | 'ESTIMATED_GRADES'
+export type LessSure = 'PHOTOS' | 'FEW_SALES' | 'OLD_SALES' | 'ESTIMATED_GRADES' | 'HIGH_VALUE'
 
 /** The confidence in words, for sellers and buyers who don't know what a B means. */
 export const LESS_SURE: Record<LessSure, string> = {
@@ -862,6 +862,7 @@ export const LESS_SURE: Record<LessSure, string> = {
   FEW_SALES: 'there are only a few recent sales',
   OLD_SALES: "the sales haven't been refreshed lately",
   ESTIMATED_GRADES: "a grade it's likely to be has no sales of its own, so we estimated it",
+  HIGH_VALUE: "it's worth enough that one photo grading isn't enough to be very sure of its condition",
 }
 
 export const CONFIDENCE_WORDS: Record<Confidence, string> = {

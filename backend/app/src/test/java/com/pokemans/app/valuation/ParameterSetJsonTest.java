@@ -52,7 +52,31 @@ class ParameterSetJsonTest {
         String json = ValuationService.JSON.writeValueAsString(v150);
 
         assertThat(json).contains("\"dayMaxSpread\":3").contains("\"dayMaxMultipleOfTier\":3")
-                .contains("\"dayGuardMinOtherDays\":2").contains("\"dayGuardNeighbourhoodDays\":90").contains("\"maxSigma\":1.0");
+                .contains("\"dayGuardMinOtherDays\":2").contains("\"dayGuardNeighbourhoodDays\":90").contains("\"maxSigma\":1.0")
+                .doesNotContain("oneProviderMaxFmvForA");
         assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v150);
+    }
+
+    @Test
+    void version160KeepsItsOneProviderThreshold() throws Exception {
+        ParameterSet v160 = ParameterSet.load("1.6.0");
+
+        String json = ValuationService.JSON.writeValueAsString(v160);
+
+        assertThat(json).contains("\"oneProviderMaxFmvForA\":1000");
+        assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v160);
+    }
+
+    /** A stored run's assessment input re-serializes as before unless it is a one-provider condition. */
+    @Test
+    void anAssessmentInputMentionsOneProviderOnlyWhenTrue() throws Exception {
+        var id = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+        var before = new CardInputs.Assessment(id, 1, java.util.Map.of(), com.pokemans.valuation.Confidence.A);
+        var one = new CardInputs.Assessment(id, 1, java.util.Map.of(), com.pokemans.valuation.Confidence.A, true);
+
+        assertThat(ValuationService.JSON.writeValueAsString(before)).doesNotContain("oneProvider");
+        assertThat(ValuationService.JSON.writeValueAsString(one)).contains("\"oneProvider\":true");
+        assertThat(ValuationService.JSON.readValue(ValuationService.JSON.writeValueAsString(before), CardInputs.Assessment.class))
+                .isEqualTo(before);
     }
 }

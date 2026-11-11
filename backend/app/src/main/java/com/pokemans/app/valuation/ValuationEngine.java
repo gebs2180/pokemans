@@ -194,6 +194,7 @@ final class ValuationEngine {
             photo = card.assessment().photoConfidence();
         }
         return new CardValuator.Input(card.cardItemId().toString(), distribution, table, sigma, card.prices().salesPerMonth(),
-                card.copiesHeld(), photo, penalties, card.graded() != null);
+                card.copiesHeld(), photo, penalties, card.graded() != null,
+                card.graded() == null && card.assessment().fromOneProvider());
     }
 }

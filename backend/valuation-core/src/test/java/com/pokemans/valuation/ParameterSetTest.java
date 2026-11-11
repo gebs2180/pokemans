@@ -98,7 +98,7 @@ class ParameterSetTest {
                 v130.compsForB(), v130.compsForC(), v130.minFmv(), v130.singleCardCap(), v130.topFiveCap(),
                 v130.correlationThreshold(), v130.correlationHaircut(), v130.suggestedAlphaLow(), v130.suggestedAlphaHigh(),
                 v130.gradeFirstMinLift(), v130.gradeFirstTopN(), v130.fallbackSigma(), v130.offerMarginA(),
-                v130.offerMarginB(), v130.offerMarginC(), null, null, null, null, null, null, null, null, null)).isEqualTo(v120);
+                v130.offerMarginB(), v130.offerMarginC(), null, null, null, null, null, null, null, null, null, null)).isEqualTo(v120);
 
         java.util.Properties p = new java.util.Properties();
         try (var in = ParameterSet.class.getResourceAsStream("/parameter-sets/1.3.0.properties")) {
@@ -130,6 +130,25 @@ class ParameterSetTest {
         assertThat(v150.cardLadderExcludesTen()).isEqualTo(v140.cardLadderExcludesTen());
         assertThat(v150.fallbackSigma()).isEqualByComparingTo(v140.fallbackSigma());
         assertThat(v150.offerMargin(Confidence.C)).isEqualByComparingTo(v140.offerMargin(Confidence.C));
+    }
+
+    @Test
+    void version160AddsTheOneProviderThresholdForA() {
+        ParameterSet v150 = ParameterSet.load("1.5.0");
+        ParameterSet v160 = ParameterSet.load("1.6.0");
+
+        assertThat(v160.oneProviderMaxFmvForA()).isEqualByComparingTo("1000");
+        assertThat(v160.oneProviderAboveA(new BigDecimal("1000"))).isFalse();
+        assertThat(v160.oneProviderAboveA(new BigDecimal("1000.01"))).isTrue();
+        // Before 1.6.0 there is no threshold: one provider is never A.
+        assertThat(v150.oneProviderMaxFmvForA()).isNull();
+        assertThat(v150.oneProviderAboveA(BigDecimal.ONE)).isTrue();
+        // Everything else is 1.5.0's.
+        assertThat(v160.maxSigma()).isEqualByComparingTo(v150.maxSigma());
+        assertThat(v160.dayMaxSpread()).isEqualByComparingTo(v150.dayMaxSpread());
+        assertThat(v160.offerMaxTenToNineMultiple()).isEqualByComparingTo(v150.offerMaxTenToNineMultiple());
+        assertThat(v160.offerMargin(Confidence.A)).isEqualByComparingTo(v150.offerMargin(Confidence.A));
+        assertThat(v160.compsForA()).isEqualByComparingTo(v150.compsForA());
     }
 
     @Test

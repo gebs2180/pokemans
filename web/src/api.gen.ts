@@ -1567,6 +1567,7 @@ export interface components {
             distribution: {
                 [key: string]: number;
             };
+            oneProvider: boolean;
             /** @enum {string} */
             photoConfidence: "A" | "B" | "C" | "D";
             /** Format: int32 */

@@ -1,5 +1,6 @@
 package com.pokemans.app.valuation;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.pokemans.valuation.Confidence;
 import com.pokemans.valuation.Grade;
 import com.pokemans.valuation.GradePrice;
@@ -44,8 +45,28 @@ public record CardInputs(
                            List<Integer> dexIds) {
     }
 
-    /** @param photoConfidence the assessment's photo confidence */
-    public record Assessment(UUID assessmentId, int version, Map<Grade, BigDecimal> distribution, Confidence photoConfidence) {
+    /**
+     * @param photoConfidence the assessment's photo confidence
+     * @param oneProvider     a system assessment built from a single pre-grade provider: its A holds only up to
+     *                        the parameter set's FMV threshold (Zach, 2026-11-10). True or null, never false, and
+     *                        left out of the JSON while null: runs and offers stored before it read back, re-serialize
+     *                        and hash exactly as they did. Read it with {@link #fromOneProvider()}.
+     */
+    public record Assessment(UUID assessmentId, int version, Map<Grade, BigDecimal> distribution, Confidence photoConfidence,
+                             @JsonInclude(JsonInclude.Include.NON_NULL) Boolean oneProvider) {
+
+        public Assessment {
+            oneProvider = Boolean.TRUE.equals(oneProvider) ? Boolean.TRUE : null;
+        }
+
+        public Assessment(UUID assessmentId, int version, Map<Grade, BigDecimal> distribution, Confidence photoConfidence) {
+            this(assessmentId, version, distribution, photoConfidence, null);
+        }
+
+        /** True when the condition was built from a single pre-grade provider. */
+        public boolean fromOneProvider() {
+            return Boolean.TRUE.equals(oneProvider);
+        }
     }
 
     /**
