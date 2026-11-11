@@ -1,5 +1,7 @@
-# Production stack for one small VPS (docs/hosting.md). Run from this folder:
-#   docker compose -f compose.prod.yml --env-file .env up -d --build
+# Production stack for one small VPS (docs/hosting.md). Deploy with deploy.sh: it pulls the images CI built for
+# one commit (.github/workflows/images.yml) and tags them `deployed`, which is what this file runs unless
+# IMAGE_TAG says otherwise.
+# The build sections are the fallback when GHCR can't be used: `deploy.sh --build` builds on the server.
 # Every secret comes from .env (copy .env.example; never commit it). Only Caddy publishes ports.
 
 x-logging: &logging
@@ -27,7 +29,7 @@ services:
 
   backend:
     build: ../backend
-    image: pokemans-backend
+    image: ghcr.io/gebs2180/pokemans-backend:${IMAGE_TAG:-deployed}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -70,7 +72,8 @@ services:
         VITE_AUTH0_CLIENT_ID: ${AUTH0_SPA_CLIENT_ID:?set AUTH0_SPA_CLIENT_ID in .env}
         VITE_AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
         VITE_COLLATERAL_ENABLED: "false"
-    image: pokemans-web
+    # CI bakes the Auth0 settings in from repository variables; the build args above apply only to --build.
+    image: ghcr.io/gebs2180/pokemans-web:${IMAGE_TAG:-deployed}
     restart: unless-stopped
     depends_on:
       - backend
@@ -96,7 +99,7 @@ services:
   # Nightly Postgres dump and photo-bucket copy to the backup bucket, and optionally off-site (backup/backup.sh).
   backup:
     build: ./backup
-    image: pokemans-backup
+    image: ghcr.io/gebs2180/pokemans-backup:${IMAGE_TAG:-deployed}
     restart: unless-stopped
     depends_on:
       postgres:

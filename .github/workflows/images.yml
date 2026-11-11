@@ -1,0 +1,77 @@
+name: Images
+
+# Builds the production images on every push to main and pushes them to GHCR, tagged with the commit SHA and
+# `main`, so the server pulls a built image instead of building one, and can roll back to an earlier SHA
+# (deploy/deploy.sh, docs/hosting.md "Day to day"). The packages are private; the server logs in with a
+# read-only token.
+on:
+  push:
+    branches: [main]
+  # Rebuild a commit by hand, for example after setting the web build variables below.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: backend
+          - name: web
+            context: web
+          - name: backup
+            context: deploy/backup
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Vite bakes the Auth0 settings into the web bundle. They are not secrets (the browser sees them), so they
+      # are repository variables: Settings → Secrets and variables → Actions → Variables.
+      - name: Web build variables are set
+        if: matrix.name == 'web'
+        env:
+          AUTH0_DOMAIN: ${{ vars.AUTH0_DOMAIN }}
+          AUTH0_SPA_CLIENT_ID: ${{ vars.AUTH0_SPA_CLIENT_ID }}
+          AUTH0_AUDIENCE: ${{ vars.AUTH0_AUDIENCE }}
+        run: |
+          if [ -z "$AUTH0_DOMAIN" ] || [ -z "$AUTH0_SPA_CLIENT_ID" ] || [ -z "$AUTH0_AUDIENCE" ]; then
+            echo "::error::Set the repository variables AUTH0_DOMAIN, AUTH0_SPA_CLIENT_ID and AUTH0_AUDIENCE (docs/hosting.md)"
+            exit 1
+          fi
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          pull: true
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/pokemans-${{ matrix.name }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/pokemans-${{ matrix.name }}:main
+          # The source label links each package to this repository.
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          # Only the web image reads these; the others ignore them.
+          build-args: |
+            VITE_AUTH0_DOMAIN=${{ vars.AUTH0_DOMAIN }}
+            VITE_AUTH0_CLIENT_ID=${{ vars.AUTH0_SPA_CLIENT_ID }}
+            VITE_AUTH0_AUDIENCE=${{ vars.AUTH0_AUDIENCE }}
+            VITE_COLLATERAL_ENABLED=false
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
