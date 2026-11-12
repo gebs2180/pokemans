@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention, type Org, type OrgType, type OverdueDeals, type PokeTraceQueue, type QueueItem } from '../api'
+import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention, type Org, type OrgType, type OverdueDeals, type PokeTraceQueue, type PreGradeFailures, type QueueItem } from '../api'
 import { useLoad } from '../useLoad'
 import { Loading, PageError } from '../ui'
 import { OrgPeople } from './OrgPeople'
@@ -12,11 +12,16 @@ function NeedsAttention({ deals, dealsError }: { deals: DealAttention[] | null; 
   const queue = useLoad(() => api<QueueItem[]>('GET', '/api/admin/review-queue'), [api])
   const overdue = useLoad(() => api<OverdueDeals>('GET', '/api/admin/deals/overdue'), [api])
   const poketrace = useLoad(() => api<PokeTraceQueue>('GET', '/api/admin/poketrace/queue'), [api])
-  const error = queue.error ?? overdue.error ?? poketrace.error ?? dealsError
+  const failures = useLoad(() => api<PreGradeFailures>('GET', '/api/admin/pregrade-failures'), [api])
+  const error = queue.error ?? overdue.error ?? poketrace.error ?? failures.error ?? dealsError
   if (error) return <p className="error" role="alert">Couldn't load what needs attention: {error}</p>
-  if (!queue.data || !overdue.data || !poketrace.data || !deals) return null
+  if (!queue.data || !overdue.data || !poketrace.data || !failures.data || !deals) return null
 
+  const f = failures.data
+  const resumes = f.submitsResumeAt ? `; sending resumes ${new Date(f.submitsResumeAt).toLocaleString()}` : ''
   const lines = [
+    { count: f.failedCards - f.outOfCreditsCards, text: 'whose automatic condition check failed: Ask again, or assess by hand', to: '/admin/review' },
+    { count: f.outOfCreditsCards, text: `waiting on CardGrade, which is out of credits${resumes}: Ask again once it has some`, to: '/admin/review' },
     { count: queue.data.filter((i) => i.identified && !i.priced).length, text: 'with no comps', to: '/admin/review' },
     { count: deals.length, text: 'with a return or payment to sort out', to: '/admin/deals' },
     { count: overdue.data.labels, text: "past the ship-by date, not marked shipped", to: '/admin/deals' },
@@ -36,6 +41,7 @@ function NeedsAttention({ deals, dealsError }: { deals: DealAttention[] | null; 
           ))}
         </ul>
       )}
+      {f.outOfCredits && f.outOfCreditsCards === 0 && <p className="muted">CardGrade is out of credits{resumes}. Cards sent now will fail.</p>}
     </section>
   )
 }

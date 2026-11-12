@@ -68,7 +68,7 @@ export function NeedsYou({ orgs }: { orgs: Membership[] }) {
           )
         })}
       </ul>
-      <p className="muted small">We don't send notifications yet, so check back here.</p>
+      <p className="muted small">We email you about a sale, but not when a card's condition or offer is ready, so check back here for those.</p>
     </section>
   )
 }

@@ -3449,6 +3449,26 @@
         },
         "required" : [ "candidates", "cardItemId", "catalogCardId", "edition", "error", "language", "name", "number", "orgId", "searchedAt", "setName", "suggestedId", "variant" ]
       },
+      "PreGradeFailuresSummary" : {
+        "properties" : {
+          "failedCards" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "outOfCredits" : {
+            "type" : "boolean"
+          },
+          "outOfCreditsCards" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "submitsResumeAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "failedCards", "outOfCredits", "outOfCreditsCards", "submitsResumeAt" ]
+      },
       "PricingControllerCompRequest" : {
         "properties" : {
           "grade" : {
@@ -6075,6 +6095,24 @@
           }
         },
         "tags" : [ "poke-trace-queue-controller" ]
+      }
+    },
+    "/api/admin/pregrade-failures" : {
+      "get" : {
+        "operationId" : "preGradeFailures",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PreGradeFailuresSummary"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "condition-controller" ]
       }
     },
     "/api/admin/reports/{reportId}/download" : {

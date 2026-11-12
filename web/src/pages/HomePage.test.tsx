@@ -221,6 +221,7 @@ describe('Admin', () => {
       '/api/admin/review-queue': [{ identified: true, priced: false }, { identified: true, priced: true }, { identified: false, priced: false }],
       '/api/admin/deals/attention': [{}, {}],
       '/api/admin/deals/overdue': { labels: 1 },
+      '/api/admin/pregrade-failures': { failedCards: 0, outOfCreditsCards: 0, outOfCredits: false, submitsResumeAt: null },
       '/api/admin/poketrace/queue': { enabled: true, searching: false, items: [{}, {}, {}] },
     })
     page('/admin')

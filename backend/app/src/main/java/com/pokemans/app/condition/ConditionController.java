@@ -92,10 +92,13 @@ class ConditionController {
     private final Directory directory;
     private final Prices prices;
     private final Assessments assessments;
+    private final PreGradeFailures preGradeFailures;
 
     ConditionController(ConditionService condition, ConditionAssessmentRepository assessmentRepository,
                         PredictionRequestRepository requestRepository, CardItems cardItems, Catalog catalog, BlobStore blobs,
-                        StorageProperties storage, Directory directory, Prices prices, Assessments assessments) {
+                        StorageProperties storage, Directory directory, Prices prices, Assessments assessments,
+                        PreGradeFailures preGradeFailures) {
+        this.preGradeFailures = preGradeFailures;
         this.assessments = assessments;
         this.condition = condition;
         this.assessmentRepository = assessmentRepository;
@@ -136,6 +139,16 @@ class ConditionController {
                     open.getOrDefault(c.id(), 0L).intValue(), orgNames.get(c.orgId()),
                     id != null && prices.latest(id.catalogCardId(), "PSA").isPresent());
         }).toList();
+    }
+
+    /**
+     * Cards in the review queue left unassessed because the automatic pre-grade failed: they wait for Ask again or
+     * a reviewer. {@code outOfCredits} is true when CardGrade ran out of credits, which hits every card at once;
+     * {@code submitsResumeAt} is when sending resumes, if known.
+     */
+    @GetMapping("/pregrade-failures")
+    PreGradeFailures.Summary preGradeFailures() {
+        return preGradeFailures.summary(cardItems.captureComplete().stream().filter(c -> !c.lot()).map(CardItems.CardItemRef::id).toList());
     }
 
     @GetMapping("/orgs/{orgId}/cards/{cardId}/condition")
