@@ -19,7 +19,7 @@ class QualityCheckerTest {
     private final QualityChecker checker = new QualityChecker(defaults());
 
     static QualityProperties defaults() {
-        return new QualityProperties(1200, 1600, 1024, 100, 250, 0.03, 800, 0.05, 0.06, 0.25, 50);
+        return new QualityProperties(1200, 1600, 1024, 100, 250, 0.03, 800, 0.05, 0.06, 0.25, 1000, 50);
     }
 
     /** A dark, lightly speckled table, like a cloth or desk. */
@@ -150,6 +150,28 @@ class QualityCheckerTest {
 
         assertThat(result.reasons()).containsExactly(RetakeReason.CARD_TOO_SMALL);
         assertThat(result.card().coverage()).isLessThan(0.25);
+    }
+
+    @Test
+    void cardLargeInPixelsPassesAtLowCoverage() {
+        // A landscape phone shot: the card is about 1100 px wide but covers under a quarter of the frame.
+        BufferedImage image = withCard(background(3000, 2400), 1100, 1500, 1200, 2);
+
+        QualityChecker.Result result = checker.check(png(image));
+
+        assertThat(result.card().coverage()).isLessThan(0.25);
+        assertThat(result.card().widthPx()).isBetween(1050.0, 1150.0);
+        assertThat(result.reasons()).isEmpty();
+    }
+
+    @Test
+    void cardSmallInPixelsAndFrameIsTooSmall() {
+        BufferedImage image = withCard(background(3000, 2400), 900, 1500, 1200, 2);
+
+        QualityChecker.Result result = checker.check(png(image));
+
+        assertThat(result.card().coverage()).isLessThan(0.25);
+        assertThat(result.reasons()).containsExactly(RetakeReason.CARD_TOO_SMALL);
     }
 
     @Test

@@ -25,7 +25,7 @@ import org.opencv.imgproc.Imgproc;
 
 class CenteringMeasurerTest {
 
-    static final QualityProperties QUALITY = new QualityProperties(1200, 1600, 1024, 100, 250, 0.03, 800, 0.05, 0.06, 0.25, 50);
+    static final QualityProperties QUALITY = new QualityProperties(1200, 1600, 1024, 100, 250, 0.03, 800, 0.05, 0.06, 0.25, 1000, 50);
 
     private static final int CARD_WIDTH = 1000;
     private static final int CARD_HEIGHT = (int) Math.round(CARD_WIDTH * 88.0 / 63.0);

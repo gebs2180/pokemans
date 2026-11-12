@@ -45,6 +45,10 @@ class CardDetector {
     }
 
     record Corner(double x, double y) {
+
+        double distanceTo(Corner other) {
+            return Math.hypot(x - other.x, y - other.y);
+        }
     }
 
     /**
@@ -57,6 +61,11 @@ class CardDetector {
      */
     record Detection(List<Corner> corners, double coverage, double aspect, double blurScore, double glareFraction,
                      byte[] cropJpeg) {
+
+        /** The card's width in full-resolution pixels: the mean of its top and bottom edges. */
+        double widthPx() {
+            return (corners.get(0).distanceTo(corners.get(1)) + corners.get(3).distanceTo(corners.get(2))) / 2;
+        }
     }
 
     private final QualityProperties properties;

@@ -76,7 +76,10 @@ pokemans:
     # the same photo with a slight blur 75, a clearly soft one 17).
     max-card-aspect-error: 0.05
     min-card-margin-fraction: 0.06
+    # Too small = under 25% of the frame AND under 1000 px wide (the crop's width). A 12 MP landscape
+    # shot with the card ~1400 px wide covered only 23% and was refused wrongly (2026-11-12).
     min-card-coverage: 0.25
+    min-card-width-px: 1000
     min-card-blur-score: 50
   catalog:
     tcgdex:
