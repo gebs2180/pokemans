@@ -8,6 +8,7 @@ import com.pokemans.valuation.GradePriceTable;
 import com.pokemans.valuation.GradePricer;
 import com.pokemans.valuation.GradingCost;
 import com.pokemans.valuation.ParameterSet;
+import com.pokemans.valuation.RawFloors;
 import com.pokemans.valuation.StepDownRatios;
 import com.pokemans.valuation.Trace;
 import com.pokemans.valuation.Volatility;
@@ -210,6 +211,9 @@ class PriceSnapshotService {
             Optional<Volatility.Estimate> sigma = Volatility.fromSeries(cc.graded().values().stream()
                     .flatMap(byGrade -> byGrade.values().stream()).toList(), asOf, properties.volatilityMonths());
             BigDecimal salesPerMonth = salesPerMonth(cc.all(), asOf);
+            // Raw-sale floors (1.8.0 on) are the card's raw market, the same for every company's set.
+            Trace floorTrace = new Trace();
+            Map<Grade, RawFloors.Floor> floors = RawFloors.compute(params, asOf, cc.raw(), floorTrace);
             for (Map.Entry<PriceSource.GradingCompany, Map<Grade, List<Comp>>> entry : cc.graded().entrySet()) {
                 PriceSource.GradingCompany company = entry.getKey();
                 Map<Grade, BigDecimal> ratios = Optional.ofNullable(ratiosByEra.get(era(card, company)))
@@ -227,8 +231,14 @@ class PriceSnapshotService {
                 for (GradePrice price : table.all()) {
                     List<String> trace = new ArrayList<>(guardTrace(guarded.excluded(), company, price.grade()));
                     table.trace().stepsFor("price[" + price.grade() + "]").stream().map(Trace.Step::toString).forEach(trace::add);
+                    RawFloors.Floor floor = floors.get(price.grade());
+                    if (floor != null) {
+                        trace.addAll(rawGuardTrace(guarded.excluded(), floor.condition()));
+                        floorTrace.stepsFor("raw_floor[" + floor.condition() + "]").stream().map(Trace.Step::toString)
+                                .forEach(trace::add);
+                    }
                     snapshots.save(new PriceSnapshot(setId, cardId, asOf, company,
-                            properties.currency(), price, price.stepDownRatio(), params.version(), trace));
+                            properties.currency(), price, price.stepDownRatio(), params.version(), trace).withRawFloor(floor));
                 }
                 stats.save(new PriceStats(setId, cardId, asOf, sigma.map(Volatility.Estimate::sigma).orElse(null),
                         sigma.map(Volatility.Estimate::changes).orElse(0), salesPerMonth));
@@ -288,6 +298,15 @@ class PriceSnapshotService {
                 e.comp().getId().toString(), e.comp().getSoldOn() + ": " + e.reason()).toString()).toList();
     }
 
+    /** Trace lines for the raw sale days of one condition that the guards left out, or a newer revision superseded. */
+    private static List<String> rawGuardTrace(List<PokeTraceDayGuard.Excluded> excluded, RawFloors.Condition condition) {
+        return excluded.stream().filter(e -> e.comp().getGrade() == null && e.comp().getRawCondition() != null
+                        && e.comp().getRawCondition().name().equals(condition.name()))
+                .map(e -> new Trace.Step("raw_floor[" + condition + "]", PokeTraceRevisions.SUPERSEDED.equals(e.rule())
+                        ? "superseded by PokeTrace's revision of the day" : "left out by the PokeTrace day guard " + e.rule(),
+                        e.comp().getId().toString(), e.comp().getSoldOn() + ": " + e.reason()).toString()).toList();
+    }
+
     /** Far enough back for the extended comp window and for σ's buckets. */
     private int lookbackDays(ParameterSet params) {
         return Math.max(params.extendedWindowDays(), (properties.volatilityMonths() + 1) * Volatility.PERIOD_DAYS);
@@ -301,16 +320,18 @@ class PriceSnapshotService {
     /**
      * @param graded  graded comps per grading company and grade, half grades folded down
      * @param damaged raw damaged or altered sales, for U
+     * @param raw     raw sales per condition that can floor a grade (near mint to heavily played)
      * @param all     every comp of the card, raw included, for its sales rate
      */
     private record CardComps(Map<PriceSource.GradingCompany, Map<Grade, List<Comp>>> graded, List<Comp> damaged,
-                             List<SoldComp> all) {
+                             Map<RawFloors.Condition, List<Comp>> raw, List<SoldComp> all) {
     }
 
     /** @param all the card's usable comps: our currency, after the day guards */
     private static CardComps load(List<SoldComp> all) {
         Map<PriceSource.GradingCompany, Map<Grade, List<Comp>>> graded = new EnumMap<>(PriceSource.GradingCompany.class);
         List<Comp> damaged = new ArrayList<>();
+        Map<RawFloors.Condition, List<Comp>> raw = new EnumMap<>(RawFloors.Condition.class);
         for (SoldComp c : all) {
             Comp comp = new Comp(c.getId().toString(), c.getSoldOn(), c.getPrice());
             if (c.getGrade() != null) {
@@ -320,9 +341,11 @@ class PriceSnapshotService {
             } else if (c.getRawCondition() == PriceSource.RawCondition.DAMAGED
                     || c.getRawCondition() == PriceSource.RawCondition.ALTERED) {
                 damaged.add(comp);
+            } else if (c.getRawCondition() != null) {
+                raw.computeIfAbsent(RawFloors.Condition.valueOf(c.getRawCondition().name()), k -> new ArrayList<>()).add(comp);
             }
         }
-        return new CardComps(graded, damaged, all);
+        return new CardComps(graded, damaged, raw, all);
     }
 
     private static BigDecimal salesPerMonth(List<SoldComp> all, LocalDate asOf) {

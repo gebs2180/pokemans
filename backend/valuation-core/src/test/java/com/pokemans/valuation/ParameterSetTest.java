@@ -98,7 +98,7 @@ class ParameterSetTest {
                 v130.compsForB(), v130.compsForC(), v130.minFmv(), v130.singleCardCap(), v130.topFiveCap(),
                 v130.correlationThreshold(), v130.correlationHaircut(), v130.suggestedAlphaLow(), v130.suggestedAlphaHigh(),
                 v130.gradeFirstMinLift(), v130.gradeFirstTopN(), v130.fallbackSigma(), v130.offerMarginA(),
-                v130.offerMarginB(), v130.offerMarginC(), null, null, null, null, null, null, null, null, null, null, null)).isEqualTo(v120);
+                v130.offerMarginB(), v130.offerMarginC(), null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null)).isEqualTo(v120);
 
         java.util.Properties p = new java.util.Properties();
         try (var in = ParameterSet.class.getResourceAsStream("/parameter-sets/1.3.0.properties")) {
@@ -130,6 +130,26 @@ class ParameterSetTest {
         assertThat(v150.cardLadderExcludesTen()).isEqualTo(v140.cardLadderExcludesTen());
         assertThat(v150.fallbackSigma()).isEqualByComparingTo(v140.fallbackSigma());
         assertThat(v150.offerMargin(Confidence.C)).isEqualByComparingTo(v140.offerMargin(Confidence.C));
+    }
+
+    @Test
+    void version180AddsRawSaleFloors() {
+        ParameterSet v170 = ParameterSet.load("1.7.0");
+        ParameterSet v180 = ParameterSet.load("1.8.0");
+
+        assertThat(v180.hasRawFloors()).isTrue();
+        assertThat(v180.rawFloorIsDerived()).isFalse();
+        assertThat(v180.rawFloorNearMint()).isEqualTo("7,8,9,10");
+        assertThat(v180.rawFloorQuantile()).isEqualByComparingTo("0.25");
+        assertThat(v180.rawFloorMinSaleDays()).isEqualTo(2);
+        assertThat(v170.hasRawFloors()).isFalse();
+        assertThat(v170.rawFloorNearMint()).isNull();
+        // Everything else is 1.7.0's.
+        assertThat(v180.pricesPokeTraceRevisions()).isEqualTo(v170.pricesPokeTraceRevisions());
+        assertThat(v180.oneProviderMaxFmvForA()).isEqualByComparingTo(v170.oneProviderMaxFmvForA());
+        assertThat(v180.offerMargin(Confidence.A)).isEqualByComparingTo(v170.offerMargin(Confidence.A));
+        assertThat(v180.windowDays()).isEqualTo(v170.windowDays());
+        assertThat(v180.halfLifeDays()).isEqualTo(v170.halfLifeDays());
     }
 
     @Test

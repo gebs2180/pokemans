@@ -4,6 +4,7 @@ import com.pokemans.valuation.Confidence;
 import com.pokemans.valuation.Grade;
 import com.pokemans.valuation.GradePrice;
 import com.pokemans.valuation.ParameterSet;
+import com.pokemans.valuation.RawFloors;
 import com.pokemans.valuation.Staleness;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -31,10 +32,11 @@ public class Prices {
      * @param basis      grades a derived price came from
      * @param confidence       confidence today: as priced, lowered if the table is stale
      * @param pricedConfidence confidence when the table was priced
+     * @param rawFloor         the grade's raw-sale floor (parameter set 1.8.0), or null for none
      */
     public record GradeSnapshot(Grade grade, BigDecimal price, String currency, GradePrice.Method method, int n,
                                 List<UUID> compIds, Integer windowDays, List<Grade> basis, BigDecimal stepDownRatio,
-                                Confidence confidence, Confidence pricedConfidence) {
+                                Confidence confidence, Confidence pricedConfidence, RawFloors.Floor rawFloor) {
     }
 
     /**
@@ -134,7 +136,7 @@ public class Prices {
             grades.put(grade, new GradeSnapshot(grade, row.getPrice(), row.getCurrency(), row.getMethod(), row.getN(),
                     row.getCompIds().stream().map(UUID::fromString).toList(), row.getWindowDays(),
                     row.getBasisGrades().stream().map(Prices::parse).toList(), row.getStepDownRatio(),
-                    Staleness.drop(row.getConfidence(), stale), row.getConfidence()));
+                    Staleness.drop(row.getConfidence(), stale), row.getConfidence(), row.getRawFloor()));
         }
         Optional<PriceStats> stat = stats.findBySnapshotSetId(snapshotSetId);
         return Optional.of(new CardPrices(snapshotSetId, first.getCatalogCardId(), first.getAsOf(), first.getParameterSet(),

@@ -1654,6 +1654,7 @@ export interface components {
             method: "OBSERVED" | "INTERPOLATED" | "STEP_DOWN" | "CARD_STEP_DOWN" | "CARRIED_DOWN" | "NO_SALES";
             /** Format: int32 */
             n: number;
+            rawFloor: components["schemas"]["RawFloorsFloor"];
             stepDownRatio: number;
             /** Format: int32 */
             windowDays: number;
@@ -3005,6 +3006,16 @@ export interface components {
             photoIds: string[];
             /** @enum {string} */
             status: "VERIFIED_AUTHENTIC" | "SUSPECTED_COUNTERFEIT" | "COUNTERFEIT";
+        };
+        RawFloorsFloor: {
+            compIds: string[];
+            /** @enum {string} */
+            condition: "NEAR_MINT" | "LIGHTLY_PLAYED" | "MODERATELY_PLAYED" | "HEAVILY_PLAYED";
+            price: number;
+            /** Format: int32 */
+            saleDays: number;
+            /** Format: int32 */
+            windowDays: number;
         };
         ReportControllerDownloadLink: {
             /** Format: uri */

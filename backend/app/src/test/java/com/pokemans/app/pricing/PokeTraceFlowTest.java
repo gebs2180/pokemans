@@ -238,7 +238,7 @@ class PokeTraceFlowTest {
             // Priced at the revision; the original is stored as superseded and traced.
             PriceSnapshotService.Result priced = snapshots.snapshotAll(TODAY);
             api.get("/api/admin/catalog-cards/" + card + "/prices", api.admin()).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.tables[0].parameterSet").value("1.7.0"))
+                    .andExpect(jsonPath("$.tables[0].parameterSet").value("1.8.0"))
                     .andExpect(jsonPath("$.tables[0].grades[8].n").value(5))
                     .andExpect(jsonPath("$.tables[0].grades[8].compIds", hasItem(r1.getId().toString())))
                     .andExpect(jsonPath("$.tables[0].grades[8].compIds", not(hasItem(original.getId().toString()))));

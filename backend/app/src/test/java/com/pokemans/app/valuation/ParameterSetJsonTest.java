@@ -77,6 +77,34 @@ class ParameterSetJsonTest {
         assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v170);
     }
 
+    @Test
+    void version180KeepsItsRawFloorsAndOlderSetsDoNotMentionThem() throws Exception {
+        ParameterSet v180 = ParameterSet.load("1.8.0");
+
+        String json = ValuationService.JSON.writeValueAsString(v180);
+
+        assertThat(json).contains("\"rawFloorNearMint\":\"7,8,9,10\"").contains("\"rawFloorDerived\":false").contains("\"rawFloorQuantile\":0.25")
+                .doesNotContain("rawFloorModeratelyPlayed");
+        assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v180);
+        assertThat(ValuationService.JSON.writeValueAsString(ParameterSet.load("1.7.0"))).doesNotContain("rawFloor");
+    }
+
+    /** A stored run's price row re-serializes as before unless it has a raw floor. */
+    @Test
+    void aPriceRowMentionsARawFloorOnlyWhenItHasOne() throws Exception {
+        var before = new CardInputs.PriceRow(com.pokemans.valuation.Grade.G7, new java.math.BigDecimal("33"),
+                com.pokemans.valuation.GradePrice.Method.OBSERVED, 3, java.util.List.of("a"), 90, java.util.List.of(), null,
+                com.pokemans.valuation.Confidence.B);
+        var floored = new CardInputs.PriceRow(before.grade(), before.gross(), before.method(), before.n(), before.compIds(),
+                before.windowDays(), before.basis(), null, before.confidence(), new com.pokemans.valuation.RawFloors.Floor(
+                com.pokemans.valuation.RawFloors.Condition.NEAR_MINT, new java.math.BigDecimal("58"), java.util.List.of("r1", "r2"), 90, 2));
+
+        assertThat(ValuationService.JSON.writeValueAsString(before)).doesNotContain("rawFloor");
+        String json = ValuationService.JSON.writeValueAsString(floored);
+        assertThat(json).contains("\"rawFloor\"").contains("NEAR_MINT");
+        assertThat(ValuationService.JSON.readValue(json, CardInputs.PriceRow.class)).isEqualTo(floored);
+    }
+
     /** A stored run's assessment input re-serializes as before unless it is a one-provider condition. */
     @Test
     void anAssessmentInputMentionsOneProviderOnlyWhenTrue() throws Exception {
