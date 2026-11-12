@@ -1,5 +1,5 @@
 -- Raw-sale floors (parameter set 1.8.0, deep review B1 step 2, Zach 2026-11-11). A grade's net price is the higher of
--- its net graded price and the raw floor of the condition mapped to it (near mint 7 and 8, lightly played 5 and 6).
+-- its net graded price and the raw floor of the condition mapped to it (near mint 7 to 10, lightly played 5 and 6).
 -- The floor is stored with the grade's snapshot row because the grade price is stored gross and netted per valuation
 -- run: the run applies the floor after netting. Null for no floor, and on every row from sets before 1.8.0.
 alter table price_snapshot

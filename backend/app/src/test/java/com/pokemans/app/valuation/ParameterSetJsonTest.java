@@ -83,7 +83,7 @@ class ParameterSetJsonTest {
 
         String json = ValuationService.JSON.writeValueAsString(v180);
 
-        assertThat(json).contains("\"rawFloorNearMint\":\"7,8\"").contains("\"rawFloorQuantile\":0.25")
+        assertThat(json).contains("\"rawFloorNearMint\":\"7,8,9,10\"").contains("\"rawFloorDerived\":false").contains("\"rawFloorQuantile\":0.25")
                 .doesNotContain("rawFloorModeratelyPlayed");
         assertThat(ValuationService.JSON.readValue(json, ParameterSet.class)).isEqualTo(v180);
         assertThat(ValuationService.JSON.writeValueAsString(ParameterSet.load("1.7.0"))).doesNotContain("rawFloor");

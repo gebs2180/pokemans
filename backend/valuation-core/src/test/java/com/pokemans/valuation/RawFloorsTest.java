@@ -67,7 +67,9 @@ class RawFloorsTest {
         // Lightly played floors 5 and 6 at its own low end: the 25th percentile of 38, 40, 45 is 38.
         assertThat(after.net(Grade.G5)).isEqualByComparingTo("38");
         assertThat(after.net(Grade.G6)).isEqualByComparingTo("38");
-        // 9 and 10 are never floored; 1 to 4 have no condition mapped; U is unchanged.
+        // Near mint floors 9 and 10 too, but they net 85.60 and 262 here, above the floor, so they're untouched.
+        // 1 to 4 have no condition mapped; U is unchanged.
+        assertThat(floors).containsKeys(Grade.G9, Grade.G10).doesNotContainKeys(Grade.G1, Grade.G2, Grade.G3, Grade.G4, Grade.U);
         for (Grade grade : List.of(Grade.G9, Grade.G10, Grade.G1, Grade.G2, Grade.G3, Grade.G4, Grade.U)) {
             assertThat(after.net(grade)).as("grade %s", grade).isEqualByComparingTo(before.net(grade));
             assertThat(after.get(grade).rawOverride()).as("grade %s", grade).isFalse();
@@ -90,10 +92,26 @@ class RawFloorsTest {
     }
 
     @Test
-    void theFlvStressStillCapsEachGradeAtTheGradeAbove() {
-        // The 9 nets 85.60; a near mint floor of 100 lifts 7 and 8 above it, and the stress caps them back.
+    void aNineThatNetsBelowTheNearMintFloorIsFlooredSoItDoesNotCapTheEightBackDown() {
+        // The 9 nets 85.60; a near mint floor of 100 lifts 7, 8 and 9 to 100, and the 10 (262) stays above it.
         Map<RawFloors.Condition, List<Comp>> raw = Map.of(RawFloors.Condition.NEAR_MINT, days(3, "100", "100"));
         GradePriceTable after = GradePriceTable.netOf(sixtyDollarCard(), COST, RawFloors.compute(V180, AS_OF, raw, new Trace()));
+
+        assertThat(after.net(Grade.G9)).isEqualByComparingTo("100");
+        assertThat(after.get(Grade.G9).rawOverride()).isTrue();
+        assertThat(after.get(Grade.G10).rawOverride()).isFalse();
+        Map<Grade, BigDecimal> capped = CardValuator.neverUp(after);
+        assertThat(capped.get(Grade.G8)).isEqualByComparingTo("100");
+        assertThat(capped.get(Grade.G7)).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void theFlvStressStillCapsEachGradeAtTheGradeAbove() throws Exception {
+        // With near mint floors on 7 and 8 only, the 9 nets 85.60; a floor of 100 lifts 7 and 8 above it, and the
+        // stress caps them back.
+        ParameterSet sevenEight = with("pricing.rawFloor.NEAR_MINT", "7,8");
+        Map<RawFloors.Condition, List<Comp>> raw = Map.of(RawFloors.Condition.NEAR_MINT, days(3, "100", "100"));
+        GradePriceTable after = GradePriceTable.netOf(sixtyDollarCard(), COST, RawFloors.compute(sevenEight, AS_OF, raw, new Trace()));
 
         Map<Grade, BigDecimal> capped = CardValuator.neverUp(after);
 
@@ -151,7 +169,7 @@ class RawFloorsTest {
         raw.put(RawFloors.Condition.HEAVILY_PLAYED, days(3, "20", "22"));
 
         assertThat(RawFloors.compute(V180, AS_OF, raw, new Trace())).isEmpty();
-        assertThat(V180.rawFloorGrades(RawFloors.Condition.NEAR_MINT)).containsExactly(Grade.G7, Grade.G8);
+        assertThat(V180.rawFloorGrades(RawFloors.Condition.NEAR_MINT)).containsExactly(Grade.G7, Grade.G8, Grade.G9, Grade.G10);
         assertThat(V180.rawFloorGrades(RawFloors.Condition.LIGHTLY_PLAYED)).containsExactly(Grade.G5, Grade.G6);
         assertThat(V180.rawFloorGrades(RawFloors.Condition.MODERATELY_PLAYED)).isEmpty();
         assertThat(V180.rawFloorGrades(RawFloors.Condition.HEAVILY_PLAYED)).isEmpty();
@@ -167,20 +185,34 @@ class RawFloorsTest {
     }
 
     @Test
-    void aGradePricedAtItsFloorCountsAsDerivedForConfidence() {
+    void aGradePricedAtItsFloorKeepsItsConfidenceIn180() {
         Map<RawFloors.Condition, List<Comp>> raw = Map.of(RawFloors.Condition.NEAR_MINT, days(3, "55", "58", "60", "62", "65"));
         GradePriceTable floored = GradePriceTable.netOf(sixtyDollarCard(), COST, RawFloors.compute(V180, AS_OF, raw, new Trace()));
+        CardValuator.Input likelySeven = new CardValuator.Input("card", GradeDistribution.certain(Grade.G7), floored, d("0.05"),
+                d("30"), 1, Confidence.A);
+
+        // Zach, 2026-11-11: a floor is observed raw sales, not a derived price, so the offer stays at A.
+        assertThat(V180.rawFloorIsDerived()).isFalse();
+        assertThat(floored.get(Grade.G7).rawOverride()).isTrue();
+        assertThat(new CardValuator(V180).value(likelySeven).offerConfidence()).isEqualTo(Confidence.A);
+    }
+
+    @Test
+    void aSetThatCountsFloorsAsDerivedDropsConfidenceWhereTheFloorCarriesProbability() throws Exception {
+        ParameterSet derived = with("pricing.rawFloor.derived", "true");
+        Map<RawFloors.Condition, List<Comp>> raw = Map.of(RawFloors.Condition.NEAR_MINT, days(3, "55", "58", "60", "62", "65"));
+        GradePriceTable floored = GradePriceTable.netOf(sixtyDollarCard(), COST, RawFloors.compute(derived, AS_OF, raw, new Trace()));
         CardValuator.Input likelySeven = new CardValuator.Input("card", GradeDistribution.certain(Grade.G7), floored, d("0.05"),
                 d("30"), 1, Confidence.A);
         CardValuator.Input likelyNine = new CardValuator.Input("card", GradeDistribution.certain(Grade.G9), floored, d("0.05"),
                 d("30"), 1, Confidence.A);
 
-        CardValuation seven = new CardValuator(V180).value(likelySeven);
+        CardValuation seven = new CardValuator(derived).value(likelySeven);
 
         assertThat(seven.offerConfidence()).isEqualTo(Confidence.B);
         assertThat(seven.trace().stepsFor("offer_confidence").getFirst().detail()).contains("raw floor");
-        // A card whose likely grade isn't floored keeps its A for the offer.
-        assertThat(new CardValuator(V180).value(likelyNine).offerConfidence()).isEqualTo(Confidence.A);
+        // The 9 nets above its floor here, so it isn't floored and keeps its A.
+        assertThat(new CardValuator(derived).value(likelyNine).offerConfidence()).isEqualTo(Confidence.A);
     }
 
     @Test

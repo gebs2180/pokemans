@@ -16,8 +16,8 @@ import java.util.Map;
  * <p>A raw condition is the seller's listing label, not a grade, and sellers label optimistically, so the
  * mapping is narrow and the price is the low end of the condition's recent sale days:
  * <ul>
- *   <li>Each condition floors only the grades the parameter set maps it to (1.8.0: near mint 7 and 8,
- *       lightly played 5 and 6; 9 and 10 can be listed). Never 1, its own market: {@link ParameterSet} refuses it.
+ *   <li>Each condition floors only the grades the parameter set maps it to (1.8.0: near mint 7 to 10,
+ *       lightly played 5 and 6). Never 1, its own market: {@link ParameterSet} refuses it.
  *   <li>The floor is the recency-weighted {@code rawFloorQuantile} (1.8.0: the 25th percentile) of the
  *       condition's sale days in the 90-day window, extended to 180 when it has fewer than
  *       {@code rawFloorMinSaleDays}; still fewer, no floor. Never the average, never asking prices.

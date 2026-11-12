@@ -138,7 +138,8 @@ class ParameterSetTest {
         ParameterSet v180 = ParameterSet.load("1.8.0");
 
         assertThat(v180.hasRawFloors()).isTrue();
-        assertThat(v180.rawFloorIsDerived()).isTrue();
+        assertThat(v180.rawFloorIsDerived()).isFalse();
+        assertThat(v180.rawFloorNearMint()).isEqualTo("7,8,9,10");
         assertThat(v180.rawFloorQuantile()).isEqualByComparingTo("0.25");
         assertThat(v180.rawFloorMinSaleDays()).isEqualTo(2);
         assertThat(v170.hasRawFloors()).isFalse();

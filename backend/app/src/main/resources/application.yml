@@ -34,7 +34,7 @@ springdoc:
 pokemans:
   # The one valuation parameter set, for price snapshots, valuation runs and offers alike (review finding 10).
   # 1.8.0 (Zach, 2026-11-11, review B1 step 2) is 1.7.0 plus raw-sale floors: a grade nets at no less than the low end
-  # of its raw condition's recent sale days (near mint floors 7 and 8, lightly played 5 and 6).
+  # of its raw condition's recent sale days (near mint floors 7 to 10, lightly played 5 and 6).
   # 1.7.0 (2026-11-10, a PR #114 follow-up) is 1.6.0 plus revised PokeTrace days: a day PokeTrace revised is priced at
   # its newest revision, and the older rows are kept and traced as superseded.
   # 1.6.0 (Zach, 2026-11-10) is 1.5.0 plus a $1,000 FMV threshold: a condition from one pre-grade provider is A up to

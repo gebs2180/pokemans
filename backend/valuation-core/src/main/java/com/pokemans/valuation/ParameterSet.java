@@ -233,7 +233,7 @@ public record ParameterSet(
         return hasRawFloors() ? parseFloorGrades(condition, rawFloorGradesText(condition)) : java.util.List.of();
     }
 
-    /** True when a grade priced at its raw floor counts as derived for confidence (1.8.0 on). */
+    /** True when a grade priced at its raw floor counts as derived for confidence (false in 1.8.0, Zach 2026-11-11). */
     public boolean rawFloorIsDerived() {
         return Boolean.TRUE.equals(rawFloorDerived);
     }
@@ -247,7 +247,7 @@ public record ParameterSet(
         };
     }
 
-    /** "7,8" as grades; never 1 (its own market, priced from its own sales only). 9 and 10 are allowed, pending Zach. */
+    /** "7,8,9,10" as grades; never 1 (its own market, priced from its own sales only). */
     private static java.util.List<Grade> parseFloorGrades(RawFloors.Condition condition, String text) {
         if (text == null || text.isBlank()) {
             return java.util.List.of();
