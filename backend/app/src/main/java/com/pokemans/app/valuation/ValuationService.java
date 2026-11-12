@@ -43,7 +43,7 @@ class ValuationService {
 
     /**
      * Canonical JSON: sorted map keys, so equal inputs always hash the same. Parameter-set fields added in
-     * 1.3.0 to 1.7.0 are left out while null, so a stored older run re-serializes, and hashes, exactly as it did.
+     * 1.3.0 to 1.8.0 are left out while null, so a stored older run re-serializes, and hashes, exactly as it did.
      */
     static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
             .addMixIn(ParameterSet.class, ParameterSetJson.class).build();
@@ -82,6 +82,27 @@ class ValuationService {
 
         @JsonInclude(JsonInclude.Include.NON_NULL)
         abstract Boolean pokeTraceLatestRevision();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract String rawFloorNearMint();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract String rawFloorLightlyPlayed();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract String rawFloorModeratelyPlayed();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract String rawFloorHeavilyPlayed();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract BigDecimal rawFloorQuantile();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract Integer rawFloorMinSaleDays();
+
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract Boolean rawFloorDerived();
     }
 
     private final CardItems cardItems;
@@ -277,7 +298,8 @@ class ValuationService {
     private static CardInputs.Prices prices(Prices.CardPrices p) {
         List<CardInputs.PriceRow> rows = p.grades().values().stream()
                 .map(g -> new CardInputs.PriceRow(g.grade(), g.price(), g.method(), g.n(),
-                        g.compIds().stream().map(UUID::toString).toList(), g.windowDays(), g.basis(), g.stepDownRatio(), g.confidence()))
+                        g.compIds().stream().map(UUID::toString).toList(), g.windowDays(), g.basis(), g.stepDownRatio(), g.confidence(),
+                        g.rawFloor()))
                 .toList();
         return new CardInputs.Prices(p.snapshotSetId(), p.gradingCompany(), p.asOf(), p.daysOld(), p.staleLevels(), rows, p.sigma(),
                 p.sigmaChanges(), p.salesPerMonth());

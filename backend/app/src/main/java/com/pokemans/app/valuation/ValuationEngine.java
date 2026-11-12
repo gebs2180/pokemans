@@ -12,6 +12,7 @@ import com.pokemans.valuation.GradePriceTable;
 import com.pokemans.valuation.GradingCost;
 import com.pokemans.valuation.ParameterSet;
 import com.pokemans.valuation.PortfolioEvaluator;
+import com.pokemans.valuation.RawFloors;
 import com.pokemans.valuation.Trace;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -147,7 +148,11 @@ final class ValuationEngine {
     /** Gross snapshot prices: raw cards are netted of grading cost; graded cards are already graded. */
     private GradePriceTable table(CardInputs card, Trace trace) {
         EnumMap<Grade, GradePrice> gross = new EnumMap<>(Grade.class);
+        EnumMap<Grade, RawFloors.Floor> floors = new EnumMap<>(Grade.class);
         for (CardInputs.PriceRow row : card.prices().grades()) {
+            if (row.rawFloor() != null) {
+                floors.put(row.grade(), row.rawFloor());
+            }
             int window = row.windowDays() == null ? 0 : row.windowDays();
             int used = row.method() == GradePrice.Method.OBSERVED ? row.compIds().size() : 0;
             gross.put(row.grade(), new GradePrice(row.grade(), row.gross(), row.gross(), row.method(), used, row.compIds(), false,
@@ -160,7 +165,8 @@ final class ValuationEngine {
         }
         trace.add("prices", card.prices().gradingCompany() + " table as of " + card.prices().asOf() + ", netted of grading cost",
                 card.prices().snapshotSetId(), "");
-        GradePriceTable netted = GradePriceTable.netOf(gross.values(), cost);
+        // Raw-sale floors (1.8.0 on): a raw card can always be sold raw, so a floored grade nets at no less than its floor.
+        GradePriceTable netted = GradePriceTable.netOf(gross.values(), cost, floors);
         trace.addAll(netted.trace());
         return netted;
     }

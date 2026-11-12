@@ -3,6 +3,8 @@ package com.pokemans.app.pricing;
 import com.pokemans.app.persistence.AssignedIdEntity;
 import com.pokemans.valuation.Confidence;
 import com.pokemans.valuation.GradePrice;
+import com.pokemans.valuation.RawFloors;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -46,7 +48,14 @@ class PriceSnapshot extends AssignedIdEntity<UUID> {
     @JdbcTypeCode(SqlTypes.JSON)
     private List<String> trace;
     private Instant createdAt;
-
+    // Raw-sale floor for the grade (parameter set 1.8.0); null for none.
+    private BigDecimal rawFloor;
+    private String rawFloorCondition;
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<String> rawFloorCompIds;
+    @Column(name = "raw_floor_n")
+    private Integer rawFloorN;
+    private Integer rawFloorWindowDays;
 
     protected PriceSnapshot() {
     }
@@ -77,6 +86,25 @@ class PriceSnapshot extends AssignedIdEntity<UUID> {
         this.parameterSet = parameterSet;
         this.trace = List.copyOf(trace);
         this.createdAt = Instant.now();
+    }
+
+    /** The grade's raw-sale floor (parameter set 1.8.0); null leaves none. */
+    PriceSnapshot withRawFloor(RawFloors.Floor floor) {
+        if (floor != null) {
+            this.rawFloor = floor.price();
+            this.rawFloorCondition = floor.condition().name();
+            this.rawFloorCompIds = floor.compIds();
+            this.rawFloorN = floor.saleDays();
+            this.rawFloorWindowDays = floor.windowDays();
+        }
+        return this;
+    }
+
+    /** The stored raw-sale floor, or null for none. */
+    RawFloors.Floor getRawFloor() {
+        return rawFloor == null ? null : new RawFloors.Floor(RawFloors.Condition.valueOf(rawFloorCondition), rawFloor,
+                rawFloorCompIds == null ? List.of() : rawFloorCompIds, rawFloorWindowDays == null ? 0 : rawFloorWindowDays,
+                rawFloorN == null ? 0 : rawFloorN);
     }
 
     UUID getSnapshotSetId() {

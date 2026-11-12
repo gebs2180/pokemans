@@ -69,6 +69,12 @@ public record GradePrice(
                 confidence, stepDownRatio);
     }
 
+    /** The same price netted at a raw-sale floor that beat it (parameter set 1.8.0): marked as a raw override. */
+    public GradePrice atRawFloor(BigDecimal floor) {
+        return new GradePrice(grade, gross, floor, method, salesUsed, compIds, true, windowDays, salesInWindow, basis,
+                confidence, stepDownRatio);
+    }
+
     /** A price given directly (e.g. by the reviewer or a test), with the net already computed. */
     public static GradePrice given(Grade grade, BigDecimal net, Method method, int salesUsed) {
         return new GradePrice(grade, net, net, method, salesUsed, List.of(), false, 0, salesUsed, List.of(), null, null);

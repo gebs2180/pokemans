@@ -92,9 +92,45 @@ public record ParameterSet(
         BigDecimal oneProviderMaxFmvForA,
         // A PokeTrace day PokeTrace revised is priced at its newest revision, the older rows left out with the revision
         // that replaced them. Null before 1.7.0, where revisions are ignored and the day's first row stays its comp
-        Boolean pokeTraceLatestRevision) {
+        Boolean pokeTraceLatestRevision,
+        // Raw-sale floors (null before 1.8.0, which means none; review B1 step 2, Zach 2026-11-11): the grades each raw
+        // condition floors, as "7,8" (null or blank for none); the recency-weighted quantile of the condition's sale
+        // days that sets the floor; the fewest sale days for a floor; and whether a grade priced at its floor counts
+        // as derived for confidence
+        String rawFloorNearMint,
+        String rawFloorLightlyPlayed,
+        String rawFloorModeratelyPlayed,
+        String rawFloorHeavilyPlayed,
+        BigDecimal rawFloorQuantile,
+        Integer rawFloorMinSaleDays,
+        Boolean rawFloorDerived) {
 
     public static final String DEFAULT_VERSION = "1.0.0";
+
+    public ParameterSet {
+        if (rawFloorQuantile != null) {
+            if (rawFloorQuantile.signum() <= 0 || rawFloorQuantile.compareTo(BigDecimal.ONE) > 0) {
+                throw new IllegalArgumentException("pricing.rawFloor.quantile must be above 0 and at most 1: " + rawFloorQuantile);
+            }
+            if (rawFloorMinSaleDays == null || rawFloorMinSaleDays < 1) {
+                throw new IllegalArgumentException("pricing.rawFloor.minSaleDays must be at least 1 with raw floors");
+            }
+            // The parameters, not the fields: a compact constructor assigns the fields only after its body.
+            java.util.Map<RawFloors.Condition, String> texts = new java.util.EnumMap<>(RawFloors.Condition.class);
+            texts.put(RawFloors.Condition.NEAR_MINT, rawFloorNearMint);
+            texts.put(RawFloors.Condition.LIGHTLY_PLAYED, rawFloorLightlyPlayed);
+            texts.put(RawFloors.Condition.MODERATELY_PLAYED, rawFloorModeratelyPlayed);
+            texts.put(RawFloors.Condition.HEAVILY_PLAYED, rawFloorHeavilyPlayed);
+            java.util.Set<Grade> seen = java.util.EnumSet.noneOf(Grade.class);
+            for (RawFloors.Condition condition : RawFloors.Condition.values()) {
+                for (Grade grade : parseFloorGrades(condition, texts.get(condition))) {
+                    if (!seen.add(grade)) {
+                        throw new IllegalArgumentException("Grade " + grade + " has a raw floor from two conditions");
+                    }
+                }
+            }
+        }
+    }
 
     /** The default bundled parameter set. */
     public static ParameterSet defaults() {
@@ -177,7 +213,63 @@ public record ParameterSet(
                 optionalInteger(p, "pricing.pokeTraceDay.neighbourhoodDays"),
                 optionalDecimal(p, "values.maxSigma"),
                 optionalDecimal(p, "confidence.oneProviderMaxFmvForA"),
-                optionalBoolean(p, "pricing.pokeTraceDay.latestRevision"));
+                optionalBoolean(p, "pricing.pokeTraceDay.latestRevision"),
+                optionalString(p, "pricing.rawFloor.NEAR_MINT"),
+                optionalString(p, "pricing.rawFloor.LIGHTLY_PLAYED"),
+                optionalString(p, "pricing.rawFloor.MODERATELY_PLAYED"),
+                optionalString(p, "pricing.rawFloor.HEAVILY_PLAYED"),
+                optionalDecimal(p, "pricing.rawFloor.quantile"),
+                optionalInteger(p, "pricing.rawFloor.minSaleDays"),
+                optionalBoolean(p, "pricing.rawFloor.derived"));
+    }
+
+    /** True when this set floors grade prices with raw sales (1.8.0 on). */
+    public boolean hasRawFloors() {
+        return rawFloorQuantile != null;
+    }
+
+    /** The grades a raw condition floors, lowest first; empty for none or before 1.8.0. */
+    public java.util.List<Grade> rawFloorGrades(RawFloors.Condition condition) {
+        return hasRawFloors() ? parseFloorGrades(condition, rawFloorGradesText(condition)) : java.util.List.of();
+    }
+
+    /** True when a grade priced at its raw floor counts as derived for confidence (1.8.0 on). */
+    public boolean rawFloorIsDerived() {
+        return Boolean.TRUE.equals(rawFloorDerived);
+    }
+
+    private String rawFloorGradesText(RawFloors.Condition condition) {
+        return switch (condition) {
+            case NEAR_MINT -> rawFloorNearMint;
+            case LIGHTLY_PLAYED -> rawFloorLightlyPlayed;
+            case MODERATELY_PLAYED -> rawFloorModeratelyPlayed;
+            case HEAVILY_PLAYED -> rawFloorHeavilyPlayed;
+        };
+    }
+
+    /** "7,8" as grades; never 1 (its own market, priced from its own sales only). 9 and 10 are allowed, pending Zach. */
+    private static java.util.List<Grade> parseFloorGrades(RawFloors.Condition condition, String text) {
+        if (text == null || text.isBlank()) {
+            return java.util.List.of();
+        }
+        java.util.List<Grade> grades = new java.util.ArrayList<>();
+        for (String part : text.split(",")) {
+            int g = Integer.parseInt(part.trim());
+            if (g < 2 || g > 10) {
+                throw new IllegalArgumentException("pricing.rawFloor." + condition + " may floor grades 2 to 10 only, never 1, not " + g);
+            }
+            Grade grade = Grade.of(g);
+            if (!grades.contains(grade)) {
+                grades.add(grade);
+            }
+        }
+        grades.sort(null);
+        return java.util.List.copyOf(grades);
+    }
+
+    private static String optionalString(Properties p, String key) {
+        String value = p.getProperty(key);
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     /** Comps confidence is also no better than the count behind the modal grade's price (1.3.0 on). */

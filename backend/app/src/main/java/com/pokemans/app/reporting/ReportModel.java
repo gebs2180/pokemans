@@ -241,8 +241,10 @@ final class ReportModel {
                 row.put("grade", r.grade().toString());
                 row.put("p", dist.p(r.grade()).stripTrailingZeros().toPlainString());
                 row.put("gross", money(r.gross()));
-                row.put("net", money(in.graded() != null || r.grade().isUngradable() ? r.gross() : cost.netPrice(r.gross())));
-                row.put("method", r.method().name());
+                BigDecimal net = in.graded() != null || r.grade().isUngradable() ? r.gross() : cost.netPrice(r.gross());
+                boolean floored = in.graded() == null && r.rawFloor() != null && r.rawFloor().price().compareTo(net) > 0;
+                row.put("net", money(floored ? r.rawFloor().price() : net));
+                row.put("method", r.method().name() + (floored ? " (raw " + r.rawFloor().condition() + " floor)" : ""));
                 row.put("sales", r.n());
                 row.put("window", r.windowDays() == null ? "-" : r.windowDays() + "d");
                 rows.add(row);

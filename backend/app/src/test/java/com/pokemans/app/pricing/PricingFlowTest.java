@@ -159,7 +159,7 @@ class PricingFlowTest {
         assertThat(card.snapshotSetId()).isEqualTo(result.snapshotSets().get(target).get(GradingCompany.PSA));
         assertThat(card.grades()).hasSize(11);
         assertThat(card.gradingCompany()).isEqualTo("PSA");
-        assertThat(card.parameterSet()).isEqualTo("1.7.0"); // one set for pricing and valuation (review finding 10)
+        assertThat(card.parameterSet()).isEqualTo("1.8.0"); // one set for pricing and valuation (review finding 10)
 
         Prices.GradeSnapshot g10 = card.grades().get(Grade.G10);
         assertThat(g10.method()).isEqualTo(GradePrice.Method.OBSERVED);

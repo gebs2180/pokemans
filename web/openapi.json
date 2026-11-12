@@ -330,6 +330,9 @@
             "format" : "int32",
             "type" : "integer"
           },
+          "rawFloor" : {
+            "$ref" : "#/components/schemas/RawFloorsFloor"
+          },
           "stepDownRatio" : {
             "type" : "number"
           },
@@ -338,7 +341,7 @@
             "type" : "integer"
           }
         },
-        "required" : [ "basis", "compIds", "confidence", "grade", "gross", "method", "n", "stepDownRatio", "windowDays" ]
+        "required" : [ "basis", "compIds", "confidence", "grade", "gross", "method", "n", "rawFloor", "stepDownRatio", "windowDays" ]
       },
       "CardInputsPrices" : {
         "properties" : {
@@ -3858,6 +3861,32 @@
           }
         },
         "required" : [ "method", "note", "photoIds", "status" ]
+      },
+      "RawFloorsFloor" : {
+        "properties" : {
+          "compIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "condition" : {
+            "enum" : [ "NEAR_MINT", "LIGHTLY_PLAYED", "MODERATELY_PLAYED", "HEAVILY_PLAYED" ],
+            "type" : "string"
+          },
+          "price" : {
+            "type" : "number"
+          },
+          "saleDays" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "windowDays" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "compIds", "condition", "price", "saleDays", "windowDays" ]
       },
       "ReportControllerDownloadLink" : {
         "properties" : {

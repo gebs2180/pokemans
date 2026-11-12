@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.pokemans.valuation.Confidence;
 import com.pokemans.valuation.Grade;
 import com.pokemans.valuation.GradePrice;
+import com.pokemans.valuation.RawFloors;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -88,9 +89,19 @@ public record CardInputs(
                          List<PriceRow> grades, BigDecimal sigma, int sigmaChanges, BigDecimal salesPerMonth) {
     }
 
-    /** @param n sales in the window before trimming */
+    /**
+     * @param n        sales in the window before trimming
+     * @param rawFloor the grade's raw-sale floor (parameter set 1.8.0), or null for none. Left out of the JSON while
+     *                 null: runs and offers stored before it read back, re-serialize and hash exactly as they did.
+     */
     public record PriceRow(Grade grade, BigDecimal gross, GradePrice.Method method, int n, List<String> compIds, Integer windowDays,
-                           List<Grade> basis, BigDecimal stepDownRatio, Confidence confidence) {
+                           List<Grade> basis, BigDecimal stepDownRatio, Confidence confidence,
+                           @JsonInclude(JsonInclude.Include.NON_NULL) RawFloors.Floor rawFloor) {
+
+        public PriceRow(Grade grade, BigDecimal gross, GradePrice.Method method, int n, List<String> compIds, Integer windowDays,
+                        List<Grade> basis, BigDecimal stepDownRatio, Confidence confidence) {
+            this(grade, gross, method, n, compIds, windowDays, basis, stepDownRatio, confidence, null);
+        }
     }
 
     public record ProvenanceState(boolean authFlagUnresolved, String authState, boolean custodyVerified, String custodyState,

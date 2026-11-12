@@ -359,15 +359,17 @@ public final class CardValuator {
 
     /**
      * The grades in play whose price is derived, as "G9, G10", or empty if none. From 1.3.0 a thin observed
-     * price counts, marked "(thin)".
+     * price counts, marked "(thin)"; from 1.8.0 so does a price set by its raw-sale floor, marked "(raw floor)".
      */
     private static String derivedGrades(Input in, ParameterSet params, Predicate<Grade> inPlay) {
         StringBuilder derived = new StringBuilder();
         for (Grade grade : Grade.values()) {
             GradePrice price = in.prices().get(grade);
             boolean thin = params.isThin(price);
-            if (inPlay.test(grade) && (price.derived() || thin)) {
-                derived.append(derived.isEmpty() ? "" : ", ").append(grade).append(thin ? " (thin)" : "");
+            boolean floored = params.rawFloorIsDerived() && price.rawOverride();
+            if (inPlay.test(grade) && (price.derived() || thin || floored)) {
+                derived.append(derived.isEmpty() ? "" : ", ").append(grade).append(thin ? " (thin)" : "")
+                        .append(floored ? " (raw floor)" : "");
             }
         }
         return derived.toString();
