@@ -80,6 +80,14 @@ class ForgetOrgScriptTest {
         String org = seller.orgId();
         int buyerRows = count("select count(*) from ship_address where org_id = ?::uuid", buyer.orgId());
 
+        // An email we sent them: the address goes with them, the row stays as the audit trail.
+        UUID mailId = UUID.randomUUID();
+        jdbc.update("""
+                insert into email_message (id, dedupe_key, template, recipient_user_id, recipient_email, org_id, subject, html_body,
+                                           text_body, status, next_attempt_at, created_at, updated_at)
+                select ?::uuid, ?, 'TEST', a.id, 'forgotten@example.com', ?::uuid, 's', 'h', 't', 'SENT', now(), now(), now()
+                from app_user a where a.subject = ?""", mailId.toString(), "forget-" + mailId, seller.orgId(), subject);
+
         // A dry run says what it would do and changes nothing.
         ExecResult dry = forget(org, false);
         assertThat(dry.getStdout()).contains("Dry run", "orgs/" + org + "/cards/" + listed.cardId() + "/",
@@ -109,6 +117,7 @@ class ForgetOrgScriptTest {
                 .containsOnly("Deleted on request");
         assertThat(count("select count(*) from app_user where subject = ?", subject)).isZero();
         assertThat(count("select count(*) from app_user where subject like 'deleted|%' and email is null")).isPositive();
+        assertThat(count("select count(*) from email_message where id = ?::uuid and recipient_email is null", mailId.toString())).isOne();
         // The buyer's org is untouched.
         assertThat(count("select count(*) from membership where org_id = ?::uuid", buyer.orgId())).isOne();
     }

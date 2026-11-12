@@ -422,12 +422,6 @@ export function DealsPage() {
           <Photos photos={deal.photos} />
           <p className="small">
             Bought for {money(deal.offer.price)} on {new Date(deal.acceptedAt).toLocaleDateString()} from {deal.seller.orgName ?? 'a seller'}
-            {deal.seller.email && (
-              <>
-                {' '}
-                (<a href={`mailto:${deal.seller.email}`}>{deal.seller.email}</a>)
-              </>
-            )}
             .
             {!deal.cancelled && !deal.outcome && ` Pay them directly, within ${days(policy.payWithinDays)} of it arriving as shown. Rawmark doesn't handle the money.`}
           </p>
@@ -440,7 +434,7 @@ export function DealsPage() {
           ) : (
             !deal.cancelled &&
             !deal.progress?.paidAt &&
-            deal.outcome?.type !== 'RETURNED' && <p className="muted small">The seller hasn't said how to pay them yet: email them, or check back here.</p>
+            deal.outcome?.type !== 'RETURNED' && <p className="muted small">The seller hasn't said how to pay them yet: check back here, or contact us if it's been a while.</p>
           )}
           {deal.cancelled ? (
             <p className="alert alert-danger">

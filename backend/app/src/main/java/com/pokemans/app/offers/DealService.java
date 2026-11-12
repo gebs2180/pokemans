@@ -15,6 +15,7 @@ import com.pokemans.app.offers.ListingStateMachine.Status;
 import com.pokemans.app.offers.ListingViews.AwaitingLabel;
 import com.pokemans.app.offers.ListingViews.DealView;
 import com.pokemans.app.offers.ListingViews.Overdue;
+import com.pokemans.app.offers.ListingViews.AdminParty;
 import com.pokemans.app.offers.ListingViews.Party;
 import com.pokemans.app.valuation.CardInputs;
 import java.math.BigDecimal;
@@ -104,7 +105,7 @@ class DealService {
             Directory.Contact seller = directory.contact(l.getOrgId(), l.getListedBy());
             Progress progress = progress(h);
             boolean owed = progress != null && progress.stage() != DealStage.RETURNED && progress.stage() != DealStage.BACK;
-            deals.add(new DealView(l.getId(), card(in).forBuyer(), views.offerView(offer).forBuyer(), views.photos(in), new Party(seller.orgName(), seller.email()),
+            deals.add(new DealView(l.getId(), card(in).forBuyer(), views.offerView(offer).forBuyer(), views.photos(in), new Party(seller.orgName()),
                     acceptedEvent.getCreatedAt(), withoutPrintable(views.label(l.getId())), outcome(h), undone(h, ListingEvent.Type.CANCELLED),
                     owed ? shipping.address(l.getOrgId()).map(ShipAddress::payment).orElse(null) : null,
                     progress == null ? null : progress.forBuyer()));
@@ -202,8 +203,8 @@ class DealService {
             CardInputs in = OfferService.inputs(offer);
             Directory.Contact buyer = directory.contact(acceptedEvent.getActorOrgId(), acceptedEvent.getActorUserId());
             Directory.Contact seller = directory.contact(l.getOrgId(), l.getListedBy());
-            waiting.add(new AwaitingLabel(l.getId(), acceptedEvent.getActorOrgId(), new Party(buyer.orgName(), buyer.email()),
-                    new Party(seller.orgName(), seller.email()), card(in), views.offerView(offer), views.photos(in), acceptedEvent.getCreatedAt()));
+            waiting.add(new AwaitingLabel(l.getId(), acceptedEvent.getActorOrgId(), new AdminParty(buyer.orgName(), buyer.email()),
+                    new AdminParty(seller.orgName(), seller.email()), card(in), views.offerView(offer), views.photos(in), acceptedEvent.getCreatedAt()));
         }
         return waiting;
     }

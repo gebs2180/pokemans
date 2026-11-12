@@ -116,8 +116,7 @@ export function SoldPanel({
     <>
       <div className={`alert ${stage === 'RETURNED' || stage === 'BACK' ? 'alert-warning' : stage === 'SOLD' || progress?.confirmedAt ? 'alert-success' : 'alert-info'}`}>
         <p>
-          Sold to {listing.buyer?.orgName ?? 'a buyer'}
-          {listing.buyer?.email && ` (${listing.buyer.email})`} on {date(listing.closedAt!)}.
+          Sold to {listing.buyer?.orgName ?? 'a buyer'} on {date(listing.closedAt!)}.
         </p>
         {stage === 'SOLD' && (
           <>

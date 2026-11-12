@@ -149,6 +149,15 @@ with d as (delete from consent_record c where c.org_id = (select id from forget_
            and not exists (select 1 from shipping_label s where s.buyer_org_id = c.org_id) returning 1)
 insert into forget_log (step, rows) select 'consent_record', count(*) from d;
 
+-- Emails we sent them: the address goes, the row stays (it is the audit trail of what we sent and when). A row with no
+-- user id is matched by the address itself. Subject and body are kept as sent.
+with u as (update email_message m set recipient_email = null
+           where m.recipient_email is not null
+             and (m.recipient_user_id in (select id from forget_user)
+                  or (m.recipient_user_id is null and lower(m.recipient_email) in (select lower(email) from forget_user where email is not null)))
+           returning 1)
+insert into forget_log (step, rows) select 'email_message address cleared', count(*) from u;
+
 -- The org and its people: deleted where nothing kept points at them, otherwise left as a nameless id.
 do $$
 declare

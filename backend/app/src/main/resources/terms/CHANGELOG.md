@@ -17,11 +17,13 @@ version's hash. Every text is a plain-language draft for Zach, not reviewed lega
 - 2026-10-26: the $500 beta maximum is gone; offers go up to what a label can insure.
 - 2026-11-01 (`seller-2026-11-01`): how the seller gets paid goes to the buyer, the seller says in the app when they
   shipped and whether they were paid, and a card returned as not genuine waits for our review.
+- 2026-11-12 (`seller-2026-11-12`): after a sale each side sees the other's name but not their email; problems go to us.
 
 ## contributor
 
 - 2026-10-21: contributors can sell too, so their terms carry the seller terms.
 - 2026-11-01 (`contributor-2026-11-01`): carries the 2026-11-01 seller body.
+- 2026-11-12 (`contributor-2026-11-12`): carries the 2026-11-12 seller body.
 
 ## buyer
 
@@ -30,3 +32,4 @@ version's hash. Every text is a plain-language draft for Zach, not reviewed lega
   around the app.
 - 2026-11-01 (`buyer-firm-2026-11-01`): arriving and paying are recorded apart, the buyer gets the seller's payment
   details, the seller says whether they were paid, and "not genuine" needs a reason.
+- 2026-11-12 (`buyer-firm-2026-11-12`): after a sale each side sees the other's name but not their email; problems go to us.

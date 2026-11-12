@@ -124,6 +124,14 @@ function WrongAndWho() {
           can also withdraw an offer or cancel a deal that went wrong, and the app shows you why.
         </p>
       </section>
+      <section id="email">
+        <h2>Where your email goes</h2>
+        <p>
+          Auth0 holds it for logging in, and Resend sends the emails Rawmark sends you. The other side of a deal never sees it: buyer and
+          seller see each other's name only. Payment goes through the seller's payment handle, shipping through the prepaid label, and
+          anything else through us. We never sell it.
+        </p>
+      </section>
       <section id="contact">
         <h2>Who runs this</h2>
         <p>
@@ -131,7 +139,7 @@ function WrongAndWho() {
           on Rawmark pays you directly.
         </p>
         <p>
-          Reach us at <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+          Reach us at <a href={`mailto:${CONTACT}`}>{CONTACT}</a>: we're the only contact either side of a deal has.
         </p>
       </section>
     </>

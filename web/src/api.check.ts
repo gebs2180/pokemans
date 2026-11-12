@@ -131,6 +131,7 @@ export type ApiTypesMatchTheBackend = {
   PostageEstimate: Ok<Covers<S['ShippingEstimate'], A.PostageEstimate>>
   Undo: Ok<Covers<S['OfferAdminServiceUndo'], A.Undo>>
   Party: Ok<Covers<S['ListingViewsParty'], A.Party>>
+  AdminParty: Ok<Covers<S['ListingViewsAdminParty'], A.AdminParty>>
   PaymentHandle: Ok<Covers<S['PaymentHandle'], A.PaymentHandle>>
   ShippingLabel: Ok<Covers<S['ListingViewsLabelView'], A.ShippingLabel>>
   Outcome: Ok<Covers<S['ListingViewsOutcomeView'], A.Outcome>>

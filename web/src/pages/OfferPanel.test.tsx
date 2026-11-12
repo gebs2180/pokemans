@@ -197,7 +197,7 @@ describe('OfferPanel', () => {
           offer: offer(),
           listing: {
             id: 'l1', offerId: 'offer1', status: 'ACCEPTED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
-            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null }, label: null, outcome: null, undone: null, progress: null,
+            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop' }, label: null, outcome: null, undone: null, progress: null,
           },
         },
       ],
@@ -216,7 +216,7 @@ describe('OfferPanel', () => {
           offer: offer(),
           listing: {
             id: 'l1', offerId: 'offer1', status: 'ACCEPTED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
-            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: 'shop@example.com' },
+            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop' },
             label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z', shipBy: '2026-10-25T10:00:00Z' },
             outcome: null,
             undone: null,
@@ -228,7 +228,7 @@ describe('OfferPanel', () => {
     )
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
-    expect(await screen.findByText(/Sold to Card Shop \(shop@example.com\)/)).toBeInTheDocument()
+    expect(await screen.findByText(/Sold to Card Shop on/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Print your prepaid label' })).toHaveAttribute('href', 'https://labels.example/l1.pdf')
     expect(screen.getByText(/tracking 9400111, insured for \$419.98/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Sell for/ })).not.toBeInTheDocument()
@@ -260,7 +260,7 @@ describe('OfferPanel', () => {
           offer: offer({ voided: { reason: 'Deal cancelled: buyer closed', at: '2026-10-21T10:00:00Z' } }),
           listing: {
             id: 'l1', offerId: 'offer1', status: 'CANCELLED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
-            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null },
+            closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop' },
             label: { carrier: 'USPS', service: 'GroundAdvantage', trackingCode: '9400111', labelUrl: 'https://labels.example/l1.pdf', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z', shipBy: '2026-10-23T10:00:00Z' },
             outcome: null,
             undone: { reason: 'buyer closed', at: '2026-10-21T10:00:00Z' },
@@ -288,7 +288,7 @@ describe('OfferPanel after the sale', () => {
     offer: offer(),
     listing: {
       id: 'l1', offerId: 'offer1', status: 'ACCEPTED', listedAt: '2026-10-19T10:00:00Z', expiresAt: '2026-11-02T10:00:00Z',
-      closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop', email: null }, label: { ...printable, labelUrl: null }, outcome: null, undone: null,
+      closedAt: '2026-10-20T10:00:00Z', buyer: { orgName: 'Card Shop' }, label: { ...printable, labelUrl: null }, outcome: null, undone: null,
       progress: { ...none, ...progress },
       ...over,
     },
@@ -790,7 +790,7 @@ describe('DealsPage', () => {
     card: { name: 'Umbreon VMAX', setName: 's', number: '1', language: 'en', edition: 'UNLIMITED', variant: 'NORMAL', label: 'x', distribution: {}, gradedAs: null },
     offer: offer(),
     photos: [{ side: 'FRONT', url: 'https://photos.example/f.jpg', fullUrl: 'https://photos.example/f-full.jpg' }],
-    seller: { orgName: 'Sam', email: null },
+    seller: { orgName: 'Sam' },
     acceptedAt: '2026-10-20T10:00:00Z',
     label: null,
     outcome: null,
@@ -927,7 +927,7 @@ describe('DealsPage', () => {
       card: { name: 'Leafeon', setName: 's', number: '1', language: 'en', edition: 'UNLIMITED', variant: 'NORMAL', label: 'x', distribution: {}, gradedAs: null },
       offer: offer(),
       photos: [],
-      seller: { orgName: 'Sam', email: null },
+      seller: { orgName: 'Sam' },
       acceptedAt: '2026-10-20T10:00:00Z',
       label: null,
       outcome: null,

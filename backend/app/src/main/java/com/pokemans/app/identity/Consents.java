@@ -36,25 +36,25 @@ public class Consents {
     private static final String FOOTER = "\n\nAsk Zach if anything here is unclear.";
 
     /** What a seller commits to by posting a card. Shared by collectors and contributors. */
-    static final String SELLER_TERMS_BODY = text("seller-2026-11-01");
+    static final String SELLER_TERMS_BODY = text("seller-2026-11-12");
 
-    public static final String SELLER_TERMS_VERSION = "seller-2026-11-01";
+    public static final String SELLER_TERMS_VERSION = "seller-2026-11-12";
 
     static final String SELLER_TERMS_TEXT = "By posting a card for sale here you agree that:\n\n" + SELLER_TERMS_BODY + FOOTER;
 
     private static final Terms SELLER_TERMS = new Terms(SELLER_TERMS_VERSION, SELLER_TERMS_TEXT, sha256(SELLER_TERMS_TEXT));
 
     /** Contributors can sell too, so their terms carry the seller terms. */
-    public static final String CONTRIBUTOR_TERMS_VERSION = "contributor-2026-11-01";
+    public static final String CONTRIBUTOR_TERMS_VERSION = "contributor-2026-11-12";
 
-    static final String CONTRIBUTOR_TERMS_TEXT = text("contributor-2026-11-01") + "\n\n" + SELLER_TERMS_BODY + FOOTER;
+    static final String CONTRIBUTOR_TERMS_TEXT = text("contributor-2026-11-12") + "\n\n" + SELLER_TERMS_BODY + FOOTER;
 
     private static final Terms CONTRIBUTOR_TERMS = new Terms(CONTRIBUTOR_TERMS_VERSION, CONTRIBUTOR_TERMS_TEXT, sha256(CONTRIBUTOR_TERMS_TEXT));
 
     /** Firm offers: one price, no grade settled on arrival. */
-    public static final String BUYER_TERMS_VERSION = "buyer-firm-2026-11-01";
+    public static final String BUYER_TERMS_VERSION = "buyer-firm-2026-11-12";
 
-    static final String BUYER_TERMS_TEXT = text("buyer-firm-2026-11-01");
+    static final String BUYER_TERMS_TEXT = text("buyer-firm-2026-11-12");
 
     private static final Terms BUYER_TERMS = new Terms(BUYER_TERMS_VERSION, BUYER_TERMS_TEXT, sha256(BUYER_TERMS_TEXT));
 
