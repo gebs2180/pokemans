@@ -2386,10 +2386,14 @@ export interface components {
             /** @enum {string} */
             stage: "SOLD" | "SHIPPED" | "ARRIVED" | "PAID" | "RETURNED" | "BACK";
         };
+        ListingViewsAdminParty: {
+            email: string;
+            orgName: string;
+        };
         ListingViewsAwaitingLabel: {
             /** Format: date-time */
             acceptedAt: string;
-            buyer: components["schemas"]["ListingViewsParty"];
+            buyer: components["schemas"]["ListingViewsAdminParty"];
             /** Format: uuid */
             buyerOrgId: string;
             card: components["schemas"]["ListingViewsCardView"];
@@ -2397,7 +2401,7 @@ export interface components {
             listingId: string;
             offer: components["schemas"]["ListingViewsOfferView"];
             photos: components["schemas"]["ListingViewsPhotoLink"][];
-            seller: components["schemas"]["ListingViewsParty"];
+            seller: components["schemas"]["ListingViewsAdminParty"];
         };
         ListingViewsCardView: {
             distribution: {
@@ -2502,7 +2506,6 @@ export interface components {
             labels: number;
         };
         ListingViewsParty: {
-            email: string;
             orgName: string;
         };
         ListingViewsPhotoLink: {
@@ -2562,7 +2565,7 @@ export interface components {
             reason: string;
         };
         OfferAdminServiceAttention: {
-            buyer: components["schemas"]["ListingViewsParty"];
+            buyer: components["schemas"]["ListingViewsAdminParty"];
             card: components["schemas"]["ListingViewsCardView"];
             /** Format: uuid */
             cardItemId: string;
@@ -2574,7 +2577,7 @@ export interface components {
             outcome: components["schemas"]["ListingViewsOutcomeView"];
             price: number;
             progress: components["schemas"]["ListingStateMachineProgress"];
-            seller: components["schemas"]["ListingViewsParty"];
+            seller: components["schemas"]["ListingViewsAdminParty"];
             /** Format: uuid */
             sellerOrgId: string;
             /** Format: date-time */
@@ -2582,7 +2585,7 @@ export interface components {
             trackingCode: string;
         };
         OfferAdminServiceListing: {
-            buyer: components["schemas"]["ListingViewsParty"];
+            buyer: components["schemas"]["ListingViewsAdminParty"];
             /** Format: uuid */
             buyerOrgId: string;
             /** Format: date-time */

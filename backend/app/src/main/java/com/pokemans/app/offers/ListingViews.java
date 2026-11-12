@@ -89,7 +89,16 @@ class ListingViews {
      */
     enum LessSure { PHOTOS, FEW_SALES, OLD_SALES, ESTIMATED_GRADES, HIGH_VALUE }
 
-    record Party(String orgName, String email) {
+    /**
+     * The other side of a deal as a buyer or seller sees it: the org's name and nothing else. Their email is never shown to
+     * the other side (Zach, 2026-11-12); payment goes to the seller's payment handle, shipping through the prepaid label,
+     * and problems to us. Admin views use {@link AdminParty}, which is the only type with an email.
+     */
+    record Party(String orgName) {
+    }
+
+    /** A party as the admin sees them, with the email to reach them. Never returned from a non-admin endpoint. */
+    record AdminParty(String orgName, String email) {
     }
 
     /**
@@ -155,7 +164,7 @@ class ListingViews {
     }
 
     /** A deal whose label hasn't been bought, for the admin: the label to retry, or the arrival to record by hand. */
-    record AwaitingLabel(UUID listingId, UUID buyerOrgId, Party buyer, Party seller, CardView card, OfferView offer,
+    record AwaitingLabel(UUID listingId, UUID buyerOrgId, AdminParty buyer, AdminParty seller, CardView card, OfferView offer,
                          List<PhotoLink> photos, Instant acceptedAt) {
     }
 
@@ -189,7 +198,7 @@ class ListingViews {
         Party buyer = null;
         if (closed != null && closed.getType() == ListingEvent.Type.ACCEPTED) {
             Directory.Contact c = directory.contact(closed.getActorOrgId(), closed.getActorUserId());
-            buyer = new Party(c.orgName(), c.email());
+            buyer = new Party(c.orgName());
         }
         UndoView undone = status == Status.CANCELLED ? undone(history, ListingEvent.Type.CANCELLED)
                 : status == Status.VOIDED ? undone(history, ListingEvent.Type.VOIDED) : null;

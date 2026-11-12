@@ -928,7 +928,8 @@ export type Undo = { reason: string; at: string; byUserId?: string; by?: string 
  * buyer took it and sent it back, and the seller has it again.
  */
 export type ListingStatus = 'OPEN' | 'ACCEPTED' | 'WITHDRAWN' | 'EXPIRED' | 'VOIDED' | 'CANCELLED' | 'BACK'
-export type Party = { orgName: string | null; email: string | null }
+export type Party = { orgName: string | null }
+export type AdminParty = { orgName: string | null; email: string | null }
 export type DeclinedReason = 'NOT_GENUINE' | 'NOT_THE_LISTED_CARD' | 'DOES_NOT_MATCH_PHOTOS'
 
 export const RETURN_REASON: Record<DeclinedReason, string> = {
@@ -1112,8 +1113,8 @@ export type AdminCalibration = {
 export type AwaitingLabel = {
   listingId: string
   buyerOrgId: string
-  buyer: Party
-  seller: Party
+  buyer: AdminParty
+  seller: AdminParty
   card: OfferCard
   offer: Offer
   photos: PhotoLink[]
@@ -1250,7 +1251,7 @@ export type AdminListing = {
   listedAt: string
   closedAt: string | null
   buyerOrgId: string | null
-  buyer: Party | null
+  buyer: AdminParty | null
   label: ShippingLabel | null
   labelRefund: LabelRefund | null
   outcome: Outcome['type'] | null
@@ -1270,8 +1271,8 @@ export type DealAttention = {
   cardItemId: string
   card: OfferCard
   price: number
-  buyer: Party
-  seller: Party
+  buyer: AdminParty
+  seller: AdminParty
   trackingCode: string | null
   outcome: Outcome | null
   progress: DealProgress | null

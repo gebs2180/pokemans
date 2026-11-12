@@ -43,7 +43,7 @@ class OfferAdminService {
 
     /** The offer's latest listing, as the admin sees it. */
     record Listing(UUID id, ListingStateMachine.Status status, Instant listedAt, Instant closedAt, UUID buyerOrgId,
-                   ListingViews.Party buyer, ListingViews.LabelView label, Refund labelRefund, String outcome, Undo undone) {
+                   ListingViews.AdminParty buyer, ListingViews.LabelView label, Refund labelRefund, String outcome, Undo undone) {
     }
 
     record Offer(UUID offerId, UUID orgId, String sellerName, UUID cardItemId, ListingViews.CardView card, BigDecimal price,
@@ -61,7 +61,7 @@ class OfferAdminService {
      * @param progress what each side has said so far
      */
     record Attention(UUID listingId, AttentionKind kind, Instant since, String note, UUID sellerOrgId, UUID cardItemId,
-                     ListingViews.CardView card, BigDecimal price, ListingViews.Party buyer, ListingViews.Party seller,
+                     ListingViews.CardView card, BigDecimal price, ListingViews.AdminParty buyer, ListingViews.AdminParty seller,
                      String trackingCode, ListingViews.OutcomeView outcome, ListingStateMachine.Progress progress) {
     }
 
@@ -117,7 +117,7 @@ class OfferAdminService {
             var seller = directory.contact(l.getOrgId(), l.getListedBy());
             waiting.add(new Attention(l.getId(), kind, raised.getCreatedAt(), raised.getNote(), l.getOrgId(), l.getCardItemId(),
                     ListingViews.card(OfferService.inputs(offer)), offer.getPrice(),
-                    new ListingViews.Party(buyer.orgName(), buyer.email()), new ListingViews.Party(seller.orgName(), seller.email()),
+                    new ListingViews.AdminParty(buyer.orgName(), buyer.email()), new ListingViews.AdminParty(seller.orgName(), seller.email()),
                     shipping.label(l.getId()).map(ShippingLabel::getTrackingCode).orElse(null), outcome, ListingStateMachine.progress(h)));
         }
         waiting.sort(Comparator.comparing(Attention::since));
@@ -267,10 +267,10 @@ class OfferAdminService {
         ListingEvent closed = history.stream().filter(e -> e.getType() == ListingEvent.Type.ACCEPTED
                 || e.getType() == ListingEvent.Type.WITHDRAWN || e.getType() == ListingEvent.Type.VOIDED).findFirst().orElse(null);
         ListingEvent accepted = history.stream().filter(e -> e.getType() == ListingEvent.Type.ACCEPTED).findFirst().orElse(null);
-        ListingViews.Party buyer = null;
+        ListingViews.AdminParty buyer = null;
         if (accepted != null) {
             var c = directory.contact(accepted.getActorOrgId(), accepted.getActorUserId());
-            buyer = new ListingViews.Party(c.orgName(), c.email());
+            buyer = new ListingViews.AdminParty(c.orgName(), c.email());
         }
         Undo undone = history.stream()
                 .filter(e -> e.getType() == ListingEvent.Type.CANCELLED || e.getType() == ListingEvent.Type.VOIDED)

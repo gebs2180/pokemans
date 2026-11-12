@@ -2139,6 +2139,17 @@
         },
         "required" : [ "arrivedAt", "cardBackAt", "confirmedAt", "disputeNote", "disputedAt", "held", "paidAt", "paidNote", "payBy", "pricePaid", "review", "shippedAt", "stage" ]
       },
+      "ListingViewsAdminParty" : {
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          },
+          "orgName" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "email", "orgName" ]
+      },
       "ListingViewsAwaitingLabel" : {
         "properties" : {
           "acceptedAt" : {
@@ -2146,7 +2157,7 @@
             "type" : "string"
           },
           "buyer" : {
-            "$ref" : "#/components/schemas/ListingViewsParty"
+            "$ref" : "#/components/schemas/ListingViewsAdminParty"
           },
           "buyerOrgId" : {
             "format" : "uuid",
@@ -2169,7 +2180,7 @@
             "type" : "array"
           },
           "seller" : {
-            "$ref" : "#/components/schemas/ListingViewsParty"
+            "$ref" : "#/components/schemas/ListingViewsAdminParty"
           }
         },
         "required" : [ "acceptedAt", "buyer", "buyerOrgId", "card", "listingId", "offer", "photos", "seller" ]
@@ -2450,14 +2461,11 @@
       },
       "ListingViewsParty" : {
         "properties" : {
-          "email" : {
-            "type" : "string"
-          },
           "orgName" : {
             "type" : "string"
           }
         },
-        "required" : [ "email", "orgName" ]
+        "required" : [ "orgName" ]
       },
       "ListingViewsPhotoLink" : {
         "properties" : {
@@ -2616,7 +2624,7 @@
       "OfferAdminServiceAttention" : {
         "properties" : {
           "buyer" : {
-            "$ref" : "#/components/schemas/ListingViewsParty"
+            "$ref" : "#/components/schemas/ListingViewsAdminParty"
           },
           "card" : {
             "$ref" : "#/components/schemas/ListingViewsCardView"
@@ -2646,7 +2654,7 @@
             "$ref" : "#/components/schemas/ListingStateMachineProgress"
           },
           "seller" : {
-            "$ref" : "#/components/schemas/ListingViewsParty"
+            "$ref" : "#/components/schemas/ListingViewsAdminParty"
           },
           "sellerOrgId" : {
             "format" : "uuid",
@@ -2665,7 +2673,7 @@
       "OfferAdminServiceListing" : {
         "properties" : {
           "buyer" : {
-            "$ref" : "#/components/schemas/ListingViewsParty"
+            "$ref" : "#/components/schemas/ListingViewsAdminParty"
           },
           "buyerOrgId" : {
             "format" : "uuid",
