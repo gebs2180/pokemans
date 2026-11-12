@@ -78,7 +78,9 @@ class QualityChecker {
             blurry = blur < properties.minBlurScore();
             glary = glare > properties.maxGlareFraction();
         } else {
-            if (card.coverage() < properties.minCardCoverage()) {
+            // Too small only when it is small in pixels too: a card that gives a full-size crop on a
+            // high-resolution phone is sharp enough, however much table is around it (2026-11-12).
+            if (card.coverage() < properties.minCardCoverage() && card.widthPx() < properties.minCardWidthPx()) {
                 reasons.add(RetakeReason.CARD_TOO_SMALL);
             }
             blurry = card.blurScore() < properties.minCardBlurScore();

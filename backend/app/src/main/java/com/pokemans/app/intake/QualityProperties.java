@@ -17,7 +17,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param maxCardAspectError how far the measured width/height may be from a card's 0.716 (perspective, detection error)
  * @param minCardMarginFraction clear space required between the card and every frame edge, as a share of the
  *                          card's width or height; also rejects cards cut off just past their inner border
- * @param minCardCoverage   smallest share of the frame the card may fill
+ * @param minCardCoverage   smallest share of the frame the card may fill, unless it is at least minCardWidthPx wide
+ * @param minCardWidthPx    a card at least this wide (full-resolution pixels) is large enough whatever its coverage;
+ *                          1000 is the crop's width, so such a card is never upscaled
  * @param minCardBlurScore  variance of the Laplacian on the 1000 px wide card crop below which the card is blurry
  */
 @ConfigurationProperties("pokemans.quality")
@@ -32,5 +34,6 @@ public record QualityProperties(
         @DefaultValue("0.05") double maxCardAspectError,
         @DefaultValue("0.06") double minCardMarginFraction,
         @DefaultValue("0.25") double minCardCoverage,
+        @DefaultValue("1000") int minCardWidthPx,
         @DefaultValue("50") double minCardBlurScore) {
 }

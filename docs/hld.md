@@ -267,7 +267,7 @@ docker-compose.yml
 **M2 carry-over from M1 testing (2026-10-16):** photo quality checks only covered resolution, blur, glare and duplicates, so a sharp photo of half a card passed. Now built:
 - **Finding the card:** the card is found with OpenCV (`org.openpnp:opencv`, `CardDetector`) on an 800 px copy, using edges per colour channel plus saturation after a median blur. Gray-only edges lose a blue border on a dark cloth and pick up fabric texture.
 - **What counts as a whole card:** the largest convex quadrilateral with a card's aspect ratio (63 × 88 mm, 0.716 ± 0.05) that doesn't touch the frame edge, with a clear margin of 6% of the card's size on every side. The margin also rejects a card cut off just past its border, whose inner border would otherwise pass for a whole card.
-- **Retake reasons:** `CARD_NOT_FOUND` covers no card, cut off and too close to the edge in one message. `CARD_TOO_SMALL` fires below 25% frame coverage.
+- **Retake reasons:** `CARD_NOT_FOUND` covers no card, cut off and too close to the edge in one message. `CARD_TOO_SMALL` fires below 25% frame coverage when the card is also under 1000 px wide (the crop's width).
 - **Lots and close-ups:** lots and DETAIL close-ups skip the card checks.
 - **Card crop:** a perspective-corrected crop (1000 px wide) is stored next to the original as `<key>.card.jpg`, with the corners and measurements on the photo row (V3).
 - **Blur:** blur and glare are measured on the card crop, not the whole frame. On the first real photos, a sharp card crop scored about 370. The same photo scored 75 with a slight blur and 17 when clearly soft. The threshold is 50. The whole-frame score is still stored and is used only when no card is found.
