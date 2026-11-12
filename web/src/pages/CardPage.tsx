@@ -120,8 +120,8 @@ export function CardPage() {
 
       {!contributor && !card.lot && !card.photosFrozen && !card.photos.some((p) => p.status !== 'AWAITING_UPLOAD') && (
         <p className="small">
-          <strong>For a good first shot:</strong> take the card out of its sleeve, lay it flat on a plain background that contrasts with its
-          border, and don't use the flash.
+          <strong>For a good first shot:</strong> take the card out of its sleeve, lay it flat on a plain, untextured background that contrasts
+          with its border (no patterned mats or wood grain), and don't use the flash.
         </p>
       )}
 

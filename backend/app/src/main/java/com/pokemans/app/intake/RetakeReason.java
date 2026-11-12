@@ -6,7 +6,7 @@ enum RetakeReason {
     SIZE_MISMATCH("The upload didn't match the file size that was announced."),
     RESOLUTION_TOO_LOW("Too low resolution. Move closer or use the main camera."),
     CARD_NOT_FOUND("Couldn't see the whole card. Get all four corners in the frame with a little space around the card, "
-            + "on a plain background that contrasts with the card's border."),
+            + "on a plain, untextured background that contrasts with the card's border (no patterned mats or wood grain)."),
     CARD_TOO_SMALL("The card is too small in the frame. Move closer, keeping a little space around it."),
     BLURRY("Out of focus. Hold steady and tap to focus on the card."),
     GLARE("Glare on the card. Tilt it or move away from direct light."),
