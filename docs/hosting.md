@@ -26,7 +26,7 @@ Not chosen: **Render**, unless your time matters more than ~$30/mo; it is the si
 
 - Cheapest for this size: free up to 10 GB, no egress fees, and phones download photos for review.
 - It supports `If-None-Match: *` on PutObject, which our presigned uploads and crop writes rely on (an existing photo is never overwritten). Backblaze B2's S3 API wasn't confirmed to support this.
-- **No bucket versioning** (R2 doesn't implement it). The app already never overwrites a photo, and the nightly backup copies the photo bucket into a separate bucket that it never deletes from. So a deleted photo can still be recovered up to the last nightly run. If versioning is a hard requirement, use AWS S3 instead (about $0.023/GB plus egress).
+- **No bucket versioning** (R2 doesn't implement it). The app never overwrites a photo, except once to take its location out ([data-retention.md](data-retention.md)), and the nightly backup copies the photo bucket into a separate bucket that it never deletes from. So a deleted photo can still be recovered up to the last nightly run. If versioning is a hard requirement, use AWS S3 instead (about $0.023/GB plus egress).
 - R2 rejects the AWS SDK's chunked uploads with a 403. The `prod` profile turns them off (`pokemans.storage.chunked-encoding: false`).
 
 ## What's in the repo
@@ -40,7 +40,7 @@ Not chosen: **Render**, unless your time matters more than ~$30/mo; it is the si
 | `deploy/deploy.sh` | Deploys one commit's images (latest main by default), with a backup first and a health wait; also rolls back. See [Day to day](#day-to-day) |
 | `deploy/Caddyfile` | HTTPS, `/api/*` and `/actuator/health` proxied to the backend, other actuator paths answer 404, SPA fallback, cache headers, and a Content-Security-Policy naming `R2_ENDPOINT` (photos) and `AUTH0_DOMAIN` (login) |
 | `deploy/.env.example` | Every variable the stack reads. Copy it to `deploy/.env` on the server; `.env` is git-ignored |
-| `deploy/backup/` | Backup image (Postgres 18 tools + rclone), `schedule.sh` (daily), `backup.sh`, `restore-test.sh` |
+| `deploy/backup/` | Backup image (Postgres 18 tools, rclone, age), `schedule.sh` (daily), `backup.sh` (encrypts), `backup-check.sh` (on the server), `restore-test.sh` and `restore-photos.sh` (on your machine, with the key) |
 | `deploy/r2-cors.json` | CORS rule for the photo bucket (browsers upload straight to it) |
 | `application.yml`, `prod` profile | No local defaults: a missing variable stops the app at startup. Sets R2 storage settings, forwarded headers and graceful shutdown |
 
@@ -73,7 +73,7 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
 1. **Hetzner Cloud** (console.hetzner.cloud): sign up and verify (they sometimes ask for ID). Create a project `pokemans`, then add your SSH public key under Security → SSH keys.
 2. **Cloudflare**: sign up, then open R2 and enable it. It needs a payment method on file even within the free tier.
 3. **Sentry** (sentry.io): Developer (free) plan. Create a project of type *Spring Boot* and copy its DSN.
-4. **healthchecks.io** (free): create a check named `pokemans backup` with a 1-day period and a 2-hour grace. Copy its ping URL. It emails you when a nightly backup doesn't report in.
+4. **healthchecks.io** (free): create three checks and copy each ping URL. `pokemans backup` (period 1 day, grace 2 hours) emails you when a nightly backup doesn't report in; `pokemans backup check` (1 day, 2 hours) when the server-side check of it fails; `pokemans restore test` (period 30 days, grace 3 days) when you haven't run the restore test on your machine for a month.
 5. **UptimeRobot** (free), or similar: you'll add a monitor in step 8.
 
 ### 2. Server
@@ -111,8 +111,20 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
 
 4. `pokemans-backups` → Settings → **Bucket lock rules** → Add rule: name `keep-30-days`, no prefix (the whole bucket), retention **30 days**. No one can delete or overwrite a backup in its first 30 days, whoever holds a token.
 5. `pokemans-backups` → Settings → **Object lifecycle rules** → Add rule: name `expire-dumps`, prefix `postgres/`, delete objects **35 days** after upload. Photos in the backup are never expired.
+6. A fourth token for the restore test on your own machine: `pokemans-backup-restore`, Object Read only, `pokemans-backups` only. It goes in your local `restore-test.env` (step 7), never on the server.
 
 The backup can read photos but not delete them, and the app can't touch the backups. R2 has no write-only token, so the backup's write token could still delete a backup; the lock rule is what stops it, for 30 days. The backup job itself never deletes: old dumps go by the lifecycle rule. A copy outside this Cloudflare account comes later (review D1).
+
+### Backup encryption key
+
+Every backup (the database dump and each photo) is encrypted with [age](https://age-encryption.org) to a public key before it leaves the server. The server holds only the public half, so it can write backups but not read them; a leaked R2 token or server shows nothing. Make the pair once, on your own machine, not the server:
+
+1. Install age: `winget install FiloSottile.age` (Windows), `brew install age` or `apt install age`.
+2. `age-keygen -o rawmark-backup.key`. It prints `Public key: age1...` and writes a file holding a `# public key:` comment and one `AGE-SECRET-KEY-1...` line.
+3. **Private half:** paste the whole `AGE-SECRET-KEY-1...` line into a new Bitwarden secure note, `Rawmark backup key`, with the public key in the note too. Then delete the file (`Remove-Item rawmark-backup.key`). Bitwarden is the only copy: **lose it and every backup is unreadable**. A second copy somewhere safe (printed, in a safe) is worth having; or make a second pair, keep its private half apart, and list both public keys.
+4. **Public half:** `BACKUP_AGE_RECIPIENT=age1...` in the server's `.env` (and the `.env` copy in Bitwarden). Several keys, space- or comma-separated, each can decrypt.
+
+Without `BACKUP_AGE_RECIPIENT`, or with something that isn't an age public key, `backup.sh` refuses to run and pings `/fail`; there is no unencrypted fallback. Changing the key: put the new public key in `.env` (both, while you switch), recreate the backup service, and keep the old private key until the last backup made with it has expired (35 days for dumps; photos copied before the switch stay encrypted to the old key for good, so keep it).
 
 ### 4. Auth0 (dev tenant, or a new prod tenant)
 
@@ -147,13 +159,56 @@ Generate `POSTGRES_PASSWORD` with `openssl rand -base64 32 | tr -d '/+='`. Keep 
 
 ### 7. Backups and the restore test
 
-The `backup` service runs every day at `BACKUP_AT` (UTC). Run it once now, then run the restore test straight after:
+The `backup` service runs every day at `BACKUP_AT` (UTC): it dumps the database, encrypts the dump and every new photo (photos under an hour old wait for the next night), and uploads them to `postgres/pokemans-<time>.dump.age` and `photos-age/<key>.age`, with a plain row count per table next to the dump (`pokemans-<time>.counts`). After each backup, `backup-check.sh` checks on the server that the newest dump is there, under 26 hours old and encrypted, and that every photo has an encrypted copy (also off-site when that's on). Run both once now:
 
 ```bash
-docker compose -f compose.prod.yml run --rm backup bash -c "backup.sh && restore-test.sh"
+docker compose -f compose.prod.yml run --rm backup bash -c "backup.sh && backup-check.sh"
 ```
 
-`restore-test.sh` downloads the newest dump and restores it into a throwaway Postgres inside the container, never production. It prints row counts per table, restored against live, and checks that no migration failed. It then checks that every photo in the photo bucket is in the backup copy with the same size, and ends with `restore-test: OK` or `FAILED`. **Repeat it weekly during the beta**, and before any risky migration.
+#### Restore test
+
+The server can't decrypt, so the real restore test runs on your machine, with the private key from Bitwarden. It needs Docker Desktop and a `restore-test.env` file kept outside the repo (e.g. `~\rawmark\restore-test.env`; it holds a read-only key, not the age key):
+
+```
+BACKUP_BUCKET=pokemans-backups
+RCLONE_CONFIG_BACKUPS_TYPE=s3
+RCLONE_CONFIG_BACKUPS_PROVIDER=Cloudflare
+RCLONE_CONFIG_BACKUPS_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+RCLONE_CONFIG_BACKUPS_ACCESS_KEY_ID=<pokemans-backup-restore key id>
+RCLONE_CONFIG_BACKUPS_SECRET_ACCESS_KEY=<pokemans-backup-restore secret>
+RCLONE_CONFIG_BACKUPS_NO_CHECK_BUCKET=true
+RESTORE_TEST_HEALTHCHECK_URL=<the "pokemans restore test" ping URL>
+```
+
+Then in PowerShell, with the `AGE-SECRET-KEY-1...` line copied from Bitwarden (it stays in this window's memory; nothing writes it to disk):
+
+```powershell
+docker login ghcr.io -u gebs2180
+$env:AGE_IDENTITY = Get-Clipboard; Set-Clipboard -Value ' '
+docker run --rm -e AGE_IDENTITY --env-file $HOME\rawmark\restore-test.env ghcr.io/gebs2180/pokemans-backup:main restore-test.sh
+Remove-Item Env:AGE_IDENTITY
+```
+
+`restore-test.sh` decrypts the newest dump and restores it into a throwaway Postgres inside the container. It prints row counts per table, restored against those counted at backup time, fails if any table has fewer or a key table is empty, and checks that no migration failed. It then decrypts the five newest photos and checks each is a JPEG or PNG, and ends with `restore-test: OK` or `FAILED`. **Run it monthly** (the healthcheck emails you when you haven't), and before any risky migration.
+
+#### Deleting the plain-text backups
+
+Backups made before encryption (`postgres/pokemans-*.dump` and the `photos/` prefix) are not encrypted, and the photos in them still carry GPS (the location strip only changes the photo bucket). Delete them once the first encrypted backup has passed `backup-check.sh` **and** `restore-test.sh` on your machine. The 30-day bucket lock refuses deletes until each object is 30 days old, so do it on or after the 31st day after the switch; anything younger is refused and can be retried later. Old dumps also go by themselves after 35 days (lifecycle rule); the `photos/` prefix never does.
+
+On the server, from `~/pokemans/deploy`, using the backup write token:
+
+```bash
+# 1. See what's there (counts only)
+docker compose -f compose.prod.yml run --rm backup bash -c 'rclone lsf backups:$BACKUP_BUCKET/postgres --include "pokemans-*.dump" | wc -l; rclone size backups:$BACKUP_BUCKET/photos'
+# 2. Dry run: lists what would go, deletes nothing
+docker compose -f compose.prod.yml run --rm backup bash -c 'rclone delete backups:$BACKUP_BUCKET/postgres --include "pokemans-*.dump" --dry-run; rclone delete backups:$BACKUP_BUCKET/photos --dry-run'
+# 3. Delete. --include "pokemans-*.dump" never matches the encrypted *.dump.age or the *.counts files
+docker compose -f compose.prod.yml run --rm backup bash -c 'rclone delete backups:$BACKUP_BUCKET/postgres --include "pokemans-*.dump"; rclone delete backups:$BACKUP_BUCKET/photos --rmdirs'
+# 4. Check: both should print 0 / empty, and the next backup-check stops reporting them
+docker compose -f compose.prod.yml exec backup backup-check.sh
+```
+
+Off-site (when it's on), delete the same two from that provider's console or with the same `rclone delete` on `offsite:postgres` and `offsite:photos`; with B2 Object Lock or Hetzner snapshots they last until their retention runs out. Older Hetzner server snapshots, if you take them, hold the plain database until they expire too.
 
 ### 8. Errors and uptime
 
@@ -191,19 +246,37 @@ ssh deploy@beta.rawmark.app 'bash -s' < deploy/prod-check.sh
 **Restore after a disaster** (lost server or a bad migration):
 
 1. New server: steps 2 and 5 up to `docker login`, then run only `docker compose -f compose.prod.yml up -d postgres`. Until the first deploy there are no `deployed` images, so the commands in steps 2 and 3 use the latest main's (`IMAGE_TAG=main`).
-2. Restore the newest dump into it (`--clean` drops what's there):
-   ```bash
-   IMAGE_TAG=main docker compose -f compose.prod.yml run --rm backup bash -c '
-     f=$(rclone lsf backups:$BACKUP_BUCKET/postgres | sort | tail -n 1) &&
-     rclone copyto backups:$BACKUP_BUCKET/postgres/$f /tmp/restore.dump &&
-     pg_restore --clean --if-exists --no-owner -d pokemans /tmp/restore.dump'
+2. Decrypt the newest dump **on your machine** (the key never goes to the server), copy it up, restore it (`--clean` drops what's there), and delete it. In PowerShell, with `restore-test.env` from step 7 and the key copied from Bitwarden. Decrypt to a file, not through a pipe: PowerShell 5.1 pipes corrupt binary data.
+   ```powershell
+   $env:AGE_IDENTITY = Get-Clipboard; Set-Clipboard -Value ' '
+   mkdir $HOME\rawmark\restore -Force
+   docker run --rm -e AGE_IDENTITY --env-file $HOME\rawmark\restore-test.env -v "$HOME\rawmark\restore:/out" --user root ghcr.io/gebs2180/pokemans-backup:main decrypt-dump.sh /out
+   Remove-Item Env:AGE_IDENTITY
+   scp $HOME\rawmark\restore\restore.dump deploy@<server-ip>:/tmp/restore.dump
+   Remove-Item $HOME\rawmark\restore\restore.dump
    ```
-3. Lost photos: copy them back with the app token, which can write to the photo bucket (the backup read token can't):
+   Then on the server:
    ```bash
-   IMAGE_TAG=main docker compose -f compose.prod.yml run --rm \
-     -e RCLONE_CONFIG_PHOTOS_ACCESS_KEY_ID=<app key id> -e RCLONE_CONFIG_PHOTOS_SECRET_ACCESS_KEY=<app secret> \
-     backup rclone copy backups:pokemans-backups/photos photos:pokemans-photos
+   IMAGE_TAG=main docker compose -f compose.prod.yml run --rm -v /tmp/restore.dump:/tmp/restore.dump:ro backup \
+     pg_restore --clean --if-exists --no-owner -d pokemans /tmp/restore.dump
+   shred -u /tmp/restore.dump
    ```
+3. Lost photos: decrypt them back into the photo bucket, also on your machine. Copy `restore-test.env` to `restore-photos.env` and add the photo bucket with the app token, which can write to it (the backup read tokens can't):
+   ```
+   PHOTO_BUCKET=pokemans-photos
+   RCLONE_CONFIG_PHOTOS_TYPE=s3
+   RCLONE_CONFIG_PHOTOS_PROVIDER=Cloudflare
+   RCLONE_CONFIG_PHOTOS_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+   RCLONE_CONFIG_PHOTOS_ACCESS_KEY_ID=<app key id>
+   RCLONE_CONFIG_PHOTOS_SECRET_ACCESS_KEY=<app secret>
+   RCLONE_CONFIG_PHOTOS_NO_CHECK_BUCKET=true
+   ```
+   ```powershell
+   $env:AGE_IDENTITY = Get-Clipboard; Set-Clipboard -Value ' '
+   docker run --rm -e AGE_IDENTITY --env-file $HOME\rawmark\restore-photos.env ghcr.io/gebs2180/pokemans-backup:main restore-photos.sh
+   Remove-Item Env:AGE_IDENTITY
+   ```
+   It only uploads photos missing from the bucket and never overwrites one. Delete `restore-photos.env` afterwards (it holds the app's write key).
 4. `bash ~/pokemans/deploy/deploy.sh`, then the smoke test.
 
 At most a day of data is lost (the last nightly backup), plus whatever Hetzner's weekly snapshot doesn't cover if you use it.

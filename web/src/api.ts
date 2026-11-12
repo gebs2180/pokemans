@@ -142,6 +142,8 @@ export type NeedsYouItem = {
 
 /** Deals the admin should look at. */
 export type OverdueDeals = { labels: number }
+/** One run of the one-off removal of location from older photo originals (POST /api/admin/photos/remove-location). */
+export type PhotoLocationRun = { checked: number; rewritten: number; clean: number; missing: number; failed: number; remaining: number }
 
 /** Cards left unassessed because the automatic pre-grade failed; out of credits hits every card at once. */
 export type PreGradeFailures = { failedCards: number; outOfCreditsCards: number; outOfCredits: boolean; submitsResumeAt: string | null }

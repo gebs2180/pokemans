@@ -99,7 +99,7 @@ services:
       - caddy-config:/config
     logging: *logging
 
-  # Nightly Postgres dump and photo-bucket copy to the backup bucket, and optionally off-site (backup/backup.sh).
+  # Nightly encrypted Postgres dump and photo copy to the backup bucket, and optionally off-site (backup/backup.sh).
   backup:
     build: ./backup
     image: ghcr.io/gebs2180/pokemans-backup:${IMAGE_TAG:-deployed}
@@ -116,9 +116,12 @@ services:
       PHOTO_BUCKET: ${R2_PHOTO_BUCKET:-pokemans-photos}
       BACKUP_BUCKET: ${R2_BACKUP_BUCKET:-pokemans-backups}
       HEALTHCHECK_URL: ${BACKUP_HEALTHCHECK_URL:-}
-      # Weekly restore test into a throwaway database, straight after that night's backup (backup/restore-test.sh).
-      RESTORE_TEST_DAYS: ${RESTORE_TEST_DAYS:-Sun}
-      RESTORE_TEST_HEALTHCHECK_URL: ${RESTORE_TEST_HEALTHCHECK_URL:-}
+      # The age public key(s) every backup is encrypted to (docs/hosting.md#backup-encryption-key). Not ":?":
+      # a missing key mustn't stop the app starting; backup.sh refuses to run and pings /fail instead.
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      # After each backup, backup-check.sh checks it's there, recent and encrypted. The restore test needs the
+      # private key, so it runs on Zach's machine (backup/restore-test.sh), not here.
+      BACKUP_CHECK_HEALTHCHECK_URL: ${BACKUP_CHECK_HEALTHCHECK_URL:-}
       # Optional off-site copy on another provider and account (backup/README.md). Off unless both are set.
       OFFSITE_REMOTE: ${OFFSITE_REMOTE:-}
       OFFSITE_PATH: ${OFFSITE_PATH:-}

@@ -21,7 +21,7 @@ reason someone else relies on.
 | Addresses and payment handles | Every address not on a label | The two addresses on each kept label (the carrier, the insurer and the other party have them already). |
 | The org | Memberships, invites; the org row if nothing kept points at it | Otherwise the org row, renamed "Deleted org …", and its folders, renamed "Deleted on request". Consent records stay only while the org does: they show the kept deals were made under the terms. |
 | The people | Their user row, if nothing kept points at it; their Auth0 login | Otherwise the user row as a bare id: login subject replaced, email cleared. Someone still active in another org is left alone. |
-| Emails we sent them | The address on each `email_message` row (`recipient_email`) | The rows themselves, with subject and body as sent: they are the audit trail of what we told whom and when, and the user row they point at stays as a bare id. |
+| Emails we sent them | The address on each `email_message` row (`recipient_email`) | The rows themselves, with subject and body as sent until the retention job clears them 90 days after queueing ([data-retention.md](data-retention.md)): they are the audit trail of what we told whom and when, and the user row they point at stays as a bare id. |
 | Already used | – | Models trained and figures published before the request (clause 5). Pre-grade providers keep what their terms let them keep from the photos we sent; we ask them to delete it where they offer that. |
 | Backups | Photo copies, by hand once the 30-day bucket lock allows | Database dumps age out by themselves after 35 days. |
 | Logs | – | Container logs rotate (5 × 20 MB per service); Sentry keeps errors for its plan's retention. Neither holds photos. |
@@ -49,8 +49,9 @@ Zach runs this; it changes the server. From `deploy/` on the server:
    Kept cards' folders aren't printed: leave them.
 5. **Auth0.** Delete each printed login (User Management → Users, search by the subject).
 6. **Backup copies, after 30 days.** The backup bucket is locked for 30 days, so add a reminder and then delete the
-   same folders under `pokemans-backups/photos/`, and from the off-site copy if one is set up. The nightly restore test
-   only checks that every live photo is in the backup, so removing them there is safe once they're gone from the live
+   same folders under `pokemans-backups/photos-age/` (encrypted copies, `<key>.age`; and under `photos/` while the
+   plain-text copies made before 2026-11-12 are still there), and from the off-site copy if one is set up. The nightly
+   check only looks for every live photo in the backup, so removing them there is safe once they're gone from the live
    bucket.
 7. **Pre-grade providers.** If the cards had predictions, ask each provider used to delete the photos, where its terms
    offer that.

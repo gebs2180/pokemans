@@ -5,7 +5,10 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 
-/** Object storage port (HLD: {@code BlobStore}). Objects are written once and never replaced. */
+/**
+ * Object storage port (HLD: {@code BlobStore}). Objects are written once and never replaced, with one exception:
+ * {@link #replace}, which only takes the location out of a photo original.
+ */
 public interface BlobStore {
 
     /**
@@ -24,6 +27,12 @@ public interface BlobStore {
      * Returns false if it existed: derivatives are deterministic, so a retry finds the same bytes there.
      */
     boolean putIfAbsent(String bucket, String key, byte[] bytes, String contentType);
+
+    /**
+     * Overwrites an existing object. Only for taking the location and device metadata out of a photo original
+     * (privacy review 2026-11-12), with the same pixels and capture time: everything else is written once.
+     */
+    void replace(String bucket, String key, byte[] bytes, String contentType);
 
     /** A short-lived link for viewing one private object in the browser. */
     URI presignDownload(String bucket, String key);

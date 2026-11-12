@@ -75,6 +75,7 @@ export type ApiTypesMatchTheBackend = {
   CardStatus: Ok<Covers<S['CardStatusServiceCardStatus'], A.CardStatus>>
   NeedsYouItem: Ok<Covers<S['CardStatusServiceNeedsYou'], A.NeedsYouItem>>
   OverdueDeals: Ok<Covers<S['ListingViewsOverdue'], A.OverdueDeals>>
+  PhotoLocationRun: Ok<Covers<S['PhotoLocationBackfillResult'], A.PhotoLocationRun>>
   UploadSlot: Ok<Covers<S['IntakeViewsUploadSlot'], A.UploadSlot>>
   QueueItem: Ok<Covers<S['ConditionControllerQueueItem'], A.QueueItem>>
   CatalogHit: Ok<Covers<S['CatalogProviderHit'], A.CatalogHit>>

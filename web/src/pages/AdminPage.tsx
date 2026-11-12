@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention, type Org, type OrgType, type OverdueDeals, type PokeTraceQueue, type PreGradeFailures, type QueueItem } from '../api'
+import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention, type Org, type OrgType, type OverdueDeals, type PhotoLocationRun, type PokeTraceQueue, type PreGradeFailures, type QueueItem } from '../api'
 import { useLoad } from '../useLoad'
 import { Loading, PageError } from '../ui'
 import { OrgPeople } from './OrgPeople'
@@ -43,6 +43,47 @@ function NeedsAttention({ deals, dealsError }: { deals: DealAttention[] | null; 
       )}
       {f.outOfCredits && f.outOfCreditsCards === 0 && <p className="muted">CardGrade is out of credits{resumes}. Cards sent now will fail.</p>}
     </section>
+  )
+}
+
+/**
+ * The one-off removal of location and device metadata from photos uploaded before it happened at upload. Each click
+ * checks up to 200; click again until none remain.
+ */
+function PhotoLocation() {
+  const api = useApi()
+  const [run, setRun] = useState<PhotoLocationRun | null>(null)
+  const [running, setRunning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function start() {
+    setError(null)
+    setRunning(true)
+    try {
+      setRun(await api<PhotoLocationRun>('POST', '/api/admin/photos/remove-location'))
+    } catch (err) {
+      setError(message(err))
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <>
+      <h2>Photo location</h2>
+      <p className="muted">Removes GPS and device details from photos uploaded before this happened at upload. Pixels and when it was taken stay.</p>
+      <button onClick={start} disabled={running || run?.remaining === 0}>
+        {running ? 'Checking…' : run ? 'Check the next 200' : 'Check 200 photos'}
+      </button>
+      {error && <p className="error" role="alert">{error}</p>}
+      {run && (
+        <p role="status">
+          Checked {run.checked}: {run.rewritten} rewritten, {run.clean} with nothing to remove
+          {run.missing > 0 && `, ${run.missing} missing from storage`}
+          {run.failed > 0 && `, ${run.failed} failed (see the logs)`}. {run.remaining === 0 ? 'None left.' : `${run.remaining} left.`}
+        </p>
+      )}
+    </>
   )
 }
 
@@ -148,6 +189,7 @@ export function AdminPage() {
           )
         })}
       </ul>
+      <PhotoLocation />
     </>
   )
 }

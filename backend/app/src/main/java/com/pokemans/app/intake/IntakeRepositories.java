@@ -80,4 +80,15 @@ interface PhotoRepository extends JpaRepository<Photo, UUID> {
     long countByOrgIdAndCreatedAtAfter(UUID orgId, Instant since);
 
     boolean existsByOrgIdAndSha256AndCardItemIdNot(UUID orgId, String sha256, UUID cardItemId);
+
+    /** Uploaded originals not yet checked for location metadata, oldest first (the one-off backfill). */
+    @Query("select p.id from Photo p where p.status <> com.pokemans.app.intake.Photo.Status.AWAITING_UPLOAD"
+            + " and p.locationCheckedAt is null order by p.createdAt")
+    List<UUID> findIdsWithLocationUnchecked(org.springframework.data.domain.Limit limit);
+
+    long countByStatusNotAndLocationCheckedAtIsNull(Photo.Status status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Photo p where p.id = :id")
+    Optional<Photo> findLockedById(UUID id);
 }
