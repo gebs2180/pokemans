@@ -185,6 +185,17 @@ pokemans:
       app-url: ${NOTIFY_APP_URL:https://beta.rawmark.app}
       # The digest goes out daily at 14:00 UTC, on days with new cards.
       digest-cron: ${NOTIFY_DIGEST_CRON:0 0 14 * * *}
+  retention:
+    # Personal data is kept only as long as it's needed (privacy review, Zach 2026-11-12; docs/data-retention.md).
+    # A daily job at 04:15 UTC. The periods are defaults to confirm.
+    enabled: ${RETENTION_ENABLED:true}
+    cron: ${RETENTION_CRON:0 15 4 * * *}
+    # A sent (or failed, skipped, cancelled) email loses its address, subject and bodies after this many days.
+    email-content-days: 90
+    # An address a label used is anonymised (state and zip kept) this long after its last deal closed.
+    label-address-days: 365
+    # An address replaced before any label used it is deleted this long after it was replaced.
+    replaced-address-days: 30
   provenance:
     # A custody check (vault statement, in-person visit, ...) counts this long, then lapses and the
     # card gets no advance until it is checked again.

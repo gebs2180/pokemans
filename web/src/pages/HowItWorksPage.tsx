@@ -26,6 +26,10 @@ function TheTest() {
           you're paid, but not when a card's condition or offer is ready. Your home page lists what needs you, so check it.
         </li>
         <li>During the test, don't buy from or sell to someone you met here outside the app.</li>
+        <li>
+          <strong>Your address goes on the shipping label.</strong> The other side sees it on the package, and EasyPost, who prints the
+          label, gets it too. We keep it only as long as a claim on the deal could need it.
+        </li>
       </ul>
     </section>
   )

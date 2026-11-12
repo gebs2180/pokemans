@@ -104,6 +104,11 @@ class S3BlobStore implements BlobStore, AutoCloseable {
     }
 
     @Override
+    public void replace(String bucket, String key, byte[] bytes, String contentType) {
+        client.putObject(r -> r.bucket(bucket).key(key).contentType(contentType), RequestBody.fromBytes(bytes));
+    }
+
+    @Override
     public boolean putIfAbsent(String bucket, String key, byte[] bytes, String contentType) {
         try {
             client.putObject(r -> r.bucket(bucket).key(key).contentType(contentType).ifNoneMatch("*"), RequestBody.fromBytes(bytes));

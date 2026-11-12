@@ -56,6 +56,9 @@ class Photo extends AssignedIdEntity<UUID> {
     private Instant createdAt;
     private Instant uploadedAt;
     private Instant checkedAt;
+    private String storedSha256;
+    private Long storedSizeBytes;
+    private Instant locationCheckedAt;
 
     protected Photo() {
     }
@@ -121,6 +124,25 @@ class Photo extends AssignedIdEntity<UUID> {
         this.status = retakeReasons.isEmpty() ? Status.PASSED : Status.RETAKE;
         this.uploadedAt = now;
         this.checkedAt = now;
+    }
+
+    /**
+     * Records that the stored original was checked for location and device metadata, and, when it carried some, the
+     * object it was rewritten to (null hash and size: it was already clean, or not a JPEG or PNG we can copy).
+     * {@link #getSha256()} stays the upload's hash: duplicate checks and issued reports use it.
+     */
+    void locationChecked(String storedSha256, Long storedSizeBytes) {
+        this.storedSha256 = storedSha256;
+        this.storedSizeBytes = storedSizeBytes;
+        this.locationCheckedAt = Instant.now();
+    }
+
+    Instant getLocationCheckedAt() {
+        return locationCheckedAt;
+    }
+
+    String getStoredSha256() {
+        return storedSha256;
     }
 
     @Override

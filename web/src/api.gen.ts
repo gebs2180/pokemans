@@ -660,6 +660,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/photos/remove-location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/poketrace/pull-gaps": {
         parameters: {
             query?: never;
@@ -2766,6 +2782,20 @@ export interface components {
             /** @enum {string} */
             method: "PAYPAL" | "VENMO" | "ZELLE";
         };
+        PhotoLocationBackfillResult: {
+            /** Format: int32 */
+            checked: number;
+            /** Format: int32 */
+            clean: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int32 */
+            missing: number;
+            /** Format: int64 */
+            remaining: number;
+            /** Format: int32 */
+            rewritten: number;
+        };
         PokeTraceControllerMapRequest: {
             overrideReason: string;
             poketraceId: string;
@@ -4368,6 +4398,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["OutcomeControllerOutcomeView"];
+                };
+            };
+        };
+    };
+    run: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoLocationBackfillResult"];
                 };
             };
         };

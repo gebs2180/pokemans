@@ -14,10 +14,14 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -32,6 +36,8 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @Service
 class PhotoService {
+
+    private static final Logger log = LoggerFactory.getLogger(PhotoService.class);
 
     static final Set<String> ACCEPTED_TYPES = Set.of("image/jpeg", "image/png");
 
@@ -157,6 +163,9 @@ class PhotoService {
             // Buyers open this one full size: the photos are what the card must match on arrival.
             CardItems.storeExactCopy(blobs, storage.photoBucket(), photo.getStorageKey(), photo.getContentType(), bytes);
         }
+        // Last, after everything above read the upload: the original we keep loses its location and device metadata,
+        // keeping its pixels, orientation and capture time (pre-loss proof). The upload's hash stays on the row.
+        removeLocation(photo, bytes);
         photos.flush();
         if (!wasComplete && IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId())).captureComplete()) {
             events.publishEvent(new CardItems.CaptureCompleted(orgId, card.getId()));
@@ -164,6 +173,27 @@ class PhotoService {
             events.publishEvent(new CardItems.PhotoRetaken(orgId, card.getId()));
         }
         return IntakeViews.photo(photo);
+    }
+
+    /**
+     * Rewrites the stored original without its location and device metadata, when it carries any, and records the
+     * check on the photo. Returns whether it was rewritten: not when it was already clean, isn't a JPEG or PNG we can
+     * copy, or the copy would read a different capture time (never risked: it is pre-loss proof).
+     */
+    boolean removeLocation(Photo photo, byte[] bytes) {
+        byte[] stripped = ExactCopy.withoutLocation(bytes);
+        if (stripped == null || Arrays.equals(stripped, bytes)) {
+            photo.locationChecked(null, null);
+            return false;
+        }
+        if (!Objects.equals(ExifReader.capturedAt(stripped), ExifReader.capturedAt(bytes))) {
+            log.warn("Photo {}: the copy without location reads a different capture time; the original is kept as it is", photo.getId());
+            photo.locationChecked(null, null);
+            return false;
+        }
+        blobs.replace(storage.photoBucket(), photo.getStorageKey(), stripped, photo.getContentType());
+        photo.locationChecked(sha256(stripped), (long) stripped.length);
+        return true;
     }
 
     private void requireNotFrozen(CardItem card) {

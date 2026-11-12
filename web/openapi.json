@@ -3166,6 +3166,35 @@
         },
         "required" : [ "handle", "method" ]
       },
+      "PhotoLocationBackfillResult" : {
+        "properties" : {
+          "checked" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "clean" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "failed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "missing" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "remaining" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "rewritten" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "checked", "clean", "failed", "missing", "remaining", "rewritten" ]
+      },
       "PokeTraceControllerMapRequest" : {
         "properties" : {
           "overrideReason" : {
@@ -6021,6 +6050,34 @@
           }
         },
         "tags" : [ "outcome-controller" ]
+      }
+    },
+    "/api/admin/photos/remove-location" : {
+      "post" : {
+        "operationId" : "run",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 200,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PhotoLocationBackfillResult"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "photo-location-controller" ]
       }
     },
     "/api/admin/poketrace/pull-gaps" : {
