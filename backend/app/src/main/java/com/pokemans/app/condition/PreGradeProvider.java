@@ -48,6 +48,11 @@ interface PreGradeProvider {
 
     Poll poll(String externalRequestId);
 
+    /** When submits resume, if this provider has stopped sending after being out of credits; empty otherwise. */
+    default java.util.Optional<java.time.Instant> submitsPausedUntil(java.time.Instant now) {
+        return java.util.Optional.empty();
+    }
+
     /**
      * The provider turned the call away for a reason that asking again won't fix (out of credits, a
      * bad key, a plan without API access). The request fails at once with no retries, so nothing burns

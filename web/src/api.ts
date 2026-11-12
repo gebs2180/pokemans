@@ -143,6 +143,9 @@ export type NeedsYouItem = {
 /** Deals the admin should look at. */
 export type OverdueDeals = { labels: number }
 
+/** Cards left unassessed because the automatic pre-grade failed; out of credits hits every card at once. */
+export type PreGradeFailures = { failedCards: number; outOfCreditsCards: number; outOfCredits: boolean; submitsResumeAt: string | null }
+
 export type UploadSlot = {
   photoId: string
   url: string

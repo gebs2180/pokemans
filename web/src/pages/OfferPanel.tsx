@@ -259,7 +259,7 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
         <div className="alert alert-info">
           <p>
             Waiting for a buyer, until {new Date(listing.expiresAt).toLocaleDateString()}. If one takes it, you have {days(policy.shipWithinDays)} to ship. We
-            don't send notifications yet, so check back here.
+            email you if one takes it.
           </p>
           <div className="actions">
             {confirming === 'withdraw' ? (

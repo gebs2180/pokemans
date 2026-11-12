@@ -22,8 +22,8 @@ function TheTest() {
         </li>
         <li>Offers can be wrong, and the app can stop working or be paused.</li>
         <li>
-          <strong>There are no notifications yet.</strong> Nobody gets an email when a buyer takes a card or a label is ready. Your home
-          page lists what needs you, so check it.
+          <strong>We email about sales, not about everything.</strong> You get an email when a buyer takes your card, when it arrives and when
+          you're paid, but not when a card's condition or offer is ready. Your home page lists what needs you, so check it.
         </li>
         <li>During the test, don't buy from or sell to someone you met here outside the app.</li>
       </ul>

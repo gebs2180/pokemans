@@ -144,6 +144,11 @@ class CardGradePreGradeProvider implements PreGradeProvider {
     }
 
     @Override
+    public java.util.Optional<Instant> submitsPausedUntil(Instant now) {
+        return now.isBefore(outOfCreditsUntil) ? java.util.Optional.of(outOfCreditsUntil) : java.util.Optional.empty();
+    }
+
+    @Override
     public Poll poll(String externalRequestId) {
         waitForSlot(reads, "reads");
         try {

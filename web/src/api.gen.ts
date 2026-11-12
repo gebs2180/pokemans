@@ -724,6 +724,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/pregrade-failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["preGradeFailures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/reports/{reportId}/download": {
         parameters: {
             query?: never;
@@ -2853,6 +2869,15 @@ export interface components {
             /** @enum {string} */
             variant: "NORMAL" | "HOLO" | "REVERSE_HOLO";
         };
+        PreGradeFailuresSummary: {
+            /** Format: int32 */
+            failedCards: number;
+            outOfCredits: boolean;
+            /** Format: int32 */
+            outOfCreditsCards: number;
+            /** Format: date-time */
+            submitsResumeAt: string;
+        };
         PricingControllerCompRequest: {
             grade: number;
             /** @enum {string} */
@@ -4424,6 +4449,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PokeTraceQueueControllerSearchView"];
+                };
+            };
+        };
+    };
+    preGradeFailures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PreGradeFailuresSummary"];
                 };
             };
         };

@@ -1,6 +1,7 @@
 package com.pokemans.app.offers;
 
 import com.pokemans.app.condition.Assessments;
+import com.pokemans.app.condition.PreGradeFailures;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.valuation.CardInputs;
 import com.pokemans.app.valuation.UnvaluedReason;
@@ -70,7 +71,8 @@ class CardStatusService {
     /** An offer this close to ending says so, on top of saying it's ready. */
     static final Duration EXPIRING_SOON = Duration.ofHours(48);
 
-    private static final String NO_NOTIFICATIONS = " We don't send notifications yet, so check back here.";
+    /** We email deal steps and buyers' digests, but nothing when a card's condition or offer is ready. */
+    private static final String NO_NOTIFICATIONS = " We email you about a sale, but not when a card's condition or offer is ready, so check back here for those.";
 
     private final OfferService offers;
     private final SaleListingRepository listings;
@@ -80,9 +82,12 @@ class CardStatusService {
     private final Assessments assessments;
     private final Shipping shipping;
     private final OfferPolicy policy;
+    private final PreGradeFailures preGradeFailures;
 
     CardStatusService(OfferService offers, SaleListingRepository listings, ListingEventRepository events, CardItems cardItems,
-                      CardOfferVoidRepository voids, Assessments assessments, Shipping shipping, OfferPolicy policy) {
+                      CardOfferVoidRepository voids, Assessments assessments, Shipping shipping, OfferPolicy policy,
+                      PreGradeFailures preGradeFailures) {
+        this.preGradeFailures = preGradeFailures;
         this.policy = policy;
         this.offers = offers;
         this.shipping = shipping;
@@ -174,6 +179,11 @@ class CardStatusService {
                     "We identify each card by hand from its photos, usually within a couple of days." + NO_NOTIFICATIONS, false);
         }
         if (reason == UnvaluedReason.NO_ASSESSMENT) {
+            if (preGradeFailures.failed(cardId)) {
+                // No provider name, error or credit status: the collector only needs to know a person will look.
+                return new CardStatus(cardId, Stage.ASSESSING, identity,
+                        "The automatic condition check didn't work for this card, so we'll check it by hand." + NO_NOTIFICATIONS, false);
+            }
             return new CardStatus(cardId, Stage.ASSESSING, identity,
                     "We're reviewing its condition from the photos." + NO_NOTIFICATIONS, false);
         }
@@ -204,7 +214,7 @@ class CardStatusService {
     private CardStatus afterTheSale(UUID cardId, String identity, ListingStateMachine.Progress deal, UUID listingId) {
         return switch (deal.stage()) {
             case SHIPPED -> new CardStatus(cardId, Stage.SHIPPED, identity,
-                    "On its way to the buyer. They record it when it arrives, and then have " + policy.terms().payWithinDays() + " days to pay you." + NO_NOTIFICATIONS, false);
+                    "On its way to the buyer. They record it when it arrives, and then have " + policy.terms().payWithinDays() + " days to pay you. We email you when it arrives.", false);
             case ARRIVED -> new CardStatus(cardId, Stage.ARRIVED, identity,
                     "It arrived. The buyer pays you directly: tell us here when they have, or if they haven't by the date on this page.", false)
                     .withDeadline(deal.payBy()).withSellersWord(deal.disputedAt() == null);

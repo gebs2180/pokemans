@@ -8,11 +8,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pokemans.app.condition.Assessments;
+import com.pokemans.app.condition.PreGradeFailures;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.offers.CardStatusService.CardStatus;
 import com.pokemans.app.offers.CardStatusService.Need;
 import com.pokemans.app.offers.CardStatusService.Stage;
 import com.pokemans.app.valuation.CardInputs;
+import com.pokemans.app.valuation.Valuations;
 import com.pokemans.valuation.ParameterSet;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -89,12 +91,56 @@ class CardStatusServiceTest {
         CardItems cardItems = mock(CardItems.class);
         CardStatusService service = new CardStatusService(mock(OfferService.class), mock(SaleListingRepository.class),
                 mock(ListingEventRepository.class), cardItems, mock(CardOfferVoidRepository.class), mock(Assessments.class),
-                mock(Shipping.class), POLICY);
+                mock(Shipping.class), POLICY, mock(PreGradeFailures.class));
         UUID lot = UUID.randomUUID();
         when(cardItems.get(lot)).thenReturn(new CardItems.CardItemRef(lot, UUID.randomUUID(), "Binder", true, 40, NOW));
 
         assertThat(POLICY.minFmvText()).isEqualTo("$25");
         assertThat(service.status(lot).nextStep()).contains("worth " + POLICY.minFmvText() + " or more");
+    }
+
+    /** An identified card with front and back photos and no assessment, as the status service sees it. */
+    private static CardStatus unassessed(boolean preGradeFailed) {
+        OfferService offers = mock(OfferService.class);
+        CardItems cardItems = mock(CardItems.class);
+        PreGradeFailures failures = mock(PreGradeFailures.class);
+        CardStatusService service = new CardStatusService(offers, mock(SaleListingRepository.class), mock(ListingEventRepository.class),
+                cardItems, mock(CardOfferVoidRepository.class), mock(Assessments.class), mock(Shipping.class), POLICY, failures);
+        UUID card = UUID.randomUUID();
+        when(cardItems.get(card)).thenReturn(new CardItems.CardItemRef(card, UUID.randomUUID(), "Umbreon", false, 1, NOW));
+        when(cardItems.passedPhotos(card)).thenReturn(List.of(
+                new CardItems.PhotoRef(UUID.randomUUID(), card, "FRONT", "k1", "image/jpeg", null, NOW, NOW, "a"),
+                new CardItems.PhotoRef(UUID.randomUUID(), card, "BACK", "k2", "image/jpeg", null, NOW, NOW, "b")));
+        CardInputs.Identity umbreon = new CardInputs.Identity(UUID.randomUUID(), "Umbreon", "Evolving Skies", "215", "en", null,
+                "UNLIMITED", "NORMAL", false, null, List.of());
+        CardInputs inputs = mock(CardInputs.class);
+        when(inputs.identity()).thenReturn(umbreon);
+        when(inputs.unvaluedReason()).thenReturn("no condition assessment");
+        Valuations.CurrentValue value = mock(Valuations.CurrentValue.class);
+        when(value.inputs()).thenReturn(inputs);
+        when(offers.quote(card)).thenReturn(new OfferService.Quote(value, OfferRefusal.NOT_ASSESSED, "Its condition hasn't been assessed yet."));
+        when(failures.failed(card)).thenReturn(preGradeFailed);
+        return service.status(card);
+    }
+
+    @Test
+    void aCardWhosePreGradeFailedSaysSoPlainlyWithoutProviderDetail() {
+        CardStatus status = unassessed(true);
+        assertThat(status.stage()).isEqualTo(Stage.ASSESSING);
+        assertThat(status.nextStep()).startsWith("The automatic condition check didn't work for this card, so we'll check it by hand.")
+                .doesNotContainIgnoringCase("cardgrade").doesNotContainIgnoringCase("credit");
+    }
+
+    @Test
+    void aCardStillWaitingForItsPreGradeKeepsTheUsualText() {
+        assertThat(unassessed(false).nextStep()).startsWith("We're reviewing its condition from the photos.");
+    }
+
+    @Test
+    void theNotificationNoteIsTrueNow() {
+        String note = unassessed(false).nextStep();
+        assertThat(note).doesNotContain("don't send notifications")
+                .contains("not when a card's condition or offer is ready, so check back here for those.");
     }
 
     @Test
@@ -105,7 +151,7 @@ class CardStatusServiceTest {
         SaleListingRepository listings = mock(SaleListingRepository.class);
         CardItems cardItems = mock(CardItems.class);
         CardStatusService service = new CardStatusService(offers, listings, mock(ListingEventRepository.class), cardItems,
-                mock(CardOfferVoidRepository.class), mock(Assessments.class), mock(Shipping.class), POLICY);
+                mock(CardOfferVoidRepository.class), mock(Assessments.class), mock(Shipping.class), POLICY, mock(PreGradeFailures.class));
         CardInputs.Identity umbreon = new CardInputs.Identity(UUID.randomUUID(), "Umbreon", "Evolving Skies", "215", "en", null,
                 "UNLIMITED", "NORMAL", false, null, List.of());
 
