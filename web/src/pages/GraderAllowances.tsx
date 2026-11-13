@@ -19,7 +19,7 @@ export function GraderAllowances({
   return (
     <>
       <h3 className="grader-allowances-heading">What each grader allows</h3>
-      <table className="table grader-allowances">
+      <table className="table ruled grader-allowances">
         <thead>
           <tr>
             <th>Grader</th>

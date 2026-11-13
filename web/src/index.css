@@ -39,7 +39,7 @@
   --color-danger-text: #9a1d14;
   --color-info-soft: var(--color-accent-soft);
   --color-info-text: var(--color-accent-text);
-  --color-focus: #2463eb;
+  --color-focus: #0f5b4a;
 
   --font-sans: 'Manrope Variable', system-ui, sans-serif;
   --font-display: 'Manrope Variable', system-ui, sans-serif;
@@ -113,7 +113,7 @@
     --color-danger-hover: #ffaba3;
     --color-danger-soft: #331816;
     --color-danger-text: #ffaaa2;
-    --color-focus: #7fa6ff;
+    --color-focus: #8fdcc5;
 
     --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 16px -8px rgb(0 0 0 / 0.6);
     --shadow-2: 0 6px 18px rgb(0 0 0 / 0.5);
