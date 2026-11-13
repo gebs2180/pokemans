@@ -1,6 +1,7 @@
 package com.pokemans.app.condition;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Each grader's published centering allowance, for display on the labelling and review pages only: the
@@ -32,10 +33,14 @@ final class GraderCentering {
     record Standard(String grader, String source, String lowest, List<Allowance> allowances) {
     }
 
+    /** PSA's grade names, so its rows read like the other graders' ("Gem Mint 10", not a bare "10"). Display only. */
+    private static final Map<Integer, String> PSA_NAMES = Map.of(
+            10, "Gem Mint 10", 9, "Mint 9", 8, "NM-MT 8", 7, "NM 7", 6, "EX-MT 6", 5, "EX 5", 4, "VG-EX 4", 3, "VG 3", 2, "Good 2");
+
     /** PSA's own table, the one the centering cap uses, so the two can't drift apart. */
     static final Standard PSA = new Standard("PSA", "https://www.psacard.com/gradingstandards, read 2026-10-28 (PsaCentering)", "1",
             PsaCentering.STANDARDS.stream()
-                    .map(t -> new Allowance(String.valueOf(t.grade()), t.maxFrontShare(), t.maxBackShare(), null))
+                    .map(t -> new Allowance(psaName(t.grade()), t.maxFrontShare(), t.maxBackShare(), null))
                     .toList());
 
     /**
@@ -107,6 +112,11 @@ final class GraderCentering {
     static final List<Standard> ALL = List.of(PSA, BGS, CGC, TAG);
 
     private GraderCentering() {
+    }
+
+    /** PSA's name for a grade, e.g. "Gem Mint 10"; a grade without one (the lowest, 1) stays a bare number like every grader's. */
+    static String psaName(int grade) {
+        return PSA_NAMES.getOrDefault(grade, String.valueOf(grade));
     }
 
     private static Allowance bgs(String grade, double front, double back) {

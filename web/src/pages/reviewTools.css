@@ -1,4 +1,4 @@
-/* Surface view and grader allowances on the review and labelling pages. Kept out of index.css while the Ledger look (PR #132) reworks it. */
+/* Reviewer and labelling tools: surface view, centering lines, grader allowances. Kept out of index.css while the Ledger look (PR #132) reworks it. */
 .surface-defs {
   position: absolute;
   width: 0;
@@ -6,8 +6,31 @@
 }
 
 .surface-controls {
+  display: flex;
   align-items: center;
   flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* Label, slider and value on one line; the slider takes what's left. */
+.surface-strength {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.surface-strength input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--color-accent);
+}
+
+.surface-strength output {
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .surface-grid {
@@ -20,13 +43,216 @@
   margin: 0;
 }
 
+/* Tap to zoom 3× at that spot; the box keeps its size and the zoomed image follows the pointer. */
+.surface-zoom {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.surface-zoom:hover:not(:disabled) {
+  background: none;
+}
+
+.surface-zoom[aria-pressed='true'] {
+  cursor: zoom-out;
+  touch-action: none;
+}
+
 .surface-image {
   display: block;
   width: 100%;
   height: auto;
 }
 
+.surface-zoom[aria-pressed='true'] .surface-image {
+  transform: scale(3);
+}
+
+/* One pick-one control: joined buttons, the pressed one filled. */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+.segmented button {
+  background: var(--color-surface);
+  color: var(--color-accent-text);
+  border-color: var(--color-border-strong);
+  border-radius: 0;
+}
+
+/* Narrower on phones, so the four surface filters stay one row at 375 px. */
+@media (max-width: 480px) {
+  .segmented button {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    font-size: 0.9375rem;
+  }
+}
+
+.segmented button + button {
+  margin-left: -2px;
+}
+
+.segmented button:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.segmented button:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+/* Hover only tints the unpressed ones, so the chosen option stays filled under the pointer. */
+.segmented button:not([aria-pressed='true']):hover:not(:disabled) {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.segmented button[aria-pressed='true'] {
+  position: relative;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+/* The − / + nudges: at least 44 × 44 to tap. */
+.nudge {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.nudge button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: var(--text-lg);
+}
+
+/* With 44 px nudges a phone row is tight: keep the side's name and its reading whole, and narrow the padding. */
+.frame-controls td:nth-child(-n + 2) {
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .frame-controls .table td {
+    padding-left: var(--space-1);
+    padding-right: var(--space-1);
+  }
+}
+
+/* Frame lines: magenta on a dark outline, to stand out against yellow and silver borders and the art alike. */
+svg .frame-line-halo {
+  stroke: rgb(0 0 0 / 0.75);
+  stroke-width: 3;
+}
+
+svg .frame-line {
+  stroke: #ff2bd6;
+  stroke-width: 1;
+  stroke-dasharray: 6 4;
+}
+
+svg .frame-line-chosen {
+  stroke: #ff2bd6;
+  stroke-dasharray: none;
+}
+
+svg .frame-line-halo.frame-line-chosen {
+  stroke: rgb(0 0 0 / 0.75);
+  stroke-width: 4;
+}
+
+/* The measurer's lines on the labelling reveal, beside yours. */
+svg .frame-line.frame-line-measurer {
+  stroke: #00e5ff;
+  stroke-dasharray: none;
+}
+
+.frame-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.frame-legend span::before {
+  content: '';
+  display: inline-block;
+  width: 1.5rem;
+  height: 0;
+  margin-right: var(--space-1);
+  vertical-align: middle;
+  border-top: 3px solid #ff2bd6;
+  outline: 1px solid rgb(0 0 0 / 0.75);
+}
+
+.frame-legend .frame-legend-measurer::before {
+  border-top-color: #00e5ff;
+}
+
+.frame-reveal {
+  display: block;
+  width: 100%;
+  max-width: 28rem;
+}
+
+.grader-allowances-heading {
+  margin-top: var(--space-5);
+}
+
 .grader-allowances td:not(:first-child),
 .grader-allowances th:not(:first-child) {
   white-space: nowrap;
+}
+
+.grader-notes ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+}
+
+/* A reviewer's tool panel, closed by default: the heading is the toggle. */
+.tool-panel > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  cursor: pointer;
+  list-style: none;
+}
+
+.tool-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tool-panel > summary h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.tool-panel > summary h2::before {
+  content: '▸';
+  display: inline-block;
+  width: 1.1em;
+  transition: transform 120ms ease;
+}
+
+.tool-panel[open] > summary h2::before {
+  transform: rotate(90deg);
+}
+
+.tool-panel[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-panel > summary h2::before {
+    transition: none;
+  }
 }

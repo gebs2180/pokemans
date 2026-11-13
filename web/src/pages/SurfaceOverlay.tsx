@@ -1,6 +1,7 @@
-import { useId, useState } from 'react'
+import { useId, useState, type MouseEvent } from 'react'
 import { SIDE_LABEL, type ReviewPhoto } from '../api'
 import { safeHref } from '../safeHref'
+import { Segmented, ToolPanel } from './reviewTools'
 import './reviewTools.css'
 
 export type SurfaceMode = 'off' | 'contrast' | 'edges' | 'emboss'
@@ -50,14 +51,49 @@ function SurfaceFilter({ id, mode, strength }: { id: string; mode: SurfaceMode; 
   )
 }
 
-/** One crop with the overlay on it. */
+/**
+ * One crop with the overlay on it. A tap zooms it 3× at that spot, inside the same box, and the zoom follows
+ * the pointer; another tap zooms back out. From the keyboard it zooms on the middle.
+ */
 export function SurfaceView({ src, alt, mode, strength }: { src: string; alt: string; mode: SurfaceMode; strength: number }) {
   const id = `surface-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const on = mode !== 'off' && strength > 0
+  // Where the zoom is centred, as percentages of the crop; null when not zoomed.
+  const [zoom, setZoom] = useState<{ x: number; y: number } | null>(null)
+
+  function at(e: MouseEvent<HTMLElement>) {
+    const box = e.currentTarget.getBoundingClientRect()
+    if (box.width === 0 || box.height === 0) return { x: 50, y: 50 }
+    const clamp = (v: number) => Math.min(100, Math.max(0, v))
+    return { x: clamp(((e.clientX - box.left) / box.width) * 100), y: clamp(((e.clientY - box.top) / box.height) * 100) }
+  }
+
   return (
     <>
       {on && <SurfaceFilter id={id} mode={mode} strength={strength} />}
-      <img className="surface-image" src={src} alt={alt} style={on ? { filter: `url(#${id})` } : undefined} data-mode={on ? mode : 'off'} />
+      <button
+        type="button"
+        className="surface-zoom"
+        aria-pressed={zoom != null}
+        aria-label={zoom ? `Zoom out of ${alt}` : `Zoom in on ${alt}`}
+        onClick={(e) => {
+          if (zoom) return setZoom(null)
+          // A click from the keyboard has no pointer position: zoom on the middle.
+          setZoom(e.detail === 0 ? { x: 50, y: 50 } : at(e))
+        }}
+        onPointerMove={(e) => zoom && setZoom(at(e))}
+      >
+        <img
+          className="surface-image"
+          src={src}
+          alt={alt}
+          style={{
+            ...(on ? { filter: `url(#${id})` } : {}),
+            ...(zoom ? { transformOrigin: `${zoom.x}% ${zoom.y}%` } : {}),
+          }}
+          data-mode={on ? mode : 'off'}
+        />
+      </button>
     </>
   )
 }
@@ -67,24 +103,29 @@ export function SurfaceView({ src, alt, mode, strength }: { src: string; alt: st
  * whitening and print lines. A viewing aid only: it changes no grade and nothing is stored.
  */
 export function SurfacePanel({ photos }: { photos: ReviewPhoto[] }) {
-  const [mode, setMode] = useState<SurfaceMode>('off')
-  const [percent, setPercent] = useState(60)
   const shown = photos.filter((p) => p.side === 'FRONT' || p.side === 'BACK')
   if (shown.length === 0) return null
+  return (
+    <ToolPanel title="Surface view" summary="Contrast, edge and emboss filters over the crops, with zoom. Nothing is saved.">
+      <SurfaceTool shown={shown} />
+    </ToolPanel>
+  )
+}
+
+function SurfaceTool({ shown }: { shown: ReviewPhoto[] }) {
+  const [mode, setMode] = useState<SurfaceMode>('off')
+  const [percent, setPercent] = useState(60)
+  const strengthId = useId()
   const hint = MODES.find((m) => m.mode === mode)?.hint
   return (
-    <section className="panel">
-      <h2>Surface view</h2>
-      <p className="muted small">Filters over the card crop, in your browser only. Nothing is saved.</p>
-      <div className="row surface-controls" role="group" aria-label="Surface filter">
-        {MODES.map((m) => (
-          <button key={m.mode} className={m.mode === mode ? undefined : 'link'} aria-pressed={m.mode === mode} onClick={() => setMode(m.mode)}>
-            {m.label}
-          </button>
-        ))}
-        <label className="small">
-          Strength{' '}
+    <>
+      <p className="muted small">Filters over the card crop, in your browser only. Tap a crop to zoom in on that spot.</p>
+      <div className="surface-controls">
+        <Segmented label="Surface filter" options={MODES.map((m) => ({ value: m.mode, label: m.label }))} value={mode} onChange={setMode} />
+        <span className="surface-strength small">
+          <label htmlFor={strengthId}>Strength</label>
           <input
+            id={strengthId}
             type="range"
             min={0}
             max={100}
@@ -92,9 +133,9 @@ export function SurfacePanel({ photos }: { photos: ReviewPhoto[] }) {
             disabled={mode === 'off'}
             onChange={(e) => setPercent(Number(e.target.value))}
             aria-label="Filter strength"
-          />{' '}
-          {percent}%
-        </label>
+          />
+          <output htmlFor={strengthId}>{percent}%</output>
+        </span>
       </div>
       {hint && <p className="muted small">{hint}</p>}
       <div className="surface-grid">
@@ -108,6 +149,6 @@ export function SurfacePanel({ photos }: { photos: ReviewPhoto[] }) {
           ) : null
         })}
       </div>
-    </section>
+    </>
   )
 }
