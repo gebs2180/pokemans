@@ -15,7 +15,7 @@ export function DealTimeline({ steps, tracking }: { steps: Step[]; tracking?: st
               {s.title}
             </span>
             {s.detail && <span className="step-detail">{s.detail}</span>}
-            {s.key === 'label' && s.state === 'done' && tracking && <span className="step-detail">Tracking {tracking}</span>}
+            {s.key === 'label' && tracking && <span className="step-detail">Tracking {tracking}</span>}
           </span>
         </li>
       ))}

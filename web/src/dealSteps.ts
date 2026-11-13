@@ -1,9 +1,8 @@
 import type { DealProgress, ShippingLabel } from './api'
+import { shortDate as date } from './format'
 
 export type StepState = 'done' | 'current' | 'upcoming'
 export type Step = { key: string; title: string; detail?: string; state: StepState }
-
-const date = (at: string) => new Date(at).toLocaleDateString()
 
 /**
  * The stages of a sale in order, each done, current (the first not done) or upcoming, from what the API already says.
@@ -39,7 +38,16 @@ export function dealSteps({
   add(
     shipped,
     'ship',
-    shipped ? 'Shipped' : label ? `Ship it by ${date(label.shipBy)}` : 'Ship it',
+    // The seller ships; the buyer waits for it. Each role gets its own words.
+    shipped
+      ? 'Shipped'
+      : seller
+        ? label
+          ? `Ship it by ${date(label.shipBy)}`
+          : 'Ship it'
+        : label
+          ? `Seller ships by ${date(label.shipBy)}`
+          : 'Seller ships',
     progress?.shippedAt ? date(progress.shippedAt) : undefined,
   )
   add(arrived, 'arrive', arrived ? 'Arrived' : 'Arrives', progress?.arrivedAt ? date(progress.arrivedAt) : undefined)

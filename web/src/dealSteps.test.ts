@@ -60,4 +60,12 @@ describe('dealSteps', () => {
     expect(steps[0].title).toBe('You accepted')
     expect(steps[4].title).toBe('You pay the seller within 7 days')
   })
+
+  it('never tells the buyer to ship, and dates it the short way', () => {
+    const buyer = run({ who: 'buyer' })
+    expect(buyer[2].title).toBe('Seller ships by Nov 5')
+    expect(run({ who: 'buyer', label: null })[2].title).toBe('Seller ships')
+    expect(run()[2].title).toBe('Ship it by Nov 5')
+    for (const s of buyer) expect(s.title).not.toMatch(/^Ship it/)
+  })
 })

@@ -16,9 +16,9 @@ import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
 import { OfferReveal } from './OfferReveal'
 import { SoldPanel } from './SoldPanel'
-import { message } from '../format'
+import { message, shortDate } from '../format'
 import { days, usePolicy } from '../policy'
-import { slipDiffers } from '../slip'
+import { slipCents } from '../slip'
 
 /** "$300 (at least 3 sales, 90 days)": the sold price a grade's worth starts from, with what it rests on. */
 function soldFor(sold: SoldPrice | undefined) {
@@ -33,6 +33,7 @@ function soldFor(sold: SoldPrice | undefined) {
 export function HowPriced({ offer }: { offer: Offer }) {
   const { likely, lower } = likelyRungs(offer.ladder)
   const sold = offer.sold
+  const cents = slipCents(likely, offer.price)
   return (
     <>
       <p className="small">{confidenceInWords(offer)}</p>
@@ -50,22 +51,22 @@ export function HowPriced({ offer }: { offer: Offer }) {
               </tr>
             </thead>
             <tbody>
-              {likely.map((r) => (
+              {likely.map((r, i) => (
                 <tr key={r.grade}>
                   <td>PSA {r.grade}</td>
                   <td>{Math.round(r.probability * 100)}%</td>
                   {sold && <td>{soldFor(sold.find((s) => s.grade === r.grade))}</td>}
                   <td>{money(r.price)}</td>
-                  <td>{money(r.probability * r.price)}</td>
+                  <td>{money(cents[i] / 100)}</td>
                 </tr>
               ))}
               {lower && (
                 <tr>
                   <td>PSA {lower.grade} or lower</td>
-                  <td className="muted">unlikely</td>
+                  <td>0%</td>
                   {sold && <td />}
-                  <td>up to {money(lower.price)}</td>
                   <td className="muted">not counted</td>
+                  <td>{money(0)}</td>
                 </tr>
               )}
             </tbody>
@@ -79,23 +80,23 @@ export function HowPriced({ offer }: { offer: Offer }) {
             </tfoot>
           </table>
         </div>
-        {slipDiffers(likely, offer.price) && (
-          <p className="muted small">The rows are rounded to the cent, so they can differ from the firm offer by a cent or two. The offer is the exact total.</p>
-        )}
         {sold && (
           <p className="muted small">
             Recently sold for: the typical PSA-graded sale at that grade, recent sales counting most, from the sales we priced this
             offer on.
           </p>
         )}
-        <p className="muted small">The offer is the chance-weighted total, and it doesn't change with the grade the card turns out to be.</p>
+        <p className="muted small">
+          The offer is each grade's chance times its worth, added up, with the last row taking the rounding. It's the price of the
+          card, not a prediction of its grade, and it doesn't change with the grade the card turns out to be.
+        </p>
         <p className="muted small">
           Each grade's worth is what the card sells for at that grade, less what it costs a buyer to get it graded (fee, shipping
           and insurance) and to sell it. That's why a PSA 10's worth is well under what PSA 10s sell for.
         </p>
         <p className="muted small">
           Each grade's worth leaves the buyer a {Math.round(offer.buyerMargin * 100)}% margin, set by how sure we are of the card's
-          condition (confidence {offer.confidence}): the less certain, the more room the buyer gets for the risk.
+          condition: the less sure, the more room the buyer gets for the risk.
         </p>
       </details>
     </>
@@ -203,7 +204,7 @@ export function OfferPanel({
             ) : offer.voided ? (
               <>
                 <p className="alert alert-warning">
-                  We withdrew this offer on {new Date(offer.voided.at).toLocaleDateString()}: {offer.voided.reason}.
+                  We withdrew this offer on {shortDate(offer.voided.at)}: {offer.voided.reason}.
                 </p>
                 {askButton('Get a new offer')}
               </>
@@ -215,7 +216,7 @@ export function OfferPanel({
             ) : (
               <>
                 <p className="muted small">
-                  Good until {new Date(offer.expiresAt).toLocaleDateString()}. Selling posts this price to our buyers: the first to
+                  Good until {shortDate(offer.expiresAt)}. Selling posts this price to our buyers: the first to
                   accept buys the card at it, and we send you a prepaid, insured shipping label. It isn't sold until a buyer accepts.
                 </p>
                 <p className="small">
@@ -285,7 +286,7 @@ export function OfferPanel({
       {listing?.status === 'OPEN' && (
         <div className="alert alert-info">
           <p>
-            Waiting for a buyer, until {new Date(listing.expiresAt).toLocaleDateString()}. If one takes it, you have {days(policy.shipWithinDays)} to ship. We
+            Waiting for a buyer, until {shortDate(listing.expiresAt)}. If one takes it, you have {days(policy.shipWithinDays)} to ship. We
             email you if one takes it.
           </p>
           <div className="actions">
@@ -325,7 +326,7 @@ export function OfferPanel({
       {listing?.status === 'CANCELLED' && listing.offerId === offer?.id && (
         <p className="alert alert-danger">
           We cancelled the sale{listing.buyer?.orgName && ` to ${listing.buyer.orgName}`}
-          {listing.undone && ` on ${new Date(listing.undone.at).toLocaleDateString()}: ${listing.undone.reason}`}. Don't ship the card, and
+          {listing.undone && ` on ${shortDate(listing.undone.at)}: ${listing.undone.reason}`}. Don't ship the card, and
           don't use its label. If you already shipped it, tell us and we'll help get it back.
         </p>
       )}

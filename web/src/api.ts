@@ -897,9 +897,9 @@ export const CONFIDENCE_WORDS: Record<Confidence, string> = {
   D: 'not sure enough to offer',
 }
 
-/** "Fairly sure (B): there are only a few recent sales." */
+/** "Fairly sure, because there are only a few recent sales." In words only: a letter next to a price reads like a card grade. */
 export function confidenceInWords(offer: Pick<Offer, 'confidence' | 'lessSureBecause'>) {
-  const head = `${CONFIDENCE_WORDS[offer.confidence]} (${offer.confidence})`
+  const head = CONFIDENCE_WORDS[offer.confidence]
   const why = (offer.lessSureBecause ?? []).map((r) => LESS_SURE[r])
   const text = why.length ? `${head}, because ${joinAnd(why)}` : head
   return text.charAt(0).toUpperCase() + text.slice(1) + '.'
