@@ -241,6 +241,16 @@ No blockers were found. Every flow walked can be completed.
 | 13 | Admin | Not re-checked in this pass. |
 | 14 | Route focus and errors | Fixed. |
 
+## Design direction chosen (Zach, 2026-11-13)
+
+The look is Ledger (Direction C): white, deep green and tabular numbers on every page. It brings in pieces from the other two directions:
+
+- **From Assay (A):** the capture helper, which runs live photo checks in the camera, and the itemised slip. The slip shows the sale days behind each worth and a total row, and it sits one tap behind the price.
+- **From Binder (B):** the flip reveal, where the card turns over to show its price, and the binder of pocket pages as home, with the four-step tracker.
+- **From Ledger (C):** the bar that splits the price by grade chance, and the deal timeline after a sale.
+
+The build order on the design page runs slip, tokens, flip, timeline, binder, then capture helper. The capture helper is the largest piece, because running the checks in the browser before upload is new work; the server checks stay the final word.
+
 ## Suggested order
 
 1. Deploy `main` (finding 6). It's free.
