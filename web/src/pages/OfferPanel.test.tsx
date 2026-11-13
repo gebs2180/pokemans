@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -83,11 +83,11 @@ describe('OfferPanel', () => {
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
     await user.click(await screen.findByRole('button', { name: 'Get an offer' }))
-    expect(await screen.findByText('$419.98')).toBeInTheDocument()
+    expect(await screen.findByTestId('offer-reveal')).toHaveTextContent('$419.98')
     expect(screen.getByText(/isn't sold until a buyer accepts/)).toBeInTheDocument()
     expect(screen.getByText(/The buyer pays you directly, not us/)).toBeInTheDocument()
     expect(screen.getByText('How we priced it')).toBeInTheDocument()
-    expect(screen.getByText(/leaves the buyer a 13% margin, set by how sure we are of the card's condition \(confidence B\)/)).toBeInTheDocument()
+    expect(screen.getByText(/leaves the buyer a 13% margin, set by how sure we are of the card's condition: the less sure/)).toBeInTheDocument()
     expect(screen.getByText(/Ships from Sam, 1 Main St, Springfield, IL 62701/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Sell for $419.98' }))
     // Posting commits the seller to ship: one more step, like the buyer's.
@@ -230,11 +230,14 @@ describe('OfferPanel', () => {
 
     expect(await screen.findByText(/Sold to Card Shop on/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Print your prepaid label' })).toHaveAttribute('href', 'https://labels.example/l1.pdf')
-    expect(screen.getByText(/tracking 9400111, insured for \$419.98/)).toBeInTheDocument()
+    // The tracking number is said once, in the timeline's label step.
+    expect(screen.getByText('Tracking 9400111')).toBeInTheDocument()
+    expect(screen.getByText(/GroundAdvantage, insured for \$419.98/)).toBeInTheDocument()
+    expect(screen.queryByText(/, tracking 9400111/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Sell for/ })).not.toBeInTheDocument()
     expect(screen.getByText(/in a bubble mailer/)).toBeInTheDocument()
     // The API's ship-by date, not one worked out from boughtAt (review finding 17).
-    expect(screen.getByText(`Hand it to the carrier by ${new Date('2026-10-25T10:00:00Z').toLocaleDateString()}.`)).toBeInTheDocument()
+    expect(screen.getByText(`Hand it to the carrier by ${'Oct 25'}.`)).toBeInTheDocument()
   })
 
   it("says so when it can't load the seller's address", async () => {
@@ -315,10 +318,13 @@ describe('OfferPanel after the sale', () => {
     stubApi([sold({ stage: 'SHIPPED', shippedAt: '2026-10-21T10:00:00Z' })], address)
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
-    expect(await screen.findByText('Shipped')).toBeInTheDocument()
+    expect((await screen.findAllByText('Shipped')).length).toBeGreaterThan(0)
     expect(screen.queryByRole('link', { name: 'Print your prepaid label' })).not.toBeInTheDocument()
     expect(screen.queryByText('How to ship it')).not.toBeInTheDocument()
-    expect(screen.getByText(/tracking 9400111/)).toBeInTheDocument()
+    // Payment is due once it arrives, so the seller isn't asked about it yet.
+    expect(screen.queryByRole('button', { name: 'I got paid' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: "I haven't been paid" })).not.toBeInTheDocument()
+    expect(screen.getByText('Tracking 9400111')).toBeInTheDocument()
   })
 
   it('shows the pay-by date, and takes "I got paid" with a confirm', async () => {
@@ -326,7 +332,7 @@ describe('OfferPanel after the sale', () => {
     const posts = stubApi([sold(arrived)], address)
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
-    expect(await screen.findByText(new Date('2099-10-31T10:00:00Z').toLocaleDateString())).toBeInTheDocument()
+    expect(await screen.findByText('Oct 31')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'I got paid' }))
     expect(posts).toHaveLength(0)
     await user.click(screen.getByRole('button', { name: 'Confirm: I got paid' }))
@@ -465,7 +471,7 @@ describe('MarketPage', () => {
     renderMarket()
 
     expect(await screen.findByText('Umbreon VMAX')).toBeInTheDocument()
-    expect(screen.getByText('$419.98')).toBeInTheDocument()
+    expect(screen.getAllByText('$419.98').length).toBeGreaterThan(0)
     expect(screen.getByText(/Not yet authenticated/)).toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument() // a non-web photo link is never rendered
     await user.click(screen.getByRole('button', { name: 'Buy' }))
@@ -610,17 +616,70 @@ describe('HowPriced', () => {
   it('shows what each likely grade recently sold for, and the confidence in words', async () => {
     renderOffer(offer())
 
-    expect(await screen.findByText('Fairly sure (B), because there are only a few recent sales.')).toBeInTheDocument()
+    expect(await screen.findByText('Fairly sure, because there are only a few recent sales.')).toBeInTheDocument()
+    expect(screen.queryByText(/\(B\)/)).not.toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Recently sold for' })).toBeInTheDocument()
     expect(screen.getByRole('row', { name: /PSA 10/ })).toHaveTextContent('$900.00 (at least 3 sales, 90 days)')
     expect(screen.getByRole('row', { name: /PSA 9/ })).toHaveTextContent('$450.00 (at least 1 sale, 180 days)')
     expect(screen.getByRole('row', { name: /^PSA 8 / })).toHaveTextContent('no sales of its own')
   })
 
+  it('itemises what each grade counts for, ending in the firm offer', async () => {
+    renderOffer(offer())
+
+    expect(await screen.findByRole('columnheader', { name: 'Counts for' })).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: /PSA 10/ })).toHaveTextContent('30%')
+    expect(screen.getByRole('row', { name: /PSA 10/ })).toHaveTextContent('$206.55')
+    expect(screen.getByRole('row', { name: /Firm offer/ })).toHaveTextContent('$419.98')
+  })
+
+  /** The dollar amounts in the "Counts for" column (the last cell of each grade row), in cents. */
+  const countsFor = () =>
+    screen
+      .getAllByRole('row')
+      .filter((row) => /^PSA \d+/.test(row.textContent ?? '') && !/or lower/.test(row.textContent ?? ''))
+      .map((row) => Math.round(Number(row.lastElementChild!.textContent!.replace(/[$,]/g, '')) * 100))
+
+  it('adds the rows up to the firm offer exactly, the last row taking the rounding', async () => {
+    renderOffer(offer())
+
+    await screen.findByRole('columnheader', { name: 'Counts for' })
+    expect(countsFor().reduce((a, b) => a + b, 0)).toBe(41998)
+  })
+
+  it('shows the lower grades as a combined row that is not counted', async () => {
+    renderOffer(offer())
+
+    const row = await screen.findByRole('row', { name: /or lower/ })
+    expect(row).toHaveTextContent('0%')
+    expect(row).toHaveTextContent('not counted')
+    expect(row).toHaveTextContent('$0.00')
+    expect(row).not.toHaveTextContent('up to')
+  })
+
+  it('puts the rounding on the last row on the Victini example', async () => {
+    renderOffer(
+      offer({
+        price: 636.12,
+        ladder: [
+          { grade: '10', probability: 0.6, price: 843.12 },
+          { grade: '9', probability: 0.3, price: 337.25 },
+          { grade: '8', probability: 0.1, price: 290.78 },
+        ],
+      }),
+    )
+
+    expect(await screen.findByRole('row', { name: /PSA 10/ })).toHaveTextContent('$505.87')
+    expect(screen.getByRole('row', { name: /PSA 9/ })).toHaveTextContent('$101.18')
+    expect(screen.getByRole('row', { name: /^PSA 8 / })).toHaveTextContent('$29.07')
+    expect(screen.getByRole('row', { name: /Firm offer/ })).toHaveTextContent('$636.12')
+    expect(countsFor().reduce((a, b) => a + b, 0)).toBe(63612)
+  })
+
   it('leaves the sold prices out when they are switched off, and needs no reason at an A', async () => {
     renderOffer(offer({ sold: null, confidence: 'A', lessSureBecause: [] }))
 
-    expect(await screen.findByText('Very sure (A).')).toBeInTheDocument()
+    expect(await screen.findByText('Very sure.')).toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: 'Recently sold for' })).not.toBeInTheDocument()
   })
 })
@@ -637,7 +696,7 @@ describe('raw sales flag', () => {
     stubApi([{ offer: offer({ rawSales: { lowest: 90, sales: 3, since: '2026-08-11', below: false } }), listing: null }], address)
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
-    expect(await screen.findByText('Fairly sure (B), because there are only a few recent sales.')).toBeInTheDocument()
+    expect(await screen.findByText('Fairly sure, because there are only a few recent sales.')).toBeInTheDocument()
     expect(screen.queryByText(/below recent raw sales/)).not.toBeInTheDocument()
   })
 })
@@ -827,7 +886,7 @@ describe('DealsPage', () => {
   it("shows the listed photos, and no arrival form before there's a label", async () => {
     renderDeals([deal])
     expect(await screen.findByRole('img', { name: 'Front photo' })).toBeInTheDocument()
-    expect(screen.getByText(/Once the label is bought and the card ships/)).toBeInTheDocument()
+    expect(screen.getByText(/Once the seller has shipped it/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument()
   })
 
@@ -837,6 +896,22 @@ describe('DealsPage', () => {
     ])
     expect(await screen.findByRole('button', { name: 'It arrived' })).toBeInTheDocument()
     expect(screen.getByText(/Pay them directly, within 7 days of it arriving as shown/)).toBeInTheDocument()
+  })
+
+  const labelled = { carrier: 'USPS', service: 'Ground', trackingCode: '94', labelUrl: 'https://l', insuredValue: 419.98, boughtAt: '2026-10-20T10:00:00Z', shipBy: '2026-10-23T10:00:00Z' }
+  const waiting: DealProgress = {
+    stage: 'SOLD', shippedAt: null, arrivedAt: null, payBy: null, paidAt: null, pricePaid: null, paidNote: null,
+    confirmedAt: null, disputedAt: null, disputeNote: null, review: null, held: false, cardBackAt: null,
+  }
+
+  it('asks for "It arrived" only after the seller has shipped, and never tells the buyer to ship', async () => {
+    renderDeals([{ ...deal, label: labelled, progress: waiting }])
+    expect(await screen.findByText('Seller ships by Oct 23')).toBeInTheDocument()
+    expect(screen.queryByText(/Ship it/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'It arrived' })).not.toBeInTheDocument()
+    cleanup()
+    renderDeals([{ ...deal, label: labelled, progress: { ...waiting, stage: 'SHIPPED', shippedAt: '2026-10-21T10:00:00Z' } }])
+    expect(await screen.findByRole('button', { name: 'It arrived' })).toBeInTheDocument()
   })
 
   const progress: DealProgress = {
@@ -849,7 +924,7 @@ describe('DealsPage', () => {
     renderDeals([{ ...deal, outcome, progress, payTo: { method: 'VENMO', handle: '@sam-cards' } }])
     expect(await screen.findByText('@sam-cards')).toBeInTheDocument()
     expect(screen.getByText('Venmo')).toBeInTheDocument()
-    expect(screen.getByText(new Date('2026-10-31T10:00:00Z').toLocaleDateString())).toBeInTheDocument()
+    expect(screen.getByText('Oct 31')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: "I've paid" })).toBeInTheDocument()
   })
 

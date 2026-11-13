@@ -1,25 +1,31 @@
 /*
  * Design tokens. Every colour, size and shadow below comes from these, so a brand direction is a swap of this block
- * (docs/brand-directions.md). The direction is Hobby energy (Zach, 2026-10-26). Text pairs meet WCAG AA (4.5:1)
- * on --color-surface and --color-surface-raised; *-soft backgrounds keep AA with their own *-text colour.
+ * (docs/brand-directions.md). The direction is Ledger (Zach, 2026-11-13): white, navy ink, one deep green, Manrope with
+ * tabular figures on money and percentages. Text pairs meet WCAG AA (4.5:1) on --color-surface and --color-surface-raised;
+ * *-soft backgrounds keep AA with their own *-text colour. --color-border is 3:1 or better against white, for controls.
+ * The ledger greens: #0f5b4a (accent), #3f8f78 (mid), #9cc9b9 (light), #e3f2ed (tint). Mid and light are for fills such as
+ * the grade-chance bar, never for text on white.
  */
 :root {
   color-scheme: light dark;
 
-  --color-bg: #fdf6ee;
+  --color-bg: #ffffff;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-surface-sunken: #f6ede2;
-  --color-text: #1b1530;
-  --color-muted: #554d6b;
-  --color-border: #1b1530;
-  --color-border-strong: #1b1530;
+  --color-surface-sunken: #f4f7fa;
+  --color-text: #0f1b2d;
+  --color-muted: #566376;
+  --color-border: #8593a6;
+  --color-border-strong: #0f1b2d;
+  --color-line: #e3e7ee;
 
-  --color-accent: #ff6a3d;
-  --color-accent-hover: #ff8459;
-  --color-accent-contrast: #1b1530;
-  --color-accent-soft: #ffe4d9;
-  --color-accent-text: #b2321a;
+  --color-accent: #0f5b4a;
+  --color-accent-hover: #0b4538;
+  --color-accent-contrast: #ffffff;
+  --color-accent-soft: #e3f2ed;
+  --color-accent-text: #0f5b4a;
+  --color-green-mid: #3f8f78;
+  --color-green-light: #9cc9b9;
 
   --color-success: #1e7a3c;
   --color-success-soft: #dff5e6;
@@ -35,8 +41,8 @@
   --color-info-text: var(--color-accent-text);
   --color-focus: #2463eb;
 
-  --font-sans: 'Figtree Variable', system-ui, sans-serif;
-  --font-display: 'Bricolage Grotesque Variable', 'Arial Black', system-ui, sans-serif;
+  --font-sans: 'Manrope Variable', system-ui, sans-serif;
+  --font-display: 'Manrope Variable', system-ui, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --font-weight-display: 800;
   --text-xs: 0.75rem;
@@ -62,7 +68,7 @@
   --radius-lg: 1.125rem;
   --radius-pill: 999px;
 
-  --shadow-1: 4px 4px 0 #1b1530;
+  --shadow-1: 0 1px 2px rgb(15 27 45 / 0.08), 0 6px 16px -8px rgb(15 27 45 / 0.25);
   --shadow-2: 0 4px 12px rgb(16 24 40 / 0.12), 0 2px 4px rgb(16 24 40 / 0.06);
 
   --tap: 44px;
@@ -78,20 +84,24 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #141022;
-    --color-surface: #1e1932;
-    --color-surface-raised: #251f3c;
-    --color-surface-sunken: #181428;
-    --color-text: #f6f1ff;
-    --color-muted: #b9afd0;
-    --color-border: #8f84b0;
-    --color-border-strong: #f6f1ff;
+    --color-bg: #0b1524;
+    --color-surface: #101d31;
+    --color-surface-raised: #15243b;
+    --color-surface-sunken: #0d192b;
+    --color-text: #eef2f7;
+    --color-muted: #a9b6c7;
+    --color-border: #6c7d94;
+    --color-border-strong: #eef2f7;
+    --color-line: #243650;
 
-    --color-accent: #ff7a50;
-    --color-accent-hover: #ff9670;
-    --color-accent-contrast: #1b1530;
-    --color-accent-soft: #3a2030;
-    --color-accent-text: #ffa07f;
+    --color-accent: #6fcfb2;
+    --color-accent-hover: #8fdcc5;
+    --color-accent-contrast: #062219;
+    --color-accent-soft: #123a30;
+    --color-accent-text: #8fdcc5;
+    --color-green-mid: #3f8f78;
+    /* Darker than the mid green, so the three steps differ in lightness against a dark page. */
+    --color-green-light: #2b5f50;
 
     --color-success: #6fcf8f;
     --color-success-soft: #14301f;
@@ -105,9 +115,18 @@
     --color-danger-text: #ffaaa2;
     --color-focus: #7fa6ff;
 
-    --shadow-1: 4px 4px 0 #000000;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 16px -8px rgb(0 0 0 / 0.6);
     --shadow-2: 0 6px 18px rgb(0 0 0 / 0.5);
   }
+}
+
+/* Money and percentages line up in columns. */
+.offer-price,
+.table td,
+.table th,
+.slip,
+.stackbar {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Base ---------- */
@@ -1521,7 +1540,7 @@ button,
   font-family: var(--font-display);
   font-weight: 700;
   border-color: var(--color-border-strong);
-  box-shadow: 2px 2px 0 var(--color-border-strong);
+  box-shadow: none;
   transition:
     background-color 120ms ease,
     transform 80ms ease,
@@ -1538,7 +1557,7 @@ button:active:not(:disabled),
 
 button.danger {
   border-color: var(--color-danger);
-  box-shadow: 2px 2px 0 var(--color-border-strong);
+  box-shadow: none;
 }
 
 button.link,
@@ -1547,18 +1566,18 @@ button.link:active:not(:disabled) {
   transform: none;
 }
 
-/* The wordmark: RAWMARK in an orange pill with an ink outline and an offset shadow, tilted 3 degrees. */
+/* The wordmark: RAWMARK in a ledger-green pill. */
 .brand {
   min-height: 0;
   padding: 0.15rem 0.8rem;
   background: var(--color-accent);
   color: var(--color-accent-contrast);
-  border: 2px solid #1b1530;
+  border: 0;
   border-radius: var(--radius-pill);
-  box-shadow: 3px 3px 0 #1b1530;
+  box-shadow: none;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  transform: rotate(-3deg);
+  transform: none;
   /* Stays one word on a phone; the email beside it shortens instead. */
   white-space: nowrap;
   flex-shrink: 0;
@@ -1660,4 +1679,269 @@ h1[tabindex='-1']:focus {
 .terms.terms-full {
   max-height: none;
   overflow: visible;
+}
+
+/* ---------- Ledger: the itemised slip, the reveal and the deal timeline (Zach, 2026-11-13) ---------- */
+
+/* The slip: the ladder, ruled like a receipt, with the firm offer as its total. */
+.slip.table th,
+.slip.table td {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.slip td:last-child,
+.slip th:last-child {
+  text-align: right;
+}
+
+.slip-total th,
+.slip-total td {
+  border-top: 2px solid var(--color-border-strong);
+  border-bottom: 0;
+  font-weight: 800;
+  color: var(--color-accent-text);
+  text-align: left;
+}
+
+.slip-total td {
+  text-align: right;
+}
+
+/* The chance of each grade as one bar. Mid and light greens can't carry text, so the legend below does. */
+.chance {
+  margin: var(--space-3) 0;
+}
+
+.stackbar {
+  display: flex;
+  gap: 2px;
+  height: 0.875rem;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--color-line);
+}
+
+.stackbar > span {
+  min-width: 2px;
+}
+
+.seg-1 {
+  background: var(--color-accent);
+}
+
+.seg-2 {
+  background: var(--color-green-mid);
+}
+
+.seg-3 {
+  background: var(--color-green-light);
+}
+
+.seg-4 {
+  background: var(--color-line);
+}
+
+.chance-intro {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+/* One row per grade: swatch, grade, chance × offer, what it adds. The last column is right-aligned like the slip. */
+.adds-up {
+  display: grid;
+  gap: var(--space-1);
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  font-size: var(--text-sm);
+}
+
+.adds-up li {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: baseline;
+  column-gap: var(--space-2);
+}
+
+.adds-sum {
+  text-align: right;
+}
+
+.adds-total {
+  min-width: 4.5rem;
+  text-align: right;
+  font-weight: 700;
+}
+
+.adds-up .swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.35rem;
+  border-radius: 3px;
+  vertical-align: -1px;
+  border: 1px solid var(--color-border);
+}
+
+/* The reveal: the card turns over once, and its back is the offer. */
+.reveal-label {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-accent-text);
+}
+
+.reveal-final {
+  margin: var(--space-2) 0 0;
+  font-weight: 700;
+}
+
+.reveal-static {
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.flip {
+  perspective: 1200px;
+  max-width: 22rem;
+  margin: var(--space-2) 0;
+}
+
+.flip-inner {
+  position: relative;
+  display: grid;
+  transform-style: preserve-3d;
+}
+
+/* Waits, face up, until the card is mostly on screen (OfferReveal adds .play). */
+.flip-inner.play {
+  animation: flip-over 900ms 400ms cubic-bezier(0.3, 0.7, 0.2, 1) forwards;
+}
+
+.flip-face {
+  grid-area: 1 / 1;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.flip-front img,
+.flip-blank {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 14rem;
+  object-fit: cover;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-line);
+}
+
+.flip-back {
+  transform: rotateY(180deg);
+  padding: var(--space-4);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-line);
+  color: var(--color-text);
+}
+
+@keyframes flip-over {
+  to {
+    transform: rotateY(180deg);
+  }
+}
+
+/* No motion asked for: the offer is simply there. (OfferReveal also checks this and skips the card.) */
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner {
+    animation: none;
+    transform: rotateY(180deg);
+  }
+}
+
+/* The deal timeline: a rail down the left, a dot per step. */
+.timeline {
+  list-style: none;
+  margin: var(--space-3) 0;
+  padding: 0;
+}
+
+.timeline .step {
+  position: relative;
+  display: flex;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+
+.timeline .step:last-child {
+  padding-bottom: 0;
+}
+
+.timeline .step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 0.5rem;
+  top: 1.25rem;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-line);
+}
+
+.timeline .step.done:not(:last-child)::before {
+  background: var(--color-accent);
+}
+
+.step-dot {
+  flex: none;
+  box-sizing: border-box;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.15rem;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.step.done .step-dot {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.step.current .step-dot {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.step-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.step-title {
+  font-weight: 700;
+}
+
+.step.upcoming .step-title {
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.step-detail {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+/* Said to screen readers, since the dot's colour isn't. */
+.step-state {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

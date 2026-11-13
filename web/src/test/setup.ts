@@ -18,6 +18,7 @@ vi.mock('@auth0/auth0-react', async () => {
 beforeEach(() => {
   resetAuth0()
   sessionStorage.clear()
+  localStorage.clear()
 })
 
 afterEach(() => {

@@ -127,7 +127,7 @@ async function sellACard(browser: Browser, testInfo: TestInfo, admin: Page, card
   await collector.getByRole('button', { name: /get an offer/i }).click()
   await fillAddress(collector, 'E2E Seller', handle)
   // The offer shows its evidence: what each grade recently sold for, and the confidence in words (UX review finding 11).
-  await expect(collector.getByText(/^(Fairly|Less) sure \([BC]\), because the photos leave its condition less certain/)).toBeVisible()
+  await expect(collector.getByText(/^(Fairly|Less) sure, because the photos leave its condition less certain/)).toBeVisible()
   await collector.locator('summary', { hasText: 'How we priced it' }).click()
   await expect(collector.getByRole('columnheader', { name: 'Recently sold for' })).toBeVisible()
   await expect(collector.getByRole('row', { name: /^PSA 9 / })).toContainText(/\$1\d\d\.\d\d \(at least \d+ sales, 90 days\)/) // 3 sales a run; the phone and desktop runs share a database
@@ -190,7 +190,7 @@ async function sellACard(browser: Browser, testInfo: TestInfo, admin: Page, card
 
   await buyer.getByRole('link', { name: /your deals/i }).click()
   const deal = buyer.locator('section').filter({ has: buyer.getByRole('heading', { name: card.name }) })
-  await expect(deal.getByText(/tracking 9400/)).toBeVisible()
+  await expect(deal.getByText(/Tracking 9400/)).toBeVisible()
   return { collector, buyer, cardUrl, price, deal }
 }
 
@@ -202,7 +202,7 @@ async function ship(collector: Page, cardUrl: string) {
   await collector.getByRole('button', { name: /^confirm: it's shipped/i }).click()
   await expect(collector.getByText('Shipped', { exact: true }).first()).toBeVisible()
   await expect(collector.getByRole('link', { name: /prepaid label/i })).toHaveCount(0)
-  await expect(collector.getByText(/tracking 9400/)).toBeVisible()
+  await expect(collector.getByText(/Tracking 9400/)).toBeVisible()
 }
 
 test('a raw card goes from photos to an offer, a sale, its arrival and its payment', async ({ browser }, testInfo) => {
@@ -224,7 +224,8 @@ test('a raw card goes from photos to an offer, a sale, its arrival and its payme
   await expect(collector.getByRole('heading', { name: 'Needs you' })).toHaveCount(0)
   await collector.goto(cardUrl)
 
-  // 6. The buyer records the arrival, and pays later.
+  // 6. The buyer records the arrival, and pays later. The form waits for the seller to ship, so the page is reloaded first.
+  await buyer.reload()
   await deal.getByRole('button', { name: 'It arrived' }).click()
   await deal.getByLabel(/arrived as shown/i).check()
   await deal.getByRole('button', { name: 'Record' }).click()
@@ -307,6 +308,7 @@ test('a card returned as not genuine goes to the admin, comes back and gets a ne
   const before = await trackRecord(admin)
   const { collector, buyer, cardUrl, deal } = await sellACard(browser, testInfo, admin, RETURNED_CARD, tag, handle)
   await ship(collector, cardUrl)
+  await buyer.reload()
 
   // "Not genuine" can't go through without a note, and asks in plain words.
   await deal.getByRole('button', { name: 'It arrived' }).click()

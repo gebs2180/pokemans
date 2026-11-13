@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { apiPath, money, PAYMENT_METHOD, RETURN_REASON, type Listing, type ShipAddress } from '../api'
 import { safeHref } from '../safeHref'
+import { shortDate } from '../format'
 import { Field } from '../ui'
 import { AddressForm } from './AddressForm'
 import { days, usePolicy } from '../policy'
+import { DealTimeline } from './DealTimeline'
+import { dealSteps } from '../dealSteps'
 
-const date = (at: string) => new Date(at).toLocaleDateString()
+const date = shortDate
 
 /** "by Venmo (@sam)", or nothing when the seller hasn't said. */
 function how(address: ShipAddress | null | undefined) {
@@ -53,8 +56,7 @@ export function SoldPanel({
   const amount = price === undefined ? 'the price' : money(price)
   const tracking = label && (
     <p className="small">
-      {label.carrier} {label.service}
-      {label.trackingCode && `, tracking ${label.trackingCode}`}, insured for {money(label.insuredValue)}
+      {label.carrier} {label.service}, insured for {money(label.insuredValue)}
     </p>
   )
   /** @param noteLabel asks for a note too; @param needsNote it can't be left empty */
@@ -118,6 +120,18 @@ export function SoldPanel({
         <p>
           Sold to {listing.buyer?.orgName ?? 'a buyer'} on {date(listing.closedAt!)}.
         </p>
+        {(stage === 'SOLD' || stage === 'SHIPPED' || stage === 'ARRIVED' || stage === 'PAID') && (
+          <DealTimeline
+            tracking={label?.trackingCode}
+            steps={dealSteps({
+              who: 'seller',
+              accepted: listing.closedAt!,
+              label,
+              progress,
+              payWithin: days(policy.payWithinDays),
+            })}
+          />
+        )}
         {stage === 'SOLD' && (
           <>
             <p>
@@ -189,7 +203,7 @@ export function SoldPanel({
               </p>
             </>
           ))}
-        {(stage === 'SHIPPED' || stage === 'ARRIVED' || stage === 'PAID') && paymentAnswer}
+        {(stage === 'ARRIVED' || stage === 'PAID') && paymentAnswer}
         {(stage === 'RETURNED' || stage === 'BACK') && listing.outcome?.returnedReason && (
           <>
             <p className="alert-title">Returned: {RETURN_REASON[listing.outcome.returnedReason]}</p>

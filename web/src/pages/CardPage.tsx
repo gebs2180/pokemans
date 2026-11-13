@@ -33,7 +33,7 @@ const SIDE_HINT: Record<Side, string> = {
 }
 
 /** Stages whose next step the offer panel says, right below the status line, in place of its button. */
-const SAID_BY_OFFER_PANEL = new Set<CardStage>(['IDENTIFYING', 'ASSESSING', 'PRICING', 'NO_OFFER', 'READY', 'SHIPPED', 'ARRIVED', 'PAID', 'RETURNED'])
+const SAID_BY_OFFER_PANEL = new Set<CardStage>(['IDENTIFYING', 'ASSESSING', 'PRICING', 'NO_OFFER', 'READY', 'LISTED', 'SOLD', 'SHIPPED', 'ARRIVED', 'PAID', 'RETURNED'])
 
 /** Capture screen for one card: take each required side, see pass or retake right away. */
 export function CardPage() {
@@ -85,6 +85,7 @@ export function CardPage() {
       key={photoVersion}
       orgId={orgId}
       cardId={cardId}
+      frontUrl={safeHref(card.photos.find((p) => p.side === 'FRONT' && p.current)?.url)}
       onChange={() => {
         reload()
         setSaleVersion((v) => v + 1)

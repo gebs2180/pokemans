@@ -28,8 +28,10 @@ import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
 import { HowPriced } from './OfferPanel'
+import { DealTimeline } from './DealTimeline'
+import { dealSteps } from '../dealSteps'
 import { DealOutcomeForm, OutcomeRecord } from './DealOutcomeForm'
-import { message as errorText } from '../format'
+import { message as errorText, shortDate } from '../format'
 import { days, usePolicy } from '../policy'
 
 export function CardTitle({ card }: { card: OfferCard }) {
@@ -411,7 +413,10 @@ export function DealsPage() {
           <p>Cards you buy show here with their labels.</p>
         </EmptyState>
       )}
-      {data?.map((deal) => (
+      {data?.map((deal) => {
+        // The timeline carries the tracking number, so the label line below leaves it out when there is one.
+        const showTimeline = !deal.cancelled && !!deal.progress && ['SOLD', 'SHIPPED', 'ARRIVED', 'PAID'].includes(deal.progress.stage)
+        return (
         <section key={deal.listingId} className="panel">
           <div className="listing-top">
             <div>
@@ -421,7 +426,7 @@ export function DealsPage() {
           </div>
           <Photos photos={deal.photos} />
           <p className="small">
-            Bought for {money(deal.offer.price)} on {new Date(deal.acceptedAt).toLocaleDateString()} from {deal.seller.orgName ?? 'a seller'}
+            Bought for {money(deal.offer.price)} on {shortDate(deal.acceptedAt)} from {deal.seller.orgName ?? 'a seller'}
             .
             {!deal.cancelled && !deal.outcome && ` Pay them directly, within ${days(policy.payWithinDays)} of it arriving as shown. Rawmark doesn't handle the money.`}
           </p>
@@ -436,15 +441,27 @@ export function DealsPage() {
             !deal.progress?.paidAt &&
             deal.outcome?.type !== 'RETURNED' && <p className="muted small">The seller hasn't said how to pay them yet: check back here, or contact us if it's been a while.</p>
           )}
+          {showTimeline && (
+            <DealTimeline
+              tracking={deal.label?.trackingCode}
+              steps={dealSteps({
+                who: 'buyer',
+                accepted: deal.acceptedAt,
+                label: deal.label,
+                progress: deal.progress,
+                payWithin: days(policy.payWithinDays),
+              })}
+            />
+          )}
           {deal.cancelled ? (
             <p className="alert alert-danger">
-              We cancelled this deal on {new Date(deal.cancelled.at).toLocaleDateString()}: {deal.cancelled.reason}. You don't pay for
+              We cancelled this deal on {shortDate(deal.cancelled.at)}: {deal.cancelled.reason}. You don't pay for
               it, and its label isn't billed to you.
             </p>
           ) : deal.label ? (
             <p className="alert alert-info small">
               {deal.label.carrier} {deal.label.service}
-              {deal.label.trackingCode && `, tracking ${deal.label.trackingCode}`}, insured for {money(deal.label.insuredValue)}.
+              {!showTimeline && deal.label.trackingCode && `, tracking ${deal.label.trackingCode}`}, insured for {money(deal.label.insuredValue)}.
             </p>
           ) : (
             <div className="alert alert-warning">
@@ -467,13 +484,14 @@ export function DealsPage() {
                 />
               )}
             </>
-          ) : deal.cancelled ? null : deal.label ? (
+          ) : deal.cancelled ? null : deal.label && deal.progress?.stage !== 'SOLD' ? (
             <ArrivalForm path={apiPath`/api/orgs/${orgId}/deals/${deal.listingId}`} onSaved={reload} />
           ) : (
-            <p className="muted small">Once the label is bought and the card ships, record here how it arrived.</p>
+            <p className="muted small">Once the seller has shipped it, you can record here how it arrived.</p>
           )}
         </section>
-      ))}
+        )
+      })}
     </>
   )
 }
@@ -482,7 +500,7 @@ export function DealsPage() {
 function DealOutcome({ deal, path, onSaved }: { deal: Deal; path: string; onSaved: () => void }) {
   const policy = usePolicy()
   const { outcome, progress } = deal
-  const date = (at: string) => new Date(at).toLocaleDateString()
+  const date = shortDate
   return (
     <>
       {outcome?.type === 'RECEIVED' && (
