@@ -80,7 +80,7 @@ export function CenteringLabelsPage() {
       {!data && <Loading />}
       {data?.length === 0 && <p className="muted">No cards have a complete capture yet.</p>}
       {data && data.length > 0 && (
-        <table className="table">
+        <table className="table ruled">
           <thead>
             <tr>
               <th>Card</th>
@@ -269,7 +269,7 @@ function FaceEditor({
           <div className="frame-controls">
             <FrameZoom view={view} contrast={contrast} side={selected} position={positions[selected]} along={along} hidden={hidden[selected]} />
             <p className="muted small">Drag the lines onto the inside edge of the printed frame. Arrow keys move the chosen line 0.05 mm.</p>
-            <table className="table">
+            <table className="table ruled">
               <tbody>
                 {SIDES.map((side) => (
                   <tr key={side} className={side === selected ? 'frame-chosen' : undefined}>
@@ -335,7 +335,7 @@ function Reveal({
   return (
     <section className="panel" aria-label="Your label and the measurer's">
       <h2>Saved</h2>
-      <table className="table">
+      <table className="table ruled">
         <thead>
           <tr>
             <th />

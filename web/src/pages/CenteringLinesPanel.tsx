@@ -117,7 +117,7 @@ function FaceLines({ base, positions, onMove }: { base: string; positions: Posit
       />
       <div className="frame-controls">
         <FrameZoom view={view} contrast={contrast} side={selected} position={positions[selected]} along={along} hidden={false} />
-        <table className="table">
+        <table className="table ruled">
           <tbody>
             {SIDES.map((side) => (
               <tr key={side} className={side === selected ? 'frame-chosen' : undefined}>
