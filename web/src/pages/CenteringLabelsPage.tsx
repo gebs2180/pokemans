@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent, type PointerEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 import {
   apiPath,
   useApi,
@@ -8,17 +8,17 @@ import {
   type CenteringFaceView,
   type CenteringLabel,
   type CenteringQueueItem,
+  type RevealedLabel,
   type StraightenedCard,
 } from '../api'
+import { faceShares, ratio, SIDES, START_PX, worstShare, type Borders, type FrameSide } from '../centering'
+import { GraderAllowances } from './GraderAllowances'
+import { useGraderStandards } from '../graderStandards'
 import { useLoad } from '../useLoad'
 import { Loading, PageError } from '../ui'
 import { message } from '../format'
 
-type FrameSide = 'left' | 'right' | 'top' | 'bottom'
-const SIDES: FrameSide[] = ['left', 'right', 'top', 'bottom']
 const FACES: CenteringFace[] = ['FRONT', 'BACK']
-/** Where a line starts: a fixed place, never the measurer's answer, which would pull the label towards it. */
-const START_PX = 50
 /** How much of the card the zoom shows, in pixels of the straightened card (20 px/mm). */
 const ZOOM_PX = 100
 
@@ -68,7 +68,8 @@ export function CenteringLabelsPage() {
       <h1>Centering labels</h1>
       <p className="muted">
         Borders in mm, left / right / top / bottom, as a person reads them. One label covers every photo of that side of the card. Cards
-        the measurer refused come first.
+        the measurer refused come first. Labelling is blind: the ratios, the grades they allow and the measurer's reading show only
+        after you press Done.
       </p>
       <p className="row">
         <button onClick={download}>Download scoreboard file</button>
@@ -134,17 +135,17 @@ export function CenteringLabelCardPage() {
           </button>
         ))}
       </p>
-      <FaceEditor key={face} card={data} face={face} base={base} />
+      <FaceEditor key={face} card={data} face={face} base={base} onOtherFace={() => setFace(face === 'FRONT' ? 'BACK' : 'FRONT')} />
     </>
   )
 }
 
-type Positions = Record<FrameSide, number>
-type Hidden = Record<FrameSide, boolean>
+export type Positions = Record<FrameSide, number>
+export type Hidden = Record<FrameSide, boolean>
 
-function FaceEditor({ card, face, base }: { card: CenteringCard; face: CenteringFace; base: string }) {
+function FaceEditor({ card, face, base, onOtherFace }: { card: CenteringCard; face: CenteringFace; base: string; onOtherFace: () => void }) {
   const api = useApi()
-  const navigate = useNavigate()
+  const [revealed, setRevealed] = useState<RevealedLabel | null>(null)
   const photos = card.photos.filter((p) => p.face === face)
   const label = face === 'FRONT' ? card.front : card.back
   const [photoId, setPhotoId] = useState(photos.at(-1)?.id ?? '')
@@ -197,7 +198,8 @@ function FaceEditor({ card, face, base }: { card: CenteringCard; face: Centering
     setBusy(true)
     try {
       const mm = (side: FrameSide) => (hidden[side] ? null : positions[side] / (view?.pxPerMm ?? 20))
-      await api('POST', `${base}/centering-labels`, {
+      // Saving is the reveal: the reply is the first time this page sees the measurer's numbers.
+      const result = await api<RevealedLabel>('POST', `${base}/centering-labels`, {
         face,
         photoId,
         left: mm('left'),
@@ -206,12 +208,15 @@ function FaceEditor({ card, face, base }: { card: CenteringCard; face: Centering
         bottom: mm('bottom'),
         hardCard: hard,
       })
-      navigate('/admin/centering')
+      setRevealed(result)
     } catch (e) {
       setErr(message(e))
+    } finally {
       setBusy(false)
     }
   }
+
+  if (revealed) return <Reveal face={face} revealed={revealed} onOtherFace={onOtherFace} />
 
   if (photos.length === 0) return <p className="warn">No passing photo of this side.</p>
   return (
@@ -292,12 +297,60 @@ function FaceEditor({ card, face, base }: { card: CenteringCard; face: Centering
               </label>
             </p>
             {err && <p className="error" role="alert">{err}</p>}
+            <p className="muted small">Ratios, grades and the measurer's reading show after Done, so they can't pull the lines.</p>
             <button onClick={save} disabled={busy}>
-              Save label
+              Done
             </button>
           </div>
         </div>
       )}
+    </section>
+  )
+}
+
+/** After Done: the label beside the measurer's reading of the same photo, and what each grader allows. */
+function Reveal({ face, revealed, onOtherFace }: { face: CenteringFace; revealed: RevealedLabel; onOtherFace: () => void }) {
+  const { data: standards, error } = useGraderStandards()
+  const yours: Borders = revealed.label
+  const system: Borders = revealed.system
+  const mm = (v: number | null) => (v == null ? '–' : v.toFixed(2))
+  const rows: { name: string; b: Borders }[] = [{ name: 'Yours', b: yours }]
+  if (!revealed.system.refused) rows.push({ name: 'Measurer', b: system })
+  return (
+    <section className="panel" aria-label="Your label and the measurer's">
+      <h2>Saved</h2>
+      <table className="table">
+        <thead>
+          <tr>
+            <th />
+            <th>Left / right / top / bottom (mm)</th>
+            <th>Left/right</th>
+            <th>Top/bottom</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ name, b }) => (
+            <tr key={name}>
+              <td>{name}</td>
+              <td>{SIDES.map((s) => mm(b[s])).join(' / ')}</td>
+              <td>{ratio(b.left, b.right) ?? '–'}</td>
+              <td>{ratio(b.top, b.bottom) ?? '–'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {revealed.system.refused && <p className="muted">The measurer gave no reading of this photo: {revealed.system.refused}.</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+      {standards && (
+        <GraderAllowances
+          standards={standards}
+          readings={rows.map(({ name, b }) => ({ heading: name, ...faceShares(face, worstShare(b)) }))}
+        />
+      )}
+      <p className="row">
+        <button onClick={onOtherFace}>Label the {face === 'FRONT' ? 'back' : 'front'}</button>
+        <Link to="/admin/centering">Back to the queue</Link>
+      </p>
     </section>
   )
 }
@@ -332,7 +385,7 @@ function FrameLines({ view, positions, selected }: { view: StraightenedCard; pos
   )
 }
 
-function FrameCard({
+export function FrameCard({
   view,
   contrast,
   positions,

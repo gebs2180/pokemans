@@ -48,6 +48,9 @@ Labels are made at `/admin/centering`, linked from the admin page. Cards the mea
 1. Open a card. The lines start at a fixed 2.5 mm, never at the measurer's answer, which would pull the label towards it. The queue shows only whether it refused.
 2. Drag each line onto the inside edge of the printed frame. The zoom shows the chosen line, the arrow keys move it 0.05 mm, and "Raise contrast" brings up faint frames.
 3. Tick "Can't see it" for a side you can't read, and "Hard card" for gold, foil or full art. Don't guess a side: a guess becomes the truth the measurer is scored against.
+4. Press "Done". Labelling is blind: until then the page shows only the widths in mm, never the ratios, the grades they allow or the measurer's reading, so nothing pulls the lines. Done saves the label, then shows it beside the measurer's fresh reading of the same photo, with the best grade PSA, BGS, CGC and TAG allow for each. Those other graders' tables are for reference only: offers and the centering cap use PSA alone.
+
+Each label stores `revealed_at`, when its result was shown, which is when it was saved. Labels made before blind labelling (2026-11-13) have none, so the scoreboard can tell them apart.
 
 Labelling a card again adds a row and the newest counts, so two passes can be compared. A photo that fails at the card's outer edge can't be straightened, so the page says why and offers the card's other photos. If it has none, it needs a retake, usually on a dark surface.
 

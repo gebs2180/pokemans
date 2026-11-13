@@ -50,6 +50,14 @@ class CenteringLabels {
     }
 
     /**
+     * The measurer's reading of one photo, in mm like a label: shown only after the label is saved.
+     *
+     * @param refused why it gave no reading, null when it did; the widths are null then
+     */
+    record SystemReading(Double left, Double right, Double top, Double bottom, String refused) {
+    }
+
+    /**
      * What the queue knows about one face.
      *
      * @param refused true when the latest centering measurement refused it, null if it never ran. Only
@@ -99,6 +107,21 @@ class CenteringLabels {
         } finally {
             card[0].release();
         }
+    }
+
+    /**
+     * What the measurer reads on a photo now, for the reveal after a blind label. Measured fresh rather than
+     * read from the stored prediction, which may be of other photos. No transaction, like straightening.
+     */
+    SystemReading measure(UUID cardId, UUID photoId) {
+        CardItems.PhotoRef photo = requireFacePhoto(cardId, photoId);
+        CenteringMeasurer.Result result = new CenteringMeasurer(outline)
+                .measure(blobs.read(storage.photoBucket(), photo.storageKey()));
+        if (result instanceof CenteringMeasurer.Measured m) {
+            double px = CenteringMeasurer.PX_PER_MM;
+            return new SystemReading(m.left() / px, m.right() / px, m.top() / px, m.bottom() / px, null);
+        }
+        return new SystemReading(null, null, null, null, ((CenteringMeasurer.Unmeasured) result).reason());
     }
 
     @Transactional

@@ -1,0 +1,32 @@
+/* Surface view and grader allowances on the review and labelling pages. Kept out of index.css while the Ledger look (PR #132) reworks it. */
+.surface-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.surface-controls {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.surface-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.surface-grid figure {
+  margin: 0;
+}
+
+.surface-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.grader-allowances td:not(:first-child),
+.grader-allowances th:not(:first-child) {
+  white-space: nowrap;
+}

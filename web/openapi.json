@@ -989,6 +989,10 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "revealedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "right" : {
             "format" : "double",
             "type" : "number"
@@ -998,7 +1002,7 @@
             "type" : "number"
           }
         },
-        "required" : [ "bottom", "createdAt", "face", "hardCard", "id", "labelledBy", "left", "photoId", "right", "top" ]
+        "required" : [ "bottom", "createdAt", "face", "hardCard", "id", "labelledBy", "left", "photoId", "revealedAt", "right", "top" ]
       },
       "CenteringLabelControllerPhotoRef" : {
         "properties" : {
@@ -1044,6 +1048,17 @@
           }
         },
         "required" : [ "back", "cardId", "front", "identifiedAs", "label", "orgId", "orgName" ]
+      },
+      "CenteringLabelControllerRevealed" : {
+        "properties" : {
+          "label" : {
+            "$ref" : "#/components/schemas/CenteringLabelControllerLabelView"
+          },
+          "system" : {
+            "$ref" : "#/components/schemas/CenteringLabelsSystemReading"
+          }
+        },
+        "required" : [ "label", "system" ]
       },
       "CenteringLabelControllerScoreCard" : {
         "properties" : {
@@ -1123,6 +1138,10 @@
             "format" : "double",
             "type" : "number"
           },
+          "revealedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "right" : {
             "format" : "double",
             "type" : "number"
@@ -1132,7 +1151,7 @@
             "type" : "number"
           }
         },
-        "required" : [ "bottom", "hardCard", "labelledAt", "labelledBy", "left", "right", "top" ]
+        "required" : [ "bottom", "hardCard", "labelledAt", "labelledBy", "left", "revealedAt", "right", "top" ]
       },
       "CenteringLabelControllerScorePhoto" : {
         "properties" : {
@@ -1176,6 +1195,30 @@
           }
         },
         "required" : [ "contrast", "height", "image", "photoId", "pxPerMm", "refused", "width" ]
+      },
+      "CenteringLabelsSystemReading" : {
+        "properties" : {
+          "bottom" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "left" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "refused" : {
+            "type" : "string"
+          },
+          "right" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "top" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        },
+        "required" : [ "bottom", "left", "refused", "right", "top" ]
       },
       "ConditionControllerAssessRequest" : {
         "properties" : {
@@ -1753,6 +1796,45 @@
           }
         },
         "required" : [ "digest" ]
+      },
+      "GraderCenteringAllowance" : {
+        "properties" : {
+          "grade" : {
+            "type" : "string"
+          },
+          "maxBackShare" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "maxFrontShare" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "unsure" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "grade", "maxBackShare", "maxFrontShare", "unsure" ]
+      },
+      "GraderCenteringStandard" : {
+        "properties" : {
+          "allowances" : {
+            "items" : {
+              "$ref" : "#/components/schemas/GraderCenteringAllowance"
+            },
+            "type" : "array"
+          },
+          "grader" : {
+            "type" : "string"
+          },
+          "lowest" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "allowances", "grader", "lowest", "source" ]
       },
       "GradingCost" : {
         "properties" : {
@@ -4935,6 +5017,27 @@
         "tags" : [ "centering-label-controller" ]
       }
     },
+    "/api/admin/centering-standards" : {
+      "get" : {
+        "operationId" : "standards",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/GraderCenteringStandard"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "centering-label-controller" ]
+      }
+    },
     "/api/admin/deal-outcomes" : {
       "get" : {
         "operationId" : "dealOutcomes",
@@ -5547,7 +5650,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/CenteringLabelControllerLabelView"
+                  "$ref" : "#/components/schemas/CenteringLabelControllerRevealed"
                 }
               }
             },

@@ -180,6 +180,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/centering-standards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["standards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/deal-outcomes": {
         parameters: {
             query?: never;
@@ -1934,6 +1950,8 @@ export interface components {
             left: number;
             /** Format: uuid */
             photoId: string;
+            /** Format: date-time */
+            revealedAt: string;
             /** Format: double */
             right: number;
             /** Format: double */
@@ -1957,6 +1975,10 @@ export interface components {
             /** Format: uuid */
             orgId: string;
             orgName: string;
+        };
+        CenteringLabelControllerRevealed: {
+            label: components["schemas"]["CenteringLabelControllerLabelView"];
+            system: components["schemas"]["CenteringLabelsSystemReading"];
         };
         CenteringLabelControllerScoreCard: {
             /** Format: uuid */
@@ -1987,6 +2009,8 @@ export interface components {
             labelledBy: string;
             /** Format: double */
             left: number;
+            /** Format: date-time */
+            revealedAt: string;
             /** Format: double */
             right: number;
             /** Format: double */
@@ -2010,6 +2034,17 @@ export interface components {
             refused: string;
             /** Format: int32 */
             width: number;
+        };
+        CenteringLabelsSystemReading: {
+            /** Format: double */
+            bottom: number;
+            /** Format: double */
+            left: number;
+            refused: string;
+            /** Format: double */
+            right: number;
+            /** Format: double */
+            top: number;
         };
         ConditionControllerAssessRequest: {
             /** @enum {string} */
@@ -2242,6 +2277,20 @@ export interface components {
         };
         EmailPreferencesControllerEmailPreferencesView: {
             digest: boolean;
+        };
+        GraderCenteringAllowance: {
+            grade: string;
+            /** Format: double */
+            maxBackShare: number;
+            /** Format: double */
+            maxFrontShare: number;
+            unsure: string;
+        };
+        GraderCenteringStandard: {
+            allowances: components["schemas"]["GraderCenteringAllowance"][];
+            grader: string;
+            lowest: string;
+            source: string;
         };
         GradingCost: {
             fee: number;
@@ -3603,6 +3652,26 @@ export interface operations {
             };
         };
     };
+    standards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["GraderCenteringStandard"][];
+                };
+            };
+        };
+    };
     dealOutcomes: {
         parameters: {
             query?: never;
@@ -4067,7 +4136,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["CenteringLabelControllerLabelView"];
+                    "*/*": components["schemas"]["CenteringLabelControllerRevealed"];
                 };
             };
         };

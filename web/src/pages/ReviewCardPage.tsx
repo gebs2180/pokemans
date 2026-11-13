@@ -24,6 +24,8 @@ import { useLoad, usePoll } from '../useLoad'
 import { searchFromLabel } from '../searchFromLabel'
 import { PricesPanel } from './PricesPanel'
 import { ProvenancePanel } from './ProvenancePanel'
+import { SurfacePanel } from './SurfaceOverlay'
+import { CenteringLinesPanel } from './CenteringLinesPanel'
 import { Loading, PageError } from '../ui'
 import { message, percent } from '../format'
 import { COLLATERAL } from '../flags'
@@ -75,6 +77,9 @@ export function ReviewCardPage() {
           ))}
         </div>
       </section>
+
+      <SurfacePanel photos={data.photos} />
+      <CenteringLinesPanel orgId={orgId} cardId={cardId} photos={data.photos} />
 
       <Identification data={data} base={base} onChange={reload} />
       {/* Keys are prefixed per panel: two siblings both keyed "none" made React duplicate a panel. */}

@@ -37,6 +37,8 @@ class CenteringLabel extends AssignedIdEntity<UUID> {
     private boolean hardCard;
     private UUID labelledBy;
     private Instant createdAt;
+    /** When the measurer's reading was shown: the moment of saving on the blind page, null before it existed. */
+    private Instant revealedAt;
 
     protected CenteringLabel() {
     }
@@ -56,6 +58,8 @@ class CenteringLabel extends AssignedIdEntity<UUID> {
         this.hardCard = hardCard;
         this.labelledBy = labelledBy;
         this.createdAt = Instant.now();
+        // Saving is the reveal: the person sees the measurer's reading only in the reply to this save.
+        this.revealedAt = this.createdAt;
     }
 
     @Override
@@ -101,5 +105,9 @@ class CenteringLabel extends AssignedIdEntity<UUID> {
 
     Instant getCreatedAt() {
         return createdAt;
+    }
+
+    Instant getRevealedAt() {
+        return revealedAt;
     }
 }
