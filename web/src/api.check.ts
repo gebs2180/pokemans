@@ -87,6 +87,9 @@ export type ApiTypesMatchTheBackend = {
   CenteringQueueItem: Ok<Covers<S['CenteringLabelControllerQueueItem'], A.CenteringQueueItem>>
   CenteringCard: Ok<Covers<S['CenteringLabelControllerCardView'], A.CenteringCard>>
   StraightenedCard: Ok<Covers<S['CenteringLabelsStraightened'], A.StraightenedCard>>
+  SystemReading: Ok<Covers<S['CenteringLabelsSystemReading'], A.SystemReading>>
+  RevealedLabel: Ok<Covers<S['CenteringLabelControllerRevealed'], A.RevealedLabel>>
+  GraderStandard: Ok<Covers<S['GraderCenteringStandard'], A.GraderStandard>>
   PredictionRequestView: Ok<Covers<S['ConditionControllerRequestView'], A.PredictionRequestView>>
   Prediction: Ok<Covers<S['ConditionControllerPredictionView'], A.Prediction>>
   Assessment: Ok<Covers<S['ConditionControllerAssessmentView'], A.Assessment>>

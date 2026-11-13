@@ -1,14 +1,14 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CenteringCard, CenteringQueueItem, StraightenedCard } from '../api'
+import type { CenteringCard, CenteringQueueItem, GraderStandard, StraightenedCard } from '../api'
 import { respond } from '../test/auth0'
 import { CenteringLabelCardPage, CenteringLabelsPage } from './CenteringLabelsPage'
 
 const label = {
   id: 'l1', face: 'FRONT', photoId: 'f1', left: 2.5, right: 2.45, top: null, bottom: 3, hardCard: true, labelledBy: 'u1',
-  createdAt: '2026-11-01T10:00:00Z',
+  createdAt: '2026-11-01T10:00:00Z', revealedAt: null,
 } as const
 
 const queueItem: CenteringQueueItem = {
@@ -26,6 +26,22 @@ const card: CenteringCard = {
   ],
 }
 
+const system = { left: 2.0, right: 3.0, top: 2.5, bottom: 2.5, refused: null }
+
+const standards: GraderStandard[] = [
+  {
+    grader: 'PSA', source: 'psa', lowest: '1',
+    allowances: [
+      { grade: '10', maxFrontShare: 55, maxBackShare: 75, unsure: null },
+      { grade: '9', maxFrontShare: 60, maxBackShare: 90, unsure: null },
+    ],
+  },
+  {
+    grader: 'TAG', source: 'tag', lowest: '1',
+    allowances: [{ grade: '10', maxFrontShare: 51, maxBackShare: 52, unsure: null }, { grade: '9', maxFrontShare: 60, maxBackShare: 75, unsure: 'back not stated' }],
+  },
+]
+
 const straightened: StraightenedCard = {
   photoId: 'f2', pxPerMm: 20, width: 1260, height: 1760, image: 'data:image/jpeg;base64,AAAA', contrast: 'data:image/jpeg;base64,BBBB', refused: null,
 }
@@ -33,7 +49,10 @@ const straightened: StraightenedCard = {
 function stubApi(routes: Record<string, unknown>) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
-    if (init?.method === 'POST') return respond(201, {})
+    if (init?.method === 'POST') {
+      const body = JSON.parse(String(init.body))
+      return respond(201, { label: { ...label, ...body, id: 'l2', revealedAt: '2026-11-13T10:00:00Z' }, system: routes.system ?? system })
+    }
     const body = Object.entries(routes).find(([path]) => url.endsWith(path))?.[1]
     return body === undefined ? respond(404, { detail: 'Not found' }) : respond(200, body)
   })
@@ -57,7 +76,8 @@ function renderCard() {
   )
 }
 
-const cardRoutes = {
+const cardRoutes: Record<string, unknown> = {
+  '/api/admin/centering-standards': standards,
   '/orgs/o1/cards/c1/centering-labels': card,
   '/photos/f2/straightened': straightened,
   '/photos/f1/straightened': { ...straightened, photoId: 'f1' },
@@ -93,9 +113,9 @@ describe('CenteringLabelCardPage', () => {
     await screen.findByRole('img', { name: /Straightened card/ })
     expect(screen.getAllByText('2.50 mm')).toHaveLength(4)
     await user.click(screen.getByRole('button', { name: 'Move right in' }))
-    await user.click(screen.getByRole('button', { name: 'Save label' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
 
-    expect(await screen.findByText('The queue')).toBeInTheDocument()
+    await screen.findByRole('region', { name: "Your label and the measurer's" })
     expect(posted(fetchMock)).toEqual({ face: 'FRONT', photoId: 'f2', left: 2.5, right: 2.55, top: 2.5, bottom: 2.5, hardCard: false })
   })
 
@@ -107,9 +127,9 @@ describe('CenteringLabelCardPage', () => {
     await screen.findByRole('img', { name: /Straightened card/ })
     await user.click(screen.getAllByLabelText("Can't see it")[3])
     await user.click(screen.getByLabelText(/Hard card/))
-    await user.click(screen.getByRole('button', { name: 'Save label' }))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
 
-    await screen.findByText('The queue')
+    await screen.findByRole('region', { name: "Your label and the measurer's" })
     expect(posted(fetchMock)).toMatchObject({ bottom: null, top: 2.5, hardCard: true })
   })
 
@@ -141,8 +161,8 @@ describe('CenteringLabelCardPage', () => {
     await user.click(screen.getByRole('button', { name: 'Back' }))
     await waitFor(() => expect(screen.queryByLabelText('Photo')).not.toBeInTheDocument())
     await screen.findByRole('img', { name: /Straightened card/ })
-    await user.click(screen.getByRole('button', { name: 'Save label' }))
-    await screen.findByText('The queue')
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await screen.findByRole('region', { name: "Your label and the measurer's" })
     expect(posted(fetchMock)).toMatchObject({ face: 'BACK', photoId: 'b1' })
   })
 
@@ -152,9 +172,9 @@ describe('CenteringLabelCardPage', () => {
     renderCard()
 
     expect(await screen.findByText(/can't be straightened: the card's left edge/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Save label' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument()
     await user.selectOptions(screen.getByLabelText('Photo'), 'f1')
-    expect(await screen.findByRole('button', { name: 'Save label' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Done' })).toBeInTheDocument()
   })
 
   it('starts from the saved label when there is one', async () => {
@@ -165,5 +185,41 @@ describe('CenteringLabelCardPage', () => {
     expect(screen.getByText('2.45 mm')).toBeInTheDocument()
     expect(screen.getAllByLabelText("Can't see it")[2]).toBeChecked()
     expect(screen.getByLabelText(/Hard card/)).toBeChecked()
+  })
+
+  it('hides ratios and grades until Done, then shows the label beside the measurer and what each grader allows', async () => {
+    const user = userEvent.setup()
+    stubApi(cardRoutes)
+    renderCard()
+
+    await screen.findByRole('img', { name: /Straightened card/ })
+    await user.click(screen.getByRole('button', { name: 'Move left in' }))
+    expect(screen.queryByText(/\d+\.\d\/\d+\.\d/)).not.toBeInTheDocument()
+    expect(screen.queryByText('PSA')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    const reveal = await screen.findByRole('region', { name: "Your label and the measurer's" })
+    // Yours: 2.55 / 2.50 left/right; the measurer's 2.00 / 3.00.
+    expect(within(reveal).getByText('50.5/49.5')).toBeInTheDocument()
+    expect(within(reveal).getByText('40.0/60.0')).toBeInTheDocument()
+    const psa = within(reveal).getByText('PSA').closest('tr')!
+    expect(within(psa).getAllByRole('cell').map((c) => c.textContent)).toEqual(['PSA', '10', '9'])
+    expect(within(reveal).getByText(/to confirm/)).toBeInTheDocument()
+
+    await user.click(within(reveal).getByRole('button', { name: 'Label the back' }))
+    expect(await screen.findByRole('button', { name: 'Done' })).toBeInTheDocument()
+  })
+
+  it("says when the measurer gave no reading, and shows only the reviewer's", async () => {
+    const user = userEvent.setup()
+    stubApi({ ...cardRoutes, system: { left: null, right: null, top: null, bottom: null, refused: 'no frame found' } })
+    renderCard()
+
+    await screen.findByRole('img', { name: /Straightened card/ })
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    const reveal = await screen.findByRole('region', { name: "Your label and the measurer's" })
+    expect(within(reveal).getByText(/no reading of this photo: no frame found/)).toBeInTheDocument()
+    expect(within(reveal).queryByText('Measurer')).not.toBeInTheDocument()
+    expect(within(reveal).getByRole('link', { name: 'Back to the queue' })).toHaveAttribute('href', '/admin/centering')
   })
 })

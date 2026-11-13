@@ -359,7 +359,24 @@ export type CenteringLabel = {
   hardCard: boolean
   labelledBy: string
   createdAt: string
+  /** When the measurer's reading was shown, on saving; null for a label made before blind measuring. */
+  revealedAt: string | null
 }
+
+/** The measurer's reading of the labelled photo in mm, sent only in the reply to "Done". */
+export type SystemReading = {
+  left: number | null
+  right: number | null
+  top: number | null
+  bottom: number | null
+  refused: string | null
+}
+
+export type RevealedLabel = { label: CenteringLabel; system: SystemReading }
+
+/** One grader's centering limits, best grade first. Display only: valuation uses PSA's alone. */
+export type GraderAllowance = { grade: string; maxFrontShare: number; maxBackShare: number; unsure: string | null }
+export type GraderStandard = { grader: string; source: string; lowest: string; allowances: GraderAllowance[] }
 
 /** @param refused the latest measurement refused this face; null if none ran. Its numbers aren't shown, so they can't bias a label. */
 export type CenteringFaceView = { label: CenteringLabel | null; refused: boolean | null; photos: number }

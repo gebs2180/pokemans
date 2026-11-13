@@ -37,8 +37,13 @@ class CenteringLabelController {
                         boolean hardCard) {
     }
 
+    /** @param revealedAt when the measurer's reading was shown, null for a label made before blind measuring */
     record LabelView(UUID id, CenteringLabel.Face face, UUID photoId, Double left, Double right, Double top, Double bottom,
-                     boolean hardCard, UUID labelledBy, Instant createdAt) {
+                     boolean hardCard, UUID labelledBy, Instant createdAt, Instant revealedAt) {
+    }
+
+    /** The reply to "Done": the label as saved, and only now the measurer's reading of the same photo. */
+    record Revealed(LabelView label, CenteringLabels.SystemReading system) {
     }
 
     /** @param refused the latest measurement refused this face; null if none ran */
@@ -62,7 +67,9 @@ class CenteringLabelController {
     record ScoreFace(CenteringLabel.Face face, ScoreLabel label, List<ScorePhoto> photos) {
     }
 
-    record ScoreLabel(Double left, Double right, Double top, Double bottom, boolean hardCard, UUID labelledBy, Instant labelledAt) {
+    /** @param revealedAt null for a label made before blind measuring: score the two apart */
+    record ScoreLabel(Double left, Double right, Double top, Double bottom, boolean hardCard, UUID labelledBy, Instant labelledAt,
+                      Instant revealedAt) {
     }
 
     /** @param set the identified set, for splitting by set; null before identification */
@@ -130,11 +137,22 @@ class CenteringLabelController {
         return labels.straighten(cardId, photoId);
     }
 
+    /**
+     * "Done" on the blind page: saves the label, then measures the same photo. The measurer's numbers are
+     * sent nowhere else on this page before this, so the label can't lean on them.
+     */
     @PostMapping("/orgs/{orgId}/cards/{cardId}/centering-labels")
     @ResponseStatus(HttpStatus.CREATED)
-    LabelView label(@PathVariable UUID orgId, @PathVariable UUID cardId, @Valid @RequestBody LabelRequest request) {
-        return view(labels.save(condition.requireCard(orgId, cardId), request.face(), request.photoId(), request.left(), request.right(),
-                request.top(), request.bottom(), request.hardCard()));
+    Revealed label(@PathVariable UUID orgId, @PathVariable UUID cardId, @Valid @RequestBody LabelRequest request) {
+        CenteringLabel saved = labels.save(condition.requireCard(orgId, cardId), request.face(), request.photoId(), request.left(),
+                request.right(), request.top(), request.bottom(), request.hardCard());
+        return new Revealed(view(saved), labels.measure(cardId, saved.getPhotoId()));
+    }
+
+    /** Each grader's centering allowance, for display only: valuation and the centering cap use PSA's alone. */
+    @GetMapping("/centering-standards")
+    List<GraderCentering.Standard> standards() {
+        return GraderCentering.ALL;
     }
 
     /**
@@ -176,11 +194,11 @@ class CenteringLabelController {
 
     private static LabelView view(CenteringLabel l) {
         return l == null ? null : new LabelView(l.getId(), l.getFace(), l.getPhotoId(), l.getLeftMm(), l.getRightMm(), l.getTopMm(),
-                l.getBottomMm(), l.isHardCard(), l.getLabelledBy(), l.getCreatedAt());
+                l.getBottomMm(), l.isHardCard(), l.getLabelledBy(), l.getCreatedAt(), l.getRevealedAt());
     }
 
     private static ScoreLabel scoreLabel(CenteringLabel l) {
         return l == null ? null : new ScoreLabel(l.getLeftMm(), l.getRightMm(), l.getTopMm(), l.getBottomMm(), l.isHardCard(),
-                l.getLabelledBy(), l.getCreatedAt());
+                l.getLabelledBy(), l.getCreatedAt(), l.getRevealedAt());
     }
 }
