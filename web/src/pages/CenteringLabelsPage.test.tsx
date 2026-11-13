@@ -146,6 +146,10 @@ describe('CenteringLabelCardPage', () => {
 
     fireEvent.keyDown(image, { key: 'ArrowRight' })
     expect(screen.getByText('4.05 mm')).toBeInTheDocument()
+    // Up and down don't move a vertical line, and don't scroll the page either.
+    expect(fireEvent.keyDown(image, { key: 'ArrowDown' })).toBe(false)
+    expect(fireEvent.keyDown(image, { key: 'ArrowUp' })).toBe(false)
+    expect(screen.getByText('4.05 mm')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Close-up of the left line' })).toBeInTheDocument()
   })
 
@@ -204,10 +208,17 @@ describe('CenteringLabelCardPage', () => {
     expect(within(reveal).getByText('40.0/60.0')).toBeInTheDocument()
     const psa = within(reveal).getByText('PSA').closest('tr')!
     expect(within(psa).getAllByRole('cell').map((c) => c.textContent)).toEqual(['PSA', '10', '9'])
-    expect(within(reveal).getByText(/to confirm/)).toBeInTheDocument()
+    // The grader table has its own heading, and what's unconfirmed is on the page, not in a tooltip.
+    expect(within(reveal).getByRole('heading', { name: 'What each grader allows' })).toBeInTheDocument()
+    expect(within(reveal).getByText(/To confirm: TAG is read from its published standards/)).toBeInTheDocument()
+    expect(within(reveal).getByText('TAG 9: back not stated')).toBeInTheDocument()
+    // Your lines and the measurer's, drawn on the card; the side toggle steps aside for "Label the back".
+    expect(within(reveal).getByRole('img', { name: "The card with your lines and the measurer's" })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Side' })).not.toBeInTheDocument()
 
     await user.click(within(reveal).getByRole('button', { name: 'Label the back' }))
     expect(await screen.findByRole('button', { name: 'Done' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it("says when the measurer gave no reading, and shows only the reviewer's", async () => {
@@ -220,6 +231,7 @@ describe('CenteringLabelCardPage', () => {
     const reveal = await screen.findByRole('region', { name: "Your label and the measurer's" })
     expect(within(reveal).getByText(/no reading of this photo: no frame found/)).toBeInTheDocument()
     expect(within(reveal).queryByText('Measurer')).not.toBeInTheDocument()
+    expect(within(reveal).getByRole('img', { name: 'The card with your lines' })).toBeInTheDocument()
     expect(within(reveal).getByRole('link', { name: 'Back to the queue' })).toHaveAttribute('href', '/admin/centering')
   })
 })

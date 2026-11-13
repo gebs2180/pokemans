@@ -118,7 +118,7 @@ class CenteringLabelFlowTest {
         api.get("/api/admin/centering-standards", api.admin())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].grader").value("PSA"))
-                .andExpect(jsonPath("$[0].allowances[0].grade").value("10"))
+                .andExpect(jsonPath("$[0].allowances[0].grade").value("Gem Mint 10"))
                 .andExpect(jsonPath("$[0].allowances[0].maxFrontShare").value(55.0))
                 .andExpect(jsonPath("$[*].grader", org.hamcrest.Matchers.contains("PSA", "BGS", "CGC", "TAG")));
         api.get("/api/admin/centering-standards", api.user("auth0|standards-collector", List.of())).andExpect(status().isForbidden());

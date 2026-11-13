@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react'
 import type { CenteringFace, GraderStandard } from './api'
 
 export type FrameSide = 'left' | 'right' | 'top' | 'bottom'
@@ -45,4 +46,22 @@ export function bestGrade(standard: GraderStandard, front: number | null, back: 
 /** Shares by face, for a reading of one face only. */
 export function faceShares(face: CenteringFace, share: number | null): { front: number | null; back: number | null } {
   return face === 'FRONT' ? { front: share, back: null } : { front: null, back: share }
+}
+
+/**
+ * Arrow keys move the chosen line 1 px (0.05 mm), inward on right or down for left and top, on left or up
+ * for right and bottom. Every arrow is kept from scrolling the page while the editor has focus, the other
+ * axis's too; a form field keeps its own arrows.
+ */
+export function onFrameKey(e: KeyboardEvent, selected: FrameSide, nudge: (side: FrameSide, by: number) => void) {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
+  const target = e.target as HTMLElement
+  if (target.closest('input, select, textarea')) return
+  e.preventDefault()
+  const vertical = selected === 'left' || selected === 'right'
+  const towardsEnd = vertical ? e.key === 'ArrowRight' : e.key === 'ArrowDown'
+  const towardsStart = vertical ? e.key === 'ArrowLeft' : e.key === 'ArrowUp'
+  if (!towardsEnd && !towardsStart) return
+  const inward = selected === 'left' || selected === 'top' ? towardsEnd : towardsStart
+  nudge(selected, inward ? 1 : -1)
 }

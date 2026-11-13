@@ -13,7 +13,7 @@ class GraderCenteringTest {
             for (Double back : new Double[] {null, 60.0, 75.0, 75.1, 90.0, 95.0}) {
                 assertThat(GraderCentering.best(GraderCentering.PSA, front, back))
                         .as("front %s back %s", front, back)
-                        .isEqualTo(String.valueOf(PsaCentering.cap(front, back, 0)));
+                        .isEqualTo(GraderCentering.psaName(PsaCentering.cap(front, back, 0)));
             }
         });
     }

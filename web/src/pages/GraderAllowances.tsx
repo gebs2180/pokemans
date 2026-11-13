@@ -15,8 +15,10 @@ export function GraderAllowances({
   standards: GraderStandard[]
   readings: { heading: string; front: number | null; back: number | null }[]
 }) {
+  const unsure = standards.filter((s) => s.allowances.some((a) => a.unsure))
   return (
     <>
+      <h3 className="grader-allowances-heading">What each grader allows</h3>
       <table className="table grader-allowances">
         <thead>
           <tr>
@@ -31,12 +33,7 @@ export function GraderAllowances({
             <tr key={s.grader}>
               <td>
                 {s.grader}
-                {s.allowances.some((a) => a.unsure) && (
-                  <span className="muted small" title={s.allowances.flatMap((a) => (a.unsure ? [`${a.grade}: ${a.unsure}`] : [])).join('\n')}>
-                    {' '}
-                    (to confirm)
-                  </span>
-                )}
+                {s.allowances.some((a) => a.unsure) && <span className="muted small"> (to confirm)</span>}
               </td>
               {readings.map((r) => (
                 <td key={r.heading}>{bestGrade(s, r.front, r.back) ?? '–'}</td>
@@ -49,6 +46,29 @@ export function GraderAllowances({
         The best grade each grader's published centering standard allows, centering alone. For reference only: offers and the centering
         cap use PSA's table and nothing else.
       </p>
+      {unsure.length > 0 && (
+        <div className="muted small grader-notes">
+          <p>
+            To confirm: {listOf(unsure.map((s) => s.grader))} {unsure.length === 1 ? 'is' : 'are'} read from{' '}
+            {unsure.length === 1 ? 'its' : 'their'} published standards, with some limits not stated or not yet checked.
+          </p>
+          <details>
+            <summary>What isn't confirmed</summary>
+            <ul>
+              {unsure.flatMap((s) =>
+                s.allowances.flatMap((a) =>
+                  a.unsure ? [<li key={`${s.grader} ${a.grade}`}>{`${s.grader} ${a.grade}: ${a.unsure}`}</li>] : [],
+                ),
+              )}
+            </ul>
+          </details>
+        </div>
+      )}
     </>
   )
+}
+
+/** "A", "A and B", "A, B and C". */
+function listOf(names: string[]) {
+  return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 }

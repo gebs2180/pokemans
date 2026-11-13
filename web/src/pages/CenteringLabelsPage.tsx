@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useState, type PointerEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import {
   apiPath,
@@ -11,12 +11,14 @@ import {
   type RevealedLabel,
   type StraightenedCard,
 } from '../api'
-import { faceShares, ratio, SIDES, START_PX, worstShare, type Borders, type FrameSide } from '../centering'
+import { faceShares, onFrameKey, ratio, SIDES, START_PX, worstShare, type Borders, type FrameSide } from '../centering'
 import { GraderAllowances } from './GraderAllowances'
+import { NudgeButtons, Segmented } from './reviewTools'
 import { useGraderStandards } from '../graderStandards'
 import { useLoad } from '../useLoad'
 import { Loading, PageError } from '../ui'
 import { message } from '../format'
+import './reviewTools.css'
 
 const FACES: CenteringFace[] = ['FRONT', 'BACK']
 /** How much of the card the zoom shows, in pixels of the straightened card (20 px/mm). */
@@ -84,7 +86,7 @@ export function CenteringLabelsPage() {
               <th>Card</th>
               <th>Front</th>
               <th>Back</th>
-              <th />
+              <th>Label</th>
             </tr>
           </thead>
           <tbody>
@@ -119,6 +121,8 @@ export function CenteringLabelCardPage() {
   const base = apiPath`/api/admin/orgs/${orgId}/cards/${cardId}`
   const { data, error } = useLoad(() => api<CenteringCard>('GET', `${base}/centering-labels`), [api, base])
   const [face, setFace] = useState<CenteringFace>('FRONT')
+  // After Done the reveal offers the other face itself, so the toggle steps aside: one route, not two.
+  const [revealedFace, setRevealedFace] = useState<CenteringFace | null>(null)
 
   if (error) return <PageError message={error} />
   if (!data) return <Loading />
@@ -128,14 +132,19 @@ export function CenteringLabelCardPage() {
         <Link to="/admin/centering">← Centering labels</Link>
       </p>
       <h1>{data.identifiedAs ?? data.label}</h1>
-      <p className="row">
-        {FACES.map((f) => (
-          <button key={f} className={f === face ? undefined : 'link'} aria-pressed={f === face} onClick={() => setFace(f)}>
-            {f === 'FRONT' ? 'Front' : 'Back'}
-          </button>
-        ))}
-      </p>
-      <FaceEditor key={face} card={data} face={face} base={base} onOtherFace={() => setFace(face === 'FRONT' ? 'BACK' : 'FRONT')} />
+      {revealedFace !== face && (
+        <p>
+          <Segmented label="Side" options={FACES.map((f) => ({ value: f, label: f === 'FRONT' ? 'Front' : 'Back' }))} value={face} onChange={setFace} />
+        </p>
+      )}
+      <FaceEditor
+        key={face}
+        card={data}
+        face={face}
+        base={base}
+        onRevealed={() => setRevealedFace(face)}
+        onOtherFace={() => setFace(face === 'FRONT' ? 'BACK' : 'FRONT')}
+      />
     </>
   )
 }
@@ -143,7 +152,19 @@ export function CenteringLabelCardPage() {
 export type Positions = Record<FrameSide, number>
 export type Hidden = Record<FrameSide, boolean>
 
-function FaceEditor({ card, face, base, onOtherFace }: { card: CenteringCard; face: CenteringFace; base: string; onOtherFace: () => void }) {
+function FaceEditor({
+  card,
+  face,
+  base,
+  onRevealed,
+  onOtherFace,
+}: {
+  card: CenteringCard
+  face: CenteringFace
+  base: string
+  onRevealed: () => void
+  onOtherFace: () => void
+}) {
   const api = useApi()
   const [revealed, setRevealed] = useState<RevealedLabel | null>(null)
   const photos = card.photos.filter((p) => p.face === face)
@@ -182,17 +203,6 @@ function FaceEditor({ card, face, base, onOtherFace }: { card: CenteringCard; fa
     setPositions((p) => ({ ...p, [side]: Math.max(0, p[side] + by) }))
   }
 
-  /** Arrow keys move the chosen line 1 px (0.05 mm), inward on up or left of the card's own direction. */
-  function onKey(e: KeyboardEvent) {
-    const vertical = selected === 'left' || selected === 'right'
-    const towardsEnd = vertical ? e.key === 'ArrowRight' : e.key === 'ArrowDown'
-    const towardsStart = vertical ? e.key === 'ArrowLeft' : e.key === 'ArrowUp'
-    if (!towardsEnd && !towardsStart) return
-    e.preventDefault()
-    const inward = selected === 'left' || selected === 'top' ? towardsEnd : towardsStart
-    nudge(selected, inward ? 1 : -1)
-  }
-
   async function save() {
     setErr(null)
     setBusy(true)
@@ -209,6 +219,7 @@ function FaceEditor({ card, face, base, onOtherFace }: { card: CenteringCard; fa
         hardCard: hard,
       })
       setRevealed(result)
+      onRevealed()
     } catch (e) {
       setErr(message(e))
     } finally {
@@ -216,11 +227,11 @@ function FaceEditor({ card, face, base, onOtherFace }: { card: CenteringCard; fa
     }
   }
 
-  if (revealed) return <Reveal face={face} revealed={revealed} onOtherFace={onOtherFace} />
+  if (revealed) return <Reveal face={face} revealed={revealed} view={view ?? null} onOtherFace={onOtherFace} />
 
   if (photos.length === 0) return <p className="warn">No passing photo of this side.</p>
   return (
-    <section className="panel" onKeyDown={onKey}>
+    <section className="panel" onKeyDown={(e) => onFrameKey(e, selected, nudge)}>
       {photos.length > 1 && (
         <p>
           <label>
@@ -269,12 +280,7 @@ function FaceEditor({ card, face, base, onOtherFace }: { card: CenteringCard; fa
                     </td>
                     <td>{hidden[side] ? '–' : `${(positions[side] / view.pxPerMm).toFixed(2)} mm`}</td>
                     <td>
-                      <button className="link" aria-label={`Move ${side} out`} onClick={() => nudge(side, -1)}>
-                        −
-                      </button>{' '}
-                      <button className="link" aria-label={`Move ${side} in`} onClick={() => nudge(side, 1)}>
-                        +
-                      </button>
+                      <NudgeButtons side={side} onNudge={(by) => nudge(side, by)} />
                     </td>
                     <td>
                       <label className="small">
@@ -309,7 +315,17 @@ function FaceEditor({ card, face, base, onOtherFace }: { card: CenteringCard; fa
 }
 
 /** After Done: the label beside the measurer's reading of the same photo, and what each grader allows. */
-function Reveal({ face, revealed, onOtherFace }: { face: CenteringFace; revealed: RevealedLabel; onOtherFace: () => void }) {
+function Reveal({
+  face,
+  revealed,
+  view,
+  onOtherFace,
+}: {
+  face: CenteringFace
+  revealed: RevealedLabel
+  view: StraightenedCard | null
+  onOtherFace: () => void
+}) {
   const { data: standards, error } = useGraderStandards()
   const yours: Borders = revealed.label
   const system: Borders = revealed.system
@@ -340,6 +356,7 @@ function Reveal({ face, revealed, onOtherFace }: { face: CenteringFace; revealed
         </tbody>
       </table>
       {revealed.system.refused && <p className="muted">The measurer gave no reading of this photo: {revealed.system.refused}.</p>}
+      {view?.image && <RevealCard view={view} yours={yours} measurer={revealed.system.refused ? null : system} />}
       {error && <p className="error" role="alert">{error}</p>}
       {standards && (
         <GraderAllowances
@@ -361,7 +378,23 @@ function linePosition(side: FrameSide, px: number, view: StraightenedCard) {
   return (side === 'right' ? view.width : view.height) - 1 - px
 }
 
-function FrameLines({ view, positions, selected }: { view: StraightenedCard; positions: Partial<Positions>; selected: FrameSide }) {
+/**
+ * The frame lines, each on a dark outline so it shows against any border colour.
+ *
+ * @param selected the chosen line, drawn solid; null draws every line solid
+ * @param extraClass added to each line, e.g. the measurer's colour
+ */
+function FrameLines({
+  view,
+  positions,
+  selected,
+  extraClass,
+}: {
+  view: StraightenedCard
+  positions: Partial<Positions>
+  selected: FrameSide | null
+  extraClass?: string
+}) {
   return (
     <>
       {SIDES.map((side) => {
@@ -369,19 +402,53 @@ function FrameLines({ view, positions, selected }: { view: StraightenedCard; pos
         if (px === undefined) return null
         const at = linePosition(side, px, view)
         const vertical = side === 'left' || side === 'right'
+        const chosen = selected === null || side === selected ? ' frame-line-chosen' : ''
+        const ends = {
+          x1: vertical ? at : 0,
+          x2: vertical ? at : view.width,
+          y1: vertical ? 0 : at,
+          y2: vertical ? view.height : at,
+        }
         return (
-          <line
-            key={side}
-            className={side === selected ? 'frame-line frame-line-chosen' : 'frame-line'}
-            x1={vertical ? at : 0}
-            x2={vertical ? at : view.width}
-            y1={vertical ? 0 : at}
-            y2={vertical ? view.height : at}
-            vectorEffect="non-scaling-stroke"
-          />
+          <g key={side}>
+            <line className={`frame-line-halo${chosen}`} {...ends} vectorEffect="non-scaling-stroke" />
+            <line className={`frame-line${chosen}${extraClass ? ` ${extraClass}` : ''}`} {...ends} vectorEffect="non-scaling-stroke" />
+          </g>
         )
       })}
     </>
+  )
+}
+
+/** mm borders as line positions on the straightened card; a side not seen has no line. */
+function bordersPx(b: Borders, pxPerMm: number): Partial<Positions> {
+  const out: Partial<Positions> = {}
+  for (const s of SIDES) {
+    const mm = b[s]
+    if (mm != null) out[s] = mm * pxPerMm
+  }
+  return out
+}
+
+/** The reveal's picture: your lines and the measurer's on the photo you labelled. */
+function RevealCard({ view, yours, measurer }: { view: StraightenedCard; yours: Borders; measurer: Borders | null }) {
+  return (
+    <figure>
+      <svg
+        className="frame-reveal"
+        viewBox={`0 0 ${view.width} ${view.height}`}
+        role="img"
+        aria-label={measurer ? "The card with your lines and the measurer's" : 'The card with your lines'}
+      >
+        <image href={view.image ?? undefined} width={view.width} height={view.height} />
+        {measurer && <FrameLines view={view} positions={bordersPx(measurer, view.pxPerMm)} selected={null} extraClass="frame-line-measurer" />}
+        <FrameLines view={view} positions={bordersPx(yours, view.pxPerMm)} selected={null} />
+      </svg>
+      <figcaption className="small frame-legend">
+        <span>Yours</span>
+        {measurer && <span className="frame-legend-measurer">Measurer</span>}
+      </figcaption>
+    </figure>
   )
 }
 
@@ -456,7 +523,7 @@ export function FrameCard({
 }
 
 /** The chosen line close up, where its pixels can be told apart. */
-function FrameZoom({
+export function FrameZoom({
   view,
   contrast,
   side,
