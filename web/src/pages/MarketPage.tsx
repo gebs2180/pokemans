@@ -28,6 +28,8 @@ import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
 import { HowPriced } from './OfferPanel'
+import { DealTimeline } from './DealTimeline'
+import { dealSteps } from '../dealSteps'
 import { DealOutcomeForm, OutcomeRecord } from './DealOutcomeForm'
 import { message as errorText } from '../format'
 import { days, usePolicy } from '../policy'
@@ -435,6 +437,18 @@ export function DealsPage() {
             !deal.cancelled &&
             !deal.progress?.paidAt &&
             deal.outcome?.type !== 'RETURNED' && <p className="muted small">The seller hasn't said how to pay them yet: check back here, or contact us if it's been a while.</p>
+          )}
+          {!deal.cancelled && deal.progress && ['SOLD', 'SHIPPED', 'ARRIVED', 'PAID'].includes(deal.progress.stage) && (
+            <DealTimeline
+              tracking={deal.label?.trackingCode}
+              steps={dealSteps({
+                who: 'buyer',
+                accepted: deal.acceptedAt,
+                label: deal.label,
+                progress: deal.progress,
+                payWithin: days(policy.payWithinDays),
+              })}
+            />
           )}
           {deal.cancelled ? (
             <p className="alert alert-danger">

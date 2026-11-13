@@ -85,6 +85,7 @@ export function CardPage() {
       key={photoVersion}
       orgId={orgId}
       cardId={cardId}
+      frontUrl={safeHref(card.photos.find((p) => p.side === 'FRONT' && p.current)?.url)}
       onChange={() => {
         reload()
         setSaleVersion((v) => v + 1)

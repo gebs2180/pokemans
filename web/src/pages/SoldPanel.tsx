@@ -4,6 +4,8 @@ import { safeHref } from '../safeHref'
 import { Field } from '../ui'
 import { AddressForm } from './AddressForm'
 import { days, usePolicy } from '../policy'
+import { DealTimeline } from './DealTimeline'
+import { dealSteps } from '../dealSteps'
 
 const date = (at: string) => new Date(at).toLocaleDateString()
 
@@ -118,6 +120,18 @@ export function SoldPanel({
         <p>
           Sold to {listing.buyer?.orgName ?? 'a buyer'} on {date(listing.closedAt!)}.
         </p>
+        {(stage === 'SOLD' || stage === 'SHIPPED' || stage === 'ARRIVED' || stage === 'PAID') && (
+          <DealTimeline
+            tracking={label?.trackingCode}
+            steps={dealSteps({
+              who: 'seller',
+              accepted: listing.closedAt!,
+              label,
+              progress,
+              payWithin: days(policy.payWithinDays),
+            })}
+          />
+        )}
         {stage === 'SOLD' && (
           <>
             <p>

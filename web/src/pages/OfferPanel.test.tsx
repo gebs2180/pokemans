@@ -83,7 +83,7 @@ describe('OfferPanel', () => {
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
     await user.click(await screen.findByRole('button', { name: 'Get an offer' }))
-    expect(await screen.findByText('$419.98')).toBeInTheDocument()
+    expect(await screen.findByTestId('offer-reveal')).toHaveTextContent('$419.98')
     expect(screen.getByText(/isn't sold until a buyer accepts/)).toBeInTheDocument()
     expect(screen.getByText(/The buyer pays you directly, not us/)).toBeInTheDocument()
     expect(screen.getByText('How we priced it')).toBeInTheDocument()
@@ -315,7 +315,7 @@ describe('OfferPanel after the sale', () => {
     stubApi([sold({ stage: 'SHIPPED', shippedAt: '2026-10-21T10:00:00Z' })], address)
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
-    expect(await screen.findByText('Shipped')).toBeInTheDocument()
+    expect((await screen.findAllByText('Shipped')).length).toBeGreaterThan(0)
     expect(screen.queryByRole('link', { name: 'Print your prepaid label' })).not.toBeInTheDocument()
     expect(screen.queryByText('How to ship it')).not.toBeInTheDocument()
     expect(screen.getByText(/tracking 9400111/)).toBeInTheDocument()
@@ -465,7 +465,7 @@ describe('MarketPage', () => {
     renderMarket()
 
     expect(await screen.findByText('Umbreon VMAX')).toBeInTheDocument()
-    expect(screen.getByText('$419.98')).toBeInTheDocument()
+    expect(screen.getAllByText('$419.98').length).toBeGreaterThan(0)
     expect(screen.getByText(/Not yet authenticated/)).toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument() // a non-web photo link is never rendered
     await user.click(screen.getByRole('button', { name: 'Buy' }))
@@ -615,6 +615,41 @@ describe('HowPriced', () => {
     expect(screen.getByRole('row', { name: /PSA 10/ })).toHaveTextContent('$900.00 (at least 3 sales, 90 days)')
     expect(screen.getByRole('row', { name: /PSA 9/ })).toHaveTextContent('$450.00 (at least 1 sale, 180 days)')
     expect(screen.getByRole('row', { name: /^PSA 8 / })).toHaveTextContent('no sales of its own')
+  })
+
+  it('itemises what each grade counts for, ending in the firm offer', async () => {
+    renderOffer(offer())
+
+    expect(await screen.findByRole('columnheader', { name: 'Counts for' })).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: /PSA 10/ })).toHaveTextContent('30%')
+    expect(screen.getByRole('row', { name: /PSA 10/ })).toHaveTextContent('$206.55')
+    expect(screen.getByRole('row', { name: /^PSA 8 / })).toHaveTextContent('$41.31')
+    expect(screen.getByRole('row', { name: /Firm offer/ })).toHaveTextContent('$419.98')
+  })
+
+  it('says so, rather than nudging a row, when the rounded rows are a cent off the offer', async () => {
+    renderOffer(offer())
+
+    expect(await screen.findByText(/The rows are rounded to the cent/)).toBeInTheDocument()
+  })
+
+  it('shows a cent of rounding on the Victini example rather than moving a row', async () => {
+    renderOffer(
+      offer({
+        price: 636.12,
+        ladder: [
+          { grade: '10', probability: 0.6, price: 843.12 },
+          { grade: '9', probability: 0.3, price: 337.25 },
+          { grade: '8', probability: 0.1, price: 290.78 },
+        ],
+      }),
+    )
+
+    expect(await screen.findByRole('row', { name: /PSA 10/ })).toHaveTextContent('$505.87')
+    expect(screen.getByRole('row', { name: /PSA 9/ })).toHaveTextContent('$101.18')
+    expect(screen.getByRole('row', { name: /^PSA 8 / })).toHaveTextContent('$29.08')
+    expect(screen.getByRole('row', { name: /Firm offer/ })).toHaveTextContent('$636.12')
+    expect(screen.getByText(/The rows are rounded to the cent/)).toBeInTheDocument()
   })
 
   it('leaves the sold prices out when they are switched off, and needs no reason at an A', async () => {

@@ -14,9 +14,11 @@ import {
 } from '../api'
 import { useLoad } from '../useLoad'
 import { AddressForm } from './AddressForm'
+import { OfferReveal } from './OfferReveal'
 import { SoldPanel } from './SoldPanel'
 import { message } from '../format'
 import { days, usePolicy } from '../policy'
+import { slipDiffers } from '../slip'
 
 /** "$300 (at least 3 sales, 90 days)": the sold price a grade's worth starts from, with what it rests on. */
 function soldFor(sold: SoldPrice | undefined) {
@@ -37,13 +39,14 @@ export function HowPriced({ offer }: { offer: Offer }) {
       <details className="disclosure">
         <summary>How we priced it</summary>
         <div className="scroll">
-          <table className="table ladder">
+          <table className="table ladder slip">
             <thead>
               <tr>
                 <th>If it's a</th>
                 <th>Chance</th>
                 {sold && <th>Recently sold for</th>}
                 <th>Worth to a buyer</th>
+                <th>Counts for</th>
               </tr>
             </thead>
             <tbody>
@@ -53,6 +56,7 @@ export function HowPriced({ offer }: { offer: Offer }) {
                   <td>{Math.round(r.probability * 100)}%</td>
                   {sold && <td>{soldFor(sold.find((s) => s.grade === r.grade))}</td>}
                   <td>{money(r.price)}</td>
+                  <td>{money(r.probability * r.price)}</td>
                 </tr>
               ))}
               {lower && (
@@ -61,11 +65,23 @@ export function HowPriced({ offer }: { offer: Offer }) {
                   <td className="muted">unlikely</td>
                   {sold && <td />}
                   <td>up to {money(lower.price)}</td>
+                  <td className="muted">not counted</td>
                 </tr>
               )}
             </tbody>
+            <tfoot>
+              <tr className="slip-total">
+                <th scope="row" colSpan={sold ? 4 : 3}>
+                  Firm offer
+                </th>
+                <td>{money(offer.price)}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
+        {slipDiffers(likely, offer.price) && (
+          <p className="muted small">The rows are rounded to the cent, so they can differ from the firm offer by a cent or two. The offer is the exact total.</p>
+        )}
         {sold && (
           <p className="muted small">
             Recently sold for: the typical PSA-graded sale at that grade, recent sales counting most, from the sales we priced this
@@ -91,7 +107,18 @@ export function HowPriced({ offer }: { offer: Offer }) {
  *
  * @param onChange called after the seller gets an offer, posts or withdraws, so the rest of the card page catches up
  */
-export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId: string; onChange?: () => void }) {
+export function OfferPanel({
+  orgId,
+  cardId,
+  onChange,
+  frontUrl,
+}: {
+  orgId: string
+  cardId: string
+  onChange?: () => void
+  /** The card's front photo, for the reveal the first time an offer is seen. */
+  frontUrl?: string | null
+}) {
   const policy = usePolicy()
   const api = useApi()
   const salePath = apiPath`/api/orgs/${orgId}/cards/${cardId}/sale`
@@ -161,7 +188,7 @@ export function OfferPanel({ orgId, cardId, onChange }: { orgId: string; cardId:
       )}
       {offer && (
         <>
-          <p className="offer-price">{money(offer.price)}</p>
+          <OfferReveal key={offer.id} offer={offer} frontUrl={frontUrl} />
           {offer.subjectToAuthentication && <p className="muted small">Subject to the buyer authenticating the card in hand.</p>}
           {offer.rawSales?.below && offer.rawSales.lowest != null && (
             <p className="alert alert-warning">
