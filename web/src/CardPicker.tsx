@@ -9,9 +9,15 @@ function tooShort(q: string) {
   return q.replace(/[^\p{L}]/gu, '').length < 2
 }
 
+/**
+ * The card's catalog image, or an empty box when TCGdex has none or it fails to load. Not lazy: lazy
+ * images inside the results' scroll box were sometimes never fetched, and there are at most ten.
+ */
 function Thumb({ card }: { card: CatalogPick }) {
-  return card.imageUrl ? (
-    <img className="picker-thumb" src={`${card.imageUrl}/low.webp`} alt="" loading="lazy" />
+  const src = card.imageUrl ? `${card.imageUrl}/low.webp` : null
+  const [failed, setFailed] = useState<string | null>(null)
+  return src && failed !== src ? (
+    <img className="picker-thumb" src={src} alt="" onError={() => setFailed(src)} />
   ) : (
     <span className="picker-thumb picker-noimg" aria-hidden="true" />
   )
