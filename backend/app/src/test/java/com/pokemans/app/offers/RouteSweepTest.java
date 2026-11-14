@@ -52,7 +52,8 @@ class RouteSweepTest {
 
     /** The routes open to any signed-in user, each with its own check. */
     private static final List<String> NOT_ORG_SCOPED = List.of("/api/me", "/api/invites/{token}", "/api/invites/{token}/accept",
-            "/api/policy", "/api/me/email-preferences");
+            "/api/policy", "/api/me/email-preferences",
+            "/api/catalog/search", "/api/catalog/cards/{externalId}", "/api/catalog/price-hint");
 
     /** A valid body for each route that needs one: validation runs before the controller, so a bad body proves nothing. */
     private static final Map<String, String> BODIES = Map.ofEntries(
@@ -65,6 +66,7 @@ class RouteSweepTest {
             Map.entry("/api/orgs/{orgId}/cards/{cardId}/outcomes", "{\"grader\":\"PSA\",\"certNumber\":\"1\",\"grade\":9}"),
             Map.entry("/api/orgs/{orgId}/cards/{cardId}/custody-records",
                     "{\"holderType\":\"OWNER\",\"holderName\":\"x\",\"location\":\"x\",\"heldSince\":\"2026-01-01\"}"),
+            Map.entry("/api/orgs/{orgId}/cards/{cardId}/proposed-identity", "{\"externalId\":\"base1-4\",\"language\":\"en\"}"),
             Map.entry("/api/orgs/{orgId}/cards/{cardId}/listings", "{\"offerId\":\"%OFFER%\"}"),
             Map.entry("/api/orgs/{orgId}/ship-address", TestMarket.ADDRESS.formatted("Thief")),
             Map.entry("/api/orgs/{orgId}/deals/{listingId}/received", "{\"pricePaid\":1}"),

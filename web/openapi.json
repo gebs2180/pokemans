@@ -404,6 +404,114 @@
         },
         "required" : [ "authFlagUnresolved", "authState", "custodyState", "custodyVerified", "custodyVerifiedUntil" ]
       },
+      "CardPickerControllerProposeRequest" : {
+        "properties" : {
+          "edition" : {
+            "enum" : [ "UNLIMITED", "FIRST_EDITION", "SHADOWLESS" ],
+            "type" : "string"
+          },
+          "externalId" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "language" : {
+            "minLength" : 1,
+            "pattern" : "[a-z]{2}(-[a-z]{2,4})?",
+            "type" : "string"
+          },
+          "stamp" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "stampUnsure" : {
+            "type" : "boolean"
+          },
+          "variant" : {
+            "enum" : [ "NORMAL", "HOLO", "REVERSE_HOLO" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "edition", "externalId", "language", "stamp", "stampUnsure", "variant" ]
+      },
+      "CardPickerPick" : {
+        "properties" : {
+          "externalId" : {
+            "type" : "string"
+          },
+          "imageUrl" : {
+            "type" : "string"
+          },
+          "language" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "number" : {
+            "type" : "string"
+          },
+          "setName" : {
+            "type" : "string"
+          },
+          "year" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "externalId", "imageUrl", "language", "name", "number", "setName", "year" ]
+      },
+      "CardPickerPickDetail" : {
+        "properties" : {
+          "editions" : {
+            "items" : {
+              "enum" : [ "UNLIMITED", "FIRST_EDITION", "SHADOWLESS" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "externalId" : {
+            "type" : "string"
+          },
+          "imageUrl" : {
+            "type" : "string"
+          },
+          "language" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "number" : {
+            "type" : "string"
+          },
+          "promo" : {
+            "type" : "boolean"
+          },
+          "setName" : {
+            "type" : "string"
+          },
+          "stamps" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "variants" : {
+            "items" : {
+              "enum" : [ "NORMAL", "HOLO", "REVERSE_HOLO" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "year" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "editions", "externalId", "imageUrl", "language", "name", "number", "promo", "setName", "stamps", "variants", "year" ]
+      },
       "CardStatusServiceCardStatus" : {
         "properties" : {
           "canOffer" : {
@@ -477,6 +585,9 @@
             },
             "type" : "array"
           },
+          "proposal" : {
+            "$ref" : "#/components/schemas/CatalogControllerProposalView"
+          },
           "reading" : {
             "$ref" : "#/components/schemas/CatalogControllerReadingView"
           },
@@ -490,7 +601,7 @@
             "type" : "array"
           }
         },
-        "required" : [ "cardId", "current", "history", "reading", "recognition", "suggestions" ]
+        "required" : [ "cardId", "current", "history", "proposal", "reading", "recognition", "suggestions" ]
       },
       "CatalogControllerCatalogCardView" : {
         "properties" : {
@@ -648,6 +759,63 @@
           }
         },
         "required" : [ "edition", "externalId", "language", "name", "note", "number", "promo", "provider", "rarity", "setName", "setReleaseDate", "stamp", "variant" ]
+      },
+      "CatalogControllerProposalView" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "edition" : {
+            "enum" : [ "UNLIMITED", "FIRST_EDITION", "SHADOWLESS" ],
+            "type" : "string"
+          },
+          "externalId" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "imageUrl" : {
+            "type" : "string"
+          },
+          "language" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "number" : {
+            "type" : "string"
+          },
+          "proposedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "provider" : {
+            "enum" : [ "TCGDEX", "MANUAL" ],
+            "type" : "string"
+          },
+          "setName" : {
+            "type" : "string"
+          },
+          "setReleaseDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "stamp" : {
+            "type" : "string"
+          },
+          "stampUnsure" : {
+            "type" : "boolean"
+          },
+          "variant" : {
+            "enum" : [ "NORMAL", "HOLO", "REVERSE_HOLO" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "createdAt", "edition", "externalId", "id", "imageUrl", "language", "name", "number", "proposedBy", "provider", "setName", "setReleaseDate", "stamp", "stampUnsure", "variant" ]
       },
       "CatalogControllerProviderCardView" : {
         "properties" : {
@@ -3588,6 +3756,17 @@
         },
         "required" : [ "failedCards", "outOfCredits", "outOfCreditsCards", "submitsResumeAt" ]
       },
+      "PriceHintControllerPriceHint" : {
+        "properties" : {
+          "minFmv" : {
+            "type" : "number"
+          },
+          "underMinimum" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "minFmv", "underMinimum" ]
+      },
       "PricingControllerCompRequest" : {
         "properties" : {
           "grade" : {
@@ -4931,7 +5110,7 @@
     },
     "/api/admin/catalog/search" : {
       "get" : {
-        "operationId" : "search_1",
+        "operationId" : "search_2",
         "parameters" : [ {
           "in" : "query",
           "name" : "name",
@@ -5662,7 +5841,7 @@
     },
     "/api/admin/orgs/{orgId}/cards/{cardId}/condition" : {
       "get" : {
-        "operationId" : "card_2",
+        "operationId" : "card_3",
         "parameters" : [ {
           "in" : "path",
           "name" : "orgId",
@@ -6497,6 +6676,145 @@
         "tags" : [ "valuation-controller" ]
       }
     },
+    "/api/catalog/cards/{externalId}" : {
+      "get" : {
+        "operationId" : "card_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "externalId",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "language",
+          "required" : false,
+          "schema" : {
+            "default" : "en",
+            "pattern" : "[a-z]{2}(-[a-z]{2,4})?",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CardPickerPickDetail"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "card-picker-controller" ]
+      }
+    },
+    "/api/catalog/price-hint" : {
+      "get" : {
+        "operationId" : "hint",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "externalId",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "language",
+          "required" : false,
+          "schema" : {
+            "default" : "en",
+            "pattern" : "[a-z]{2}(-[a-z]{2,4})?",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "edition",
+          "required" : true,
+          "schema" : {
+            "enum" : [ "UNLIMITED", "FIRST_EDITION", "SHADOWLESS" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "variant",
+          "required" : true,
+          "schema" : {
+            "enum" : [ "NORMAL", "HOLO", "REVERSE_HOLO" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "stamp",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PriceHintControllerPriceHint"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "price-hint-controller" ]
+      }
+    },
+    "/api/catalog/search" : {
+      "get" : {
+        "operationId" : "search_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "q",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "language",
+          "required" : false,
+          "schema" : {
+            "default" : "en",
+            "pattern" : "[a-z]{2}(-[a-z]{2,4})?",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/CardPickerPick"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "card-picker-controller" ]
+      }
+    },
     "/api/invites/{token}" : {
       "get" : {
         "operationId" : "preview",
@@ -7075,6 +7393,51 @@
           }
         },
         "tags" : [ "intake-controller" ]
+      }
+    },
+    "/api/orgs/{orgId}/cards/{cardId}/proposed-identity" : {
+      "post" : {
+        "operationId" : "propose",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CardPickerControllerProposeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CatalogControllerProposalView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "card-picker-controller" ]
       }
     },
     "/api/orgs/{orgId}/cards/{cardId}/provenance" : {

@@ -39,7 +39,7 @@ class ClaudeCardReaderTest {
         try {
             URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
             ClaudeCardReader reader = new ClaudeCardReader(new CatalogProperties(null, new CatalogProperties.Reader(true, "sk-test",
-                    "claude-sonnet-5-5", base, Duration.ofSeconds(5), false, Duration.ofSeconds(15), 5)));
+                    "claude-sonnet-5-5", base, Duration.ofSeconds(5), false, Duration.ofSeconds(15), 5), null));
 
             CardReader.Reading reading = reader.read(new byte[] {1, 2, 3}, "image/jpeg");
 

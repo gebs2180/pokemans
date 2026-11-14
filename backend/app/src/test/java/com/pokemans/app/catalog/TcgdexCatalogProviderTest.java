@@ -51,7 +51,7 @@ class TcgdexCatalogProviderTest {
         server.start();
         URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v2");
         provider = new TcgdexCatalogProvider(
-                new CatalogProperties(new CatalogProperties.Tcgdex(true, base, Duration.ofSeconds(5)), null));
+                new CatalogProperties(new CatalogProperties.Tcgdex(true, base, Duration.ofSeconds(5)), null, null));
     }
 
     @AfterEach

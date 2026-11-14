@@ -199,6 +199,19 @@ class TcgdexCatalogProvider implements CatalogProvider {
                 string(card, "image"), card, officialCount(set)));
     }
 
+    @Override
+    public Optional<LocalDate> setReleaseDate(String setId, String language) {
+        String release = string(set(setId, language), "releaseDate");
+        if (release == null || release.length() < 10) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(LocalDate.parse(release.substring(0, 10)));
+        } catch (java.time.format.DateTimeParseException e) {
+            return Optional.empty();
+        }
+    }
+
     private static Integer officialCount(Map<String, Object> set) {
         return map(set, "cardCount").get("official") instanceof Number n ? n.intValue() : null;
     }

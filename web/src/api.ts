@@ -545,7 +545,46 @@ export type CardIdentificationView = {
   recognition: boolean
   reading: CardReadingView | null
   suggestions: Suggestion[]
+  /** The collector's own pick from the card picker: a proposal only, until the admin confirms an identity. */
+  proposal: IdentityProposal | null
 }
+
+/** A card in the collector's picker: only what the picker shows. */
+export type CatalogPick = {
+  externalId: string
+  name: string
+  setName: string | null
+  /** as printed, e.g. 4/102 */
+  number: string | null
+  year: number | null
+  language: string
+  imageUrl: string | null
+}
+
+/** A picked card's prints, for the edition, finish and stamp choices. */
+export type CatalogPickDetail = CatalogPick & { editions: Edition[]; variants: Variant[]; stamps: string[]; promo: boolean }
+
+/** What the collector picked. A null edition or variant means they weren't sure. */
+export type IdentityProposal = {
+  id: string
+  provider: string
+  externalId: string
+  language: string
+  name: string
+  setName: string | null
+  number: string | null
+  setReleaseDate: string | null
+  imageUrl: string | null
+  edition: Edition | null
+  variant: Variant | null
+  stamp: string | null
+  stampUnsure: boolean
+  proposedBy: string
+  createdAt: string
+}
+
+/** Whether a picked card is clearly under the FMV minimum, whatever its condition. */
+export type PriceHint = { underMinimum: boolean; minFmv: number }
 
 // Pricing (admin): sold comps entered by hand and per-grader price tables
 
