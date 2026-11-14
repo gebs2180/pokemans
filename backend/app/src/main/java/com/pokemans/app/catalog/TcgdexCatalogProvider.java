@@ -52,7 +52,7 @@ class TcgdexCatalogProvider implements CatalogProvider {
     @Override
     public List<Hit> search(String name, String number, String language) {
         // TCGdex matches the name as one phrase, so "metagross delta" or "charizard base set holo"
-        // find nothing. Query by the first word and keep names containing every other word.
+        // find nothing. Query by the first word and filter on the rest.
         List<String> words = Arrays.stream(name.trim().toLowerCase(Locale.ROOT).split("\\s+"))
                 .map(TcgdexCatalogProvider::normalizeWord)
                 .filter(w -> !w.isEmpty())
@@ -70,6 +70,8 @@ class TcgdexCatalogProvider implements CatalogProvider {
         String wantedNumber = normalizeNumber(number);
         Integer wantedTotal = setTotal(number);
         Map<String, Map<String, Object>> setList = setList(language);
+        Map<String, Integer> setOrder = new java.util.HashMap<>();
+        setList.keySet().forEach(id -> setOrder.put(id, setOrder.size()));
         List<Hit> hits = new ArrayList<>();
         for (Map<String, Object> r : results) {
             String id = string(r, "id");
@@ -78,19 +80,38 @@ class TcgdexCatalogProvider implements CatalogProvider {
             if (wantedNumber != null && !wantedNumber.equals(normalizeNumber(localId))) {
                 continue;
             }
-            String haystack = cardName == null ? "" : cardName.toLowerCase(Locale.ROOT);
-            if (!words.stream().skip(1).allMatch(haystack::contains)) {
-                continue;
-            }
             String setId = setIdOf(id, localId);
             Map<String, Object> set = setId == null ? Map.of() : setList.getOrDefault(setId, Map.of());
-            hits.add(new Hit(id, localId, cardName, setId, string(r, "image"), string(set, "name"), officialCount(set)));
+            String setName = string(set, "name");
+            // Every other word is in the card's name, its set's name ("charizard 30th", "charizard
+            // classic") or its set's release year ("charizard 2026").
+            String haystack = ((cardName == null ? "" : cardName) + " " + (setName == null ? "" : setName)).toLowerCase(Locale.ROOT);
+            boolean matches = words.stream().skip(1).allMatch(w -> haystack.contains(w)
+                    || (YEAR.matcher(w).matches() && setId != null && w.equals(releaseYear(setId, language))));
+            if (!matches) {
+                continue;
+            }
+            hits.add(new Hit(id, localId, cardName, setId, string(r, "image"), setName, officialCount(set)));
         }
+        // Newest sets first: TCGdex lists sets oldest first, and a name like Charizard has over a hundred cards.
+        hits.sort(Comparator.comparing((Hit h) -> h.setId() == null ? -1 : setOrder.getOrDefault(h.setId(), -1)).reversed());
         if (wantedTotal != null) {
-            // "4/102" names Base Set, not Base Set 2 (4/130): sets of the printed size first, in TCGdex's order otherwise.
+            // "4/102" names Base Set, not Base Set 2 (4/130): sets of the printed size first, newest first otherwise.
             hits.sort(Comparator.comparing(h -> !wantedTotal.equals(h.setTotal())));
         }
         return hits;
+    }
+
+    /** A release year typed as a search word. */
+    private static final java.util.regex.Pattern YEAR = java.util.regex.Pattern.compile("(19|20)\\d\\d");
+
+    /** The set's release year, from its detail (fetched once per set), or null if TCGdex won't say. */
+    private String releaseYear(String setId, String language) {
+        try {
+            return setReleaseDate(setId, language).map(d -> String.valueOf(d.getYear())).orElse(null);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /** The set size printed after the slash ("102" in "4/102"), or null when there's no slash. */
@@ -108,7 +129,7 @@ class TcgdexCatalogProvider implements CatalogProvider {
         if (cached != null) {
             return cached;
         }
-        Map<String, Map<String, Object>> byId = new java.util.HashMap<>();
+        Map<String, Map<String, Object>> byId = new java.util.LinkedHashMap<>(); // in TCGdex order: oldest first
         try {
             List<Map<String, Object>> body = http.get().uri("/{lang}/sets", language).retrieve().body(LIST);
             if (body != null) {

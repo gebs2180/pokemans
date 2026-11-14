@@ -151,13 +151,16 @@ class CardPicker {
     record Query(String name, String number) {
     }
 
+    /** A release year ("charizard 2026"): no card number is that high, so it filters by set instead. */
+    private static final Pattern YEAR = Pattern.compile("(19|20)\\d\\d");
+
     /** Splits what was typed into a name and the last thing that looks like a collector number. */
     static Query parse(String query) {
         List<String> words = new ArrayList<>(List.of(query.trim().split("\\s+")));
         String number = null;
         for (int i = words.size() - 1; i >= 0; i--) {
             String w = words.get(i);
-            if (w.chars().anyMatch(Character::isDigit) && NUMBER.matcher(w).matches()) {
+            if (w.chars().anyMatch(Character::isDigit) && NUMBER.matcher(w).matches() && !YEAR.matcher(w).matches()) {
                 number = w.startsWith("#") ? w.substring(1) : w;
                 words.remove(i);
                 break;

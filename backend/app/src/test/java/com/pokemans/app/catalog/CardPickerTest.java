@@ -23,6 +23,9 @@ class CardPickerTest {
         // Long words with digits are names, not numbers.
         assertThat(CardPicker.parse("Porygon2")).isEqualTo(new CardPicker.Query("Porygon2", null));
         assertThat(CardPicker.parse("4/102")).isEqualTo(new CardPicker.Query("", "4/102"));
+        // A year filters by set: it is never a card number.
+        assertThat(CardPicker.parse("Charizard 2026")).isEqualTo(new CardPicker.Query("Charizard 2026", null));
+        assertThat(CardPicker.parse("Charizard 30th 1")).isEqualTo(new CardPicker.Query("Charizard 30th", "1"));
     }
 
     @Test

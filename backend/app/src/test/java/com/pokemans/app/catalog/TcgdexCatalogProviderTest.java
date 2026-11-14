@@ -32,7 +32,10 @@ class TcgdexCatalogProviderTest {
                     {"id":"base1","name":"Base Set","releaseDate":"1999-01-09","serie":{"id":"base","name":"Base"}}""",
             "/v2/en/sets", """
                     [{"id":"ex5","name":"Hidden Legends","cardCount":{"total":102,"official":101}},
-                     {"id":"ex11","name":"Delta Species","cardCount":{"total":114,"official":113}}]""");
+                     {"id":"ex11","name":"Delta Species","cardCount":{"total":114,"official":113}},
+                     {"id":"30th-c","name":"30th Classic Collection","cardCount":{"total":30,"official":30}}]""",
+            "/v2/en/sets/30th-c", """
+                    {"id":"30th-c","name":"30th Classic Collection","releaseDate":"2026-02-27","serie":{"id":"me","name":"Mega Evolution"}}""");
 
     private HttpServer server;
     private TcgdexCatalogProvider provider;
@@ -63,8 +66,8 @@ class TcgdexCatalogProviderTest {
     void searchFiltersByExactNumberIgnoringLeadingZeros() {
         assertThat(provider.search("metagross", null, "en")).hasSize(4);
         assertThat(provider.search("metagross", "11", "en")).extracting(CatalogProvider.Hit::externalId)
-                .containsExactly("ex5-11", "ex11-11");
-        assertThat(provider.search("metagross", "11", "en").getFirst().setId()).isEqualTo("ex5");
+                .containsExactly("ex11-11", "ex5-11");
+        assertThat(provider.search("metagross", "11", "en").getFirst().setId()).isEqualTo("ex11");
         assertThat(provider.search("metagross", "3", "en")).singleElement()
                 .satisfies(hit -> assertThat(hit.setId()).isEqualTo("30th-c"));
     }
@@ -78,7 +81,7 @@ class TcgdexCatalogProviderTest {
                 .satisfies(hit -> assertThat(hit.setName()).isEqualTo("Delta Species"))
                 .satisfies(hit -> assertThat(hit.setTotal()).isEqualTo(113));
         assertThat(provider.search("metagross", "11", "en")).extracting(CatalogProvider.Hit::externalId)
-                .containsExactly("ex5-11", "ex11-11");
+                .containsExactly("ex11-11", "ex5-11");
         assertThat(provider.search("metagross", null, "en")).filteredOn(h -> h.externalId().equals("swsh6-112"))
                 .singleElement().satisfies(hit -> assertThat(hit.setName()).isNull());
         assertThat(TcgdexCatalogProvider.setTotal("4/102")).isEqualTo(102);
@@ -96,6 +99,23 @@ class TcgdexCatalogProviderTest {
         assertThat(provider.search("metagross holo", null, "en")).isEmpty();
         assertThat(TcgdexCatalogProvider.normalizeNumber(" 011/113 ")).isEqualTo("11");
         assertThat(TcgdexCatalogProvider.normalizeNumber("SWSH050")).isEqualTo("swsh050");
+    }
+
+    @Test
+    void extraWordsCanNameTheSetOrItsYearAndNewestSetsComeFirst() {
+        // "30th" and "Classic" are in the set's name, not the card's; 2026 is the set's release year.
+        assertThat(provider.search("metagross 30th", null, "en")).extracting(CatalogProvider.Hit::externalId)
+                .containsExactly("30th-c-003");
+        assertThat(provider.search("Metagross Classic", null, "en")).extracting(CatalogProvider.Hit::externalId)
+                .containsExactly("30th-c-003");
+        assertThat(provider.search("metagross 2026", null, "en")).extracting(CatalogProvider.Hit::externalId)
+                .containsExactly("30th-c-003");
+        assertThat(provider.search("metagross delta species", null, "en")).extracting(CatalogProvider.Hit::externalId)
+                .containsExactly("ex11-11");
+        assertThat(provider.search("metagross 1999", null, "en")).isEmpty();
+        // TCGdex lists sets oldest first; a set it doesn't list goes last.
+        assertThat(provider.search("metagross", null, "en")).extracting(CatalogProvider.Hit::externalId)
+                .containsExactly("30th-c-003", "ex11-11", "ex5-11", "swsh6-112");
     }
 
     @Test
