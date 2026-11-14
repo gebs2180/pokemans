@@ -1,7 +1,9 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { apiPath, deadlineText, useApi, type CardStatus, type CardView, type ContainerDetail, type Me, type ReportView } from '../api'
 import { Chip, EmptyState, Field, Loading, NotFound, PageError, StageChip } from '../ui'
+import { CardPicker } from '../CardPicker'
+import { labelOf, type PickedCard } from '../cardPick'
 import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { ReportsList } from './ReportsPanel'
@@ -55,6 +57,10 @@ export function ContainerView({
     [api, orgId, kind, containerId],
   )
   const [label, setLabel] = useState('')
+  // A card is picked from the catalog; describing it in words is the fallback, and lots are always described.
+  const [describe, setDescribe] = useState(false)
+  const [picked, setPicked] = useState<PickedCard | null>(null)
+  const pickerId = useId()
   const [lot, setLot] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [addError, setAddError] = useState<string | null>(null)
@@ -66,13 +72,29 @@ export function ContainerView({
   async function addCard(e: FormEvent) {
     e.preventDefault()
     setAddError(null)
+    const fromCatalog = !lot && !describe
+    if (fromCatalog && !picked) {
+      setAddError("Choose your card from the list, or describe it if you can't find it.")
+      return
+    }
     setAdding(true)
     try {
       const card = await api<CardView>('POST', apiPath`/api/orgs/${orgId}/${kind}/${containerId}/cards`, {
-        label,
+        label: fromCatalog && picked ? labelOf(picked) : label,
         lot,
         quantity: lot ? quantity : 1,
       })
+      if (fromCatalog && picked) {
+        // The pick is a proposal for the admin. The label already carries it, so a failure here loses nothing.
+        await api('POST', apiPath`/api/orgs/${orgId}/cards/${card.id}/proposed-identity`, {
+          externalId: picked.card.externalId,
+          language: picked.card.language,
+          edition: picked.edition,
+          variant: picked.variant,
+          stamp: picked.stamp,
+          stampUnsure: picked.stampUnsure,
+        }).catch((err: unknown) => console.warn('Could not store the picked card', err))
+      }
       // Straight to its photos: that's the next step for a new card.
       navigate(`/orgs/${encodeURIComponent(orgId)}/cards/${encodeURIComponent(card.id)}`)
     } catch (err) {
@@ -102,18 +124,53 @@ export function ContainerView({
       )}
 
       <form onSubmit={addCard} className="panel form" aria-describedby={formError.describedBy}>
-        <Field label="Card name and number" hint={lots ? 'Its name and number, as printed.' : `Its name and number, as printed. One card at a time: we'll tell you if it's under our ${dollars(policy.minFmv)} minimum.`}>
-          {(control) => (
-            <input
-              {...control}
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="Card, e.g. Charizard 4/102"
-              required
-              maxLength={300}
+        {lot || describe ? (
+          <Field
+            label={lot ? 'Lot description' : 'Describe your card'}
+            hint={
+              lot
+                ? 'What the lot holds.'
+                : `Its name, set and number as printed, and anything else on it: 1st Edition, holo, a stamp. One card at a time: we'll tell you if it's under our ${dollars(policy.minFmv)} minimum.`
+            }
+          >
+            {(control) => (
+              <input
+                {...control}
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={lot ? 'e.g. 40 Base Set commons' : 'e.g. Charizard Base Set 4/102, holo'}
+                required
+                maxLength={300}
+              />
+            )}
+          </Field>
+        ) : (
+          <div className="field">
+            <label htmlFor={pickerId} className="field-label">
+              Find your card
+            </label>
+            <p id={`${pickerId}-hint`} className="field-hint">
+              Type its name and number as printed. One card at a time: we'll tell you if it's under our {dollars(policy.minFmv)} minimum.
+            </p>
+            <CardPicker
+              inputId={pickerId}
+              describedBy={`${pickerId}-hint`}
+              onChange={setPicked}
+              onDescribe={(typed) => {
+                setDescribe(true)
+                setLabel(typed)
+                setPicked(null)
+              }}
             />
-          )}
-        </Field>
+          </div>
+        )}
+        {describe && !lot && (
+          <p className="small">
+            <button type="button" className="link" onClick={() => setDescribe(false)}>
+              Search the catalog instead
+            </button>
+          </p>
+        )}
         {lots && (
           <div className="row">
             <label className="check">

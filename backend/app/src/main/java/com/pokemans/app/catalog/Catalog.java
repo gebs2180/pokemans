@@ -100,6 +100,19 @@ public class Catalog {
                 .toList();
     }
 
+    /**
+     * The catalog identities a catalog provider card has in one print and stamp (null for none),
+     * whatever their promo status: the ones a collector's pick could become. Empty when none exists yet.
+     */
+    @Transactional(readOnly = true)
+    public List<UUID> printsOf(String externalId, String language, Edition edition, Variant variant, String stamp) {
+        return catalogCards.findByProviderAndExternalIdAndLanguageAndEditionAndVariant(CatalogCard.Provider.TCGDEX, externalId,
+                        language, edition, variant).stream()
+                .filter(c -> java.util.Objects.equals(c.getStamp(), stamp))
+                .map(CatalogCard::getId)
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<CardSummary> cards(Collection<UUID> catalogCardIds) {
         if (catalogCardIds.isEmpty()) {

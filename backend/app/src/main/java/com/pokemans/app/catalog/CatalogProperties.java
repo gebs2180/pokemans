@@ -7,7 +7,15 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /** Card catalog providers. */
 @ConfigurationProperties("pokemans.catalog")
-record CatalogProperties(@DefaultValue Tcgdex tcgdex, @DefaultValue Reader reader) {
+record CatalogProperties(@DefaultValue Tcgdex tcgdex, @DefaultValue Reader reader, @DefaultValue Picker picker) {
+
+    /**
+     * The collector's card picker.
+     *
+     * @param perMinute catalog calls (searches, card details, picks) one user may make a minute
+     */
+    record Picker(@DefaultValue("60") int perMinute) {
+    }
 
     /**
      * @param enabled turn off to work with manual entries only (offline, or the API is down)

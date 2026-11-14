@@ -15,6 +15,7 @@ import {
   type Edition,
   type OfferPreview,
   type Prediction,
+  type IdentityProposal,
   type ProviderCard,
   type Variant,
 } from '../api'
@@ -181,6 +182,43 @@ export function OfferPreviewPanel({ cardId }: { cardId: string }) {
   )
 }
 
+const EDITION_NAME: Record<Edition, string> = { UNLIMITED: 'Unlimited', FIRST_EDITION: '1st Edition', SHADOWLESS: 'Shadowless' }
+const VARIANT_NAME: Record<Variant, string> = { NORMAL: 'Non-holo', HOLO: 'Holo', REVERSE_HOLO: 'Reverse holo' }
+
+/** What the collector picked when adding the card: a proposal only, which the reviewer checks against the photos. */
+function CollectorPick({ orgId, cardId, onUse }: { orgId: string; cardId: string; onUse: (p: IdentityProposal) => void }) {
+  const api = useApi()
+  const { data } = useLoad(
+    () => api<CardIdentificationView>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}/identification`),
+    [api, orgId, cardId],
+  )
+  const p = data?.proposal
+  if (!p) return null
+  const unsure = [
+    p.edition ? null : 'edition',
+    p.variant ? null : 'finish',
+    p.stampUnsure ? 'stamp' : null,
+  ].filter(Boolean)
+  return (
+    <div className="identity collector-pick">
+      {p.imageUrl && <img src={`${p.imageUrl}/low.webp`} alt="" />}
+      <div>
+        <div className="muted small">Collector picked</div>
+        <strong>{p.name}</strong> · {p.setName} {p.number} · {p.language.toUpperCase()}
+        <div className="muted">
+          {[p.edition && EDITION_NAME[p.edition], p.variant && VARIANT_NAME[p.variant], p.stamp && `${p.stamp} stamp`, p.setReleaseDate?.slice(0, 4)]
+            .filter(Boolean)
+            .join(' · ')}
+        </div>
+        {unsure.length > 0 && <p className="warn small">Not sure of the {unsure.join(', ')}.</p>}
+        <button type="button" className="secondary" onClick={() => onUse(p)}>
+          Start from their pick
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function Identification({ data, base, onChange }: { data: CardCondition; base: string; onChange: () => void }) {
   const api = useApi()
   // Start from the collector's own words; the reviewer corrects them as needed.
@@ -220,15 +258,19 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
     }
   }
 
-  async function pick(hit: CatalogHit) {
+  async function pick(hit: Pick<CatalogHit, 'externalId'>, proposal?: IdentityProposal) {
     setErr(null)
     try {
-      const card = await api<ProviderCard>('GET', apiPath`/api/admin/catalog/cards/${hit.externalId}?language=${language}`)
+      const lang = proposal?.language ?? language
+      const card = await api<ProviderCard>('GET', apiPath`/api/admin/catalog/cards/${hit.externalId}?language=${lang}`)
+      setManual(false)
+      setLanguage(lang)
       setPicked(card)
-      setEdition(card.editions[0] ?? 'UNLIMITED')
-      setVariant(card.variants[0] ?? 'NORMAL')
+      // The collector's choices where they made them; what they weren't sure of is for the reviewer to set.
+      setEdition(proposal?.edition ?? card.editions[0] ?? 'UNLIMITED')
+      setVariant(proposal ? (proposal.variant ?? '') : (card.variants[0] ?? 'NORMAL'))
       setPromo(card.promo)
-      setStamp('')
+      setStamp(proposal?.stamp ?? '')
     } catch (e) {
       setErr(message(e))
     }
@@ -259,6 +301,7 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
   return (
     <section className="panel">
       <h2>Identity</h2>
+      <CollectorPick orgId={data.orgId} cardId={data.cardId} onUse={(p) => void pick(p, p)} />
       <Suggestions orgId={data.orgId} cardId={data.cardId} base={base} confirmedId={id?.catalogCardId ?? null} onChange={onChange} />
       {id ? (
         <div className="identity">

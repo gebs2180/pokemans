@@ -22,6 +22,14 @@ interface CatalogProvider {
      */
     List<Hit> search(String name, String number, String language);
 
+    /**
+     * When a set was released, if the provider says: the year a search result shows. Cached by the
+     * provider, so a typeahead doesn't ask again for sets it has seen.
+     */
+    default Optional<LocalDate> setReleaseDate(String setId, String language) {
+        return Optional.empty();
+    }
+
     /** Full detail for one provider card, or empty if the provider doesn't know it. */
     Optional<ProviderCard> card(String externalId, String language);
 

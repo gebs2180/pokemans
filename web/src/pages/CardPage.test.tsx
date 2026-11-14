@@ -222,14 +222,26 @@ describe('ContainerPage', () => {
     cards: [card(), { ...card(), id: 'card2', label: 'Umbreon', captureComplete: false, missingSides: ['BACK'] }],
   }
 
-  function renderCollection(posts: unknown[] = [], statusFails = false) {
+  const charizard = { externalId: 'base1-4', name: 'Charizard', setName: 'Base Set', number: '4/102', year: 1999, language: 'en', imageUrl: 'https://img/base1/4' }
+  const blastoise = { ...charizard, externalId: 'base1-2', name: 'Blastoise', number: '2/102', imageUrl: null }
+  const charizardPrints = { ...charizard, editions: ['UNLIMITED', 'FIRST_EDITION', 'SHADOWLESS'], variants: ['HOLO'], stamps: [], promo: false }
+  const searches: string[] = []
+
+  function renderCollection(posts: unknown[] = [], statusFails = false, underMinimum = false) {
+    searches.length = 0
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
         if (init?.method === 'POST') {
-          posts.push(JSON.parse(String(init.body)))
+          posts.push({ url: url.replace(/^.*\/api/, '/api'), ...JSON.parse(String(init.body)) })
           return Promise.resolve(respond(201, { ...card(), id: 'new1', label: 'Mew 151/165' }))
         }
+        if (url.includes('/api/catalog/search')) {
+          searches.push(new URL(url, 'http://x').searchParams.get('q') ?? '')
+          return Promise.resolve(respond(200, [charizard, blastoise]))
+        }
+        if (url.includes('/api/catalog/cards/base1-4')) return Promise.resolve(respond(200, charizardPrints))
+        if (url.includes('/api/catalog/price-hint')) return Promise.resolve(respond(200, { underMinimum, minFmv: 25 }))
         if (url.endsWith('/status')) {
           if (statusFails) return Promise.resolve(respond(500, { detail: 'Server error' }))
           return Promise.resolve(respond(200, [{ ...status, stage: 'SOLD', identity: 'Pikachu VMAX · Vivid Voltage 188 · EN', deadline: '2026-11-05T12:00:00Z' }]))
@@ -261,16 +273,81 @@ describe('ContainerPage', () => {
     expect(await screen.findByText(/Couldn't load where each card is/)).toBeInTheDocument()
   })
 
-  it('goes straight to a new card to photograph it', async () => {
+  it('picks a card from the catalog by keyboard and stores the pick as a proposal', async () => {
     const user = userEvent.setup()
     const posts: unknown[] = []
     renderCollection(posts)
-    await user.type(await screen.findByLabelText('Card name and number'), 'Mew 151/165')
+    const box = await screen.findByRole('combobox', { name: 'Find your card' })
     // Lots never get an offer, so a seller isn't asked about them.
     expect(screen.queryByLabelText('Lot of cheaper cards')).not.toBeInTheDocument()
+    await user.type(box, 'charizard 4/102')
+    const list = await screen.findByRole('listbox', { name: 'Matching cards' })
+    const options = within(list).getAllByRole('option')
+    expect(options).toHaveLength(2)
+    expect(options[0]).toHaveTextContent('CharizardBase Set · 4/102 · 1999 · English')
+    expect(searches.at(-1)).toBe('charizard 4/102')
+
+    await user.keyboard('{ArrowDown}{ArrowDown}{ArrowUp}')
+    expect(box).toHaveAttribute('aria-activedescendant', options[0].id)
+    expect(options[0]).toHaveAttribute('aria-selected', 'true')
+    await user.keyboard('{Enter}')
+
+    // Three editions: asked, with nothing chosen for them. One finish: taken, not asked.
+    const edition = await screen.findByRole('group', { name: 'Edition' })
+    expect(within(edition).getByRole('radio', { name: 'Not sure' })).toBeChecked()
+    expect(screen.queryByRole('group', { name: 'Finish' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Stamp' })).not.toBeInTheDocument()
+    await user.click(within(edition).getByRole('radio', { name: 'Shadowless' }))
+
     await user.click(screen.getByRole('button', { name: 'Add card' }))
     expect(await screen.findByText('Card page')).toBeInTheDocument()
-    expect(posts).toEqual([{ label: 'Mew 151/165', lot: false, quantity: 1 }])
+    expect(posts).toEqual([
+      { url: '/api/orgs/org1/collections/c1/cards', label: 'Charizard · Base Set 4/102 · Shadowless · Holo', lot: false, quantity: 1 },
+      { url: '/api/orgs/org1/cards/new1/proposed-identity', externalId: 'base1-4', language: 'en', edition: 'SHADOWLESS', variant: 'HOLO', stamp: null, stampUnsure: false },
+    ])
+  })
+
+  it('leaves an edition the collector is unsure of for review, and asks for a pick before adding', async () => {
+    const user = userEvent.setup()
+    const posts: unknown[] = []
+    renderCollection(posts)
+    await user.click(await screen.findByRole('button', { name: 'Add card' }))
+    expect(await screen.findByText(/Choose your card from the list/)).toBeInTheDocument()
+    expect(posts).toEqual([])
+
+    await user.type(screen.getByRole('combobox', { name: 'Find your card' }), 'charizard')
+    await user.click(await screen.findByRole('option', { name: /Charizard/ }))
+    expect(await screen.findByText(/Not sure is fine/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add card' }))
+    await screen.findByText('Card page')
+    expect(posts[1]).toMatchObject({ externalId: 'base1-4', edition: null, variant: 'HOLO' })
+  })
+
+  it('says early when a picked card is clearly under the minimum, without refusing it', async () => {
+    const user = userEvent.setup()
+    renderCollection([], false, true)
+    await user.type(await screen.findByRole('combobox', { name: 'Find your card' }), 'charizard')
+    await user.click(await screen.findByRole('option', { name: /Charizard/ }))
+    // No hint until the print is known.
+    await screen.findByRole('group', { name: 'Edition' })
+    expect(screen.queryByText(/whatever its condition/)).not.toBeInTheDocument()
+    await user.click(within(screen.getByRole('group', { name: 'Edition' })).getByRole('radio', { name: 'Unlimited' }))
+    expect(await screen.findByText(/usually sells for under our \$25 minimum, whatever its condition/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add card' })).toBeEnabled()
+  })
+
+  it("lets a collector describe a card they can't find, as before", async () => {
+    const user = userEvent.setup()
+    const posts: unknown[] = []
+    renderCollection(posts)
+    await user.type(await screen.findByRole('combobox', { name: 'Find your card' }), 'Mew')
+    await user.click(screen.getByRole('button', { name: "Can't find it? Describe it" }))
+    // What they typed carries over.
+    expect(screen.getByLabelText('Describe your card')).toHaveValue('Mew')
+    await user.type(screen.getByLabelText('Describe your card'), ' 151/165')
+    await user.click(screen.getByRole('button', { name: 'Add card' }))
+    expect(await screen.findByText('Card page')).toBeInTheDocument()
+    expect(posts).toEqual([{ url: '/api/orgs/org1/collections/c1/cards', label: 'Mew 151/165', lot: false, quantity: 1 }])
   })
 })
 

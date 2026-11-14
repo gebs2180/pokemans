@@ -77,7 +77,11 @@ async function sellACard(browser: Browser, testInfo: TestInfo, admin: Page, card
   // 2. Straight to adding a card (a binder is waiting), and its front and back photos through the file inputs.
   await expect(collector).toHaveURL(/\/$/)
   await expect(collector.getByRole('heading', { level: 1, name: 'Your cards' })).toBeVisible()
-  await collector.getByLabel('Card name and number').fill(label)
+  // The browser tests run without the card catalog, so the search says so and the collector describes the card.
+  await collector.getByRole('combobox', { name: 'Find your card' }).fill(label)
+  await expect(collector.getByRole('alert')).toContainText("Card search isn't available")
+  await collector.getByRole('button', { name: "Can't find it? Describe it" }).click()
+  await expect(collector.getByLabel('Describe your card')).toHaveValue(label)
   await collector.getByRole('button', { name: /add card/i }).click()
   await expect(collector.getByRole('heading', { level: 1, name: label })).toBeVisible()
   await expect(collector).toHaveTitle(`${label} · Rawmark`)

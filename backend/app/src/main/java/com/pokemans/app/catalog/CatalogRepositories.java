@@ -12,6 +12,15 @@ import org.springframework.data.jpa.repository.Query;
 interface CatalogCardRepository extends JpaRepository<CatalogCard, UUID> {
 
     Optional<CatalogCard> findByIdentityKey(String identityKey);
+
+    /** Catalog identities of one provider card in one print, whatever their stamp and promo status. */
+    List<CatalogCard> findByProviderAndExternalIdAndLanguageAndEditionAndVariant(CatalogCard.Provider provider, String externalId,
+                                                                                String language, Edition edition, Variant variant);
+}
+
+interface IdentityProposalRepository extends JpaRepository<IdentityProposal, UUID> {
+
+    Optional<IdentityProposal> findFirstByCardItemIdOrderByCreatedAtDesc(UUID cardItemId);
 }
 
 interface CardIdentificationRepository extends JpaRepository<CardIdentification, UUID> {

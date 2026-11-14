@@ -112,6 +112,8 @@ with d as (delete from prediction_request where card_item_id in (select id from 
 insert into forget_log (step, rows) select 'prediction_request', count(*) from d;
 with d as (delete from card_identification where card_item_id in (select id from gone_card) returning 1)
 insert into forget_log (step, rows) select 'card_identification', count(*) from d;
+with d as (delete from card_identity_proposal where card_item_id in (select id from gone_card) returning 1)
+insert into forget_log (step, rows) select 'card_identity_proposal', count(*) from d;
 with d as (delete from card_reading where card_item_id in (select id from gone_card) returning 1)
 insert into forget_log (step, rows) select 'card_reading', count(*) from d;
 with d as (delete from photo where card_item_id in (select id from gone_card) returning 1)

@@ -139,7 +139,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["search_1"];
+        get: operations["search_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -491,7 +491,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["card_2"];
+        get: operations["card_3"];
         put?: never;
         post?: never;
         delete?: never;
@@ -884,6 +884,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/cards/{externalId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["card_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/price-hint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["hint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["search_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/invites/{token}": {
         parameters: {
             query?: never;
@@ -1102,6 +1150,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["requestUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{orgId}/cards/{cardId}/proposed-identity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["propose"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1731,6 +1795,40 @@ export interface components {
             /** Format: date-time */
             custodyVerifiedUntil: string;
         };
+        CardPickerControllerProposeRequest: {
+            /** @enum {string} */
+            edition: "UNLIMITED" | "FIRST_EDITION" | "SHADOWLESS";
+            externalId: string;
+            language: string;
+            stamp: string;
+            stampUnsure: boolean;
+            /** @enum {string} */
+            variant: "NORMAL" | "HOLO" | "REVERSE_HOLO";
+        };
+        CardPickerPick: {
+            externalId: string;
+            imageUrl: string;
+            language: string;
+            name: string;
+            number: string;
+            setName: string;
+            /** Format: int32 */
+            year: number;
+        };
+        CardPickerPickDetail: {
+            editions: ("UNLIMITED" | "FIRST_EDITION" | "SHADOWLESS")[];
+            externalId: string;
+            imageUrl: string;
+            language: string;
+            name: string;
+            number: string;
+            promo: boolean;
+            setName: string;
+            stamps: string[];
+            variants: ("NORMAL" | "HOLO" | "REVERSE_HOLO")[];
+            /** Format: int32 */
+            year: number;
+        };
         CardStatusServiceCardStatus: {
             canOffer: boolean;
             /** Format: uuid */
@@ -1759,6 +1857,7 @@ export interface components {
             cardId: string;
             current: components["schemas"]["CatalogControllerIdentificationView"];
             history: components["schemas"]["CatalogControllerIdentificationView"][];
+            proposal: components["schemas"]["CatalogControllerProposalView"];
             reading: components["schemas"]["CatalogControllerReadingView"];
             recognition: boolean;
             suggestions: components["schemas"]["CatalogControllerSuggestionView"][];
@@ -1818,6 +1917,30 @@ export interface components {
             /** Format: date */
             setReleaseDate: string;
             stamp: string;
+            /** @enum {string} */
+            variant: "NORMAL" | "HOLO" | "REVERSE_HOLO";
+        };
+        CatalogControllerProposalView: {
+            /** Format: date-time */
+            createdAt: string;
+            /** @enum {string} */
+            edition: "UNLIMITED" | "FIRST_EDITION" | "SHADOWLESS";
+            externalId: string;
+            /** Format: uuid */
+            id: string;
+            imageUrl: string;
+            language: string;
+            name: string;
+            number: string;
+            /** Format: uuid */
+            proposedBy: string;
+            /** @enum {string} */
+            provider: "TCGDEX" | "MANUAL";
+            setName: string;
+            /** Format: date */
+            setReleaseDate: string;
+            stamp: string;
+            stampUnsure: boolean;
             /** @enum {string} */
             variant: "NORMAL" | "HOLO" | "REVERSE_HOLO";
         };
@@ -2960,6 +3083,10 @@ export interface components {
             /** Format: date-time */
             submitsResumeAt: string;
         };
+        PriceHintControllerPriceHint: {
+            minFmv: number;
+            underMinimum: boolean;
+        };
         PricingControllerCompRequest: {
             grade: number;
             /** @enum {string} */
@@ -3588,7 +3715,7 @@ export interface operations {
             };
         };
     };
-    search_1: {
+    search_2: {
         parameters: {
             query: {
                 name: string;
@@ -4141,7 +4268,7 @@ export interface operations {
             };
         };
     };
-    card_2: {
+    card_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -4773,6 +4900,79 @@ export interface operations {
             };
         };
     };
+    card_2: {
+        parameters: {
+            query?: {
+                language?: string;
+            };
+            header?: never;
+            path: {
+                externalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CardPickerPickDetail"];
+                };
+            };
+        };
+    };
+    hint: {
+        parameters: {
+            query: {
+                externalId: string;
+                language?: string;
+                edition: "UNLIMITED" | "FIRST_EDITION" | "SHADOWLESS";
+                variant: "NORMAL" | "HOLO" | "REVERSE_HOLO";
+                stamp?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PriceHintControllerPriceHint"];
+                };
+            };
+        };
+    };
+    search_1: {
+        parameters: {
+            query: {
+                q: string;
+                language?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CardPickerPick"][];
+                };
+            };
+        };
+    };
     preview: {
         parameters: {
             query?: never;
@@ -5175,6 +5375,33 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["IntakeViewsUploadSlot"];
+                };
+            };
+        };
+    };
+    propose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                cardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CardPickerControllerProposeRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CatalogControllerProposalView"];
                 };
             };
         };

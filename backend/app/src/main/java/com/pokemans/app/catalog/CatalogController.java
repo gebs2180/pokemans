@@ -59,9 +59,20 @@ class CatalogController {
      * @param recognition     whether automatic recognition is turned on
      * @param reading         the latest automatic reading of the card, or null
      * @param suggestions     what that reading matched in the catalog, best first
+     * @param proposal        the collector's latest pick from the catalog, or null: for the admin to confirm or correct
      */
     record CardIdentificationView(UUID cardId, IdentificationView current, List<IdentificationView> history,
-                                  boolean recognition, ReadingView reading, List<SuggestionView> suggestions) {
+                                  boolean recognition, ReadingView reading, List<SuggestionView> suggestions,
+                                  ProposalView proposal) {
+    }
+
+    /**
+     * The collector's pick. Null edition or variant: they weren't sure; {@code stampUnsure}: the
+     * catalog lists stamps and they weren't sure. Never an identification.
+     */
+    record ProposalView(UUID id, CatalogCard.Provider provider, String externalId, String language, String name,
+                        String setName, String number, LocalDate setReleaseDate, String imageUrl, Edition edition,
+                        Variant variant, String stamp, boolean stampUnsure, UUID proposedBy, Instant createdAt) {
     }
 
     record ReadingView(UUID id, String reader, CardReading.Status status, String name, String number, Integer setTotal,
@@ -81,11 +92,14 @@ class CatalogController {
     private final IdentificationService identification;
     private final RecognitionService recognition;
     private final CardItems cardItems;
+    private final CardPicker picker;
 
-    CatalogController(IdentificationService identification, RecognitionService recognition, CardItems cardItems) {
+    CatalogController(IdentificationService identification, RecognitionService recognition, CardItems cardItems,
+                      CardPicker picker) {
         this.identification = identification;
         this.recognition = recognition;
         this.cardItems = cardItems;
+        this.picker = picker;
     }
 
     @GetMapping("/api/admin/catalog/search")
@@ -140,7 +154,13 @@ class CatalogController {
                         s.getConfidence(), s.getNote()))
                 .toList();
         return new CardIdentificationView(cardId, current, history, recognition.enabled(),
-                reading == null ? null : view(reading), suggestions);
+                reading == null ? null : view(reading), suggestions, picker.latest(cardId).map(CatalogController::view).orElse(null));
+    }
+
+    static ProposalView view(IdentityProposal p) {
+        return new ProposalView(p.getId(), p.getProvider(), p.getExternalId(), p.getLanguage(), p.getName(), p.getSetName(),
+                p.getNumber(), p.getSetReleaseDate(), p.getImageUrl(), p.getEdition(), p.getVariant(), p.getStamp(),
+                p.isStampUnsure(), p.getProposedBy(), p.getCreatedAt());
     }
 
     private IdentificationView view(CardIdentification i) {
