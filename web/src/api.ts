@@ -1364,3 +1364,28 @@ export function likelyRungs(ladder: Rung[]): { likely: Rung[]; lower: Rung | nul
   const lower = gradable.find((r) => Number(r.grade) < lowest) ?? null
   return { likely, lower }
 }
+
+/** What holds a card or org back from the admin's hard delete: a trade still in play. */
+export type DeletionHold = {
+  cardItemId: string
+  listingId: string | null
+  reason: 'LIVE_OFFER' | 'ON_THE_MARKET' | 'DEAL_IN_PROGRESS' | 'BOUGHT_FROM_ANOTHER_ORG'
+  message: string
+}
+
+/** Admin: what a hard delete removes (rows per table, photos, storage), or what holds it (2026-11-15). */
+export type DeletionPlan = {
+  kind: 'CARD' | 'ORG'
+  id: string
+  name: string
+  orgId: string
+  orgName: string
+  rows: Record<string, number>
+  photos: number
+  cards: number
+  storage: string[]
+  holds: DeletionHold[]
+}
+
+/** Admin: a done hard delete, with how the photo bucket went. */
+export type DeletionDone = { deletionId: string; plan: DeletionPlan; objectsDeleted: number; storageError: string | null }

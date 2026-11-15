@@ -4,6 +4,8 @@ import { apiPath, ORG_TYPE_LABEL, useApi, type CreatedInvite, type DealAttention
 import { useLoad } from '../useLoad'
 import { Loading, PageError } from '../ui'
 import { OrgPeople } from './OrgPeople'
+import { HardDelete } from './HardDelete'
+import type { DeletionDone } from '../api'
 import { message } from '../format'
 
 /** How much is waiting on the admin, with the way to each. A failed count says so: zero would read as all clear. */
@@ -99,6 +101,15 @@ export function AdminPage() {
   const [invitesMade, setInvitesMade] = useState(0)
   const [actionError, setActionError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [deleted, setDeleted] = useState<string | null>(null)
+
+  function orgDeleted(done: DeletionDone) {
+    setDeleted(
+      `Deleted ${done.plan.name}: ${done.plan.cards} card${done.plan.cards === 1 ? '' : 's'}, ${done.objectsDeleted} stored file${done.objectsDeleted === 1 ? '' : 's'}.` +
+        (done.storageError ? ` Some files couldn't be deleted: ${done.storageError}` : ''),
+    )
+    reload()
+  }
 
   async function createOrg(e: FormEvent) {
     e.preventDefault()
@@ -157,6 +168,7 @@ export function AdminPage() {
         </button>
       </form>
       {actionError && <p className="error" role="alert">{actionError}</p>}
+      {deleted && <p role="status">{deleted}</p>}
 
       {!orgs && <Loading />}
       <ul className="list">
@@ -174,7 +186,13 @@ export function AdminPage() {
               </button>{' '}
               <button className="link" aria-expanded={people === org.id} onClick={() => setPeople(people === org.id ? null : org.id)}>
                 People and links
-              </button>
+              </button>{' '}
+              <HardDelete
+                what="org"
+                previewPath={apiPath`/api/admin/orgs/${org.id}/deletion-preview`}
+                deletePath={apiPath`/api/admin/orgs/${org.id}`}
+                onDeleted={orgDeleted}
+              />
               {link && (
                 <div className="invite">
                   <input readOnly value={link} onFocus={(e) => e.target.select()} aria-label="Invite link" />

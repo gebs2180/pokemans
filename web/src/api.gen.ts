@@ -420,6 +420,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/orgs/{orgId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteOrg"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/orgs/{orgId}/cards/{cardId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteCard"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/orgs/{orgId}/cards/{cardId}/assessments": {
         parameters: {
             query?: never;
@@ -492,6 +524,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["card_3"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/orgs/{orgId}/cards/{cardId}/deletion-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["previewCard"];
         put?: never;
         post?: never;
         delete?: never;
@@ -574,6 +622,22 @@ export interface paths {
         get: operations["list_1"];
         put?: never;
         post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/orgs/{orgId}/deletion-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["previewOrg"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1640,6 +1704,33 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AdminDeletionServiceDone: {
+            /** Format: uuid */
+            deletionId: string;
+            /** Format: int32 */
+            objectsDeleted: number;
+            plan: components["schemas"]["AdminDeletionServicePlan"];
+            storageError: string;
+        };
+        AdminDeletionServicePlan: {
+            /** Format: int32 */
+            cards: number;
+            holds: components["schemas"]["TradeHoldsHold"][];
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "CARD" | "ORG";
+            name: string;
+            /** Format: uuid */
+            orgId: string;
+            orgName: string;
+            /** Format: int32 */
+            photos: number;
+            rows: {
+                [key: string]: number;
+            };
+            storage: string[];
+        };
         AdminOrgControllerCreateOrg: {
             name: string;
             /** @enum {string} */
@@ -3387,6 +3478,15 @@ export interface components {
             prices: components["schemas"]["TrackRecordServicePriceCheck"];
             shipping: components["schemas"]["TrackRecordServiceShippingCost"];
         };
+        TradeHoldsHold: {
+            /** Format: uuid */
+            cardItemId: string;
+            /** Format: uuid */
+            listingId: string;
+            message: string;
+            /** @enum {string} */
+            reason: "LIVE_OFFER" | "ON_THE_MARKET" | "DEAL_IN_PROGRESS" | "BOUGHT_FROM_ANOTHER_ORG";
+        };
         ValuationControllerDefaults: {
             gradingCompany: string;
             gradingCost: components["schemas"]["GradingCost"];
@@ -4141,6 +4241,55 @@ export interface operations {
             };
         };
     };
+    deleteOrg: {
+        parameters: {
+            query?: {
+                confirm?: string;
+            };
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminDeletionServiceDone"];
+                };
+            };
+        };
+    };
+    deleteCard: {
+        parameters: {
+            query?: {
+                confirm?: string;
+            };
+            header?: never;
+            path: {
+                orgId: string;
+                cardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminDeletionServiceDone"];
+                };
+            };
+        };
+    };
     assess: {
         parameters: {
             query?: never;
@@ -4291,6 +4440,29 @@ export interface operations {
             };
         };
     };
+    previewCard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                cardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminDeletionServicePlan"];
+                };
+            };
+        };
+    };
     identify: {
         parameters: {
             query?: never;
@@ -4434,6 +4606,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ValuationsRunSummary"];
+                };
+            };
+        };
+    };
+    previewOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminDeletionServicePlan"];
                 };
             };
         };

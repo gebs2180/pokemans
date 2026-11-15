@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
+import { HardDelete } from './HardDelete'
 import {
   apiPath,
   money,
@@ -51,6 +52,7 @@ export function ReviewCardPage() {
   const api = useApi()
   const base = apiPath`/api/admin/orgs/${orgId}/cards/${cardId}`
   const { data, error, reload } = useLoad(() => api<CardCondition>('GET', `${base}/condition`), [api, base])
+  const navigate = useNavigate()
 
   if (error) return <PageError message={error} />
   if (!data) return <Loading />
@@ -62,6 +64,14 @@ export function ReviewCardPage() {
         <Link to="/admin/review">← Review queue</Link>
       </p>
       <h1>{data.label}</h1>
+      <div>
+        <HardDelete
+          what="card"
+          previewPath={`${base}/deletion-preview`}
+          deletePath={base}
+          onDeleted={() => navigate('/admin/review')}
+        />
+      </div>
 
       <section className="panel">
         <h2>Photos</h2>

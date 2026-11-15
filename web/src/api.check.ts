@@ -60,6 +60,8 @@ export type ApiTypesMatchTheBackend = {
   Membership: Ok<Covers<S['MeControllerMembershipView'], A.Membership>>
   Me: Ok<Covers<S['MeControllerMe'], A.Me>>
   Org: Ok<Covers<S['AdminOrgControllerOrgView'], A.Org>>
+  DeletionPlan: Ok<Covers<S['AdminDeletionServicePlan'], A.DeletionPlan>>
+  DeletionDone: Ok<Covers<S['AdminDeletionServiceDone'], A.DeletionDone>>
   CreatedInvite: Ok<Covers<S['AdminOrgControllerInviteView'], A.CreatedInvite>>
   OpenInvite: Ok<Covers<S['InviteServiceOpenInvite'], A.OpenInvite>>
   OrgMember: Ok<Covers<S['InviteServiceMember'], A.OrgMember>>
