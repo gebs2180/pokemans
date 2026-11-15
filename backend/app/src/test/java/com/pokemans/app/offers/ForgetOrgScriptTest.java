@@ -144,7 +144,9 @@ class ForgetOrgScriptTest {
     void everyTableThatPointsAtACardOrAnOrgIsHandled() throws Exception {
         // A new table holding card or org data must be added to the script, or a request would leave it behind
         // (or fail on its foreign key mid-way).
-        String script = Files.readString(SCRIPT);
+        // The per-card deletes live in forget_cards() (V36), shared with the admin's hard delete.
+        String script = Files.readString(SCRIPT) + jdbc.queryForObject(
+                "select pg_get_functiondef('forget_cards(uuid[])'::regprocedure)", String.class);
         List<String> tables = jdbc.queryForList("""
                 select distinct tc.table_name from information_schema.table_constraints tc
                 join information_schema.constraint_column_usage cu on cu.constraint_name = tc.constraint_name
@@ -152,10 +154,6 @@ class ForgetOrgScriptTest {
                 """, String.class);
         assertThat(tables).isNotEmpty();
         for (String table : tables) {
-            if (List.of("shipping_label", "label_refund").contains(table)) {
-                // Only a taken card has these, and a taken card is kept: the script reads them, never deletes them.
-                continue;
-            }
             assertThat(script).as(table).containsPattern("(delete from|update) " + table + "\\b");
         }
         assertThat(script).contains("join shipping_label s on s.listing_id = l.id");

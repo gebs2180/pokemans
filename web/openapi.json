@@ -1,6 +1,75 @@
 {
   "components" : {
     "schemas" : {
+      "AdminDeletionServiceDone" : {
+        "properties" : {
+          "deletionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "objectsDeleted" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "plan" : {
+            "$ref" : "#/components/schemas/AdminDeletionServicePlan"
+          },
+          "storageError" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "deletionId", "objectsDeleted", "plan", "storageError" ]
+      },
+      "AdminDeletionServicePlan" : {
+        "properties" : {
+          "cards" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "holds" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TradeHoldsHold"
+            },
+            "type" : "array"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "CARD", "ORG" ],
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "orgId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "orgName" : {
+            "type" : "string"
+          },
+          "photos" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "rows" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "object"
+          },
+          "storage" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "cards", "holds", "id", "kind", "name", "orgId", "orgName", "photos", "rows", "storage" ]
+      },
       "AdminOrgControllerCreateOrg" : {
         "properties" : {
           "name" : {
@@ -4545,6 +4614,26 @@
         },
         "required" : [ "asOf", "byPriceBand", "caveats", "deliveries", "overall", "prices", "shipping" ]
       },
+      "TradeHoldsHold" : {
+        "properties" : {
+          "cardItemId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "listingId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "enum" : [ "LIVE_OFFER", "ON_THE_MARKET", "DEAL_IN_PROGRESS", "BOUGHT_FROM_ANOTHER_ORG" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "cardItemId", "listingId", "message", "reason" ]
+      },
       "ValuationControllerDefaults" : {
         "properties" : {
           "gradingCompany" : {
@@ -5636,6 +5725,82 @@
         "tags" : [ "admin-org-controller" ]
       }
     },
+    "/api/admin/orgs/{orgId}" : {
+      "delete" : {
+        "operationId" : "deleteOrg",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "confirm",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminDeletionServiceDone"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "admin-deletion-controller" ]
+      }
+    },
+    "/api/admin/orgs/{orgId}/cards/{cardId}" : {
+      "delete" : {
+        "operationId" : "deleteCard",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "confirm",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminDeletionServiceDone"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "admin-deletion-controller" ]
+      }
+    },
     "/api/admin/orgs/{orgId}/cards/{cardId}/assessments" : {
       "post" : {
         "operationId" : "assess",
@@ -5872,6 +6037,41 @@
           }
         },
         "tags" : [ "condition-controller" ]
+      }
+    },
+    "/api/admin/orgs/{orgId}/cards/{cardId}/deletion-preview" : {
+      "get" : {
+        "operationId" : "previewCard",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminDeletionServicePlan"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "admin-deletion-controller" ]
       }
     },
     "/api/admin/orgs/{orgId}/cards/{cardId}/identifications" : {
@@ -6114,6 +6314,33 @@
           }
         },
         "tags" : [ "valuation-controller" ]
+      }
+    },
+    "/api/admin/orgs/{orgId}/deletion-preview" : {
+      "get" : {
+        "operationId" : "previewOrg",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminDeletionServicePlan"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "admin-deletion-controller" ]
       }
     },
     "/api/admin/orgs/{orgId}/invites" : {

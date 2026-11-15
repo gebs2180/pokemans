@@ -108,7 +108,7 @@ The methodology's worked example (FMV $411 → RV $481 → QSV $314 → stressed
 | `reporting` | HTML templates, PDF rendering (OpenHTMLtoPDF), report storage and hashing |
 | `outcomes` | Grader submissions, returned grades (manual + CSV import), linking outcomes to predictions |
 | `offers` | Instant offers on raw cards, listings posted to buyer orgs, first-come acceptance, buyers' inspection records |
-| `admin` | Parameter set versions, review queues, comp overrides, user and org management (planned as a module; as built there is no `admin` package: its work lives in each module's admin controllers, parameter sets are classpath files, and the review queue is in `condition`) |
+| `admin` | Parameter set versions, review queues, comp overrides, user and org management (planned as a module; as built, most of its work lives in each module's admin controllers, parameter sets are classpath files, and the review queue is in `condition`. The `admin` package holds only the hard delete of test and junk cards and orgs, 2026-11-15, see [data-deletion.md](data-deletion.md)) |
 
 Modules talk through published interfaces, not each other's repositories. The application events built are `CaptureCompleted` and `PhotoRetaken` (both from `intake`). The events first planned here (`PhotosAccepted`, `CardIdentified`, `AssessmentFinalized`, `GradeReturned`) were not built; modules call each other's published API instead.
 

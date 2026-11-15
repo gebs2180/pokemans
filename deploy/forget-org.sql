@@ -10,8 +10,9 @@
 -- and once the output looks right, again with -v apply=true to commit.
 --
 -- The storage keys it prints are deleted from the photo bucket by hand (docs/data-deletion.md); the database can't
--- reach the bucket. Tested by ForgetOrgScriptTest, which also fails when a new table points at card_item, org,
--- photo or app_user and this script doesn't handle it.
+-- reach the bucket. The cards themselves go through forget_cards() (migration V36), shared with the admin's hard
+-- delete. Tested by ForgetOrgScriptTest, which also fails when a new table points at card_item, org, photo,
+-- card_offer or sale_listing and neither this script nor forget_cards() handles it.
 
 \set ON_ERROR_STOP on
 \if :{?org_id}
@@ -47,10 +48,6 @@ create temp table kept_card on commit drop as
 create temp table gone_card on commit drop as
     select id from card_item
     where org_id = (select id from forget_target) and id not in (select id from kept_card);
-create temp table gone_listing on commit drop as
-    select id from sale_listing where card_item_id in (select id from gone_card);
-create temp table gone_offer on commit drop as
-    select id from card_offer where card_item_id in (select id from gone_card);
 
 -- The people: everyone who was ever a member. Those still active in another org are left alone.
 create temp table forget_user on commit drop as
@@ -67,59 +64,21 @@ create temp table forget_key on commit drop as
     union all
     select storage_key, 'report' from report where org_id = (select id from forget_target);
 
--- Children first. Each step logs how many rows it removed.
-with d as (delete from deal_outcome where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'deal_outcome', count(*) from d;
-with d as (delete from listing_event where listing_id in (select id from gone_listing) returning 1)
-insert into forget_log (step, rows) select 'listing_event', count(*) from d;
-with d as (delete from sale_listing where id in (select id from gone_listing) returning 1)
-insert into forget_log (step, rows) select 'sale_listing', count(*) from d;
-with d as (delete from card_offer_void where offer_id in (select id from gone_offer) returning 1)
-insert into forget_log (step, rows) select 'card_offer_void', count(*) from d;
+-- The gone cards and everything recorded about them, children first: forget_cards() (migration V36), the same path
+-- the admin's hard delete takes. It logs how many rows it removed from each table.
+insert into forget_log (step, rows)
+select deleted_from, deleted_rows from forget_cards(array(select id from gone_card));
 
 -- Valuation runs and reports cover the whole collection, kept cards included: all of the org's go.
-with d as (delete from card_valuation
-           where org_id = (select id from forget_target) or card_item_id in (select id from gone_card) returning 1)
+with d as (delete from card_valuation where org_id = (select id from forget_target) returning 1)
 insert into forget_log (step, rows) select 'card_valuation', count(*) from d;
 with d as (delete from report where org_id = (select id from forget_target) returning 1)
 insert into forget_log (step, rows) select 'report', count(*) from d;
 with d as (delete from valuation_run where org_id = (select id from forget_target) returning 1)
 insert into forget_log (step, rows) select 'valuation_run', count(*) from d;
-
-with d as (delete from card_offer where id in (select id from gone_offer) returning 1)
-insert into forget_log (step, rows) select 'card_offer', count(*) from d;
-with d as (delete from outcome_verification
-           where outcome_id in (select id from grade_outcome where card_item_id in (select id from gone_card)) returning 1)
-insert into forget_log (step, rows) select 'outcome_verification', count(*) from d;
-with d as (delete from grade_outcome where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'grade_outcome', count(*) from d;
-with d as (delete from centering_label where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'centering_label', count(*) from d;
-with d as (delete from authenticity_verification_photo
-           where verification_id in (select id from authenticity_verification where card_item_id in (select id from gone_card))
-           returning 1)
-insert into forget_log (step, rows) select 'authenticity_verification_photo', count(*) from d;
-with d as (delete from authenticity_verification where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'authenticity_verification', count(*) from d;
 -- Custody says where the collector keeps their cards: gone for kept cards too, since a taken card has left them.
 with d as (delete from custody_record where org_id = (select id from forget_target) returning 1)
 insert into forget_log (step, rows) select 'custody_record', count(*) from d;
-with d as (delete from condition_assessment where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'condition_assessment', count(*) from d;
-with d as (delete from provider_prediction where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'provider_prediction', count(*) from d;
-with d as (delete from prediction_request where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'prediction_request', count(*) from d;
-with d as (delete from card_identification where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'card_identification', count(*) from d;
-with d as (delete from card_identity_proposal where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'card_identity_proposal', count(*) from d;
-with d as (delete from card_reading where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'card_reading', count(*) from d;
-with d as (delete from photo where card_item_id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'photo', count(*) from d;
-with d as (delete from card_item where id in (select id from gone_card) returning 1)
-insert into forget_log (step, rows) select 'card_item', count(*) from d;
 
 -- Folders: delete the empty ones, rename the ones a kept card is still in (their names are the collector's words).
 with d as (delete from collection c where c.org_id = (select id from forget_target)

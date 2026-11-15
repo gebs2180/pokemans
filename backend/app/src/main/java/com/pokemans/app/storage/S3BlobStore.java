@@ -17,6 +17,7 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -119,6 +120,32 @@ class S3BlobStore implements BlobStore, AutoCloseable {
             }
             throw e;
         }
+    }
+
+    @Override
+    public int deletePrefix(String bucket, String prefix) {
+        if (prefix == null || prefix.isBlank() || !prefix.endsWith("/")) {
+            throw new IllegalArgumentException("A prefix to delete must be a folder, ending in /: " + prefix);
+        }
+        int deleted = 0;
+        String token = null;
+        do {
+            String continuation = token;
+            ListObjectsV2Response page = client.listObjectsV2(r -> r.bucket(bucket).prefix(prefix).continuationToken(continuation));
+            // One at a time rather than DeleteObjects, whose required checksum header not every S3-compatible service
+            // accepts the same way; a card has a few dozen objects at most.
+            for (var object : page.contents()) {
+                client.deleteObject(r -> r.bucket(bucket).key(object.key()));
+                deleted++;
+            }
+            token = Boolean.TRUE.equals(page.isTruncated()) ? page.nextContinuationToken() : null;
+        } while (token != null);
+        return deleted;
+    }
+
+    @Override
+    public void delete(String bucket, String key) {
+        client.deleteObject(r -> r.bucket(bucket).key(key));
     }
 
     @Override

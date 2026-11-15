@@ -7,7 +7,8 @@ import java.util.Optional;
 
 /**
  * Object storage port (HLD: {@code BlobStore}). Objects are written once and never replaced, with one exception:
- * {@link #replace}, which only takes the location out of a photo original.
+ * {@link #replace}, which only takes the location out of a photo original. Nothing is deleted except by the admin's hard
+ * delete of a card or an org ({@link #deletePrefix}, {@link #delete}).
  */
 public interface BlobStore {
 
@@ -33,6 +34,15 @@ public interface BlobStore {
      * (privacy review 2026-11-12), with the same pixels and capture time: everything else is written once.
      */
     void replace(String bucket, String key, byte[] bytes, String contentType);
+
+    /**
+     * Deletes every object whose key starts with {@code prefix}, e.g. a card's folder. Only for the admin's hard delete.
+     * In a versioned bucket this leaves a delete marker over each object. Returns how many objects it deleted.
+     */
+    int deletePrefix(String bucket, String prefix);
+
+    /** Deletes one object; nothing happens if it isn't there. Only for the admin's hard delete. */
+    void delete(String bucket, String key);
 
     /** A short-lived link for viewing one private object in the browser. */
     URI presignDownload(String bucket, String key);
