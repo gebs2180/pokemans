@@ -77,19 +77,23 @@ async function sellACard(browser: Browser, testInfo: TestInfo, admin: Page, card
   // 2. Straight to adding a card (a binder is waiting), and its front and back photos through the file inputs.
   await expect(collector).toHaveURL(/\/$/)
   await expect(collector.getByRole('heading', { level: 1, name: 'Your cards' })).toBeVisible()
-  // The browser tests run without the card catalog, so the search says so and the collector describes the card.
-  await collector.getByRole('combobox', { name: 'Find your card' }).fill(label)
-  await expect(collector.getByRole('alert')).toContainText("Card search isn't available")
-  await collector.getByRole('button', { name: "Can't find it? Describe it" }).click()
-  await expect(collector.getByLabel('Describe your card')).toHaveValue(label)
+  // Photo-first: the card has no name until its photos are taken.
   await collector.getByRole('button', { name: /add card/i }).click()
-  await expect(collector.getByRole('heading', { level: 1, name: label })).toBeVisible()
-  await expect(collector).toHaveTitle(`${label} · Rawmark`)
+  await expect(collector.getByRole('heading', { level: 1, name: 'New card' })).toBeVisible()
   const cardUrl = collector.url()
   for (const side of ['front', 'back'] as const) {
     await collector.getByLabel(`Choose a ${side} photo`).setInputFiles(await cardPhoto(collector, side))
     await expect(collector.getByRole('img', { name: new RegExp(`^${side} photo you took`, 'i') })).toBeVisible()
   }
+  // The browser tests run without the card reader or the catalog: the search comes next, says it isn't
+  // available, and the collector describes the card.
+  await collector.getByRole('combobox', { name: 'Find your card' }).fill(label)
+  await expect(collector.getByRole('alert')).toContainText("Card search isn't available")
+  await collector.getByRole('button', { name: "Can't find it? Describe it" }).click()
+  await expect(collector.getByLabel('Describe your card')).toHaveValue(label)
+  await collector.getByRole('button', { name: 'Save' }).click()
+  await expect(collector.getByRole('heading', { level: 1, name: label })).toBeVisible()
+  await expect(collector).toHaveTitle(`${label} · Rawmark`)
   await expect(collector.getByText(/all required photos passed/i)).toBeVisible()
   await expectNoSideScroll(collector)
 

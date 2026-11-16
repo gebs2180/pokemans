@@ -17,6 +17,8 @@ import {
   type OfferPreview,
   type Prediction,
   type IdentityProposal,
+  type ProposalSource,
+  PLACEHOLDER_LABEL,
   type ProviderCard,
   type Variant,
 } from '../api'
@@ -195,8 +197,14 @@ export function OfferPreviewPanel({ cardId }: { cardId: string }) {
 const EDITION_NAME: Record<Edition, string> = { UNLIMITED: 'Unlimited', FIRST_EDITION: '1st Edition', SHADOWLESS: 'Shadowless' }
 const VARIANT_NAME: Record<Variant, string> = { NORMAL: 'Non-holo', HOLO: 'Holo', REVERSE_HOLO: 'Reverse holo' }
 
-/** What the collector picked when adding the card: a proposal only, which the reviewer checks against the photos. */
-function CollectorPick({ orgId, cardId, onUse }: { orgId: string; cardId: string; onUse: (p: IdentityProposal) => void }) {
+const SOURCE_TEXT: Record<ProposalSource, string> = {
+  SUGGESTION: "Collector confirmed the reader's suggestion",
+  SEARCH: 'Collector picked by search',
+  DESCRIBED: 'Collector described it',
+}
+
+/** What the collector says the card is: a proposal only, which the reviewer checks against the photos. */
+function CollectorPick({ orgId, cardId, onUse }: { orgId: string; cardId: string; onUse: (externalId: string, p: IdentityProposal) => void }) {
   const api = useApi()
   const { data } = useLoad(
     () => api<CardIdentificationView>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}/identification`),
@@ -204,6 +212,18 @@ function CollectorPick({ orgId, cardId, onUse }: { orgId: string; cardId: string
   )
   const p = data?.proposal
   if (!p) return null
+  if (p.source === 'DESCRIBED' || !p.externalId) {
+    return (
+      <div className="identity collector-pick">
+        <div>
+          <div className="muted small">{SOURCE_TEXT[p.source]}</div>
+          <strong>{p.description}</strong>
+          <p className="muted small">They couldn't find it in the catalog.</p>
+        </div>
+      </div>
+    )
+  }
+  const externalId = p.externalId
   const unsure = [
     p.edition ? null : 'edition',
     p.variant ? null : 'finish',
@@ -213,15 +233,15 @@ function CollectorPick({ orgId, cardId, onUse }: { orgId: string; cardId: string
     <div className="identity collector-pick">
       {p.imageUrl && <img src={`${p.imageUrl}/low.webp`} alt="" />}
       <div>
-        <div className="muted small">Collector picked</div>
-        <strong>{p.name}</strong> · {p.setName} {p.number} · {p.language.toUpperCase()}
+        <div className="muted small">{SOURCE_TEXT[p.source]}</div>
+        <strong>{p.name}</strong> · {p.setName} {p.number} · {(p.language ?? '').toUpperCase()}
         <div className="muted">
           {[p.edition && EDITION_NAME[p.edition], p.variant && VARIANT_NAME[p.variant], p.stamp && `${p.stamp} stamp`, p.setReleaseDate?.slice(0, 4)]
             .filter(Boolean)
             .join(' · ')}
         </div>
         {unsure.length > 0 && <p className="warn small">Not sure of the {unsure.join(', ')}.</p>}
-        <button type="button" className="secondary" onClick={() => onUse(p)}>
+        <button type="button" className="secondary" onClick={() => onUse(externalId, p)}>
           Start from their pick
         </button>
       </div>
@@ -232,7 +252,7 @@ function CollectorPick({ orgId, cardId, onUse }: { orgId: string; cardId: string
 function Identification({ data, base, onChange }: { data: CardCondition; base: string; onChange: () => void }) {
   const api = useApi()
   // Start from the collector's own words; the reviewer corrects them as needed.
-  const [initial] = useState(() => searchFromLabel(data.label))
+  const [initial] = useState(() => (data.label === PLACEHOLDER_LABEL ? { name: '', number: '' } : searchFromLabel(data.label)))
   const [name, setName] = useState(initial.name)
   const [number, setNumber] = useState(initial.number)
   const [language, setLanguage] = useState('en')
@@ -311,7 +331,7 @@ function Identification({ data, base, onChange }: { data: CardCondition; base: s
   return (
     <section className="panel">
       <h2>Identity</h2>
-      <CollectorPick orgId={data.orgId} cardId={data.cardId} onUse={(p) => void pick(p, p)} />
+      <CollectorPick orgId={data.orgId} cardId={data.cardId} onUse={(externalId, p) => void pick({ externalId }, p)} />
       <Suggestions orgId={data.orgId} cardId={data.cardId} base={base} confirmedId={id?.catalogCardId ?? null} onChange={onChange} />
       {id ? (
         <div className="identity">

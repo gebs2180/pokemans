@@ -37,11 +37,17 @@ sequenceDiagram
     Pred->>DB: condition_assessment v(n) SYSTEM via DistributionBuilder
   end
 
+  S->>API: GET /cards/{c}/identify (polled while READING)
+  API-->>S: IdentifyPolicy step: PHOTOS · READING · SUGGEST · PICK (why) · PROPOSED · IDENTIFIED
+  S->>API: POST /cards/{c}/proposed-identity (SUGGESTION · SEARCH · DESCRIBED)
+  API->>DB: card_identity_proposal (append-only, linked to the reading); card named if unnamed
   A->>API: POST /api/admin/orgs/{o}/cards/{c}/identifications (confirm)
   API->>DB: card_identification CONFIRMED (resets authenticity findings for the old identity)
   A->>API: POST …/assessments (adjusted distribution, override reason if above the centering cap)
   API->>DB: condition_assessment v(n+1) REVIEWER
 ```
+
+**Photo-first identify (V37, 2026-11-15).** "Add card" creates a card with no name (`label` null, shown as "New card") and goes straight to its front and back. The card page then asks `GET /identify`, and `IdentifyPolicy` is the one place that decides what the collector sees: IDENTIFIED once the admin has confirmed an identity (nothing to ask); PROPOSED once they have answered (with "Change", which asks again with `again=true`); PHOTOS until front and back pass; READING while the reader works; SUGGEST ("Is this your card?", the reader's top suggestion and up to two alternatives, one per catalog card); otherwise PICK, the catalog search, prefilled with the name and number the reader saw, with the reason: READER_OFF, NOT_READ (no reading), READING_SLOW (pending over 2 minutes), READING_FAILED, or NO_MATCH (done with no suggestion, after 30 s for matching). "Not my card" switches to the same search on the client and isn't stored. "Can't find it? Describe it" is the last resort. Edition, finish and stamp are asked only where the catalog lists more than one. The answer is a `card_identity_proposal` with its `source`, `reading_id`, `suggestion_id` or `description`, and names the card unless the admin has already confirmed one. It is only a proposal: the admin still confirms every identity and nothing is priced from it. `/api/catalog/price-hint` is shown after the answer. Lots are still described when added.
 
 Both queues are lease queues (`FOR UPDATE SKIP LOCKED`), polled every 15 s by `RecognitionScheduler` / `PredictionScheduler` and kicked straight after commit. A retake (`PhotoRetaken`) queues new predictions; `ListingCaptureFreeze` refuses a retake while the card is OPEN or ACCEPTED.
 
