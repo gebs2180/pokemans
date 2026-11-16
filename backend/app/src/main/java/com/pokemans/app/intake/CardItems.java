@@ -17,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CardItems {
 
+    /** The longest card name kept, as a typed one is limited to. */
+    public static final int MAX_LABEL = 300;
+
     /** A card item as other modules see it. */
     public record CardItemRef(UUID id, UUID orgId, String label, boolean lot, int quantity, Instant createdAt) {
     }
@@ -130,6 +133,38 @@ public class CardItems {
     @Transactional(readOnly = true)
     public CardItemRef get(UUID cardId) {
         return cards.findById(cardId).map(CardItems::ref).orElseThrow(() -> IntakeService.notFound("Card"));
+    }
+
+    /**
+     * Names a card that has no name yet; a card already named keeps its name, so a later identification never renames
+     * what the collector called it. Lots are never renamed. No access check. True if the card took the name.
+     */
+    @Transactional
+    public boolean nameIfUnnamed(UUID cardId, String label) {
+        CardItem card = cards.findById(cardId).orElseThrow(() -> IntakeService.notFound("Card"));
+        if (card.isNamed() || card.isLot() || label == null || label.isBlank()) {
+            return false;
+        }
+        card.name(trimmed(label));
+        return true;
+    }
+
+    /**
+     * Names a card from what its collector says it is, replacing an earlier name. Lots are never renamed. No access
+     * check: the caller has established that the collector may change this card.
+     */
+    @Transactional
+    public void rename(UUID cardId, String label) {
+        CardItem card = cards.findById(cardId).orElseThrow(() -> IntakeService.notFound("Card"));
+        if (!card.isLot() && label != null && !label.isBlank()) {
+            card.name(trimmed(label));
+        }
+    }
+
+    /** A label as card_item keeps it: trimmed, and at most the 300 characters a typed one may have. */
+    private static String trimmed(String label) {
+        String t = label.trim();
+        return t.length() > MAX_LABEL ? t.substring(0, MAX_LABEL) : t;
     }
 
     /** Passing photos of a card, oldest first. No access check. */

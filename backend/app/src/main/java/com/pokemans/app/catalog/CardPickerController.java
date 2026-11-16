@@ -24,18 +24,30 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 class CardPickerController {
 
-    record ProposeRequest(@NotBlank @Size(max = 100) String externalId,
-                          @NotBlank @Pattern(regexp = "[a-z]{2}(-[a-z]{2,4})?") String language,
+    /**
+     * What the collector says the card is.
+     *
+     * @param source       SUGGESTION (the reader's suggestion, by {@code suggestionId}), SEARCH (a picked
+     *                     catalog card, the default) or DESCRIBED (in their own words, {@code description})
+     * @param externalId   the catalog card; for a suggestion it may be left out, and must match if given
+     */
+    record ProposeRequest(IdentityProposal.Source source,
+                          UUID suggestionId,
+                          @Size(max = 100) String externalId,
+                          @Pattern(regexp = "[a-z]{2}(-[a-z]{2,4})?") String language,
                           Edition edition,
                           Variant variant,
                           @Size(max = 100) String stamp,
-                          Boolean stampUnsure) {
+                          Boolean stampUnsure,
+                          @Size(max = 300) String description) {
     }
 
     private final CardPicker picker;
+    private final IdentifyService identify;
 
-    CardPickerController(CardPicker picker) {
+    CardPickerController(CardPicker picker, IdentifyService identify) {
         this.picker = picker;
+        this.identify = identify;
     }
 
     @GetMapping("/api/catalog/search")
@@ -53,7 +65,19 @@ class CardPickerController {
     @PostMapping("/api/orgs/{orgId}/cards/{cardId}/proposed-identity")
     @ResponseStatus(HttpStatus.CREATED)
     CatalogController.ProposalView propose(@PathVariable UUID orgId, @PathVariable UUID cardId, @Valid @RequestBody ProposeRequest r) {
-        return CatalogController.view(picker.propose(orgId, cardId, new CardPicker.Proposal(r.externalId(), r.language(),
-                r.edition(), r.variant(), r.stamp(), Boolean.TRUE.equals(r.stampUnsure()))));
+        return CatalogController.view(picker.propose(orgId, cardId, new CardPicker.Proposal(r.source(), r.suggestionId(),
+                r.externalId(), r.language(), r.edition(), r.variant(), r.stamp(), Boolean.TRUE.equals(r.stampUnsure()),
+                r.description())));
+    }
+
+    /**
+     * Where the collector is in identifying a card added photos first: taking photos, waiting for the
+     * reader, choosing among its suggestions, or searching. {@code again} leaves out an earlier answer,
+     * for a collector changing it.
+     */
+    @GetMapping("/api/orgs/{orgId}/cards/{cardId}/identify")
+    IdentifyService.IdentifyView identify(@PathVariable UUID orgId, @PathVariable UUID cardId,
+                                          @RequestParam(defaultValue = "false") boolean again) {
+        return identify.view(orgId, cardId, again);
     }
 }

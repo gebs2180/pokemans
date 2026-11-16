@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -26,9 +27,10 @@ import org.springframework.web.server.ResponseStatusException;
  * and store their pick as a proposed identity. A proposal is never an identification: the admin
  * still confirms it, and only a confirmed identity is priced, flagged or verified.
  *
- * <p>Seam for the next step (photo-first "Is this your card?"): a {@link CardReader} reading of the
- * front photo can be turned into the same {@link Pick}s, and the collector's choice stored with
- * {@link #propose} like a typed pick.
+ * <p>Photo-first: the card is added with no name and photographed, the reader's suggestions are shown
+ * as "Is this your card?" ({@link IdentifyService}), and the collector's answer is stored with
+ * {@link #propose}, whether they confirmed a suggestion, picked by search or described the card.
+ * The answer names the card, until the admin has confirmed an identity.
  */
 @Service
 class CardPicker {
@@ -52,8 +54,19 @@ class CardPicker {
     /**
      * What the collector chose. Null edition or variant: not sure, left for review. A null stamp is
      * "no stamp" unless {@code stampUnsure}.
+     *
+     * @param suggestionId the reader's suggestion confirmed, for {@link IdentityProposal.Source#SUGGESTION}
+     * @param description  the collector's words, for {@link IdentityProposal.Source#DESCRIBED}, which takes no
+     *                     catalog card
      */
-    record Proposal(String externalId, String language, Edition edition, Variant variant, String stamp, boolean stampUnsure) {
+    record Proposal(IdentityProposal.Source source, UUID suggestionId, String externalId, String language, Edition edition,
+                    Variant variant, String stamp, boolean stampUnsure, String description) {
+
+        /** A card picked by search. */
+        static Proposal searched(String externalId, String language, Edition edition, Variant variant, String stamp,
+                                 boolean stampUnsure) {
+            return new Proposal(IdentityProposal.Source.SEARCH, null, externalId, language, edition, variant, stamp, stampUnsure, null);
+        }
     }
 
     /** A collector number in the query: "4/102", "#4", "004", "TG01/TG30", "SV-P 001"'s "001". */
@@ -64,12 +77,19 @@ class CardPicker {
     private final CardItems cardItems;
     private final CurrentUser currentUser;
     private final CatalogRateLimiter limiter;
+    private final CardIdentificationRepository identifications;
+    private final CatalogCardRepository catalogCards;
+    private final CardReadingRepository readings;
 
     CardPicker(Optional<CatalogProvider> provider, IdentityProposalRepository proposals, CardItems cardItems,
-               CurrentUser currentUser, CatalogProperties properties) {
+               CurrentUser currentUser, CatalogProperties properties, CardIdentificationRepository identifications,
+               CatalogCardRepository catalogCards, CardReadingRepository readings) {
         this.provider = provider;
         this.proposals = proposals;
         this.cardItems = cardItems;
+        this.identifications = identifications;
+        this.catalogCards = catalogCards;
+        this.readings = readings;
         this.currentUser = currentUser;
         this.limiter = new CatalogRateLimiter(properties.picker().perMinute(), Duration.ofMinutes(1), Clock.systemUTC());
     }
@@ -110,8 +130,11 @@ class CardPicker {
     }
 
     /**
-     * Stores the collector's pick for their card. Every choice must be one the catalog lists; where it
-     * lists only one, that one is taken. Nothing else changes: the card waits for the admin as before.
+     * Stores what the collector says their card is, and names the card from it. Every choice must be
+     * one the catalog lists; where it lists only one, that one is taken. A confirmed suggestion must be
+     * one the reader made for this card. The proposal keeps the card's latest reading, so what the
+     * reader suggested stays on record next to what the collector said. Nothing else changes: the
+     * admin still confirms the identity, and nothing prices from a proposal.
      */
     @Transactional
     IdentityProposal propose(UUID orgId, UUID cardId, Proposal p) {
@@ -119,8 +142,38 @@ class CardPicker {
         if (item.lot()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lots aren't identified card by card");
         }
+        IdentityProposal.Source source = p.source() == null ? IdentityProposal.Source.SEARCH : p.source();
+        UUID readingId = readings.findByCardItemIdOrderByCreatedAtDesc(cardId).stream().findFirst()
+                .map(CardReading::getId).orElse(null);
+        if (source == IdentityProposal.Source.DESCRIBED) {
+            String description = p.description() == null ? "" : p.description().trim();
+            if (description.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Describe the card");
+            }
+            IdentityProposal saved = proposals.save(IdentityProposal.described(item.orgId(), cardId, description, readingId,
+                    currentUser.id()));
+            name(cardId, description);
+            return saved;
+        }
+        String externalId = p.externalId();
+        String language = p.language();
+        UUID suggestionId = null;
+        if (source == IdentityProposal.Source.SUGGESTION) {
+            CardIdentification suggestion = suggestion(cardId, p.suggestionId());
+            CatalogCard suggested = catalogCards.findById(suggestion.getCatalogCardId()).orElseThrow();
+            if ((externalId != null && !externalId.equals(suggested.getExternalId()))
+                    || (language != null && !language.equals(suggested.getLanguage()))) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "That isn't the card the reader suggested");
+            }
+            externalId = suggested.getExternalId();
+            language = suggested.getLanguage();
+            suggestionId = suggestion.getId();
+            readingId = suggestion.getReadingId();
+        } else if (externalId == null || externalId.isBlank() || language == null || language.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pick the card");
+        }
         limiter.acquire(caller());
-        CatalogProvider.ProviderCard c = providerCard(p.externalId(), p.language());
+        CatalogProvider.ProviderCard c = providerCard(externalId, language);
         Edition edition = choose(p.edition(), c.editions(), "edition");
         Variant variant = choose(p.variant(), c.variants(), "variant");
         String stamp = p.stamp() == null || p.stamp().isBlank() ? null : p.stamp().trim();
@@ -129,7 +182,58 @@ class CardPicker {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The catalog doesn't list that stamp for this card");
         }
         boolean stampUnsure = !stamps.isEmpty() && stamp == null && p.stampUnsure();
-        return proposals.save(new IdentityProposal(item.orgId(), cardId, c, edition, variant, stamp, stampUnsure, currentUser.id()));
+        IdentityProposal saved = proposals.save(new IdentityProposal(item.orgId(), cardId, c, edition, variant, stamp,
+                stampUnsure, readingId, suggestionId, currentUser.id()));
+        name(cardId, label(c.name(), c.setName(), printed(c.number(), c.setOfficialCount()), c.language(), edition, variant, stamp));
+        return saved;
+    }
+
+    /** A reader's suggestion for this card, else 400: a collector confirms only what the reader suggested. */
+    private CardIdentification suggestion(UUID cardId, UUID suggestionId) {
+        if (suggestionId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "suggestionId is required to confirm a suggestion");
+        }
+        return identifications.findById(suggestionId)
+                .filter(s -> s.getCardItemId().equals(cardId) && s.getStatus() == CardIdentification.Status.SUGGESTED
+                        && s.getReadingId() != null)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "That isn't one of the reader's suggestions for this card"));
+    }
+
+    /**
+     * Names the card from the collector's answer. Once the admin has confirmed an identity the card keeps
+     * its name; the collector's later answer is still stored, for the admin to see.
+     */
+    private void name(UUID cardId, String label) {
+        boolean confirmed = identifications.findByCardItemIdOrderByCreatedAtDesc(cardId).stream()
+                .anyMatch(i -> i.getStatus() == CardIdentification.Status.CONFIRMED);
+        if (!confirmed) {
+            cardItems.rename(cardId, label);
+        }
+    }
+
+    private static final Map<String, String> LANGUAGE_NAMES = Map.of("ja", "Japanese");
+    private static final Map<Edition, String> EDITION_NAMES = Map.of(Edition.FIRST_EDITION, "1st Edition",
+            Edition.SHADOWLESS, "Shadowless");
+    private static final Map<Variant, String> VARIANT_NAMES = Map.of(Variant.NORMAL, "Non-holo", Variant.HOLO, "Holo",
+            Variant.REVERSE_HOLO, "Reverse holo");
+
+    /**
+     * A card's name from its identity, e.g. "Charizard · Base Set 4/102 · Shadowless · Holo": English and
+     * Unlimited go without saying, and unknown parts are left out. As the picker used to name cards.
+     */
+    static String label(String name, String setName, String printedNumber, String language, Edition edition,
+                        Variant variant, String stamp) {
+        List<String> parts = new ArrayList<>();
+        parts.add(name);
+        parts.add(String.join(" ", Stream.of(setName, printedNumber).filter(v -> v != null && !v.isBlank()).toList()));
+        parts.add(language == null || "en".equals(language) ? null
+                : LANGUAGE_NAMES.getOrDefault(language, language.toUpperCase(Locale.ROOT)));
+        parts.add(edition == null ? null : EDITION_NAMES.get(edition));
+        parts.add(variant == null ? null : VARIANT_NAMES.get(variant));
+        parts.add(stamp == null ? null : stamp + " stamp");
+        String label = String.join(" · ", parts.stream().filter(v -> v != null && !v.isBlank()).toList());
+        return label.length() > CardItems.MAX_LABEL ? label.substring(0, CardItems.MAX_LABEL) : label;
     }
 
     @Transactional(readOnly = true)
@@ -185,7 +289,7 @@ class CardPicker {
         }
     }
 
-    private CatalogProvider.ProviderCard providerCard(String externalId, String language) {
+    CatalogProvider.ProviderCard providerCard(String externalId, String language) {
         return call(() -> requireProvider().card(externalId, language))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Card not found in the catalog"));
     }

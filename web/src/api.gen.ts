@@ -1156,6 +1156,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{orgId}/cards/{cardId}/identify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["identify_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{orgId}/cards/{cardId}/listings": {
         parameters: {
             query?: never;
@@ -1887,12 +1903,17 @@ export interface components {
             custodyVerifiedUntil: string;
         };
         CardPickerControllerProposeRequest: {
+            description: string;
             /** @enum {string} */
             edition: "UNLIMITED" | "FIRST_EDITION" | "SHADOWLESS";
             externalId: string;
             language: string;
+            /** @enum {string} */
+            source: "SUGGESTION" | "SEARCH" | "DESCRIBED";
             stamp: string;
             stampUnsure: boolean;
+            /** Format: uuid */
+            suggestionId: string;
             /** @enum {string} */
             variant: "NORMAL" | "HOLO" | "REVERSE_HOLO";
         };
@@ -2014,6 +2035,7 @@ export interface components {
         CatalogControllerProposalView: {
             /** Format: date-time */
             createdAt: string;
+            description: string;
             /** @enum {string} */
             edition: "UNLIMITED" | "FIRST_EDITION" | "SHADOWLESS";
             externalId: string;
@@ -2027,11 +2049,17 @@ export interface components {
             proposedBy: string;
             /** @enum {string} */
             provider: "TCGDEX" | "MANUAL";
+            /** Format: uuid */
+            readingId: string;
             setName: string;
             /** Format: date */
             setReleaseDate: string;
+            /** @enum {string} */
+            source: "SUGGESTION" | "SEARCH" | "DESCRIBED";
             stamp: string;
             stampUnsure: boolean;
+            /** Format: uuid */
+            suggestionId: string;
             /** @enum {string} */
             variant: "NORMAL" | "HOLO" | "REVERSE_HOLO";
         };
@@ -2512,6 +2540,28 @@ export interface components {
             shipping: number;
             timeToCashRate: number;
         };
+        IdentifyServiceIdentifyView: {
+            proposal: components["schemas"]["CatalogControllerProposalView"];
+            readLanguage: string;
+            readQuery: string;
+            /** Format: uuid */
+            readingId: string;
+            /** @enum {string} */
+            step: "IDENTIFIED" | "PHOTOS" | "READING" | "SUGGEST" | "PICK" | "PROPOSED";
+            suggestions: components["schemas"]["IdentifyServiceSuggestedCard"][];
+            /** @enum {string} */
+            why: "READER_OFF" | "NOT_READ" | "READING_SLOW" | "READING_FAILED" | "NO_MATCH";
+        };
+        IdentifyServiceSuggestedCard: {
+            card: components["schemas"]["CardPickerPickDetail"];
+            confidence: number;
+            /** @enum {string} */
+            edition: "UNLIMITED" | "FIRST_EDITION" | "SHADOWLESS";
+            /** Format: uuid */
+            suggestionId: string;
+            /** @enum {string} */
+            variant: "NORMAL" | "HOLO" | "REVERSE_HOLO";
+        };
         IntakeControllerCreateCard: {
             label: string;
             lot: boolean;
@@ -2545,6 +2595,7 @@ export interface components {
             label: string;
             lot: boolean;
             missingSides: ("FRONT" | "BACK" | "DETAIL")[];
+            named: boolean;
             photos: components["schemas"]["IntakeViewsPhotoView"][];
             photosFrozen: string;
             /** Format: int32 */
@@ -5442,6 +5493,31 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["CatalogControllerCardIdentificationView"];
+                };
+            };
+        };
+    };
+    identify_1: {
+        parameters: {
+            query?: {
+                again?: boolean;
+            };
+            header?: never;
+            path: {
+                orgId: string;
+                cardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentifyServiceIdentifyView"];
                 };
             };
         };

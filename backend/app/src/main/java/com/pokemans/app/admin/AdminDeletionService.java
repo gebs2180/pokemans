@@ -219,7 +219,7 @@ public class AdminDeletionService {
 
     private Target card(UUID orgId, UUID cardId) {
         List<Target> found = jdbc.query("""
-                select c.label, o.name from card_item c join org o on o.id = c.org_id where c.id = ? and c.org_id = ? for update of c""",
+                select coalesce(c.label, 'New card'), o.name from card_item c join org o on o.id = c.org_id where c.id = ? and c.org_id = ? for update of c""",
                 (rs, i) -> new Target(Kind.CARD, cardId, rs.getString(1), orgId, rs.getString(2), List.of(cardId)), cardId, orgId);
         if (found.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No such card in this org.");

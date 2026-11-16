@@ -80,6 +80,10 @@ class IdentificationService {
         CatalogCard catalogCard = findOrCreate(identity, payload, currentUser.id());
         CardIdentification saved = identifications.save(CardIdentification.confirmedByReviewer(orgId, cardId,
                 catalogCard.getId(), blankToNull(choice.note()), currentUser.id()));
+        // A card added photos first that the collector never named takes the confirmed identity's name.
+        cardItems.nameIfUnnamed(cardId, CardPicker.label(catalogCard.getName(), catalogCard.getSetName(),
+                catalogCard.getNumber(), catalogCard.getLanguage(), catalogCard.getEdition(), catalogCard.getVariant(),
+                catalogCard.getStamp()));
         events.publishEvent(new Catalog.CardIdentified(catalogCard.getId()));
         return saved;
     }
