@@ -1,8 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import { apiPath, useApi, type CatalogPick, type CatalogPickDetail, type PriceHint } from './api'
+import { apiPath, useApi, type CatalogPick, type CatalogPickDetail } from './api'
 import { EDITION_LABEL, LANGUAGES, metaLine, VARIANT_LABEL, type PickedCard } from './cardPick'
 import { message } from './format'
-import { dollars } from './policy'
 import './cardPicker.css'
 
 function tooShort(q: string) {
@@ -13,7 +12,7 @@ function tooShort(q: string) {
  * The card's catalog image, or an empty box when TCGdex has none or it fails to load. Not lazy: lazy
  * images inside the results' scroll box were sometimes never fetched, and there are at most ten.
  */
-function Thumb({ card }: { card: CatalogPick }) {
+export function Thumb({ card }: { card: CatalogPick }) {
   const src = card.imageUrl ? `${card.imageUrl}/low.webp` : null
   const [failed, setFailed] = useState<string | null>(null)
   return src && failed !== src ? (
@@ -27,28 +26,34 @@ function Thumb({ card }: { card: CatalogPick }) {
  * Search-as-you-type over the card catalog, then the prints the catalog knows the card came in. The
  * pick is only a proposal: the admin still confirms the card's identity from its photos.
  *
- * Photo-first suggestions ("Is this your card?") would feed the same list from a reading of the
- * photos instead of typed words, and end in the same {@link PickedCard}.
+ * On the card page it's the fallback to the reader's suggestions ("Is this your card?"), started from
+ * what the reader saw.
  *
  * @param inputId    the search box's id, for the form's own label
+ * @param initialQuery    what to search for first, e.g. the name and number the reader saw
+ * @param initialLanguage the card's language, if known
  * @param onChange   the current pick, or null while there's none
  * @param onDescribe the collector can't find their card and will describe it instead, starting from what they typed
  */
 export function CardPicker({
   inputId,
   describedBy,
+  initialQuery = '',
+  initialLanguage,
   onChange,
   onDescribe,
 }: {
   inputId: string
   describedBy?: string
+  initialQuery?: string
+  initialLanguage?: string | null
   onChange: (pick: PickedCard | null) => void
   onDescribe: (typed: string) => void
 }) {
   const api = useApi()
   const listId = useId()
-  const [language, setLanguage] = useState('en')
-  const [query, setQuery] = useState('')
+  const [language, setLanguage] = useState(initialLanguage && initialLanguage in LANGUAGES ? initialLanguage : 'en')
+  const [query, setQuery] = useState(initialQuery)
   // The last answer; a box cleared below two letters shows none.
   const [found, setFound] = useState<CatalogPick[] | null>(null)
   const [open, setOpen] = useState(false)
@@ -56,7 +61,6 @@ export function CardPicker({
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [picked, setPicked] = useState<PickedCard | null>(null)
-  const [hint, setHint] = useState<{ key: string; hint: PriceHint } | null>(null)
   const seq = useRef(0)
   const input = useRef<HTMLInputElement>(null)
 
@@ -86,28 +90,6 @@ export function CardPicker({
     return () => window.clearTimeout(timer)
   }, [api, query, language, picked])
 
-  // The minimum, early: only once the print is known, and only ever as a hint.
-  const edition = picked?.edition
-  const variant = picked?.variant
-  const externalId = picked?.card.externalId
-  const pickedLanguage = picked?.card.language
-  const stamp = picked?.stamp ?? ''
-  const hintKey = externalId && pickedLanguage && edition && variant ? [externalId, pickedLanguage, edition, variant, stamp].join('|') : null
-  useEffect(() => {
-    if (!hintKey || !externalId || !pickedLanguage || !edition || !variant) return
-    let cancelled = false
-    api<PriceHint>('GET', apiPath`/api/catalog/price-hint?externalId=${externalId}&language=${pickedLanguage}&edition=${edition}&variant=${variant}&stamp=${stamp}`)
-      .then((h) => {
-        if (!cancelled) setHint({ key: hintKey, hint: h })
-      })
-      .catch(() => {
-        // No hint: the card can be added as before.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [api, hintKey, externalId, pickedLanguage, edition, variant, stamp])
-  const underMinimum = hint != null && hint.key === hintKey && hint.hint.underMinimum ? hint.hint.minFmv : null
   const results = tooShort(query.trim()) ? null : found
 
   function update(next: PickedCard | null) {
@@ -201,12 +183,6 @@ export function CardPicker({
         {(picked.edition == null && c.editions.length > 1) || (picked.variant == null && c.variants.length > 1) || picked.stampUnsure ? (
           <p className="muted small">Not sure is fine: we'll check from your photos.</p>
         ) : null}
-        {underMinimum != null && (
-          <p className="alert alert-warning" role="status">
-            This card usually sells for under our {dollars(underMinimum)} minimum, whatever its condition, so it's unlikely to get an
-            offer. You can still add it.
-          </p>
-        )}
       </div>
     )
   }
@@ -286,7 +262,7 @@ export function CardPicker({
 }
 
 /** A pick-one print choice, with "Not sure" for a collector who can't tell. */
-function PrintChoice<T extends string>({
+export function PrintChoice<T extends string>({
   legend,
   options,
   value,

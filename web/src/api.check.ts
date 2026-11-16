@@ -105,6 +105,8 @@ export type ApiTypesMatchTheBackend = {
   CatalogPick: Ok<Covers<S['CardPickerPick'], A.CatalogPick>>
   CatalogPickDetail: Ok<Covers<S['CardPickerPickDetail'], A.CatalogPickDetail>>
   IdentityProposal: Ok<Covers<S['CatalogControllerProposalView'], A.IdentityProposal>>
+  SuggestedCard: Ok<Covers<S['IdentifyServiceSuggestedCard'], A.SuggestedCard>>
+  IdentifyView: Ok<Covers<S['IdentifyServiceIdentifyView'], A.IdentifyView>>
   PriceHint: Ok<Covers<S['PriceHintControllerPriceHint'], A.PriceHint>>
   CompRequest: Ok<Covers<S['PricingControllerCompRequest'], A.CompRequest>>
   CompView: Ok<Covers<S['PricingControllerCompView'], A.CompView>>

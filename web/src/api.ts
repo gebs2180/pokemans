@@ -46,9 +46,15 @@ export type PhotoView = {
   url: string | null
 }
 
+/** A card's label until the collector says what it is (the backend's CardItem.PLACEHOLDER_LABEL). */
+export const PLACEHOLDER_LABEL = 'New card'
+
 export type CardView = {
   id: string
+  /** The card's name, or "New card" until the collector says what it is. */
   label: string
+  /** False while the label is only the placeholder. */
+  named: boolean
   lot: boolean
   quantity: number
   captureComplete: boolean
@@ -564,13 +570,17 @@ export type CatalogPick = {
 /** A picked card's prints, for the edition, finish and stamp choices. */
 export type CatalogPickDetail = CatalogPick & { editions: Edition[]; variants: Variant[]; stamps: string[]; promo: boolean }
 
-/** What the collector picked. A null edition or variant means they weren't sure. */
+/**
+ * What the collector says the card is: the reader's suggestion confirmed, a card picked by search, or
+ * their own description (catalog fields null). A null edition or variant means they weren't sure.
+ */
 export type IdentityProposal = {
   id: string
-  provider: string
-  externalId: string
-  language: string
-  name: string
+  source: ProposalSource
+  provider: string | null
+  externalId: string | null
+  language: string | null
+  name: string | null
   setName: string | null
   number: string | null
   setReleaseDate: string | null
@@ -578,9 +588,41 @@ export type IdentityProposal = {
   edition: Edition | null
   variant: Variant | null
   stamp: string | null
-  stampUnsure: boolean
+  stampUnsure: boolean | null
+  description: string | null
+  /** The reading of the photos the collector answered, if there was one. */
+  readingId: string | null
+  /** The reader's suggestion they confirmed, on SUGGESTION. */
+  suggestionId: string | null
   proposedBy: string
   createdAt: string
+}
+
+export type ProposalSource = 'SUGGESTION' | 'SEARCH' | 'DESCRIBED'
+
+/** Where the collector is in identifying a card added photos first. */
+export type IdentifyStep = 'IDENTIFIED' | 'PHOTOS' | 'READING' | 'SUGGEST' | 'PICK' | 'PROPOSED'
+/** Why the collector searches instead of choosing among the reader's suggestions. */
+export type IdentifyWhy = 'READER_OFF' | 'NOT_READ' | 'READING_SLOW' | 'READING_FAILED' | 'NO_MATCH'
+
+export type SuggestedCard = {
+  suggestionId: string
+  card: CatalogPickDetail
+  /** What the reader saw, if it could tell: a starting choice only. */
+  edition: Edition | null
+  variant: Variant | null
+  confidence: number | null
+}
+
+export type IdentifyView = {
+  step: IdentifyStep
+  why: IdentifyWhy | null
+  readingId: string | null
+  /** What the reader saw, name and number, to start the search with. */
+  readQuery: string | null
+  readLanguage: string | null
+  suggestions: SuggestedCard[]
+  proposal: IdentityProposal | null
 }
 
 /** Whether a picked card is clearly under the FMV minimum, whatever its condition. */

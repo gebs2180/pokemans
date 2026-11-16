@@ -21,12 +21,13 @@ final class IntakeViews {
     }
 
     /**
+     * @param label           the card's name, or "New card" until it is identified ({@code named} false)
      * @param captureComplete true once the required sides have a passing photo (front and back for
      *                        a single card, front for a lot)
      * @param missingSides    required sides without a passing photo yet
      * @param photosFrozen    why the photos can't change any more (the card is posted or sold), or null
      */
-    record CardView(UUID id, String label, boolean lot, int quantity, boolean captureComplete,
+    record CardView(UUID id, String label, boolean named, boolean lot, int quantity, boolean captureComplete,
                     List<Photo.Side> missingSides, List<PhotoView> photos, String photosFrozen) {
     }
 
@@ -76,7 +77,7 @@ final class IntakeViews {
                 .filter(side -> photos.stream().noneMatch(p -> p.getSide() == side && p.getStatus() == Photo.Status.PASSED))
                 .toList();
         List<Photo> current = current(photos);
-        return new CardView(card.getId(), card.getLabel(), card.isLot(), card.getQuantity(), missing.isEmpty(), missing,
+        return new CardView(card.getId(), card.getLabel(), card.isNamed(), card.isLot(), card.getQuantity(), missing.isEmpty(), missing,
                 photos.stream().map(p -> photo(p, current.contains(p), p.getStatus() == Photo.Status.AWAITING_UPLOAD ? null : link.apply(p)))
                         .toList(), frozen);
     }

@@ -21,6 +21,7 @@ import { safeHref } from '../safeHref'
 import { useLoad } from '../useLoad'
 import { useOrg } from '../useOrg'
 import { Chip, Loading, PageError, StageChip } from '../ui'
+import { IdentifyPanel } from './IdentifyPanel'
 import { OfferPanel } from './OfferPanel'
 import { ProvenancePanel } from './ProvenancePanel'
 import { message } from '../format'
@@ -102,6 +103,7 @@ export function CardPage() {
         </button>
       </p>
       <h1>{card.label}</h1>
+      {org != null && !card.lot && <IdentifyPanel orgId={orgId} cardId={cardId} photoVersion={photoVersion} onAnswer={reload} />}
       {seller && !contributor && !card.lot && (
         <StatusLine key={`${photoVersion}:${saleVersion}`} orgId={orgId} cardId={cardId} offerFirst={offerFirst} />
       )}

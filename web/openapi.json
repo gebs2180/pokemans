@@ -475,6 +475,11 @@
       },
       "CardPickerControllerProposeRequest" : {
         "properties" : {
+          "description" : {
+            "maxLength" : 300,
+            "minLength" : 0,
+            "type" : "string"
+          },
           "edition" : {
             "enum" : [ "UNLIMITED", "FIRST_EDITION", "SHADOWLESS" ],
             "type" : "string"
@@ -485,8 +490,11 @@
             "type" : "string"
           },
           "language" : {
-            "minLength" : 1,
             "pattern" : "[a-z]{2}(-[a-z]{2,4})?",
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "SUGGESTION", "SEARCH", "DESCRIBED" ],
             "type" : "string"
           },
           "stamp" : {
@@ -497,12 +505,16 @@
           "stampUnsure" : {
             "type" : "boolean"
           },
+          "suggestionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
           "variant" : {
             "enum" : [ "NORMAL", "HOLO", "REVERSE_HOLO" ],
             "type" : "string"
           }
         },
-        "required" : [ "edition", "externalId", "language", "stamp", "stampUnsure", "variant" ]
+        "required" : [ "description", "edition", "externalId", "language", "source", "stamp", "stampUnsure", "suggestionId", "variant" ]
       },
       "CardPickerPick" : {
         "properties" : {
@@ -835,6 +847,9 @@
             "format" : "date-time",
             "type" : "string"
           },
+          "description" : {
+            "type" : "string"
+          },
           "edition" : {
             "enum" : [ "UNLIMITED", "FIRST_EDITION", "SHADOWLESS" ],
             "type" : "string"
@@ -866,11 +881,19 @@
             "enum" : [ "TCGDEX", "MANUAL" ],
             "type" : "string"
           },
+          "readingId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
           "setName" : {
             "type" : "string"
           },
           "setReleaseDate" : {
             "format" : "date",
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "SUGGESTION", "SEARCH", "DESCRIBED" ],
             "type" : "string"
           },
           "stamp" : {
@@ -879,12 +902,16 @@
           "stampUnsure" : {
             "type" : "boolean"
           },
+          "suggestionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
           "variant" : {
             "enum" : [ "NORMAL", "HOLO", "REVERSE_HOLO" ],
             "type" : "string"
           }
         },
-        "required" : [ "createdAt", "edition", "externalId", "id", "imageUrl", "language", "name", "number", "proposedBy", "provider", "setName", "setReleaseDate", "stamp", "stampUnsure", "variant" ]
+        "required" : [ "createdAt", "description", "edition", "externalId", "id", "imageUrl", "language", "name", "number", "proposedBy", "provider", "readingId", "setName", "setReleaseDate", "source", "stamp", "stampUnsure", "suggestionId", "variant" ]
       },
       "CatalogControllerProviderCardView" : {
         "properties" : {
@@ -2090,6 +2117,61 @@
         },
         "required" : [ "fee", "insurance", "shipping", "timeToCashRate" ]
       },
+      "IdentifyServiceIdentifyView" : {
+        "properties" : {
+          "proposal" : {
+            "$ref" : "#/components/schemas/CatalogControllerProposalView"
+          },
+          "readLanguage" : {
+            "type" : "string"
+          },
+          "readQuery" : {
+            "type" : "string"
+          },
+          "readingId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "step" : {
+            "enum" : [ "IDENTIFIED", "PHOTOS", "READING", "SUGGEST", "PICK", "PROPOSED" ],
+            "type" : "string"
+          },
+          "suggestions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/IdentifyServiceSuggestedCard"
+            },
+            "type" : "array"
+          },
+          "why" : {
+            "enum" : [ "READER_OFF", "NOT_READ", "READING_SLOW", "READING_FAILED", "NO_MATCH" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "proposal", "readLanguage", "readQuery", "readingId", "step", "suggestions", "why" ]
+      },
+      "IdentifyServiceSuggestedCard" : {
+        "properties" : {
+          "card" : {
+            "$ref" : "#/components/schemas/CardPickerPickDetail"
+          },
+          "confidence" : {
+            "type" : "number"
+          },
+          "edition" : {
+            "enum" : [ "UNLIMITED", "FIRST_EDITION", "SHADOWLESS" ],
+            "type" : "string"
+          },
+          "suggestionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "variant" : {
+            "enum" : [ "NORMAL", "HOLO", "REVERSE_HOLO" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "card", "confidence", "edition", "suggestionId", "variant" ]
+      },
       "IntakeControllerCreateCard" : {
         "properties" : {
           "label" : {
@@ -2180,6 +2262,9 @@
             },
             "type" : "array"
           },
+          "named" : {
+            "type" : "boolean"
+          },
           "photos" : {
             "items" : {
               "$ref" : "#/components/schemas/IntakeViewsPhotoView"
@@ -2194,7 +2279,7 @@
             "type" : "integer"
           }
         },
-        "required" : [ "captureComplete", "id", "label", "lot", "missingSides", "photos", "photosFrozen", "quantity" ]
+        "required" : [ "captureComplete", "id", "label", "lot", "missingSides", "named", "photos", "photosFrozen", "quantity" ]
       },
       "IntakeViewsContainerDetail" : {
         "properties" : {
@@ -7414,6 +7499,49 @@
           }
         },
         "tags" : [ "catalog-controller" ]
+      }
+    },
+    "/api/orgs/{orgId}/cards/{cardId}/identify" : {
+      "get" : {
+        "operationId" : "identify_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "again",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IdentifyServiceIdentifyView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "card-picker-controller" ]
       }
     },
     "/api/orgs/{orgId}/cards/{cardId}/listings" : {

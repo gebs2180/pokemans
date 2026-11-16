@@ -313,9 +313,9 @@ describe('ReviewCardPage', () => {
   it("shows the collector's pick and starts from it, leaving what they weren't sure of to the reviewer", async () => {
     const user = userEvent.setup()
     const proposal: IdentityProposal = {
-      id: 'p1', provider: 'TCGDEX', externalId: 'base1-4', language: 'en', name: 'Charizard', setName: 'Base Set', number: '4/102',
+      id: 'p1', source: 'SEARCH', provider: 'TCGDEX', externalId: 'base1-4', language: 'en', name: 'Charizard', setName: 'Base Set', number: '4/102',
       setReleaseDate: '1999-01-09', imageUrl: null, edition: 'SHADOWLESS', variant: null, stamp: null, stampUnsure: false,
-      proposedBy: 'u1', createdAt: '2026-11-13T10:00:00Z',
+      description: null, readingId: null, suggestionId: null, proposedBy: 'u1', createdAt: '2026-11-13T10:00:00Z',
     }
     const urls: string[] = []
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
@@ -336,7 +336,7 @@ describe('ReviewCardPage', () => {
         </Routes>
       </MemoryRouter>,
     )
-    expect(await screen.findByText('Collector picked')).toBeInTheDocument()
+    expect(await screen.findByText('Collector picked by search')).toBeInTheDocument()
     expect(screen.getByText('Not sure of the finish.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Start from their pick' }))
     expect(await screen.findByLabelText('Edition')).toHaveValue('SHADOWLESS')

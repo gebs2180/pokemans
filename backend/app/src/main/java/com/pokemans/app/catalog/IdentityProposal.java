@@ -11,9 +11,14 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * The collector's pick from the catalog for a card they added: a proposed identity for the admin to
- * confirm or correct, never an identification. Nothing prices, flags or verifies on it. Append-only:
- * a changed pick adds a row, and the latest is the one shown.
+ * What the collector says a card they added is: a proposed identity for the admin to confirm or
+ * correct, never an identification. Nothing prices, flags or verifies on it. Append-only: a changed
+ * answer adds a row, and the latest is the one shown.
+ *
+ * <p>It is the reader's suggestion confirmed ({@link Source#SUGGESTION}), a card picked by search
+ * ({@link Source#SEARCH}), or, when neither found it, the collector's own words ({@link Source#DESCRIBED}),
+ * which carry no catalog card. It keeps the reading the collector was shown, so a wrong suggestion
+ * stays on record next to what the collector said instead.
  *
  * <p>Edition and variant are null where the catalog listed more than one and the collector wasn't
  * sure: we never guess them.
@@ -21,6 +26,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "card_identity_proposal")
 class IdentityProposal extends AssignedIdEntity<UUID> {
+
+    enum Source {
+        SUGGESTION, SEARCH, DESCRIBED
+    }
 
     @Id
     private UUID id;
@@ -40,18 +49,23 @@ class IdentityProposal extends AssignedIdEntity<UUID> {
     @Enumerated(EnumType.STRING)
     private Variant variant;
     private String stamp;
-    private boolean stampUnsure;
+    private Boolean stampUnsure;
+    @Enumerated(EnumType.STRING)
+    private Source source;
+    private UUID readingId;
+    private UUID suggestionId;
+    private String description;
     private UUID proposedBy;
     private Instant createdAt;
 
     protected IdentityProposal() {
     }
 
+    /** A catalog card: confirmed from a suggestion ({@code suggestionId} set) or picked by search. */
     IdentityProposal(UUID orgId, UUID cardItemId, CatalogProvider.ProviderCard card, Edition edition, Variant variant,
-                     String stamp, boolean stampUnsure, UUID proposedBy) {
-        this.id = UUID.randomUUID();
-        this.orgId = orgId;
-        this.cardItemId = cardItemId;
+                     String stamp, boolean stampUnsure, UUID readingId, UUID suggestionId, UUID proposedBy) {
+        this(orgId, cardItemId, suggestionId != null ? Source.SUGGESTION : Source.SEARCH, readingId, proposedBy);
+        this.suggestionId = suggestionId;
         this.provider = CatalogCard.Provider.TCGDEX;
         this.externalId = card.externalId();
         this.language = card.language();
@@ -64,6 +78,21 @@ class IdentityProposal extends AssignedIdEntity<UUID> {
         this.variant = variant;
         this.stamp = stamp;
         this.stampUnsure = stampUnsure;
+    }
+
+    /** The collector's own words, when neither the reader nor the search found the card. */
+    static IdentityProposal described(UUID orgId, UUID cardItemId, String description, UUID readingId, UUID proposedBy) {
+        IdentityProposal p = new IdentityProposal(orgId, cardItemId, Source.DESCRIBED, readingId, proposedBy);
+        p.description = description;
+        return p;
+    }
+
+    private IdentityProposal(UUID orgId, UUID cardItemId, Source source, UUID readingId, UUID proposedBy) {
+        this.id = UUID.randomUUID();
+        this.orgId = orgId;
+        this.cardItemId = cardItemId;
+        this.source = source;
+        this.readingId = readingId;
         this.proposedBy = proposedBy;
         this.createdAt = Instant.now();
     }
@@ -121,8 +150,25 @@ class IdentityProposal extends AssignedIdEntity<UUID> {
         return stamp;
     }
 
-    boolean isStampUnsure() {
+    /** Null for a description. */
+    Boolean getStampUnsure() {
         return stampUnsure;
+    }
+
+    Source getSource() {
+        return source;
+    }
+
+    UUID getReadingId() {
+        return readingId;
+    }
+
+    UUID getSuggestionId() {
+        return suggestionId;
+    }
+
+    String getDescription() {
+        return description;
     }
 
     UUID getProposedBy() {

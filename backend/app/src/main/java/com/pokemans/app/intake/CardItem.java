@@ -10,11 +10,19 @@ import java.util.UUID;
 
 /**
  * One physical card, or a photographed lot of cheap cards. Belongs to exactly one batch or one
- * collection. Identification against the catalog comes in M2; until then the label is free text.
+ * collection.
+ *
+ * <p>The label is the name people see. A card is added before anyone knows its name (photos first): it
+ * shows {@link #PLACEHOLDER_LABEL} until the collector's proposal or the admin's identification names it,
+ * through {@link #name}. A lot is still described up front. Identity itself lives in the catalog module;
+ * the label is only what to call the card.
  */
 @Entity
 @Table(name = "card_item")
 class CardItem extends AssignedIdEntity<UUID> {
+
+    /** What a card is called until it is named. */
+    static final String PLACEHOLDER_LABEL = "New card";
 
     @Id
     private UUID id;
@@ -68,8 +76,17 @@ class CardItem extends AssignedIdEntity<UUID> {
         return collectionId;
     }
 
+    /** The card's name, or {@link #PLACEHOLDER_LABEL} until it has one. */
     String getLabel() {
-        return label;
+        return label != null ? label : PLACEHOLDER_LABEL;
+    }
+
+    boolean isNamed() {
+        return label != null;
+    }
+
+    void name(String label) {
+        this.label = label;
     }
 
     boolean isLot() {

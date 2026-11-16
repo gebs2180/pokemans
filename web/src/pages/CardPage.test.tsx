@@ -26,6 +26,7 @@ const photo = (over: Partial<PhotoView>): PhotoView => ({
 const card = (over: Partial<CardView> = {}): CardView => ({
   id: 'card1',
   label: 'Pikachu VMAX',
+  named: true,
   lot: false,
   quantity: 1,
   captureComplete: true,
@@ -65,6 +66,7 @@ function renderCard(view: CardView, cardStatus: CardStatus = status, orgType = '
         )
       }
       if (url.endsWith('/status')) return Promise.resolve(respond(200, cardStatus))
+      if (url.includes('/identify?')) return Promise.resolve(respond(200, { step: 'IDENTIFIED', why: null, readingId: null, readQuery: null, readLanguage: null, suggestions: [], proposal: null }))
       if (url.endsWith('/sale')) return Promise.resolve(respond(200, { offer: null, listing: null }))
       if (url.endsWith('/ship-address')) return Promise.resolve(new Response(null, { status: 200 }))
       if (url.endsWith('/provenance')) return Promise.resolve(respond(404, { detail: 'x' }))
@@ -273,81 +275,18 @@ describe('ContainerPage', () => {
     expect(await screen.findByText(/Couldn't load where each card is/)).toBeInTheDocument()
   })
 
-  it('picks a card from the catalog by keyboard and stores the pick as a proposal', async () => {
+  it('adds a card with no name and goes straight to its photos', async () => {
+    // Photo-first: which card it is comes from its photos, on the card page.
     const user = userEvent.setup()
     const posts: unknown[] = []
     renderCollection(posts)
-    const box = await screen.findByRole('combobox', { name: 'Find your card' })
+    expect(await screen.findByText(/we'll work out which card it is from the photos/)).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Find your card' })).not.toBeInTheDocument()
     // Lots never get an offer, so a seller isn't asked about them.
     expect(screen.queryByLabelText('Lot of cheaper cards')).not.toBeInTheDocument()
-    await user.type(box, 'charizard 4/102')
-    const list = await screen.findByRole('listbox', { name: 'Matching cards' })
-    const options = within(list).getAllByRole('option')
-    expect(options).toHaveLength(2)
-    expect(options[0]).toHaveTextContent('CharizardBase Set · 4/102 · 1999 · English')
-    expect(searches.at(-1)).toBe('charizard 4/102')
-
-    await user.keyboard('{ArrowDown}{ArrowDown}{ArrowUp}')
-    expect(box).toHaveAttribute('aria-activedescendant', options[0].id)
-    expect(options[0]).toHaveAttribute('aria-selected', 'true')
-    await user.keyboard('{Enter}')
-
-    // Three editions: asked, with nothing chosen for them. One finish: taken, not asked.
-    const edition = await screen.findByRole('group', { name: 'Edition' })
-    expect(within(edition).getByRole('radio', { name: 'Not sure' })).toBeChecked()
-    expect(screen.queryByRole('group', { name: 'Finish' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: 'Stamp' })).not.toBeInTheDocument()
-    await user.click(within(edition).getByRole('radio', { name: 'Shadowless' }))
-
     await user.click(screen.getByRole('button', { name: 'Add card' }))
     expect(await screen.findByText('Card page')).toBeInTheDocument()
-    expect(posts).toEqual([
-      { url: '/api/orgs/org1/collections/c1/cards', label: 'Charizard · Base Set 4/102 · Shadowless · Holo', lot: false, quantity: 1 },
-      { url: '/api/orgs/org1/cards/new1/proposed-identity', externalId: 'base1-4', language: 'en', edition: 'SHADOWLESS', variant: 'HOLO', stamp: null, stampUnsure: false },
-    ])
-  })
-
-  it('leaves an edition the collector is unsure of for review, and asks for a pick before adding', async () => {
-    const user = userEvent.setup()
-    const posts: unknown[] = []
-    renderCollection(posts)
-    await user.click(await screen.findByRole('button', { name: 'Add card' }))
-    expect(await screen.findByText(/Choose your card from the list/)).toBeInTheDocument()
-    expect(posts).toEqual([])
-
-    await user.type(screen.getByRole('combobox', { name: 'Find your card' }), 'charizard')
-    await user.click(await screen.findByRole('option', { name: /Charizard/ }))
-    expect(await screen.findByText(/Not sure is fine/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Add card' }))
-    await screen.findByText('Card page')
-    expect(posts[1]).toMatchObject({ externalId: 'base1-4', edition: null, variant: 'HOLO' })
-  })
-
-  it('says early when a picked card is clearly under the minimum, without refusing it', async () => {
-    const user = userEvent.setup()
-    renderCollection([], false, true)
-    await user.type(await screen.findByRole('combobox', { name: 'Find your card' }), 'charizard')
-    await user.click(await screen.findByRole('option', { name: /Charizard/ }))
-    // No hint until the print is known.
-    await screen.findByRole('group', { name: 'Edition' })
-    expect(screen.queryByText(/whatever its condition/)).not.toBeInTheDocument()
-    await user.click(within(screen.getByRole('group', { name: 'Edition' })).getByRole('radio', { name: 'Unlimited' }))
-    expect(await screen.findByText(/usually sells for under our \$25 minimum, whatever its condition/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add card' })).toBeEnabled()
-  })
-
-  it("lets a collector describe a card they can't find, as before", async () => {
-    const user = userEvent.setup()
-    const posts: unknown[] = []
-    renderCollection(posts)
-    await user.type(await screen.findByRole('combobox', { name: 'Find your card' }), 'Mew')
-    await user.click(screen.getByRole('button', { name: "Can't find it? Describe it" }))
-    // What they typed carries over.
-    expect(screen.getByLabelText('Describe your card')).toHaveValue('Mew')
-    await user.type(screen.getByLabelText('Describe your card'), ' 151/165')
-    await user.click(screen.getByRole('button', { name: 'Add card' }))
-    expect(await screen.findByText('Card page')).toBeInTheDocument()
-    expect(posts).toEqual([{ url: '/api/orgs/org1/collections/c1/cards', label: 'Mew 151/165', lot: false, quantity: 1 }])
+    expect(posts).toEqual([{ url: '/api/orgs/org1/collections/c1/cards', label: null, lot: false, quantity: 1 }])
   })
 })
 

@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Org-scoped intake API. Batches live in partner orgs, collections in collector orgs; cards and
@@ -36,9 +37,22 @@ class IntakeController {
     record CreateContainer(@NotBlank @Size(max = 200) String name) {
     }
 
-    record CreateCard(@NotBlank @Size(max = 300) String label, boolean lot, @Min(1) @Max(100_000) Integer quantity) {
+    /**
+     * @param label what the card is, or blank for a single card, which is named once it is identified from its
+     *              photos. A lot is always described.
+     */
+    record CreateCard(@Size(max = 300) String label, boolean lot, @Min(1) @Max(100_000) Integer quantity) {
         int quantityOrOne() {
             return quantity == null ? 1 : quantity;
+        }
+
+        /** The trimmed label, null if blank; a lot without one is refused. */
+        String labelOrNull() {
+            String trimmed = label == null || label.isBlank() ? null : label.trim();
+            if (trimmed == null && lot) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Describe the lot");
+            }
+            return trimmed;
         }
     }
 
@@ -72,7 +86,7 @@ class IntakeController {
     @PostMapping("/batches/{batchId}/cards")
     @ResponseStatus(HttpStatus.CREATED)
     CardView addBatchCard(@PathVariable UUID orgId, @PathVariable UUID batchId, @Valid @RequestBody CreateCard request) {
-        return intake.addCardToBatch(orgId, batchId, request.label().trim(), request.lot(), request.quantityOrOne());
+        return intake.addCardToBatch(orgId, batchId, request.labelOrNull(), request.lot(), request.quantityOrOne());
     }
 
     @PostMapping("/collections")
@@ -94,7 +108,7 @@ class IntakeController {
     @PostMapping("/collections/{collectionId}/cards")
     @ResponseStatus(HttpStatus.CREATED)
     CardView addCollectionCard(@PathVariable UUID orgId, @PathVariable UUID collectionId, @Valid @RequestBody CreateCard request) {
-        return intake.addCardToCollection(orgId, collectionId, request.label().trim(), request.lot(), request.quantityOrOne());
+        return intake.addCardToCollection(orgId, collectionId, request.labelOrNull(), request.lot(), request.quantityOrOne());
     }
 
     @GetMapping("/cards/{cardId}")
