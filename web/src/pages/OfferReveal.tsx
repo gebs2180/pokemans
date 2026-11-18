@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { likelyRungs, money, type Offer } from '../api'
+import { likelyRungs, money, type MeasuredCentering, type Offer, type SideCentering } from '../api'
 import { hasSeenOffer, markOfferSeen, prefersReducedMotion } from '../offerSeen'
 import { slipCents } from '../slip'
 
@@ -64,12 +64,38 @@ export function PriceBreakdown({ offer }: { offer: Offer }) {
   )
 }
 
-function RevealBack({ offer }: { offer: Offer }) {
+/** "58/42": the side's more off-centre ratio of the two, left-right or top-bottom. */
+function worseRatio(side: SideCentering) {
+  const share = (ratio: string) => Math.max(...ratio.split('/').map(Number))
+  return share(side.topBottom) > share(side.leftRight) ? side.topBottom : side.leftRight
+}
+
+/**
+ * Our own centering reading beside the grade chances, read-only: each measured side's more off-centre ratio and the best
+ * PSA grade that centering allows. Only ever our measurement (never a provider's), and nothing when nothing was measured.
+ */
+export function CenteringNote({ centering }: { centering?: MeasuredCentering | null }) {
+  const sides = [
+    centering?.front ? `${worseRatio(centering.front)} front` : null,
+    centering?.back ? `${worseRatio(centering.back)} back` : null,
+  ].filter((s) => s != null)
+  if (sides.length === 0) return null
+  const best = centering?.bestPsaGrade
+  return (
+    <p className="small centering-note">
+      Centering measured {sides.join(', ')}
+      {best != null ? `, so the best PSA grade for centering is ${best}.` : '.'}
+    </p>
+  )
+}
+
+function RevealBack({ offer, centering }: { offer: Offer; centering?: MeasuredCentering | null }) {
   return (
     <>
       <p className="reveal-label">Firm offer</p>
       <p className="offer-price">{money(offer.price)}</p>
       <PriceBreakdown offer={offer} />
+      <CenteringNote centering={centering} />
       <p className="reveal-final">Final. No re-grade on arrival.</p>
     </>
   )
@@ -84,8 +110,17 @@ const VISIBLE = 0.6
  * only once the turn has finished, so a phone that opens it below the fold still gets the moment.
  *
  * @param frontUrl the card's front, cropped, shown until it turns over; a plain card face when there isn't one
+ * @param centering our own centering measurement, shown beside the grade chances; none when not measured
  */
-export function OfferReveal({ offer, frontUrl }: { offer: Offer; frontUrl?: string | null }) {
+export function OfferReveal({
+  offer,
+  frontUrl,
+  centering,
+}: {
+  offer: Offer
+  frontUrl?: string | null
+  centering?: MeasuredCentering | null
+}) {
   // Decided once, when the offer first renders.
   const [flipping, setFlipping] = useState(() => !hasSeenOffer(offer.id) && !prefersReducedMotion())
   const [play, setPlay] = useState(false)
@@ -119,7 +154,7 @@ export function OfferReveal({ offer, frontUrl }: { offer: Offer; frontUrl?: stri
   if (!flipping) {
     return (
       <div className="reveal-static" data-testid="offer-reveal">
-        <RevealBack offer={offer} />
+        <RevealBack offer={offer} centering={centering} />
       </div>
     )
   }
@@ -136,7 +171,7 @@ export function OfferReveal({ offer, frontUrl }: { offer: Offer; frontUrl?: stri
           {frontUrl ? <img src={frontUrl} alt="" /> : <div className="flip-blank" />}
         </div>
         <div className="flip-face flip-back">
-          <RevealBack offer={offer} />
+          <RevealBack offer={offer} centering={centering} />
         </div>
       </div>
     </div>

@@ -82,6 +82,16 @@ class ConditionSummaryTest {
 
         assertThat(s.centering().front()).isEqualTo(new Assessments.SideCentering("49/51", "48/52"));
         assertThat(s.centering().back()).isNull();
+        assertThat(s.centering().bestPsaGrade()).isEqualTo(10);
+    }
+
+    @Test
+    void showsTheBestGradeOurMeasurementAllows() {
+        Map<String, Object> off = Map.of("leftRight", "58.2/41.8", "topBottom", "50/50", "worstShare", 58.2);
+        Assessments.Summary s = Assessments.summarize(dist(Grade.G8, "1"), List.of(measured(9, off, EVEN)));
+
+        assertThat(s.centering().front()).isEqualTo(new Assessments.SideCentering("58/42", "50/50"));
+        assertThat(s.centering().bestPsaGrade()).isEqualTo(9);
     }
 
     @Test

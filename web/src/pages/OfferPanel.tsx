@@ -189,7 +189,7 @@ export function OfferPanel({
       )}
       {offer && (
         <>
-          <OfferReveal key={offer.id} offer={offer} frontUrl={frontUrl} />
+          <OfferReveal key={offer.id} offer={offer} frontUrl={frontUrl} centering={status?.condition?.centering} />
           {offer.subjectToAuthentication && <p className="muted small">Subject to the buyer authenticating the card in hand.</p>}
           {offer.rawSales?.below && offer.rawSales.lowest != null && (
             <p className="alert alert-warning">
