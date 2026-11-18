@@ -142,6 +142,9 @@ pokemans:
     # Offers show sellers what each grade recently sold for, from the comps stored with the offer (UX
     # review finding 11). A kill switch in case the price data's licence doesn't allow showing them.
     show-sold-prices: ${SHOW_SOLD_PRICES:true}
+    # The raw sanity band: an offer below what its own formula would pay for a card certain to be worth the lowest raw
+    # near-mint sale of this many days is flagged to the admin and the seller, never refused (Zach, 2026-11-18).
+    raw-sales-days: 90
   shipping:
     # Prepaid, insured labels for taken cards, bought on our account and billed to buyers monthly
     # (Zach, 2026-10-19). Off until a key is set in the environment; a test key buys test labels.

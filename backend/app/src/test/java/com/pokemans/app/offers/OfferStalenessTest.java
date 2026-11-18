@@ -99,13 +99,17 @@ class OfferStalenessTest {
                 .andExpect(jsonPath("$.offer.rawSales.below").value(true))
                 .andExpect(jsonPath("$.offer.rawSales.lowest").value(500.0))
                 .andExpect(jsonPath("$.offer.rawSales.sales").value(2))
-                .andExpect(jsonPath("$.offer.rawSales.since").value(TODAY.minusDays(OfferService.RAW_SALES_DAYS).toString()));
+                .andExpect(jsonPath("$.offer.rawSales.since").value(TODAY.minusDays(90).toString()));
         api.get("/api/admin/cards/" + card.cardId() + "/offer-preview", api.admin())
                 .andExpect(jsonPath("$.offered").value(true))
                 .andExpect(jsonPath("$.rawSales.below").value(true))
                 .andExpect(jsonPath("$.rawSales.lowest").value(500.0));
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
                 "select below_raw_sales from card_offer where id = ?::uuid", Boolean.class, card.offerId())).isTrue();
+        // Flagged against the $500 sale through the offer's own haircut, which is under the sale itself.
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
+                "select raw_nm_net_low > price and raw_nm_net_low < raw_nm_low from card_offer where id = ?::uuid", Boolean.class,
+                card.offerId())).isTrue();
 
         // A flag only: the offer can be posted and sold, and buyers never see the check.
         api.postJson(listings(seller, card), "{\"offerId\":\"" + card.offerId() + "\"}", seller.who()).andExpect(status().isCreated());
@@ -153,6 +157,10 @@ class OfferStalenessTest {
         // The offer row is untouched; the void is its own row, which commits although the post was refused.
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
                 "select count(*) from card_offer_void where offer_id = ?::uuid", Integer.class, card.offerId())).isEqualTo(1);
+        // Both prices are kept, so the direction of the move can be counted: up, here.
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
+                "select v.repriced_was = o.price and v.repriced_now > v.repriced_was from card_offer_void v"
+                        + " join card_offer o on o.id = v.offer_id where v.offer_id = ?::uuid", Boolean.class, card.offerId())).isTrue();
 
         // A new offer on today's prices posts.
         String fresh = TestApi.read(api.postJson("/api/orgs/" + seller.orgId() + "/cards/" + card.cardId() + "/offers", "", seller.who())
@@ -179,6 +187,9 @@ class OfferStalenessTest {
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
                 "select count(*) from listing_event where listing_id = ?::uuid and type = 'VOIDED' and note = ?", Integer.class,
                 UUID.fromString(card.listingId()), OfferService.PRICE_CHANGED)).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
+                "select v.repriced_now > v.repriced_was from card_offer_void v where v.offer_id = ?::uuid", Boolean.class,
+                UUID.fromString(card.offerId()))).isTrue();
         api.get("/api/orgs/" + buyer.orgId() + "/market", buyer.who())
                 .andExpect(jsonPath("$[?(@.listingId=='" + card.listingId() + "')]").isEmpty());
 

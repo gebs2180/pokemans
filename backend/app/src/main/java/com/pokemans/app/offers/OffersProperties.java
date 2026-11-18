@@ -23,11 +23,20 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                       at accept its ladder is re-run on the card's current prices, and past this share of the offer
  *                       price the offer is voided ("The price has changed. Get a new offer."). Deep review 2026-11-09,
  *                       B3. A property, not part of the parameter set: it guards the market, it doesn't price
+ * @param rawSalesDays   how far back the raw sanity band looks for the card's near-mint raw sales (deep review B1 step 1;
+ *                       90, the comp window, Zach 2026-11-18). It flags, never prices
  */
 @ConfigurationProperties("pokemans.offers")
 record OffersProperties(@DefaultValue("7d") Duration offerValidFor,
                         @DefaultValue("14d") Duration listingOpenFor,
                         @DefaultValue("5000") BigDecimal maxPrice,
                         @DefaultValue("true") boolean showSoldPrices,
-                        @DefaultValue("0.10") BigDecimal repriceThreshold) {
+                        @DefaultValue("0.10") BigDecimal repriceThreshold,
+                        @DefaultValue("90") int rawSalesDays) {
+
+    OffersProperties {
+        if (rawSalesDays < 1) {
+            throw new IllegalArgumentException("pokemans.offers.raw-sales-days must be at least 1, got " + rawSalesDays);
+        }
+    }
 }

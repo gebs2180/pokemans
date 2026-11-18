@@ -81,7 +81,8 @@ These defaults are the reviewing session's picks, not Zach's decisions yet.
 
 - **Raw sanity band (B1 step 1).** When an offer is quoted, the card's raw near-mint comps from the last 90 days are looked up. These are what PokeTrace stores. A PokeTrace comp is a day's average, so "lowest" is the lowest day.
   - The lowest one, the count and the window start are stored on the offer (`card_offer.raw_nm_*`).
-  - The firm price below the lowest one sets `below_raw_sales`.
+  - The firm price below the lowest one *through the offer's own haircut* sets `below_raw_sales` (Zach, 2026-11-18; [decisions-to-confirm.md](decisions-to-confirm.md) item 12). The benchmark is the lowest day × (1 − f)(1 − d)(1 − m) at the offer's own liquidity tier and margin, stored as `card_offer.raw_nm_net_low`: what the formula would pay for a card certain to be worth that sale. Every offer sits under the raw sale by its haircut, so comparing with the sale itself flagged almost every cheap card. Offers quoted before 2026-11-18 were flagged against the lowest day itself and have no `raw_nm_net_low`.
+  - The window is `pokemans.offers.raw-sales-days` (90).
   - **The flag never refuses the offer and never changes the formula.**
   - The admin's offer preview on the review page shows the raw comps and the flag.
   - The seller is told "This offer is below recent raw sales of $X" on the card's offer.
@@ -97,6 +98,7 @@ These defaults are the reviewing session's picks, not Zach's decisions yet.
   - The refusal appends rows and never edits one. At post, it appends a `card_offer_void`. At accept, it appends a `VOIDED` listing event plus the offer void, so the card comes off the market.
   - The void rows commit although the request is refused.
   - Their `voided_by` is the user whose request found the move: the seller or the buyer.
+  - From 2026-11-18 the offer void keeps both prices, `repriced_was` and `repriced_now` (null when the card couldn't be priced), so the direction of each move can be counted.
   - The self-dealing and address refusals at accept come before the re-price, so a refused buyer doesn't take the card off the market.
   - A listing voided this way counts as `VOIDED` in the track record.
 

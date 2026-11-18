@@ -13,7 +13,7 @@ class LessSureTest {
     private static CardOffer offer(String trace) {
         return new CardOffer(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), false,
                 "{}", "1.6.0", new BigDecimal("0.13"), "{}", new BigDecimal("900"), new BigDecimal("1001"), "B", false, trace,
-                UUID.randomUUID(), Instant.EPOCH, Instant.EPOCH, new CardOffer.RawCheck(null, 0, null));
+                UUID.randomUUID(), Instant.EPOCH, Instant.EPOCH, new CardOffer.RawCheck(null, 0, null, null));
     }
 
     @Test
