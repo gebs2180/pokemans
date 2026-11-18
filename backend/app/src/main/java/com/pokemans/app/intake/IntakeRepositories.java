@@ -88,12 +88,17 @@ interface PhotoRepository extends JpaRepository<Photo, UUID> {
 
     long countByStatusNotAndLocationCheckedAtIsNull(Photo.Status status);
 
-    /** Photos with a card found but no wide crop yet, oldest first (made before wide crops were kept). */
+    /**
+     * Photos with a card found but no wide crop or no surface crop yet, oldest first (made before those were kept).
+     * Bounded to what the backfill can make: a photo it fails on stays in the list and the next run tries it again.
+     */
     @Query("select p.id from Photo p where p.cropKey is not null and p.cardCorners is not null"
-            + " and p.wideCropKey is null order by p.createdAt")
+            + " and (p.wideCropKey is null or p.surfaceKey is null) order by p.createdAt")
     List<UUID> findIdsWithoutWideCrop(org.springframework.data.domain.Limit limit);
 
-    long countByCropKeyIsNotNullAndCardCornersIsNotNullAndWideCropKeyIsNull();
+    @Query("select count(p) from Photo p where p.cropKey is not null and p.cardCorners is not null"
+            + " and (p.wideCropKey is null or p.surfaceKey is null)")
+    long countWithoutWideCrop();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Photo p where p.id = :id")

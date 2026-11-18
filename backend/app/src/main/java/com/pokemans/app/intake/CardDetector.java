@@ -42,6 +42,13 @@ class CardDetector {
      * edge line against the background, and well inside the 6% the quality check leaves between card and frame.
      */
     static final double WIDE_MARGIN = 0.04;
+    /** The surface view's full-resolution crop is about this wide in all, margins included (never more than the source has). */
+    static final int SURFACE_WIDTH = 2000;
+    /** Local-contrast (CLAHE) clip limit and tile grid: strong enough to show print lines and dents, not so strong that grain turns to noise. */
+    private static final double CLAHE_CLIP = 3.0;
+    private static final int CLAHE_TILES = 8;
+    /** Blur sigma of the high-pass layer, as a share of the crop's width: wider than a scratch, narrower than a dent's shading. */
+    private static final double HIGH_PASS_SIGMA_SHARE = 0.006;
     /** Widest printed border as a share of its inner box's width: a 90/10 card's wide border is about 5.5 mm of 57. */
     private static final double MAX_BORDER_SHARE = 0.10;
 
@@ -415,19 +422,87 @@ class CardDetector {
     }
 
     /**
+     * The surface view's images for a photo whose corners were found: the card upright with {@link #WIDE_MARGIN} past each
+     * edge at the source's own resolution (about {@link #SURFACE_WIDTH} px wide in all, less if the source has fewer pixels
+     * on the card), and its local-contrast version. Null if the original doesn't decode. Call only on images
+     * {@link com.pokemans.app.storage.ImageGuard} let through.
+     */
+    static Surface surface(byte[] imageBytes, List<Corner> corners) {
+        if (corners == null || corners.size() != 4) {
+            return null;
+        }
+        MatOfByte encoded = new MatOfByte(imageBytes);
+        Mat full = Imgcodecs.imdecode(encoded, Imgcodecs.IMREAD_COLOR);
+        List<Mat> owned = new ArrayList<>(List.of(encoded, full));
+        try {
+            if (full.empty()) {
+                return null;
+            }
+            Point[] quad = corners.stream().map(c -> new Point(c.x(), c.y())).toArray(Point[]::new);
+            double sourceCardWidth = (distance(quad[0], quad[1]) + distance(quad[3], quad[2])) / 2;
+            double cardWidth = Math.min(SURFACE_WIDTH / (1 + 2 * WIDE_MARGIN), sourceCardWidth);
+            Mat crop = wideWarp(full, quad, Math.max(1, (int) Math.round(cardWidth)), owned);
+            return new Surface(jpeg(crop), jpeg(enhance(crop, owned)));
+        } finally {
+            owned.forEach(Mat::release);
+        }
+    }
+
+    /** The surface view's two images, JPEG: the full-resolution crop and its local-contrast version. */
+    record Surface(byte[] hiResJpeg, byte[] detailJpeg) {
+    }
+
+    /**
+     * Greyscale with the contrast evened out in tiles (CLAHE), then a high-pass layer added: the image minus its Gaussian
+     * blur, which lifts scratches, print lines and dents that sit on a bright or dark ground. A global stretch clips holo
+     * foil to white; working per tile keeps the foil's structure. Same size as the input.
+     */
+    static Mat enhance(Mat bgr, List<Mat> owned) {
+        Mat gray = track(owned, new Mat());
+        Imgproc.cvtColor(bgr, gray, Imgproc.COLOR_BGR2GRAY);
+        Mat even = track(owned, new Mat());
+        Imgproc.createCLAHE(CLAHE_CLIP, new Size(CLAHE_TILES, CLAHE_TILES)).apply(gray, even);
+        Mat blur = track(owned, new Mat());
+        double sigma = Math.max(1.0, HIGH_PASS_SIGMA_SHARE * bgr.cols());
+        Imgproc.GaussianBlur(even, blur, new Size(0, 0), sigma);
+        // even + 1.5 × (even − blur) = 2.5 × even − 1.5 × blur, saturating at 0 and 255.
+        Mat out = track(owned, new Mat());
+        Core.addWeighted(even, 2.5, blur, -1.5, 0, out);
+        return out;
+    }
+
+    /** {@link #enhance} for a decoded JPEG or PNG, for tests and tools. */
+    static byte[] enhanceJpeg(byte[] imageBytes) {
+        MatOfByte encoded = new MatOfByte(imageBytes);
+        Mat image = Imgcodecs.imdecode(encoded, Imgcodecs.IMREAD_COLOR);
+        List<Mat> owned = new ArrayList<>(List.of(encoded, image));
+        try {
+            return image.empty() ? null : jpeg(enhance(image, owned));
+        } finally {
+            owned.forEach(Mat::release);
+        }
+    }
+
+    /**
      * The card upright with {@link #WIDE_MARGIN} past each edge, so its outer edges and corners show against the
      * background. The tight crop ends exactly on the detected outline, a few pixels either side of the true edge, so it
      * can cut the edge off. Anything past the photo's frame repeats the frame's edge.
      */
     private static Mat wideWarp(Mat full, Point[] quad, List<Mat> owned) {
-        double mx = CROP_WIDTH * WIDE_MARGIN;
-        double my = CROP_HEIGHT * WIDE_MARGIN;
+        return wideWarp(full, quad, CROP_WIDTH, owned);
+    }
+
+    /** The same at a chosen card width in pixels (height follows the card's aspect). */
+    private static Mat wideWarp(Mat full, Point[] quad, int cardWidth, List<Mat> owned) {
+        int cardHeight = (int) Math.round(cardWidth / CARD_ASPECT);
+        double mx = cardWidth * WIDE_MARGIN;
+        double my = cardHeight * WIDE_MARGIN;
         Mat src = track(owned, new MatOfPoint2f(quad));
         Mat dst = track(owned, new MatOfPoint2f(
-                new Point(mx, my), new Point(mx + CROP_WIDTH, my), new Point(mx + CROP_WIDTH, my + CROP_HEIGHT), new Point(mx, my + CROP_HEIGHT)));
+                new Point(mx, my), new Point(mx + cardWidth, my), new Point(mx + cardWidth, my + cardHeight), new Point(mx, my + cardHeight)));
         Mat transform = track(owned, Imgproc.getPerspectiveTransform(src, dst));
         Mat crop = track(owned, new Mat());
-        Imgproc.warpPerspective(full, crop, transform, new Size(Math.round(CROP_WIDTH + 2 * mx), Math.round(CROP_HEIGHT + 2 * my)),
+        Imgproc.warpPerspective(full, crop, transform, new Size(Math.round(cardWidth + 2 * mx), Math.round(cardHeight + 2 * my)),
                 Imgproc.INTER_AREA, Core.BORDER_REPLICATE);
         return crop;
     }

@@ -10,6 +10,7 @@ import com.pokemans.app.intake.IntakeViews.ContainerDetail;
 import com.pokemans.app.intake.IntakeViews.ContainerSummary;
 import com.pokemans.app.storage.BlobStore;
 import com.pokemans.app.storage.StorageProperties;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -157,8 +158,12 @@ class IntakeService {
         CardItem card = requireCard(orgId, cardId);
         return IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId()),
                 p -> blobs.presignDownload(storage.photoBucket(), p.getCropKey() != null ? p.getCropKey() : p.getStorageKey()),
-                p -> p.getWideCropKey() == null ? null : blobs.presignDownload(storage.photoBucket(), p.getWideCropKey()),
+                p -> new IntakeViews.SurfaceLinks(link(p.getWideCropKey()), link(p.getSurfaceKey()), link(p.getSurfaceDetailKey())),
                 frozenReason(card.getId()));
+    }
+
+    private URI link(String key) {
+        return key == null ? null : blobs.presignDownload(storage.photoBucket(), key);
     }
 
     /** Why the card's photos can't change any more (it is posted or sold), or null. */
@@ -173,7 +178,7 @@ class IntakeService {
         Map<UUID, List<Photo>> byCard = photos.findByCardItemIdInOrderByCreatedAtAsc(items.stream().map(CardItem::getId).toList())
                 .stream()
                 .collect(Collectors.groupingBy(Photo::getCardItemId));
-        return items.stream().map(c -> IntakeViews.card(c, byCard.getOrDefault(c.getId(), List.of()), p -> null, p -> null, frozenReason(c.getId())))
+        return items.stream().map(c -> IntakeViews.card(c, byCard.getOrDefault(c.getId(), List.of()), p -> null, p -> IntakeViews.SurfaceLinks.NONE, frozenReason(c.getId())))
                 .toList();
     }
 

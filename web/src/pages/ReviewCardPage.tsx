@@ -28,7 +28,7 @@ import { useLoad, usePoll } from '../useLoad'
 import { searchFromLabel } from '../searchFromLabel'
 import { PricesPanel } from './PricesPanel'
 import { ProvenancePanel } from './ProvenancePanel'
-import { SurfacePanel } from './SurfaceOverlay'
+import { MarkedSurfacePanel } from './DefectMarks'
 import { CenteringLinesPanel } from './CenteringLinesPanel'
 import { Loading, PageError } from '../ui'
 import { message, percent } from '../format'
@@ -91,7 +91,7 @@ export function ReviewCardPage() {
         </div>
       </section>
 
-      <SurfacePanel photos={data.photos} />
+      <MarkedSurfacePanel orgId={orgId} cardId={cardId} photos={data.photos} />
       <CenteringLinesPanel orgId={orgId} cardId={cardId} photos={data.photos} />
 
       <Identification data={data} base={base} onChange={reload} />

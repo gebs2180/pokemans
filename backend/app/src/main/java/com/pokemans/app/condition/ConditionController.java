@@ -59,8 +59,12 @@ class ConditionController {
                      String assessment, Confidence confidence, int openRequests, String orgName, boolean priced) {
     }
 
-    /** @param wideUrl the card with a little background past each edge (the surface view), or null for older photos */
-    record PhotoLink(UUID id, String side, URI url, URI cropUrl, Instant capturedAt, URI wideUrl) {
+    /**
+     * @param wideUrl    the card with a little background past each edge (1000 px), or null for older photos
+     * @param surfaceUrl the same at full resolution (about 2000 px wide), for the surface view; null until the backfill
+     * @param detailUrl  the full-resolution crop with its local contrast evened out (CLAHE plus a high-pass layer), or null
+     */
+    record PhotoLink(UUID id, String side, URI url, URI cropUrl, Instant capturedAt, URI wideUrl, URI surfaceUrl, URI detailUrl) {
     }
 
     record RequestView(UUID id, String provider, PredictionRequest.Status status, int attempts, String lastError,
@@ -158,7 +162,7 @@ class ConditionController {
         List<PhotoLink> photos = cardItems.currentPhotos(cardId).stream()
                 .map(p -> new PhotoLink(p.id(), p.side(), blobs.presignDownload(storage.photoBucket(), p.storageKey()),
                         p.cropKey() == null ? null : blobs.presignDownload(storage.photoBucket(), p.cropKey()), p.capturedAt(),
-                        p.wideCropKey() == null ? null : blobs.presignDownload(storage.photoBucket(), p.wideCropKey())))
+                        link(p.wideCropKey()), link(p.surfaceKey()), link(p.surfaceDetailKey())))
                 .toList();
         java.util.Optional<ConditionAssessment> current = assessmentRepository.findByCardItemIdAndIsCurrentTrue(cardId);
         return new CardConditionView(card.id(), card.orgId(), card.label(), condition.enabledProviders(), photos,
@@ -168,6 +172,10 @@ class ConditionController {
                 condition.assessments(cardId).stream().map(ConditionController::view).toList(), condition.centeringCap(cardId),
                 current.map(assessments::photosChanged).orElse(false),
                 current.map(Assessments::builtOnRetiredProvider).orElse(false));
+    }
+
+    private URI link(String key) {
+        return key == null ? null : blobs.presignDownload(storage.photoBucket(), key);
     }
 
     /** Asks every enabled provider (again) about this card. */

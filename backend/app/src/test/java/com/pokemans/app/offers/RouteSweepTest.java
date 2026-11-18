@@ -231,7 +231,7 @@ class RouteSweepTest {
                 // No fixture seeds these yet (valuation runs, reports, memberships, ...), so each is named here on purpose:
                 // a new path variable fails the sweep until someone adds it, instead of silently getting a random id.
                 Map.entry("reportId", UNSEEDED), Map.entry("runId", UNSEEDED), Map.entry("outcomeId", UNSEEDED),
-                Map.entry("membershipId", UNSEEDED), Map.entry("inviteId", UNSEEDED), Map.entry("catalogCardId", UNSEEDED),
+                Map.entry("membershipId", UNSEEDED), Map.entry("inviteId", UNSEEDED), Map.entry("markId", UNSEEDED), Map.entry("catalogCardId", UNSEEDED),
                 Map.entry("externalId", "base1-4"), Map.entry("token", "unseeded-token"));
         Matcher m = Pattern.compile("\\{(\\w+)}").matcher(path);
         StringBuilder url = new StringBuilder();

@@ -14,7 +14,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * One-off, run by the admin after the deploy that started keeping wide crops (2026-11-18): makes the wide card crop
- * ({@link CardDetector#wideCrop}) for photos checked before, from the stored original and the corners found then. Until a
+ * ({@link CardDetector#wideCrop}) and the full-resolution surface crop with its local-contrast version
+ * ({@link CardDetector#surface}, since 2026-11-18) for photos checked before, from the stored original and the corners found then. Until a
  * photo has one, the surface view shows its tight crop. Each photo runs in its own transaction, so a run can stop
  * anywhere and the next one carries on.
  */
@@ -61,14 +62,14 @@ class PhotoWideCropBackfill {
                 log.warn("Wide crop backfill: photo {} failed", id, e);
             }
         }
-        Result result = new Result(ids.size(), made, failed, photos.countByCropKeyIsNotNullAndCardCornersIsNotNullAndWideCropKeyIsNull());
+        Result result = new Result(ids.size(), made, failed, photos.countWithoutWideCrop());
         log.info("Wide crop backfill: {}", result);
         return result;
     }
 
     private boolean one(UUID id) {
         Photo photo = photos.findLockedById(id).orElse(null);
-        if (photo == null || photo.getWideCropKey() != null) {
+        if (photo == null || photo.getWideCropKey() != null && photo.getSurfaceKey() != null) {
             return true;
         }
         if (blobs.head(storage.photoBucket(), photo.getStorageKey()).isEmpty()) {
@@ -76,14 +77,27 @@ class PhotoWideCropBackfill {
             return false;
         }
         byte[] bytes = blobs.read(storage.photoBucket(), photo.getStorageKey());
-        byte[] wide = ImageGuard.safeHeader(bytes).isEmpty() ? null : CardDetector.wideCrop(bytes, photo.getCardCorners());
-        if (wide == null) {
-            log.warn("Wide crop backfill: photo {} doesn't decode", id);
-            return false;
+        boolean decodable = ImageGuard.safeHeader(bytes).isPresent();
+        if (photo.getWideCropKey() == null) {
+            byte[] wide = decodable ? CardDetector.wideCrop(bytes, photo.getCardCorners()) : null;
+            if (wide == null) {
+                log.warn("Wide crop backfill: photo {} doesn't decode", id);
+                return false;
+            }
+            String key = photo.wideCropStorageKey();
+            blobs.putIfAbsent(storage.photoBucket(), key, wide, "image/jpeg");
+            photo.wideCropStored(key);
         }
-        String key = photo.wideCropStorageKey();
-        blobs.putIfAbsent(storage.photoBucket(), key, wide, "image/jpeg");
-        photo.wideCropStored(key);
+        if (photo.getSurfaceKey() == null) {
+            CardDetector.Surface surface = decodable ? CardDetector.surface(bytes, photo.getCardCorners()) : null;
+            if (surface == null) {
+                log.warn("Wide crop backfill: photo {} doesn't decode for the surface crop", id);
+                return false;
+            }
+            blobs.putIfAbsent(storage.photoBucket(), photo.surfaceStorageKey(), surface.hiResJpeg(), "image/jpeg");
+            blobs.putIfAbsent(storage.photoBucket(), photo.surfaceDetailStorageKey(), surface.detailJpeg(), "image/jpeg");
+            photo.surfaceStored(photo.surfaceStorageKey(), photo.surfaceDetailStorageKey());
+        }
         return true;
     }
 }

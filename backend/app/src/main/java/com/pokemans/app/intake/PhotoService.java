@@ -117,6 +117,12 @@ class PhotoService {
     }
 
     /** Idempotent: confirming a photo that was already checked returns the stored result. */
+    private void storeSurface(Photo photo, CardDetector.Surface surface) {
+        blobs.putIfAbsent(storage.photoBucket(), photo.surfaceStorageKey(), surface.hiResJpeg(), "image/jpeg");
+        blobs.putIfAbsent(storage.photoBucket(), photo.surfaceDetailStorageKey(), surface.detailJpeg(), "image/jpeg");
+        photo.surfaceStored(photo.surfaceStorageKey(), photo.surfaceDetailStorageKey());
+    }
+
     private PhotoView check(UUID orgId, UUID photoId) {
         if (access.require(orgId, OrgType.values()).getType() != OrgType.PARTNER) {
             consents.requireAccepted(orgId);
@@ -156,6 +162,10 @@ class PhotoService {
             String wideKey = photo.wideCropStorageKey();
             blobs.putIfAbsent(storage.photoBucket(), wideKey, result.card().wideCropJpeg(), "image/jpeg");
             photo.wideCropStored(wideKey);
+            CardDetector.Surface surface = CardDetector.surface(bytes, result.card().corners());
+            if (surface != null) {
+                storeSurface(photo, surface);
+            }
         }
         if (cropKey == null && photo.getStatus() == Photo.Status.PASSED) {
             // Buyers are shown this copy (CardItems.shownKey), never the upload with its EXIF location.

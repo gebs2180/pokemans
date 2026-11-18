@@ -30,9 +30,18 @@ public class CardItems {
      * @param side      FRONT, BACK or DETAIL
      * @param cropKey   the card crop next to it, or null
      * @param wideCropKey the card crop with a little background past each edge, or null
+     * @param surfaceKey the full-resolution wide crop, or null
+     * @param surfaceDetailKey its local-contrast version, or null
      */
     public record PhotoRef(UUID id, UUID cardItemId, String side, String storageKey, String contentType, String cropKey,
-                           Instant capturedAt, Instant uploadedAt, String sha256, String wideCropKey) {
+                           Instant capturedAt, Instant uploadedAt, String sha256, String wideCropKey, String surfaceKey,
+                           String surfaceDetailKey) {
+
+        /** A photo without a surface crop (made before they were kept). */
+        public PhotoRef(UUID id, UUID cardItemId, String side, String storageKey, String contentType, String cropKey,
+                        Instant capturedAt, Instant uploadedAt, String sha256, String wideCropKey) {
+            this(id, cardItemId, side, storageKey, contentType, cropKey, capturedAt, uploadedAt, sha256, wideCropKey, null, null);
+        }
     }
 
     /**
@@ -190,7 +199,8 @@ public class CardItems {
 
     private static PhotoRef ref(Photo p) {
         return new PhotoRef(p.getId(), p.getCardItemId(), p.getSide().name(), p.getStorageKey(), p.getContentType(),
-                p.getCropKey(), p.getCapturedAt(), p.getUploadedAt(), p.getSha256(), p.getWideCropKey());
+                p.getCropKey(), p.getCapturedAt(), p.getUploadedAt(), p.getSha256(), p.getWideCropKey(),
+                p.getSurfaceKey(), p.getSurfaceDetailKey());
     }
 
     /**

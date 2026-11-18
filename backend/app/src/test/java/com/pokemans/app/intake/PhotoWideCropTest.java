@@ -65,7 +65,38 @@ class PhotoWideCropTest {
         assertThat(blobs.head(storage.photoBucket(), photo.getWideCropKey())).isPresent();
         mvc.perform(get("/api/orgs/" + org + "/cards/" + card).with(seller))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.photos[0].wideUrl").isNotEmpty())
+                .andExpect(jsonPath("$.photos[0].surfaceUrl").isNotEmpty())
+                .andExpect(jsonPath("$.photos[0].detailUrl").isNotEmpty());
+        assertThat(photo.getSurfaceKey()).isEqualTo(photo.getStorageKey() + ".surface.jpg");
+        assertThat(photo.getSurfaceDetailKey()).isEqualTo(photo.getStorageKey() + ".surface-detail.jpg");
+        assertThat(blobs.head(storage.photoBucket(), photo.getSurfaceKey())).isPresent();
+        assertThat(blobs.head(storage.photoBucket(), photo.getSurfaceDetailKey())).isPresent();
+    }
+
+    @Test
+    void theBackfillAlsoMakesTheSurfaceImagesForPhotosThatOnlyHaveAWideCrop() throws Exception {
+        TestApi api = new TestApi(mvc, security);
+        String subject = "auth0|surface-backfill-" + UUID.randomUUID();
+        String org = api.collectorOrg("Surface backfill " + UUID.randomUUID(), subject);
+        var seller = api.user(subject, List.of());
+        String card = api.card(org, "Venusaur", seller);
+        Photo photo = upload(api, org, card, seller);
+        jdbc.sql("update photo set surface_key = null, surface_detail_key = null where id = :id").param("id", photo.getId()).update();
+        mvc.perform(get("/api/orgs/" + org + "/cards/" + card).with(seller))
+                .andExpect(jsonPath("$.photos[0].surfaceUrl").doesNotExist())
                 .andExpect(jsonPath("$.photos[0].wideUrl").isNotEmpty());
+
+        for (int run = 0; run < 20 && photos.findById(photo.getId()).orElseThrow().getSurfaceKey() == null; run++) {
+            mvc.perform(post("/api/admin/photos/wide-crops").param("limit", "1000").with(api.admin())).andExpect(status().isOk());
+        }
+
+        Photo after = photos.findById(photo.getId()).orElseThrow();
+        assertThat(after.getSurfaceKey()).isNotNull();
+        assertThat(after.getSurfaceDetailKey()).isNotNull();
+        mvc.perform(get("/api/orgs/" + org + "/cards/" + card).with(seller))
+                .andExpect(jsonPath("$.photos[0].surfaceUrl").isNotEmpty())
+                .andExpect(jsonPath("$.photos[0].detailUrl").isNotEmpty());
     }
 
     @Test

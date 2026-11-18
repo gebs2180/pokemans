@@ -1798,11 +1798,19 @@
             "format" : "uri",
             "type" : "string"
           },
+          "detailUrl" : {
+            "format" : "uri",
+            "type" : "string"
+          },
           "id" : {
             "format" : "uuid",
             "type" : "string"
           },
           "side" : {
+            "type" : "string"
+          },
+          "surfaceUrl" : {
+            "format" : "uri",
             "type" : "string"
           },
           "url" : {
@@ -1814,7 +1822,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "capturedAt", "cropUrl", "id", "side", "url", "wideUrl" ]
+        "required" : [ "capturedAt", "cropUrl", "detailUrl", "id", "side", "surfaceUrl", "url", "wideUrl" ]
       },
       "ConditionControllerPredictionView" : {
         "properties" : {
@@ -2214,6 +2222,122 @@
         },
         "required" : [ "buyerOrgId", "cardItemId", "certNumber", "certStatus", "earlier", "grade", "gradeLabel", "gradeOutcomeId", "gradedOn", "grader", "id", "kind", "listingId", "lookupUrl", "note", "offerId", "recordedAt", "resalePrice" ]
       },
+      "DefectMarkControllerAdminMarkView" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "createdBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "photoId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "severity" : {
+            "enum" : [ "MINOR", "MODERATE", "MAJOR" ],
+            "type" : "string"
+          },
+          "side" : {
+            "type" : "string"
+          },
+          "type" : {
+            "enum" : [ "SCRATCH", "PRINT_LINE", "DENT_CREASE", "WHITENING", "STAIN", "OTHER" ],
+            "type" : "string"
+          },
+          "x" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "y" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        },
+        "required" : [ "createdAt", "createdBy", "id", "note", "photoId", "severity", "side", "type", "x", "y" ]
+      },
+      "DefectMarkControllerMarkRequest" : {
+        "properties" : {
+          "note" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "photoId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "severity" : {
+            "enum" : [ "MINOR", "MODERATE", "MAJOR" ],
+            "type" : "string"
+          },
+          "type" : {
+            "enum" : [ "SCRATCH", "PRINT_LINE", "DENT_CREASE", "WHITENING", "STAIN", "OTHER" ],
+            "type" : "string"
+          },
+          "x" : {
+            "format" : "double",
+            "maximum" : 1,
+            "minimum" : 0,
+            "type" : "number"
+          },
+          "y" : {
+            "format" : "double",
+            "maximum" : 1,
+            "minimum" : 0,
+            "type" : "number"
+          }
+        },
+        "required" : [ "note", "photoId", "severity", "type", "x", "y" ]
+      },
+      "DefectMarkControllerMarkView" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "photoId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "severity" : {
+            "enum" : [ "MINOR", "MODERATE", "MAJOR" ],
+            "type" : "string"
+          },
+          "side" : {
+            "type" : "string"
+          },
+          "type" : {
+            "enum" : [ "SCRATCH", "PRINT_LINE", "DENT_CREASE", "WHITENING", "STAIN", "OTHER" ],
+            "type" : "string"
+          },
+          "x" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "y" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        },
+        "required" : [ "createdAt", "id", "note", "photoId", "severity", "side", "type", "x", "y" ]
+      },
       "EmailPreferencesControllerEmailPreferencesBody" : {
         "properties" : {
           "digest" : {
@@ -2508,6 +2632,10 @@
           "current" : {
             "type" : "boolean"
           },
+          "detailUrl" : {
+            "format" : "uri",
+            "type" : "string"
+          },
           "glareFraction" : {
             "format" : "double",
             "type" : "number"
@@ -2534,6 +2662,10 @@
             "enum" : [ "AWAITING_UPLOAD", "PASSED", "RETAKE" ],
             "type" : "string"
           },
+          "surfaceUrl" : {
+            "format" : "uri",
+            "type" : "string"
+          },
           "uploadedAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -2551,7 +2683,7 @@
             "type" : "integer"
           }
         },
-        "required" : [ "blurScore", "capturedAt", "card", "current", "glareFraction", "height", "id", "retakeReasons", "side", "status", "uploadedAt", "url", "wideUrl", "width" ]
+        "required" : [ "blurScore", "capturedAt", "card", "current", "detailUrl", "glareFraction", "height", "id", "retakeReasons", "side", "status", "surfaceUrl", "uploadedAt", "url", "wideUrl", "width" ]
       },
       "IntakeViewsReasonView" : {
         "properties" : {
@@ -6318,6 +6450,123 @@
         "tags" : [ "condition-controller" ]
       }
     },
+    "/api/admin/orgs/{orgId}/cards/{cardId}/defect-marks" : {
+      "get" : {
+        "operationId" : "adminList",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/DefectMarkControllerAdminMarkView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "defect-mark-controller" ]
+      },
+      "post" : {
+        "operationId" : "add",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DefectMarkControllerMarkRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DefectMarkControllerAdminMarkView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "defect-mark-controller" ]
+      }
+    },
+    "/api/admin/orgs/{orgId}/cards/{cardId}/defect-marks/{markId}" : {
+      "delete" : {
+        "operationId" : "remove",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "markId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "tags" : [ "defect-mark-controller" ]
+      }
+    },
     "/api/admin/orgs/{orgId}/cards/{cardId}/deletion-preview" : {
       "get" : {
         "operationId" : "previewCard",
@@ -6775,7 +7024,7 @@
     },
     "/api/admin/outcomes" : {
       "get" : {
-        "operationId" : "list_2",
+        "operationId" : "list_3",
         "parameters" : [ {
           "in" : "query",
           "name" : "status",
@@ -7704,6 +7953,44 @@
           }
         },
         "tags" : [ "provenance-controller" ]
+      }
+    },
+    "/api/orgs/{orgId}/cards/{cardId}/defect-marks" : {
+      "get" : {
+        "operationId" : "list_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/DefectMarkControllerMarkView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "defect-mark-controller" ]
       }
     },
     "/api/orgs/{orgId}/cards/{cardId}/identification" : {

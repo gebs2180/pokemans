@@ -46,6 +46,10 @@ export type PhotoView = {
   url: string | null
   /** The card with a little background past each edge, for the surface view; null in lists and for photos checked before these were kept. */
   wideUrl?: string | null
+  /** The same card at full resolution (about 2000 px across), for the surface view; null where one was not kept. */
+  surfaceUrl?: string | null
+  /** The full-resolution version with its local contrast raised on the server ("Detail" in the surface view). */
+  detailUrl?: string | null
 }
 
 /** A card's label until the collector says what it is (the backend's CardItem.PLACEHOLDER_LABEL). */
@@ -360,6 +364,26 @@ export type ReviewPhoto = {
   capturedAt: string | null
   /** The card with a little background past each edge, for the surface view; null for photos checked before these were kept. */
   wideUrl?: string | null
+  surfaceUrl?: string | null
+  detailUrl?: string | null
+}
+
+// Defect marks (admin adds them; the collector reads them): where on a surface view a reviewer saw a flaw
+export type DefectType = 'SCRATCH' | 'PRINT_LINE' | 'DENT_CREASE' | 'WHITENING' | 'STAIN' | 'OTHER'
+export type DefectSeverity = 'MINOR' | 'MODERATE' | 'MAJOR'
+/** x and y are shares (0 to 1) of the surface crop's width and height. Shown only: marks change no grade or price. */
+export type DefectMarkView = {
+  id: string
+  photoId: string
+  side: string
+  x: number
+  y: number
+  type: DefectType
+  severity: DefectSeverity
+  note: string | null
+  createdAt: string
+  /** Admin only. */
+  createdBy?: string
 }
 
 // Centering labels (admin): the printed frame read by hand
