@@ -67,7 +67,7 @@ class OfferService {
      *
      * @param refused why the card gets no offer, as a code, or null
      * @param refusal the same in words for the seller, or null
-     * @param offer   the firm price and its ladder, or null when refused
+     * @param offer   the firm price and its ladder, or null when refused (kept over the maximum, for the admin's preview)
      * @param raw     the card's raw near-mint sales of the last {@code pokemans.offers.raw-sales-days}, or null when refused
      */
     record Quote(Valuations.CurrentValue value, OfferRefusal refused, String refusal, BigDecimal margin, OfferLadder.Offer offer,
@@ -79,12 +79,14 @@ class OfferService {
 
         /** The firm price is under what a card sure to be near mint would be offered: a flag, not a refusal. */
         boolean belowRawSales() {
-            return offer != null && raw.flags(offer.price());
+            return offer != null && raw != null && raw.flags(offer.price());
         }
     }
 
     /**
      * The admin's preview of a card's offer, stored nowhere.
+     *
+     * @param price      the firm price; also set when it is refused for being over the maximum, so the admin sees it
      *
      * @param fmv        null when the card can't be valued
      * @param confidence the confidence the offer would be priced at, or null
@@ -127,8 +129,9 @@ class OfferService {
         OfferLadder.Offer offer = new OfferLadder(value.params(), margin)
                 .offer(value.distribution(), value.prices(), in.prices().salesPerMonth());
         if (offer.price().compareTo(properties.maxPrice()) > 0) {
+            // Refused, but the price is kept so the admin's preview can show what it would have been.
             return new Quote(value, OfferRefusal.OVER_MAXIMUM, "Instant offers go up to $" + String.format(Locale.US, "%,d", properties.maxPrice().longValue())
-                    + ", the most a shipping label can insure, and this card is worth more than that, so it gets no offer.");
+                    + ", the most a shipping label can insure, and this card is worth more than that, so it gets no offer.", margin, offer, null);
         }
         Prices.RawSales raw = prices.rawNearMint(in.identity().catalogCardId(), properties.rawSalesDays());
         return new Quote(value, null, null, margin, offer,

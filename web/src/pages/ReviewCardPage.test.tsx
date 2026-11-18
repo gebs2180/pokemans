@@ -223,6 +223,16 @@ describe('OfferPreviewPanel', () => {
     expect(screen.getByText(/derived grades \[5, 6, 7\]/)).toBeInTheDocument()
   })
 
+  it('shows the price a card over the maximum would have been offered', async () => {
+    stub({
+      offered: false, refusal: 'Instant offers go up to $5,000, the most a shipping label can insure, and this card is worth more than that, so it gets no offer.',
+      refusalCode: 'OVER_MAXIMUM', price: 7210.5, fmv: 12000, confidence: 'B', buyerMargin: 0.13, why: [], tenCap: null,
+    })
+    render(<OfferPreviewPanel cardId="card1" />)
+    expect(await screen.findByText(/No offer: Instant offers go up to \$5,000/)).toBeInTheDocument()
+    expect(screen.getByText(/would have been \$7,210\.50 at confidence B, leaving the buyer 13% \(FMV \$12,000\.00\)/)).toBeInTheDocument()
+  })
+
   it('says when the 10 rung was capped at M times the 9', async () => {
     stub({
       offered: true, refusal: null, refusalCode: null, price: 344.25, fmv: 750, confidence: 'A', buyerMargin: 0.1, why: [],

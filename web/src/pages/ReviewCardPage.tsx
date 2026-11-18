@@ -147,12 +147,20 @@ export function OfferPreviewPanel({ cardId }: { cardId: string }) {
             {data.buyerMargin != null && `, leaving the buyer ${Math.round(data.buyerMargin * 100)}%`} (FMV {money(data.fmv)}).
           </p>
         ) : (
-          <p className="warn">
-            No offer: {data.refusal}
-            {data.confidence && ` (confidence ${data.confidence})`}
-          </p>
+          <>
+            <p className="warn">
+              No offer: {data.refusal}
+              {data.confidence && ` (confidence ${data.confidence})`}
+            </p>
+            {data.price != null && (
+              <p className="muted">
+                The offer would have been {money(data.price)} at confidence {data.confidence}
+                {data.buyerMargin != null && `, leaving the buyer ${Math.round(data.buyerMargin * 100)}%`} (FMV {money(data.fmv)}).
+              </p>
+            )}
+          </>
         ))}
-      {data?.offered && data.tenCap && (
+      {data?.price != null && data.tenCap && (
         <p className="muted small" role="status">
           The grade 10 rung is capped at {data.tenCap.multiple}× the grade 9 rung: {money(data.tenCap.cap)} instead of{' '}
           {money(data.tenCap.uncapped)}.
