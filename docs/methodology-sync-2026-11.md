@@ -2,9 +2,9 @@
 
 2026-11-18 · proposed edits for Zach to approve. **Nothing here has been written into the Claude Doc yet.**
 
-The [Raw Collection Valuation Methodology](https://claude.ai/artifact/1XVmPmLtueJk37u2hXgDmL) Claude Doc (revision 46, header date 2026-10-18) is behind `CLAUDE.md`: 35 rules are missing from it or disagree with it. This file lists each one under the doc section it belongs in, with the text to add or replace. It supersedes [methodology-changes-2026-10-26.md](methodology-changes-2026-10-26.md), which covered 15 of them and was never applied; its wording is reused here where it still holds.
+The [Raw Collection Valuation Methodology](https://claude.ai/artifact/1XVmPmLtueJk37u2hXgDmL) Claude Doc (revision 46, header date 2026-10-18) is behind `CLAUDE.md`: 34 rules are missing from it or disagree with it (item 21 was withdrawn), and 10 more are in the code but in neither (items 37–46). This file lists each one under the doc section it belongs in, with the text to add or replace. It supersedes [methodology-changes-2026-10-26.md](methodology-changes-2026-10-26.md), which covered 15 of them and was never applied; its wording is reused here where it still holds.
 
-**Compared:** the doc at revision 46 against `CLAUDE.md` on main at `796c4cc`.
+**Compared:** the doc at revision 46 against `CLAUDE.md` on main at `796c4cc`, then each item checked against the backend code at the same commit: parameter set 1.8.0 (`backend/valuation-core/src/main/resources/parameter-sets/`), `application.yml` and the services named under [Checked against the code](#checked-against-the-code). That check corrected items 4, 21 and 34 and found items 37–46, which are built but in neither `CLAUDE.md` nor the doc.
 
 **Rules for this file:**
 - Each item keeps its attribution and date as `CLAUDE.md` gives them.
@@ -21,7 +21,7 @@ The [Raw Collection Valuation Methodology](https://claude.ai/artifact/1XVmPmLtue
 | 1 | Purpose and principles | Instant offers are a use of the valuation; lender/insurer side paused | 2026-10-19 | Add |
 | 2 | Purpose and principles | Store everything, including wrong predictions | — | Add |
 | 3 | Purpose and principles | Conservative: never shift upward for prices, grades or photo confidence | — | Replace |
-| 4 | Step 1 | Per-card photos at or above $25; no bulk lots | 2026-10-18 | Replace |
+| 4 | Step 1 | Per-card photos at or above $25; a lot is recorded but never identified, valued or offered | 2026-10-18 | Replace |
 | 5 | Step 1 | What verifies an authenticity flag; findings reset on re-identification | 2026-10-18 | Add |
 | 6 | Step 1 | Custody self-recorded, admin-verified, lapses after 90 days | 2026-10-18 | Add |
 | 7 | Step 2 | Half grades always fold down until half-grade comps exist | 2026-11-04 | Replace |
@@ -38,7 +38,7 @@ The [Raw Collection Valuation Methodology](https://claude.ai/artifact/1XVmPmLtue
 | 18 | Step 3 | Grading cost of the day is a run input | 2026-10-18 | Add |
 | 19 | Step 3 | Raw-sale floor (P_g = max(net graded, raw floor)) | 2026-11-11 | Replace |
 | 20 | Step 3 | Fallback σ; measured σ above 1.0 treated the same | 2026-10-18, 2026-11-09 | Add |
-| 21 | Step 3 | Stale-prices sentence: daily PokeTrace pull | 2026-11-07 | Replace |
+| 21 | Step 3 | *Withdrawn: the doc's "refreshed nightly" matches the code* | — | None |
 | 22 | Step 4 | Verified graded cards valued as graded | 2026-10-18, 2026-10-19 | Add |
 | 23 | Step 5 | Eligibility adds custody and "lots are never valued" | 2026-10-18 | Replace |
 | 24 | Step 5 | Caps against eligible FLV before caps, at every size | 2026-10-19 | Replace |
@@ -51,9 +51,19 @@ The [Raw Collection Valuation Methodology](https://claude.ai/artifact/1XVmPmLtue
 | 31 | New Step 8 | 10 rung capped at 2.5 × the 9 rung | 2026-11-09 | Add |
 | 32 | New Step 8 | Selling, expiry, labels, payment, returns; no self-buying; doubts void offers | 2026-10-19, 2026-11-02 | Add |
 | 33 | New Step 8 | No-offer list and the $5,000 maximum | 2026-10-21, 2026-10-26 | Add |
-| 34 | New Step 8 | Reprice at post and accept; below-raw-comp flag | 2026-10-21, 2026-11-09 | Add |
+| 34 | New Step 8 | Reprice at post and accept; below-raw-comp flag | 2026-11-09 | Add |
 | 35 | New Step 8 | Admin undo by appending | 2026-10-21 | Add |
 | 36 | Worked example, Limitations, changes table | Advance line vs the caps; limitation wording; table intro | — | Decision + replace |
+| 37 | Step 2 | Default spread of a provider grade; providers averaged | — | Add (code only) |
+| 38 | Step 2 | P(10) capped at 25%, excess to 9 | review B2 | Add (code only) |
+| 39 | Step 2 | U gets at least 2% | review B2 | Add (code only) |
+| 40 | Step 2 | Penalty sizes (B 10%, C 25%); providers more than 1.5 apart are C | — | Add (code only) |
+| 41 | Step 2 | Assessments on a retired provider wait to be assessed again | 2026-11-10 | Add (code only) |
+| 42 | Step 3 | Outlier trim is 10% from each end | — | Add (code only) |
+| 43 | Step 3 | An era step-down ratio needs 3 cards | — | Add (code only) |
+| 44 | Step 4 | Comps confidence thresholds: 10 / 5 / 2 sales for A / B / C | — | Add (code only) |
+| 45 | Step 4 | Thin grades count as derived; modal-grade cap on comps confidence | review B5, set 1.3.0 | Add (code only) |
+| 46 | Step 5 | How a character is found; a card with no species is keyed by its name | 2026-10-19 | Add (code only) |
 
 ## Purpose and principles
 
@@ -81,7 +91,9 @@ The doc says "It never interpolates upward." `CLAUDE.md` is broader.
 Contradicts the doc's "bulk lots below it are counted and photographed as lots".
 
 **Replace the first sentence of Capture with:**
-> **Capture.** Front and back photos for every card at or above $25 estimated raw value. Bulk lots aren't supported.
+> **Capture.** Front and back photos for every card at or above $25 estimated raw value. Bulk lots aren't supported: a lot can be recorded, with a description and a count, but it is never identified card by card, valued or offered.
+
+*Code check:* `CLAUDE.md` says only "bulk lots aren't supported". The intake API still accepts a lot (`IntakeController.CreateCard`: `lot`, `quantity`, a required description), and identification, valuation and offers each refuse it (`IdentifyService`, `UnvaluedReason.LOT`, `OfferRefusal.LOT`). The wording above describes what the code does.
 
 ### 5. Verifying an authenticity flag (Zach, 2026-10-18)
 
@@ -173,12 +185,9 @@ Replaces the doc's "If the raw-sale price for that condition is higher, use it i
 **Add at the end of Volatility:**
 > With too few changes to measure it, a valuation uses a fallback σ of 20% a month and drops confidence one level. A measured σ above 1.0 is treated the same way (the cap is a default to confirm).
 
-### 21. Refresh cadence (follows from item 13)
+### 21. Refresh cadence: withdrawn
 
-The doc says "Prices are refreshed nightly." PokeTrace is pulled daily when switched on (`docs/poketrace-pilot.md`).
-
-**Replace with:**
-> Prices are refreshed by a daily PokeTrace pull.
+An earlier draft proposed replacing "Prices are refreshed nightly." The code matches the doc: comp ingestion runs nightly at 06:30 UTC from every enabled source, PokeTrace included (`pokemans.pricing.ingestion.cron`). It is off unless `PRICING_INGESTION_ENABLED` is set, which is a deployment setting, not a methodology rule. No edit.
 
 ## Step 4: The four values
 
@@ -276,7 +285,9 @@ All of `CLAUDE.md` Pipeline 8. `docs/offers.md` holds the implementation detail;
 **Add:**
 > No offer for lots, doubted cards, confidence D, FMV under $25, or a price above the maximum, EasyPost's $5,000 insurance limit, so every label is insured for the full price (`pokemans.offers.max-price`; the $500 beta maximum of 2026-10-21 was lifted 2026-10-26 because too many cards were above it). Unverified high-risk cards get an offer subject to authentication in hand.
 
-### 34. Repricing and the raw-comp flag (reprice: Zach, 2026-10-21; flag: deep review 2026-11-09, a default to confirm, not Zach's decision yet)
+### 34. Repricing and the raw-comp flag (both from the 2026-11-09 deep review; the flag is a default to confirm, not Zach's decision yet)
+
+*Code check, attribution:* an earlier draft credited repricing to "Zach, 2026-10-21", reading `CLAUDE.md`'s closing attribution as covering it. The code says otherwise: `OffersProperties.repriceThreshold` cites "Deep review 2026-11-09, B3", and both were built in the commit "Offers: flag offers below raw sales, re-price at post and accept" (2026-11-09). `CLAUDE.md` labels the raw-comp flag "defaults to confirm", but not the reprice rule or its 10%. **Zach: is repricing at 10% your decision, or a default to confirm?** Until you say, the wording below doesn't label it either way.
 
 **Add:**
 > At post and at accept, the offer's ladder is re-run on today's prices. A move of more than 10% either way (`pokemans.offers.reprice-threshold`) voids the offer by appending rows and refuses with "The price has changed. Get a new offer."
@@ -302,6 +313,110 @@ Option 1 changes no numbers or tests. Either way, delete the "under 10 eligible 
 > Authenticity is flagged, and verified only by a slab, third-party authentication, an in-hand inspection, or (recent chase cards only) a photo review. Counterfeits and resealed product still need physical inspection.
 
 **C. Changes table intro.** Rename the section "Changes since 2026-10-15" intro to cover 2026-10-17 to the apply date, list sources as `CLAUDE.md`, `docs/m3-progress.md`, `docs/review-2026-10-17.md`, `docs/offers.md`, `docs/poketrace-pilot.md` and the 2026-11-09 deep review, and add one row per item above.
+
+## Rules in the code but in neither `CLAUDE.md` nor the doc
+
+Found by the code check. Each one is built and running, but no written rule covers it. The code comments call most of these numbers starting guesses to calibrate against returned grades; they're labelled that way below. **Zach: confirm these belong in the methodology** (they decide prices and confidence).
+
+### 37. Default spread of a provider grade (`ConditionProperties.DEFAULT_SPREAD`)
+
+**Add to Step 2, before item 9's tighter spread:**
+> **Spread.** Each provider's grade, half grades folded down, is spread over neighbouring grades, more below than above: +1 10%, 0 50%, −1 25%, −2 10%, −3 5%. Providers that answered are averaged. (Starting values, to calibrate against returned grades.)
+
+*Also:* the code labels item 9's tighter spread weights "defaults to confirm" (`ConditionProperties`, `tightSpread`); `CLAUDE.md` doesn't. This file keeps `CLAUDE.md`'s labels as they are, so Zach should say which label is right.
+
+### 38. Cap on the probability of a 10 (review B2; `pokemans.condition.max-ten-probability` 0.25)
+
+**Add to Step 2:**
+> **Grade 10.** A system distribution puts at most 25% on 10; the rest moves down to 9. Raw cards that look perfect in photos grade 10 less often than the spread implies. Reviewer distributions and graded cards are exempt. (A starting guess, not calibrated.)
+
+### 39. Floor on ungradable (review B2; `pokemans.condition.ungradable-floor` 0.02)
+
+**Add to Step 2:**
+> **Ungradable floor.** A system distribution puts at least 2% on U, taken proportionally from the other grades: a photo model can't see trimming or recolouring. Reviewer distributions and graded cards are exempt. (A starting guess, not calibrated.)
+
+### 40. Confidence penalty sizes and the C trigger (`ConditionProperties`, `DistributionBuilder`)
+
+`CLAUDE.md` says providers "more than a grade apart (B)" and partial photos "(C)" move probability down, without saying how much, and leaves out a second trigger for C.
+
+**Add to item 8's paragraph:**
+> Providers more than 1.5 grades apart, or any photo not showing the whole card, give C. At B, 10% of each grade's probability moves one grade down; at C, 25%. (Starting values.)
+
+### 41. Retired provider (2026-11-10; `UnvaluedReason.PROVIDER_RETIRED`, `OfferRefusal.PROVIDER_RETIRED`)
+
+**Add to item 12 (Retakes):**
+> An assessment built partly on a grading provider we no longer use (Ximilar, from 2026-11-10) also waits to be assessed again; until then the card is unvalued and gets no offer.
+
+### 42. How much the outlier trim removes (`pricing.outlierTrimFraction` 0.10)
+
+**Add to Price per grade:**
+> Trimming removes 10% of sales from each end.
+
+### 43. Cards an era ratio needs (`pokemans.pricing.min-cards-per-ratio` 3)
+
+**Add to "Sales only above":**
+> An era step-down ratio needs at least 3 comparable cards. (A starting value, to set from real data.)
+
+### 44. Comps confidence thresholds (`confidence.compsForA/B/C` 10, 5, 2)
+
+The doc says confidence comes from "photo quality and comp counts" but gives no counts.
+
+**Add to Step 4, after "Each value is reported with a confidence grade":**
+> Comps confidence comes from the probability-weighted count of sales behind the grade prices: 10 or more for A, 5 for B, 2 for C, else D. A card's confidence is the worse of its comps and photo confidence, and any derived price in play drops it one level.
+
+### 45. Thin grades and the modal grade (deep review B5, 2026-11-09; parameter set 1.3.0)
+
+**Add after item 44:**
+> A grade with fewer than 2 sale days even in the 180-day window is thin: its price is still used, but for confidence it counts as derived. It drops its own confidence one level, drops the card's one level where it carries probability, and is left out of the weighted count. Comps confidence is also no better than the sales behind the modal grade's price (for a derived grade, the thinnest grade it came from), so a deep neighbour can't hide a thin price where the card most likely grades.
+
+### 46. How a character is found (Zach, 2026-10-19, detail from `CorrelationKeys`)
+
+**Add to item 25:**
+> The species comes from the catalog's Pokédex numbers where given, else from the card's name (the longest English or Japanese species name in it). A tag team's more popular partner comes from a fixed popularity list. A card with no species, such as a trainer, is keyed by its own name.
+
+## Checked against the code
+
+Each item checked against the backend at `796c4cc`. Matches = the code does what the item says, with the same numbers.
+
+| # | Result | Where |
+| --- | --- | --- |
+| 1 | Matches: the lender and insurer APIs aren't registered unless `COLLATERAL_ENABLED` is on (off by default) | `pokemans.collateral.enabled` |
+| 2–3 | Principles, not code | — |
+| 4 | **Differs: lots can be recorded (wording corrected)** | `IntakeController`, `UnvaluedReason.LOT`, `OfferRefusal.LOT` |
+| 5 | Matches | `Provenance`, `ProvenanceService` |
+| 6 | Matches (90 days) | `ProvenanceController`, `pokemans.provenance.custody-check-valid-for` |
+| 7 | Matches | `PriceSnapshotService` ("half grades fold down"), `Grade.foldHalf` |
+| 8 | Matches ($1,000, set 1.6.0); CardGrade is off unless `CARDGRADE_ENABLED` | `DistributionBuilder`, parameter set |
+| 9 | Matches; **code labels the weights defaults to confirm** (item 37) | `ConditionProperties` |
+| 10 | Matches | `DistributionBuilder` |
+| 11 | Matches, with reviewer override and reason; centering is off unless `CENTERING_ENABLED` | `ConditionController`, `CenteringPreGradeProvider` |
+| 12 | Matches | `UnvaluedReason.PHOTOS_CHANGED`, `OfferRefusal.PHOTOS_CHANGED` |
+| 13 | Matches, count never used, mapping override reason stored | `PokeTraceDays`, `PokeTraceMappings` |
+| 14 | Matches; code also drops a day whose low isn't positive, and the 90 days are either side, across all sources | `PokeTraceDayGuard`, set 1.5.0 |
+| 15 | Matches (2 days) | `PokeTraceRevisions`, `pull-gap-days`, set 1.7.0 |
+| 16 | Matches | `pricing.cardLadder.excludeTen`, set 1.4.0 |
+| 17 | Matches | `pokemans.valuation.grading-company: PSA` |
+| 18 | Matches ($25, $5, $2, 2%; the admin can override them per run) | `pokemans.valuation.grading-cost` |
+| 19 | Matches; a raw condition is the seller's listing label | `RawFloors`, set 1.8.0 |
+| 20 | Matches (20%, 1.0) | `values.fallbackSigma`, `values.maxSigma` |
+| 21 | **Withdrawn**: doc already right | `pokemans.pricing.ingestion.cron` |
+| 22 | Matches | `ValuationEngine` (gross, no grading cost) |
+| 23 | Matches | `PortfolioEvaluator.Card` (custody), `UnvaluedReason.LOT` |
+| 24 | Matches; correlation haircut after the caps | `PortfolioEvaluator` |
+| 25 | Matches; more detail in item 46 | `CorrelationKeys` |
+| 26 | Matches | `GradeFirstRanker` |
+| 27 | Matches | `ValuationEngine` |
+| 28 | Matches: admin issues, org members download | `ReportController` |
+| 29 | Matches (10 / 13 / 17%, set 1.2.0) | `OfferLadder`, parameter set |
+| 30 | Not checked line by line; the confidence split is in `ValuationService` | — |
+| 31 | Matches (2.5, trace records when it binds) | `OfferLadder.TenCap`, `OfferService` |
+| 32 | Matches: 7 / 14 days, pay within 7 days of arrival, shared member refused, doubt voids live offers but not a taken one | `OffersProperties`, `ListingStateMachine`, `ListingService`, `OfferAdminService` |
+| 33 | Matches ($5,000, subject to authentication) | `pokemans.offers.max-price`, `CardOffer.subjectToAuthentication` |
+| 34 | Matches (10%, 90 days); **attribution corrected** | `OffersProperties`, `OfferService.RAW_SALES_DAYS` |
+| 35 | Matches | `OfferAdminService`, `ShippingBilling` |
+| 36A | Confirmed: the golden test applies α to the card's FLV without caps | `WorkedExampleGoldenTest` line 141 |
+
+Not checked: the web app, and whether production has CardGrade, centering, PokeTrace and ingestion switched on.
 
 ## Left in `CLAUDE.md` on purpose
 
