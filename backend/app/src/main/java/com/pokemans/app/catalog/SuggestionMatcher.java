@@ -44,16 +44,20 @@ class SuggestionMatcher {
         // try the name as read, then without known subtitles, then its first word. With the number
         // first; then without it, in case the number was misread (scored lower).
         List<String> names = nameVariants(reading.name());
-        for (String number : reading.number() == null ? Collections.<String>singletonList(null)
-                : Arrays.asList(reading.number(), null)) {
-            for (String name : names) {
-                hits = provider.search(name, number, language);
-                if (!hits.isEmpty()) {
-                    break;
+        // With the set known (printed, or recognised from its symbol) search within it first: the
+        // provider filters on the set's name, so the right card can't fall outside the fetched
+        // candidates. A set that finds nothing (misread, or named differently) falls back to name only.
+        String setName = reading.setName() == null || reading.setName().isBlank() ? null : reading.setName().trim();
+        search:
+        for (String set : setName == null ? Collections.<String>singletonList(null) : Arrays.asList(setName, null)) {
+            for (String number : reading.number() == null ? Collections.<String>singletonList(null)
+                    : Arrays.asList(reading.number(), null)) {
+                for (String name : names) {
+                    hits = provider.search(set == null ? name : name + " " + set, number, language);
+                    if (!hits.isEmpty()) {
+                        break search;
+                    }
                 }
-            }
-            if (!hits.isEmpty()) {
-                break;
             }
         }
         // Anniversary reprints keep the original's printed number (11/113) but the catalog numbers
@@ -66,7 +70,10 @@ class SuggestionMatcher {
                     .filter(h -> reprintSet.equals(h.setId()))
                     .forEach(candidates::add);
         }
-        candidates.addAll(hits);
+        candidates.addAll(hits.stream()
+                .sorted(Comparator.comparing((CatalogProvider.Hit h) -> !sameSet(reading.setName(), h.setName()))
+                        .thenComparing(h -> reading.setTotal() == null || !reading.setTotal().equals(h.setTotal())))
+                .toList());
         List<Match> matches = new ArrayList<>();
         for (CatalogProvider.Hit hit : candidates.stream().limit(MAX_CANDIDATES).toList()) {
             provider.card(hit.externalId(), language).map(card -> score(reading, card, reprintSet)).ifPresent(matches::add);
@@ -116,6 +123,24 @@ class SuggestionMatcher {
     private static final Pattern THIRTIETH = Pattern.compile("(?i)30th|\\b3 0\\b|\"30\"");
     private static final Pattern TWENTY_FIFTH = Pattern.compile("(?i)25th|celebrations");
 
+    /**
+     * A set match is worth enough that name + set + year clears the threshold on its own, but less
+     * than a collector number: without a number the best possible is still well under certain.
+     */
+    static final double SET_NAME_SCORE = 0.4;
+
+    /** Whether two set names are the same set, ignoring case and punctuation ("Skyridge" vs "skyridge."). */
+    static boolean sameSet(String read, String catalog) {
+        if (read == null || catalog == null) {
+            return false;
+        }
+        return setKey(read).equals(setKey(catalog)) && !setKey(read).isEmpty();
+    }
+
+    private static String setKey(String name) {
+        return name.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", " ").trim();
+    }
+
     static Match score(CardReader.Reading reading, CatalogProvider.ProviderCard card, String reprintSet) {
         double score = 0;
         List<String> why = new ArrayList<>();
@@ -135,6 +160,10 @@ class SuggestionMatcher {
         if (reading.setTotal() != null && Objects.equals(reading.setTotal(), card.setOfficialCount())) {
             score += 0.35;
             why.add("set size");
+        }
+        if (sameSet(reading.setName(), card.setName())) {
+            score += SET_NAME_SCORE;
+            why.add("set name");
         }
         if (nameVariants(reading.name()).stream().anyMatch(n -> normalize(n).equals(normalize(card.name())))) {
             score += 0.15;

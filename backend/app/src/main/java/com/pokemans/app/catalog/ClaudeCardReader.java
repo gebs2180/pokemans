@@ -35,7 +35,12 @@ class ClaudeCardReader implements CardReader {
             (number 11, set total 113) or a promo code like "SWSH050" with no total. Give the name exactly
             as printed, including suffixes such as ex, EX, GX, V, VMAX, VSTAR, Star or the δ (delta) symbol.
             Describe any stamp in notes (anniversary Pikachu with a number, 1st Edition, Staff, Prerelease,
-            set logo): stamps tell reprints apart from originals that print the same number.""";
+            set logo): stamps tell reprints apart from originals that print the same number.
+            Older sets (WotC and e-Card era and others) print only a set symbol or logo, not the set's
+            name. When you recognise the set from its symbol or logo with confidence, report set_name and
+            set set_from_symbol to true; if you aren't sure of the set, leave it out. If the number is
+            blurry but the total after the slash is clear, still report set_total. If only part of the
+            number is legible (such as an "H" prefix), say so in notes.""";
 
     /** JSON schema of the tool input: the fields of {@link CardReader.Reading}. */
     static final Map<String, Object> TOOL = Map.of(
@@ -46,13 +51,14 @@ class ClaudeCardReader implements CardReader {
                     "properties", Map.of(
                             "name", Map.of("type", "string", "description", "Card name as printed"),
                             "number", Map.of("type", "string", "description", "Collector number before the slash, or the promo code"),
-                            "set_total", Map.of("type", "integer", "description", "Number after the slash"),
+                            "set_total", Map.of("type", "integer", "description", "Number after the slash; report it even if the number before the slash is unreadable"),
                             "language", Map.of("type", "string", "description", "ISO 639-1 code of the card text, e.g. en, ja"),
                             "first_edition_stamp", Map.of("type", "boolean", "description", "A '1st Edition' stamp is visible"),
                             "finish", Map.of("type", "string", "enum", List.of("NORMAL", "HOLO", "REVERSE_HOLO", "UNSURE"),
                                     "description", "HOLO: foil artwork. REVERSE_HOLO: foil everywhere except the artwork."),
                             "copyright_year", Map.of("type", "integer", "description", "Latest year in the copyright line"),
-                            "set_name", Map.of("type", "string", "description", "Set name only if printed on the card"),
+                            "set_name", Map.of("type", "string", "description", "Set name, if printed on the card, or if you confidently recognise it from its symbol or logo (then set set_from_symbol). Leave out if unsure"),
+                            "set_from_symbol", Map.of("type", "boolean", "description", "set_name was recognised from the set symbol or logo, not printed as text"),
                             "notes", Map.of("type", "string", "description", "Anything else that identifies the print, e.g. stamps")),
                     "required", List.of()));
 
