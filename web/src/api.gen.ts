@@ -884,6 +884,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/validation/condition-calibration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["conditionCalibration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/valuation-runs/{runId}": {
         parameters: {
             query?: never;
@@ -2287,6 +2303,71 @@ export interface components {
             right: number;
             /** Format: double */
             top: number;
+        };
+        ConditionCalibrationGradeCount: {
+            expected: number;
+            grade: string;
+            /** Format: int32 */
+            observed: number;
+        };
+        ConditionCalibrationRate: {
+            /** Format: int32 */
+            belowStressed: number;
+            belowStressedHigh: number;
+            meanError: number;
+            meetsTargets: boolean;
+            /** Format: int32 */
+            n: number;
+            /** Format: int32 */
+            withinOne: number;
+            withinOneLow: number;
+        };
+        ConditionCalibrationReport: {
+            byAuthor: {
+                [key: string]: components["schemas"]["ConditionCalibrationRate"];
+            };
+            byConfidence: {
+                [key: string]: components["schemas"]["ConditionCalibrationRate"];
+            };
+            bySpread: {
+                [key: string]: components["schemas"]["ConditionCalibrationRate"];
+            };
+            /** Format: int32 */
+            mismatched: number;
+            otherGraders: {
+                [key: string]: components["schemas"]["ConditionCalibrationRate"];
+            };
+            psa: components["schemas"]["ConditionCalibrationRate"];
+            psaGrades: components["schemas"]["ConditionCalibrationGradeCount"][];
+            psaVerified: components["schemas"]["ConditionCalibrationRate"];
+            rows: components["schemas"]["ConditionCalibrationRow"][];
+            /** Format: int32 */
+            unpredicted: number;
+        };
+        ConditionCalibrationRow: {
+            /** Format: uuid */
+            assessmentId: string;
+            /** Format: int32 */
+            assessmentVersion: number;
+            authorType: string;
+            belowStressed: boolean;
+            /** Format: uuid */
+            cardItemId: string;
+            certStatus: string;
+            confidence: string;
+            /** Format: int32 */
+            error: number;
+            grader: string;
+            median: string;
+            /** Format: uuid */
+            outcomeId: string;
+            returned: string;
+            source: string;
+            spread: string;
+            /** Format: int32 */
+            stressShift: number;
+            stressedMedian: string;
+            withinOne: boolean;
         };
         ConditionControllerAssessRequest: {
             /** @enum {string} */
@@ -5029,6 +5110,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ShippingBillingBuyerCharges"][];
+                };
+            };
+        };
+    };
+    conditionCalibration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConditionCalibrationReport"];
                 };
             };
         };

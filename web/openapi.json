@@ -1484,6 +1484,167 @@
         },
         "required" : [ "bottom", "left", "refused", "right", "top" ]
       },
+      "ConditionCalibrationGradeCount" : {
+        "properties" : {
+          "expected" : {
+            "type" : "number"
+          },
+          "grade" : {
+            "type" : "string"
+          },
+          "observed" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "expected", "grade", "observed" ]
+      },
+      "ConditionCalibrationRate" : {
+        "properties" : {
+          "belowStressed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "belowStressedHigh" : {
+            "type" : "number"
+          },
+          "meanError" : {
+            "type" : "number"
+          },
+          "meetsTargets" : {
+            "type" : "boolean"
+          },
+          "n" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "withinOne" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "withinOneLow" : {
+            "type" : "number"
+          }
+        },
+        "required" : [ "belowStressed", "belowStressedHigh", "meanError", "meetsTargets", "n", "withinOne", "withinOneLow" ]
+      },
+      "ConditionCalibrationReport" : {
+        "properties" : {
+          "byAuthor" : {
+            "additionalProperties" : {
+              "$ref" : "#/components/schemas/ConditionCalibrationRate"
+            },
+            "type" : "object"
+          },
+          "byConfidence" : {
+            "additionalProperties" : {
+              "$ref" : "#/components/schemas/ConditionCalibrationRate"
+            },
+            "type" : "object"
+          },
+          "bySpread" : {
+            "additionalProperties" : {
+              "$ref" : "#/components/schemas/ConditionCalibrationRate"
+            },
+            "type" : "object"
+          },
+          "mismatched" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "otherGraders" : {
+            "additionalProperties" : {
+              "$ref" : "#/components/schemas/ConditionCalibrationRate"
+            },
+            "type" : "object"
+          },
+          "psa" : {
+            "$ref" : "#/components/schemas/ConditionCalibrationRate"
+          },
+          "psaGrades" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ConditionCalibrationGradeCount"
+            },
+            "type" : "array"
+          },
+          "psaVerified" : {
+            "$ref" : "#/components/schemas/ConditionCalibrationRate"
+          },
+          "rows" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ConditionCalibrationRow"
+            },
+            "type" : "array"
+          },
+          "unpredicted" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "byAuthor", "byConfidence", "bySpread", "mismatched", "otherGraders", "psa", "psaGrades", "psaVerified", "rows", "unpredicted" ]
+      },
+      "ConditionCalibrationRow" : {
+        "properties" : {
+          "assessmentId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "assessmentVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "authorType" : {
+            "type" : "string"
+          },
+          "belowStressed" : {
+            "type" : "boolean"
+          },
+          "cardItemId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "certStatus" : {
+            "type" : "string"
+          },
+          "confidence" : {
+            "type" : "string"
+          },
+          "error" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "grader" : {
+            "type" : "string"
+          },
+          "median" : {
+            "type" : "string"
+          },
+          "outcomeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "returned" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "spread" : {
+            "type" : "string"
+          },
+          "stressShift" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "stressedMedian" : {
+            "type" : "string"
+          },
+          "withinOne" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "assessmentId", "assessmentVersion", "authorType", "belowStressed", "cardItemId", "certStatus", "confidence", "error", "grader", "median", "outcomeId", "returned", "source", "spread", "stressShift", "stressedMedian", "withinOne" ]
+      },
       "ConditionControllerAssessRequest" : {
         "properties" : {
           "confidence" : {
@@ -6849,6 +7010,24 @@
           }
         },
         "tags" : [ "offer-admin-controller" ]
+      }
+    },
+    "/api/admin/validation/condition-calibration" : {
+      "get" : {
+        "operationId" : "conditionCalibration",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConditionCalibrationReport"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "validation-admin-controller" ]
       }
     },
     "/api/admin/valuation-runs/{runId}" : {

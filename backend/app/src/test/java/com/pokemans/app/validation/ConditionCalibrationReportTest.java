@@ -10,6 +10,7 @@ import com.pokemans.app.TestMarket.Posted;
 import com.pokemans.app.TestMarket.Seller;
 import com.pokemans.app.TestcontainersConfiguration;
 import com.pokemans.app.identity.SecurityProperties;
+import com.pokemans.app.offers.FakeShippingProvider;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(properties = "pokemans.condition.worker.enabled=false")
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, FakeShippingProvider.Config.class})
 @Testcontainers(disabledWithoutDocker = true)
 class ConditionCalibrationReportTest {
 
@@ -76,9 +77,9 @@ class ConditionCalibrationReportTest {
 
     @Test
     void eachReturnedGradeIsScoredAgainstTheAssessmentBeforeIt() throws Exception {
-        Deal nine = arrived("Calibrated Charizard");
+        Deal nine = arrived("Calibrated Gengar");
         graded(nine, "9", null);
-        Deal five = arrived("Calibrated Blastoise");
+        Deal five = arrived("Calibrated Pikachu");
         graded(five, "5", null);
         // Taken back: the buyer said "kept" after all, so the grade no longer counts.
         Deal retracted = arrived("Calibrated Venusaur");
