@@ -139,8 +139,9 @@ class ListingService {
             requireNotHeld(cardItemId);
         }
         // Last, so the reasons above (photos changed, already posted) win over a moved price.
-        if (pricing.reprice(offer).moved()) {
-            voids.saveAndFlush(new CardOfferVoid(offerId, OfferService.PRICE_CHANGED, currentUser.id()));
+        OfferService.Reprice reprice = pricing.reprice(offer);
+        if (reprice.moved()) {
+            voids.saveAndFlush(CardOfferVoid.repriced(offerId, OfferService.PRICE_CHANGED, currentUser.id(), reprice.was(), reprice.now()));
             throw new PriceChanged();
         }
         return listings.save(new SaleListing(offerId, orgId, cardItemId, currentUser.id(), now, now.plus(properties.listingOpenFor())));
@@ -215,10 +216,12 @@ class ListingService {
             throw new ApiException(HttpStatus.CONFLICT, OfferRefusal.NO_BUYER_ADDRESS, "Add the address cards should ship to first.");
         }
         CardOffer offer = offers.findById(listing.getOfferId()).orElseThrow();
-        if (pricing.reprice(offer).moved()) {
+        OfferService.Reprice reprice = pricing.reprice(offer);
+        if (reprice.moved()) {
             close(ListingEvent.voided(listingId, currentUser.id(), OfferService.PRICE_CHANGED), "Another buyer took this card first.");
             if (voids.findByOfferId(offer.getId()).isEmpty()) {
-                voids.saveAndFlush(new CardOfferVoid(offer.getId(), OfferService.PRICE_CHANGED, currentUser.id()));
+                voids.saveAndFlush(CardOfferVoid.repriced(offer.getId(), OfferService.PRICE_CHANGED, currentUser.id(),
+                        reprice.was(), reprice.now()));
             }
             throw new PriceChanged();
         }

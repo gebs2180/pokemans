@@ -49,14 +49,34 @@ class CardOffer extends AssignedIdEntity<UUID> {
     private BigDecimal rawNmLow;
     private Integer rawNmSales;
     private java.time.LocalDate rawNmSince;
-    /** The price was below {@link #rawNmLow} when quoted. A flag, never a refusal. */
+    /**
+     * What this offer's formula would pay for a card certain to be worth {@link #rawNmLow}: that times (1 - f)(1 - d)(1 - m)
+     * at the offer's own liquidity tier and margin. Null when there's no raw near-mint sale, and for offers from before
+     * 2026-11-18, which were flagged against {@link #rawNmLow} itself.
+     */
+    private BigDecimal rawNmNetLow;
+    /**
+     * The price was below {@link #rawNmNetLow} when quoted (before 2026-11-18: below {@link #rawNmLow}). A flag, never a
+     * refusal.
+     */
     private boolean belowRawSales;
 
     protected CardOffer() {
     }
 
-    /** What the card recently sold for raw in near mint, when the offer was quoted. */
-    record RawCheck(BigDecimal lowest, int sales, java.time.LocalDate since) {
+    /**
+     * What the card recently sold for raw in near mint, when the offer was quoted.
+     *
+     * @param netLowest {@code lowest} through the offer's own factor (1 - f)(1 - d)(1 - m): the least a sure near-mint
+     *                  card would be offered. The flag compares the price with this, not with {@code lowest}, which every
+     *                  offer is under by its haircut. Null when {@code lowest} is
+     */
+    record RawCheck(BigDecimal lowest, int sales, java.time.LocalDate since, BigDecimal netLowest) {
+
+        /** The firm price is under what a sure near-mint card would be offered: a flag, not a refusal. */
+        boolean flags(BigDecimal price) {
+            return netLowest != null && price.compareTo(netLowest) < 0;
+        }
     }
 
     CardOffer(UUID orgId, UUID cardItemId, UUID catalogCardId, UUID assessmentId, UUID snapshotSetId, boolean graded, String inputs,
@@ -65,7 +85,8 @@ class CardOffer extends AssignedIdEntity<UUID> {
         this.rawNmLow = raw.lowest();
         this.rawNmSales = raw.sales();
         this.rawNmSince = raw.since();
-        this.belowRawSales = raw.lowest() != null && price.compareTo(raw.lowest()) < 0;
+        this.rawNmNetLow = raw.netLowest();
+        this.belowRawSales = raw.flags(price);
         this.id = UUID.randomUUID();
         this.orgId = orgId;
         this.cardItemId = cardItemId;
@@ -158,6 +179,10 @@ class CardOffer extends AssignedIdEntity<UUID> {
 
     java.time.LocalDate getRawNmSince() {
         return rawNmSince;
+    }
+
+    BigDecimal getRawNmNetLow() {
+        return rawNmNetLow;
     }
 
     boolean isBelowRawSales() {
@@ -413,6 +438,9 @@ class CardOfferVoid extends AssignedIdEntity<UUID> {
     private String reason;
     private UUID voidedBy;
     private Instant createdAt;
+    /** For a re-price void: the offer's price, and its re-run on that day's prices (null when it couldn't be priced). */
+    private BigDecimal repricedWas;
+    private BigDecimal repricedNow;
 
     protected CardOfferVoid() {
     }
@@ -428,6 +456,22 @@ class CardOfferVoid extends AssignedIdEntity<UUID> {
         this.reason = reason;
         this.voidedBy = voidedBy;
         this.createdAt = Instant.now();
+    }
+
+    /** A void because the offer's price moved: keeps both prices, so the direction of each move can be counted. */
+    static CardOfferVoid repriced(UUID offerId, String reason, UUID voidedBy, BigDecimal was, BigDecimal now) {
+        CardOfferVoid v = new CardOfferVoid(offerId, reason, voidedBy);
+        v.repricedWas = was;
+        v.repricedNow = now;
+        return v;
+    }
+
+    BigDecimal getRepricedWas() {
+        return repricedWas;
+    }
+
+    BigDecimal getRepricedNow() {
+        return repricedNow;
     }
 
     UUID getOfferId() {

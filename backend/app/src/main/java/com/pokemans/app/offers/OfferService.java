@@ -11,6 +11,7 @@ import com.pokemans.valuation.Confidence;
 import com.pokemans.valuation.Grade;
 import com.pokemans.valuation.GradeDistribution;
 import com.pokemans.valuation.OfferLadder;
+import com.pokemans.valuation.ParameterSet;
 import com.pokemans.valuation.Trace;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -43,9 +44,6 @@ class OfferService {
     static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
 
 
-    /** How far back the raw sanity band looks: the comp window. */
-    static final int RAW_SALES_DAYS = 90;
-
     /** Why a buyer can't take, or a seller post, an offer whose price no longer holds. */
     static final String PRICE_CHANGED = "The price has changed. Get a new offer.";
 
@@ -70,7 +68,7 @@ class OfferService {
      * @param refused why the card gets no offer, as a code, or null
      * @param refusal the same in words for the seller, or null
      * @param offer   the firm price and its ladder, or null when refused
-     * @param raw     the card's raw near-mint sales of the last 90 days, or null when refused
+     * @param raw     the card's raw near-mint sales of the last {@code pokemans.offers.raw-sales-days}, or null when refused
      */
     record Quote(Valuations.CurrentValue value, OfferRefusal refused, String refusal, BigDecimal margin, OfferLadder.Offer offer,
                  CardOffer.RawCheck raw) {
@@ -79,9 +77,9 @@ class OfferService {
             this(value, refused, refusal, null, null, null);
         }
 
-        /** The firm price is under what the card recently sold for raw in near mint: a flag, not a refusal. */
+        /** The firm price is under what a card sure to be near mint would be offered: a flag, not a refusal. */
         boolean belowRawSales() {
-            return offer != null && raw.lowest() != null && offer.price().compareTo(raw.lowest()) < 0;
+            return offer != null && raw.flags(offer.price());
         }
     }
 
@@ -91,7 +89,7 @@ class OfferService {
      * @param fmv        null when the card can't be valued
      * @param confidence the confidence the offer would be priced at, or null
      * @param why        the trace steps that set the offer's confidence (base, price penalties, derived grades) and the parameter set
-     * @param rawSales   the card's raw near-mint sales of the last 90 days, or null when it gets no offer
+     * @param rawSales   the card's raw near-mint sales of the last {@code pokemans.offers.raw-sales-days}, or null when it gets no offer
      * @param tenCap     the 10 rung's cap when it bound (parameter set 1.4.0 on): the uncapped rung, the cap and M; else null
      */
     record Preview(boolean offered, String refusal, OfferRefusal refusalCode, BigDecimal price, BigDecimal fmv, String confidence, BigDecimal buyerMargin,
@@ -132,8 +130,24 @@ class OfferService {
             return new Quote(value, OfferRefusal.OVER_MAXIMUM, "Instant offers go up to $" + String.format(Locale.US, "%,d", properties.maxPrice().longValue())
                     + ", the most a shipping label can insure, and this card is worth more than that, so it gets no offer.");
         }
-        Prices.RawSales raw = prices.rawNearMint(in.identity().catalogCardId(), RAW_SALES_DAYS);
-        return new Quote(value, null, null, margin, offer, new CardOffer.RawCheck(raw.lowest(), raw.sales(), raw.since()));
+        Prices.RawSales raw = prices.rawNearMint(in.identity().catalogCardId(), properties.rawSalesDays());
+        return new Quote(value, null, null, margin, offer,
+                new CardOffer.RawCheck(raw.lowest(), raw.sales(), raw.since(), netLowest(raw.lowest(), value.params(), offer, margin)));
+    }
+
+    /**
+     * The lowest raw near-mint sale through the offer's own factor, (1 - f)(1 - d)(1 - m) at its liquidity tier and
+     * margin: what the formula would pay for a card certain to be worth that sale. Every offer sits under the raw sale
+     * by its haircut, so the flag only means something against this (decision sheet item 12, Zach 2026-11-18).
+     */
+    static BigDecimal netLowest(BigDecimal lowest, ParameterSet params, OfferLadder.Offer offer, BigDecimal margin) {
+        if (lowest == null) {
+            return null;
+        }
+        BigDecimal factor = BigDecimal.ONE.subtract(params.sellingFees())
+                .multiply(BigDecimal.ONE.subtract(params.speedDiscount(offer.liquidityTier())))
+                .multiply(BigDecimal.ONE.subtract(margin));
+        return lowest.multiply(factor).setScale(2, RoundingMode.HALF_EVEN);
     }
 
     @Transactional(readOnly = true)
