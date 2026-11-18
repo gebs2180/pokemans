@@ -110,6 +110,34 @@ class QualityCheckerTest {
     }
 
     @Test
+    void theWideCropShowsBackgroundPastEveryEdge() throws IOException {
+        byte[] photo = png(goodPhoto());
+        CardDetector.Detection card = checker.check(photo).card();
+        BufferedImage wide = ImageIO.read(new java.io.ByteArrayInputStream(card.wideCropJpeg()));
+        BufferedImage tight = ImageIO.read(new java.io.ByteArrayInputStream(card.cropJpeg()));
+
+        int margin = (int) Math.round(CardDetector.CROP_WIDTH * CardDetector.WIDE_MARGIN);
+        assertThat(wide.getWidth()).isEqualTo(tight.getWidth() + 2 * margin);
+        assertThat(wide.getHeight()).isCloseTo(tight.getHeight() + 2 * (int) Math.round(CardDetector.CROP_HEIGHT * CardDetector.WIDE_MARGIN), within(1));
+        // Half a margin out from each edge's middle is the dark table, not the yellow border.
+        int w = wide.getWidth();
+        int h = wide.getHeight();
+        for (int[] at : new int[][] {{margin / 2, h / 2}, {w - margin / 2, h / 2}, {w / 2, margin / 2}, {w / 2, h - margin / 2}}) {
+            assertThat(new Color(wide.getRGB(at[0], at[1])).getRed()).as("background at %d,%d", at[0], at[1]).isLessThan(90);
+        }
+        // Just inside each edge is the card's border.
+        assertThat(new Color(wide.getRGB(margin + 15, h / 2)).getRed()).isGreaterThan(180);
+        assertThat(new Color(wide.getRGB(w / 2, margin + 15)).getRed()).isGreaterThan(180);
+
+        // The backfill makes the same from the stored original and the corners found then.
+        byte[] again = CardDetector.wideCrop(photo, card.corners());
+        BufferedImage rebuilt = ImageIO.read(new java.io.ByteArrayInputStream(again));
+        assertThat(rebuilt.getWidth()).isEqualTo(w);
+        assertThat(rebuilt.getHeight()).isEqualTo(h);
+        assertThat(CardDetector.wideCrop(photo, null)).isNull();
+    }
+
+        @Test
     void halfACardIsNotFound() {
         BufferedImage image = withCard(background(1600, 2200), 900, 800, 300, 2); // top half off the frame
 

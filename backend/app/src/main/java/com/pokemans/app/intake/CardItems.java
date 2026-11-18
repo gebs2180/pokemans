@@ -29,9 +29,10 @@ public class CardItems {
      *
      * @param side      FRONT, BACK or DETAIL
      * @param cropKey   the card crop next to it, or null
+     * @param wideCropKey the card crop with a little background past each edge, or null
      */
     public record PhotoRef(UUID id, UUID cardItemId, String side, String storageKey, String contentType, String cropKey,
-                           Instant capturedAt, Instant uploadedAt, String sha256) {
+                           Instant capturedAt, Instant uploadedAt, String sha256, String wideCropKey) {
     }
 
     /**
@@ -189,7 +190,7 @@ public class CardItems {
 
     private static PhotoRef ref(Photo p) {
         return new PhotoRef(p.getId(), p.getCardItemId(), p.getSide().name(), p.getStorageKey(), p.getContentType(),
-                p.getCropKey(), p.getCapturedAt(), p.getUploadedAt(), p.getSha256());
+                p.getCropKey(), p.getCapturedAt(), p.getUploadedAt(), p.getSha256(), p.getWideCropKey());
     }
 
     /**

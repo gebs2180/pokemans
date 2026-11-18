@@ -157,6 +157,7 @@ class IntakeService {
         CardItem card = requireCard(orgId, cardId);
         return IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId()),
                 p -> blobs.presignDownload(storage.photoBucket(), p.getCropKey() != null ? p.getCropKey() : p.getStorageKey()),
+                p -> p.getWideCropKey() == null ? null : blobs.presignDownload(storage.photoBucket(), p.getWideCropKey()),
                 frozenReason(card.getId()));
     }
 
@@ -172,7 +173,7 @@ class IntakeService {
         Map<UUID, List<Photo>> byCard = photos.findByCardItemIdInOrderByCreatedAtAsc(items.stream().map(CardItem::getId).toList())
                 .stream()
                 .collect(Collectors.groupingBy(Photo::getCardItemId));
-        return items.stream().map(c -> IntakeViews.card(c, byCard.getOrDefault(c.getId(), List.of()), p -> null, frozenReason(c.getId())))
+        return items.stream().map(c -> IntakeViews.card(c, byCard.getOrDefault(c.getId(), List.of()), p -> null, p -> null, frozenReason(c.getId())))
                 .toList();
     }
 

@@ -109,8 +109,8 @@ class CardStatusServiceTest {
         UUID card = UUID.randomUUID();
         when(cardItems.get(card)).thenReturn(new CardItems.CardItemRef(card, UUID.randomUUID(), "Umbreon", false, 1, NOW));
         when(cardItems.passedPhotos(card)).thenReturn(List.of(
-                new CardItems.PhotoRef(UUID.randomUUID(), card, "FRONT", "k1", "image/jpeg", null, NOW, NOW, "a"),
-                new CardItems.PhotoRef(UUID.randomUUID(), card, "BACK", "k2", "image/jpeg", null, NOW, NOW, "b")));
+                new CardItems.PhotoRef(UUID.randomUUID(), card, "FRONT", "k1", "image/jpeg", null, NOW, NOW, "a", null),
+                new CardItems.PhotoRef(UUID.randomUUID(), card, "BACK", "k2", "image/jpeg", null, NOW, NOW, "b", null)));
         CardInputs.Identity umbreon = new CardInputs.Identity(UUID.randomUUID(), "Umbreon", "Evolving Skies", "215", "en", null,
                 "UNLIMITED", "NORMAL", false, null, List.of());
         CardInputs inputs = mock(CardInputs.class);

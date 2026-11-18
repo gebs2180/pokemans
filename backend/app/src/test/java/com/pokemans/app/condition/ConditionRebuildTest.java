@@ -33,7 +33,7 @@ class ConditionRebuildTest {
     private static final CardItems.PhotoRef BACK = photo("BACK", TAKEN);
 
     private static CardItems.PhotoRef photo(String side, Instant uploadedAt) {
-        return new CardItems.PhotoRef(UUID.randomUUID(), CARD, side, "key", "image/jpeg", "crop", uploadedAt, uploadedAt, "sha");
+        return new CardItems.PhotoRef(UUID.randomUUID(), CARD, side, "key", "image/jpeg", "crop", uploadedAt, uploadedAt, "sha", null);
     }
 
     private static PredictionRequest request(String provider) {

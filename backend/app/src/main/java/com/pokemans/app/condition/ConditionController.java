@@ -59,7 +59,8 @@ class ConditionController {
                      String assessment, Confidence confidence, int openRequests, String orgName, boolean priced) {
     }
 
-    record PhotoLink(UUID id, String side, URI url, URI cropUrl, Instant capturedAt) {
+    /** @param wideUrl the card with a little background past each edge (the surface view), or null for older photos */
+    record PhotoLink(UUID id, String side, URI url, URI cropUrl, Instant capturedAt, URI wideUrl) {
     }
 
     record RequestView(UUID id, String provider, PredictionRequest.Status status, int attempts, String lastError,
@@ -156,7 +157,8 @@ class ConditionController {
         CardItems.CardItemRef card = condition.requireCard(orgId, cardId);
         List<PhotoLink> photos = cardItems.currentPhotos(cardId).stream()
                 .map(p -> new PhotoLink(p.id(), p.side(), blobs.presignDownload(storage.photoBucket(), p.storageKey()),
-                        p.cropKey() == null ? null : blobs.presignDownload(storage.photoBucket(), p.cropKey()), p.capturedAt()))
+                        p.cropKey() == null ? null : blobs.presignDownload(storage.photoBucket(), p.cropKey()), p.capturedAt(),
+                        p.wideCropKey() == null ? null : blobs.presignDownload(storage.photoBucket(), p.wideCropKey())))
                 .toList();
         java.util.Optional<ConditionAssessment> current = assessmentRepository.findByCardItemIdAndIsCurrentTrue(cardId);
         return new CardConditionView(card.id(), card.orgId(), card.label(), condition.enabledProviders(), photos,
