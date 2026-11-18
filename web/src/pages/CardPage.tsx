@@ -24,7 +24,7 @@ import { Chip, Loading, PageError, StageChip } from '../ui'
 import { IdentifyPanel } from './IdentifyPanel'
 import { OfferPanel } from './OfferPanel'
 import { ProvenancePanel } from './ProvenancePanel'
-import { SurfacePanel } from './SurfaceOverlay'
+import { MarkedSurfacePanel } from './DefectMarks'
 import { message } from '../format'
 
 /** What each side should show, so a back in the Front slot is caught before it's sent. */
@@ -203,7 +203,7 @@ export function CardPage() {
         )
       })}
       {/* A closer look at the passing photos, filters and zoom in the browser only: it changes nothing about the offer. */}
-      {!card.lot && <SurfacePanel audience="collector" photos={card.photos.filter((p) => p.current)} />}
+      {!card.lot && <MarkedSurfacePanel audience="collector" orgId={orgId} cardId={cardId} photos={card.photos.filter((p) => p.current)} />}
       {org?.type === 'CONTRIBUTOR' && !card.lot && <GradedResult orgId={orgId} cardId={cardId} ready={card.captureComplete} />}
       {!offerFirst &&
         (contributor && offerPanel ? (

@@ -1,10 +1,12 @@
-import { useId, useState, type MouseEvent } from 'react'
-import { SIDE_LABEL, type Side } from '../api'
+import { useId, useState, type MouseEvent, type ReactNode } from 'react'
+import { SIDE_LABEL, type DefectMarkView, type Side } from '../api'
+import { markWords } from './defectWords'
 import { safeHref } from '../safeHref'
 import { Segmented, ToolPanel } from './reviewTools'
 import './reviewTools.css'
 
-export type SurfaceMode = 'off' | 'contrast' | 'edges' | 'emboss'
+/** 'detail' is the server's local-contrast image; the others are filters drawn in the browser. */
+export type SurfaceMode = 'off' | 'contrast' | 'edges' | 'emboss' | 'detail'
 
 /** Who is looking: a reviewer on the admin page, or the collector on their own card. Only the wording differs. */
 export type SurfaceAudience = 'reviewer' | 'collector'
@@ -28,6 +30,14 @@ const MODES: { mode: SurfaceMode; label: string; hint: Record<SurfaceAudience, s
     },
   },
   {
+    mode: 'detail',
+    label: 'Detail',
+    hint: {
+      reviewer: 'Local contrast raised on the server, from the full-resolution crop: scratches and print lines on holo foil without washing it out.',
+      collector: 'Brings out the fine detail across the whole card, scratches and print lines on the holo included, without blowing out the shine.',
+    },
+  },
+  {
     mode: 'emboss',
     label: 'Emboss',
     hint: {
@@ -44,7 +54,20 @@ export const SURFACE_ZOOM = 2
  * A photo the surface view can show: the wide crop (the card with a little background past each edge) when there is
  * one, else the card crop, else the photo itself.
  */
-export type SurfacePhoto = { id: string; side: Side; url: string | null; cropUrl?: string | null; wideUrl?: string | null }
+export type SurfacePhoto = {
+  id: string
+  side: Side
+  url: string | null
+  cropUrl?: string | null
+  wideUrl?: string | null
+  /** The wide crop at full resolution, when one was kept: preferred over the wide crop. */
+  surfaceUrl?: string | null
+  /** That crop with its local contrast raised on the server: what the Detail mode shows. */
+  detailUrl?: string | null
+}
+
+/** Where a tap on the crop landed, and which photo. */
+export type Placement = { photoId: string; x: number; y: number }
 
 /**
  * The SVG filter for a mode at a strength from 0 to 1, mixed over the photo. In the browser only: nothing
@@ -88,11 +111,33 @@ function SurfaceFilter({ id, mode, strength }: { id: string; mode: SurfaceMode; 
  * One crop with the overlay on it. A tap zooms it 2× at that spot, inside the same box, and the zoom follows
  * the pointer; another tap zooms back out. From the keyboard it zooms on the middle.
  */
-export function SurfaceView({ src, alt, mode, strength }: { src: string; alt: string; mode: SurfaceMode; strength: number }) {
+export function SurfaceView({
+  src,
+  alt,
+  mode,
+  strength,
+  marks = [],
+  pending,
+  onPlace,
+}: {
+  src: string
+  alt: string
+  mode: SurfaceMode
+  strength: number
+  /** Defects to draw on the crop, numbered as given. */
+  marks?: { n: number; x: number; y: number; label: string }[]
+  /** A spot picked but not yet saved. */
+  pending?: { x: number; y: number } | null
+  /** When set, a tap picks a spot (as shares of the crop) instead of zooming. */
+  onPlace?: (x: number, y: number) => void
+}) {
   const id = `surface-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
-  const on = mode !== 'off' && strength > 0
+  const on = (mode === 'contrast' || mode === 'edges' || mode === 'emboss') && strength > 0
   // Where the zoom is centred, as percentages of the crop; null when not zoomed.
-  const [zoom, setZoom] = useState<{ x: number; y: number } | null>(null)
+  const [zoomed, setZoom] = useState<{ x: number; y: number } | null>(null)
+  // Placing a mark works on the whole crop: never while zoomed.
+  const zoom = onPlace ? null : zoomed
+  const stage = zoom ? { transformOrigin: `${zoom.x}% ${zoom.y}%`, transform: `scale(${SURFACE_ZOOM})` } : {}
 
   function at(e: MouseEvent<HTMLElement>) {
     const box = e.currentTarget.getBoundingClientRect()
@@ -108,8 +153,13 @@ export function SurfaceView({ src, alt, mode, strength }: { src: string; alt: st
         type="button"
         className="surface-zoom"
         aria-pressed={zoom != null}
-        aria-label={zoom ? `Zoom out of ${alt}` : `Zoom in on ${alt}`}
+        aria-label={onPlace ? `Mark a defect on ${alt}` : zoom ? `Zoom out of ${alt}` : `Zoom in on ${alt}`}
+        data-placing={onPlace ? 'true' : undefined}
         onClick={(e) => {
+          if (onPlace) {
+            const spot = e.detail === 0 ? { x: 50, y: 50 } : at(e)
+            return onPlace(spot.x / 100, spot.y / 100)
+          }
           if (zoom) return setZoom(null)
           // A click from the keyboard has no pointer position: zoom on the middle.
           setZoom(e.detail === 0 ? { x: 50, y: 50 } : at(e))
@@ -122,10 +172,20 @@ export function SurfaceView({ src, alt, mode, strength }: { src: string; alt: st
           alt={alt}
           style={{
             ...(on ? { filter: `url(#${id})` } : {}),
-            ...(zoom ? { transformOrigin: `${zoom.x}% ${zoom.y}%`, transform: `scale(${SURFACE_ZOOM})` } : {}),
+            ...stage,
           }}
-          data-mode={on ? mode : 'off'}
+          data-mode={on || mode === 'detail' ? mode : 'off'}
         />
+        {(marks.length > 0 || pending) && (
+          <span className="surface-marks" style={stage} aria-hidden="true">
+            {marks.map((m) => (
+              <span key={m.n} className="surface-mark" style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%` }} title={m.label}>
+                {m.n}
+              </span>
+            ))}
+            {pending && <span className="surface-mark pending" style={{ left: `${pending.x * 100}%`, top: `${pending.y * 100}%` }} />}
+          </span>
+        )}
       </button>
     </>
   )
@@ -153,32 +213,75 @@ const WORDS: Record<SurfaceAudience, { title: string; summary: string; intro: st
  * lines. Reviewers have it on the admin page; collectors on their own card, as a way to look their card over. A
  * viewing aid only: it changes no grade or price, and nothing is stored.
  */
-export function SurfacePanel({ photos, audience = 'reviewer' }: { photos: SurfacePhoto[]; audience?: SurfaceAudience }) {
+export function SurfacePanel({
+  photos,
+  audience = 'reviewer',
+  marks = [],
+  pending = null,
+  onPlace,
+  children,
+}: {
+  photos: SurfacePhoto[]
+  audience?: SurfaceAudience
+  /** Defects a reviewer marked: drawn on their photo, numbered in this order. */
+  marks?: DefectMarkView[]
+  /** A spot picked and not yet saved. */
+  pending?: Placement | null
+  /** Reviewer only, while marking: a tap on a crop picks a spot instead of zooming. */
+  onPlace?: (p: Placement) => void
+  /** Under the images: the marks list, or the form for a new one. */
+  children?: ReactNode
+}) {
   const shown = photos.filter((p) => (p.side === 'FRONT' || p.side === 'BACK') && surfaceSrc(p) != null)
   if (shown.length === 0) return null
   const words = WORDS[audience]
   return (
     <ToolPanel title={words.title} summary={words.summary}>
-      <SurfaceTool shown={shown} audience={audience} />
+      <SurfaceTool shown={shown} audience={audience} marks={marks} pending={pending} onPlace={onPlace}>
+        {children}
+      </SurfaceTool>
     </ToolPanel>
   )
 }
 
-function surfaceSrc(p: SurfacePhoto) {
-  return safeHref(p.wideUrl) ?? safeHref(p.cropUrl) ?? safeHref(p.url)
+/** The most detailed image there is for the mode: the server's Detail image, else the full-resolution crop, the wide crop, the card crop, the photo. */
+function surfaceSrc(p: SurfacePhoto, mode: SurfaceMode = 'off') {
+  return (
+    (mode === 'detail' ? safeHref(p.detailUrl) : null) ??
+    safeHref(p.surfaceUrl) ??
+    safeHref(p.wideUrl) ??
+    safeHref(p.cropUrl) ??
+    safeHref(p.url)
+  )
 }
 
-function SurfaceTool({ shown, audience }: { shown: SurfacePhoto[]; audience: SurfaceAudience }) {
+function SurfaceTool({
+  shown,
+  audience,
+  marks,
+  pending,
+  onPlace,
+  children,
+}: {
+  shown: SurfacePhoto[]
+  audience: SurfaceAudience
+  marks: DefectMarkView[]
+  pending: Placement | null
+  onPlace?: (p: Placement) => void
+  children?: ReactNode
+}) {
   const [mode, setMode] = useState<SurfaceMode>('off')
   const [percent, setPercent] = useState(60)
   const strengthId = useId()
-  const hint = MODES.find((m) => m.mode === mode)?.hint[audience]
+  // Detail needs the server's image: offered only where some photo has one.
+  const modes = MODES.filter((m) => m.mode !== 'detail' || shown.some((p) => safeHref(p.detailUrl)))
+  const hint = modes.find((m) => m.mode === mode)?.hint[audience]
   const words = WORDS[audience]
   return (
     <>
       <p className="muted small">{words.intro}</p>
       <div className="surface-controls">
-        <Segmented label="Surface filter" options={MODES.map((m) => ({ value: m.mode, label: m.label }))} value={mode} onChange={setMode} />
+        <Segmented label="Surface filter" options={modes.map((m) => ({ value: m.mode, label: m.label }))} value={mode} onChange={setMode} />
         <span className="surface-strength small">
           <label htmlFor={strengthId}>Strength</label>
           <input
@@ -187,7 +290,7 @@ function SurfaceTool({ shown, audience }: { shown: SurfacePhoto[]; audience: Sur
             min={0}
             max={100}
             value={percent}
-            disabled={mode === 'off'}
+            disabled={mode === 'off' || mode === 'detail'}
             onChange={(e) => setPercent(Number(e.target.value))}
             aria-label="Filter strength"
           />
@@ -197,15 +300,25 @@ function SurfaceTool({ shown, audience }: { shown: SurfacePhoto[]; audience: Sur
       {hint && <p className="muted small">{hint}</p>}
       <div className="surface-grid">
         {shown.map((p) => {
-          const src = surfaceSrc(p)
+          const src = surfaceSrc(p, mode)
+          const mine = marks.filter((m) => m.photoId === p.id)
           return src ? (
             <figure key={p.id}>
-              <SurfaceView src={src} alt={`${SIDE_LABEL[p.side]} ${words.image}, surface view`} mode={mode} strength={percent / 100} />
+              <SurfaceView
+                src={src}
+                alt={`${SIDE_LABEL[p.side]} ${words.image}, surface view`}
+                mode={mode}
+                strength={percent / 100}
+                marks={mine.map((m) => ({ n: marks.indexOf(m) + 1, x: m.x, y: m.y, label: markWords(m) }))}
+                pending={pending?.photoId === p.id ? pending : null}
+                onPlace={onPlace ? (x, y) => onPlace({ photoId: p.id, x, y }) : undefined}
+              />
               <figcaption className="small">{SIDE_LABEL[p.side]}</figcaption>
             </figure>
           ) : null
         })}
       </div>
+      {children}
     </>
   )
 }

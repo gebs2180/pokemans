@@ -307,3 +307,58 @@ svg .frame-line.frame-line-measurer {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* Defects marked on the surface view: numbered dots over the crop (they follow its zoom), and the form for a new one. */
+.surface-zoom {
+  position: relative;
+}
+
+.surface-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.surface-mark {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.25rem;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 2px solid var(--color-surface);
+  background: var(--color-accent-text);
+  color: var(--color-surface);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.surface-mark.pending {
+  background: transparent;
+  border-color: var(--color-accent-text);
+  outline: 2px solid var(--color-surface);
+}
+
+.surface-zoom[data-placing='true'] {
+  cursor: crosshair;
+}
+
+.defect-tools,
+.defect-list {
+  margin-top: 0.75rem;
+}
+
+.defect-form {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 24rem;
+  margin-top: 0.5rem;
+}
+
+.defect-form label {
+  display: grid;
+  gap: 0.125rem;
+}

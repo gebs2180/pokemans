@@ -532,6 +532,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/orgs/{orgId}/cards/{cardId}/defect-marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["adminList"];
+        put?: never;
+        post: operations["add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/orgs/{orgId}/cards/{cardId}/defect-marks/{markId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/orgs/{orgId}/cards/{cardId}/deletion-preview": {
         parameters: {
             query?: never;
@@ -715,7 +747,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_2"];
+        get: operations["list_3"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1166,6 +1198,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["recordCustody"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{orgId}/cards/{cardId}/defect-marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_2"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2444,9 +2492,13 @@ export interface components {
             capturedAt: string;
             /** Format: uri */
             cropUrl: string;
+            /** Format: uri */
+            detailUrl: string;
             /** Format: uuid */
             id: string;
             side: string;
+            /** Format: uri */
+            surfaceUrl: string;
             /** Format: uri */
             url: string;
             /** Format: uri */
@@ -2615,6 +2667,57 @@ export interface components {
             recordedAt: string;
             resalePrice: number;
         };
+        DefectMarkControllerAdminMarkView: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy: string;
+            /** Format: uuid */
+            id: string;
+            note: string;
+            /** Format: uuid */
+            photoId: string;
+            /** @enum {string} */
+            severity: "MINOR" | "MODERATE" | "MAJOR";
+            side: string;
+            /** @enum {string} */
+            type: "SCRATCH" | "PRINT_LINE" | "DENT_CREASE" | "WHITENING" | "STAIN" | "OTHER";
+            /** Format: double */
+            x: number;
+            /** Format: double */
+            y: number;
+        };
+        DefectMarkControllerMarkRequest: {
+            note: string;
+            /** Format: uuid */
+            photoId: string;
+            /** @enum {string} */
+            severity: "MINOR" | "MODERATE" | "MAJOR";
+            /** @enum {string} */
+            type: "SCRATCH" | "PRINT_LINE" | "DENT_CREASE" | "WHITENING" | "STAIN" | "OTHER";
+            /** Format: double */
+            x: number;
+            /** Format: double */
+            y: number;
+        };
+        DefectMarkControllerMarkView: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            note: string;
+            /** Format: uuid */
+            photoId: string;
+            /** @enum {string} */
+            severity: "MINOR" | "MODERATE" | "MAJOR";
+            side: string;
+            /** @enum {string} */
+            type: "SCRATCH" | "PRINT_LINE" | "DENT_CREASE" | "WHITENING" | "STAIN" | "OTHER";
+            /** Format: double */
+            x: number;
+            /** Format: double */
+            y: number;
+        };
         EmailPreferencesControllerEmailPreferencesBody: {
             digest: boolean;
         };
@@ -2726,6 +2829,8 @@ export interface components {
             capturedAt: string;
             card: components["schemas"]["IntakeViewsCardFit"];
             current: boolean;
+            /** Format: uri */
+            detailUrl: string;
             /** Format: double */
             glareFraction: number;
             /** Format: int32 */
@@ -2737,6 +2842,8 @@ export interface components {
             side: "FRONT" | "BACK" | "DETAIL";
             /** @enum {string} */
             status: "AWAITING_UPLOAD" | "PASSED" | "RETAKE";
+            /** Format: uri */
+            surfaceUrl: string;
             /** Format: date-time */
             uploadedAt: string;
             /** Format: uri */
@@ -4604,6 +4711,78 @@ export interface operations {
             };
         };
     };
+    adminList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                cardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DefectMarkControllerAdminMarkView"][];
+                };
+            };
+        };
+    };
+    add: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                cardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefectMarkControllerMarkRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DefectMarkControllerAdminMarkView"];
+                };
+            };
+        };
+    };
+    remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                cardId: string;
+                markId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     previewCard: {
         parameters: {
             query?: never;
@@ -4908,7 +5087,7 @@ export interface operations {
             };
         };
     };
-    list_2: {
+    list_3: {
         parameters: {
             query?: {
                 status?: string;
@@ -5625,6 +5804,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ProvenanceControllerProvenanceView"];
+                };
+            };
+        };
+    };
+    list_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                cardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DefectMarkControllerMarkView"][];
                 };
             };
         };

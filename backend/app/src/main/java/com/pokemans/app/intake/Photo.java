@@ -52,6 +52,8 @@ class Photo extends AssignedIdEntity<UUID> {
     private Double cardGlareFraction;
     private String cropKey;
     private String wideCropKey;
+    private String surfaceKey;
+    private String surfaceDetailKey;
     private Instant capturedAt;
     private UUID createdBy;
     private Instant createdAt;
@@ -90,6 +92,22 @@ class Photo extends AssignedIdEntity<UUID> {
     /** Records where the wide card crop was stored. */
     void wideCropStored(String key) {
         this.wideCropKey = key;
+    }
+
+    /** Key for the full-resolution wide crop the surface view shows. */
+    String surfaceStorageKey() {
+        return storageKey + ".surface.jpg";
+    }
+
+    /** Key for the local-contrast version of the surface crop (the surface view's "Detail" mode). */
+    String surfaceDetailStorageKey() {
+        return storageKey + ".surface-detail.jpg";
+    }
+
+    /** Records where the surface crop and its local-contrast version were stored. */
+    void surfaceStored(String surfaceKey, String detailKey) {
+        this.surfaceKey = surfaceKey;
+        this.surfaceDetailKey = detailKey;
     }
 
     /** Key for the copy of a photo without a crop that others are shown: re-encoded, so without the upload's metadata. */
@@ -239,6 +257,14 @@ class Photo extends AssignedIdEntity<UUID> {
 
     String getWideCropKey() {
         return wideCropKey;
+    }
+
+    String getSurfaceKey() {
+        return surfaceKey;
+    }
+
+    String getSurfaceDetailKey() {
+        return surfaceDetailKey;
     }
 
     Instant getCapturedAt() {
