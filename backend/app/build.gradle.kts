@@ -23,7 +23,7 @@ dependencies {
     implementation("org.thymeleaf:thymeleaf")
     implementation("io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.100")
     // Error reports to Sentry (docs/hosting.md). Does nothing unless SENTRY_DSN is set.
-    implementation("io.sentry:sentry-spring-boot-4-starter:8.63.0")
+    implementation("io.sentry:sentry-spring-boot-4-starter:8.64.0")
     implementation("io.sentry:sentry-logback:8.63.0")
     // The API's OpenAPI description, which the web app's types are generated from (docs/api-types.md). The
     // endpoint is off in the running app; OpenApiSpecTest writes web/openapi.json from it.
