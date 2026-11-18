@@ -11,7 +11,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 
 /** A shipping provider for tests: records what it was asked to buy and refund, and fails while {@link #failing} is set. */
-class FakeShippingProvider implements ShippingProvider {
+public class FakeShippingProvider implements ShippingProvider {
 
     record Bought(Address from, Address to, BigDecimal insuredValue, String reference) {
     }
@@ -75,7 +75,7 @@ class FakeShippingProvider implements ShippingProvider {
     }
 
     @TestConfiguration(proxyBeanMethods = false)
-    static class Config {
+    public static class Config {
         @Bean
         FakeShippingProvider fakeShippingProvider() {
             return new FakeShippingProvider();
