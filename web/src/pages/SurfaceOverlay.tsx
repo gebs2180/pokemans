@@ -1,17 +1,50 @@
 import { useId, useState, type MouseEvent } from 'react'
-import { SIDE_LABEL, type ReviewPhoto } from '../api'
+import { SIDE_LABEL, type Side } from '../api'
 import { safeHref } from '../safeHref'
 import { Segmented, ToolPanel } from './reviewTools'
 import './reviewTools.css'
 
 export type SurfaceMode = 'off' | 'contrast' | 'edges' | 'emboss'
 
-const MODES: { mode: SurfaceMode; label: string; hint: string }[] = [
-  { mode: 'off', label: 'Photo', hint: '' },
-  { mode: 'contrast', label: 'Contrast', hint: 'Grey and steep contrast: scratches and print lines on foil.' },
-  { mode: 'edges', label: 'Edges', hint: 'Sharp changes stand out: whitening on edges and corners, dents.' },
-  { mode: 'emboss', label: 'Emboss', hint: 'Lit from one corner: indents, creases and roller lines.' },
+/** Who is looking: a reviewer on the admin page, or the collector on their own card. Only the wording differs. */
+export type SurfaceAudience = 'reviewer' | 'collector'
+
+const MODES: { mode: SurfaceMode; label: string; hint: Record<SurfaceAudience, string> }[] = [
+  { mode: 'off', label: 'Photo', hint: { reviewer: '', collector: '' } },
+  {
+    mode: 'contrast',
+    label: 'Contrast',
+    hint: {
+      reviewer: 'Grey and steep contrast: scratches and print lines on foil.',
+      collector: 'Takes out the colour and turns up the contrast, so scratches and print lines on the holo show up.',
+    },
+  },
+  {
+    mode: 'edges',
+    label: 'Edges',
+    hint: {
+      reviewer: 'Sharp changes stand out: whitening on edges and corners, dents.',
+      collector: 'Makes sharp changes stand out, like whitening on the edges and corners, and dents.',
+    },
+  },
+  {
+    mode: 'emboss',
+    label: 'Emboss',
+    hint: {
+      reviewer: 'Lit from one corner: indents, creases and roller lines.',
+      collector: 'Lights the card from one corner, so dents, creases and roller lines cast a shadow.',
+    },
+  },
 ]
+
+/** The zoom a tap gives: enough to see whitening, while an edge or corner tapped on stays in the box with its edge line. */
+export const SURFACE_ZOOM = 2
+
+/**
+ * A photo the surface view can show: the wide crop (the card with a little background past each edge) when there is
+ * one, else the card crop, else the photo itself.
+ */
+export type SurfacePhoto = { id: string; side: Side; url: string | null; cropUrl?: string | null; wideUrl?: string | null }
 
 /**
  * The SVG filter for a mode at a strength from 0 to 1, mixed over the photo. In the browser only: nothing
@@ -52,7 +85,7 @@ function SurfaceFilter({ id, mode, strength }: { id: string; mode: SurfaceMode; 
 }
 
 /**
- * One crop with the overlay on it. A tap zooms it 3× at that spot, inside the same box, and the zoom follows
+ * One crop with the overlay on it. A tap zooms it 2× at that spot, inside the same box, and the zoom follows
  * the pointer; another tap zooms back out. From the keyboard it zooms on the middle.
  */
 export function SurfaceView({ src, alt, mode, strength }: { src: string; alt: string; mode: SurfaceMode; strength: number }) {
@@ -89,7 +122,7 @@ export function SurfaceView({ src, alt, mode, strength }: { src: string; alt: st
           alt={alt}
           style={{
             ...(on ? { filter: `url(#${id})` } : {}),
-            ...(zoom ? { transformOrigin: `${zoom.x}% ${zoom.y}%` } : {}),
+            ...(zoom ? { transformOrigin: `${zoom.x}% ${zoom.y}%`, transform: `scale(${SURFACE_ZOOM})` } : {}),
           }}
           data-mode={on ? mode : 'off'}
         />
@@ -98,28 +131,52 @@ export function SurfaceView({ src, alt, mode, strength }: { src: string; alt: st
   )
 }
 
+/** What the panel says, for each audience. */
+const WORDS: Record<SurfaceAudience, { title: string; summary: string; intro: string; image: string }> = {
+  reviewer: {
+    title: 'Surface view',
+    summary: 'Contrast, edge and emboss filters over the crops, with zoom. Nothing is saved.',
+    intro: 'Filters over the card crop, in your browser only. Tap a crop to zoom in on that spot.',
+    image: 'crop',
+  },
+  collector: {
+    title: 'Take a closer look',
+    summary: 'Filters that bring out scratches, whitening and dents in your photos.',
+    intro:
+      "Tap a photo to zoom in on that spot, and tap again to zoom out. This only changes how the photo looks on your screen: it doesn't change your offer, and nothing is saved or sent.",
+    image: 'photo',
+  },
+}
+
 /**
- * Reviewer: the card crops with contrast, edge and emboss filters drawn over them, to bring out scratches,
- * whitening and print lines. A viewing aid only: it changes no grade and nothing is stored.
+ * The card photos with contrast, edge and emboss filters drawn over them, to bring out scratches, whitening and print
+ * lines. Reviewers have it on the admin page; collectors on their own card, as a way to look their card over. A
+ * viewing aid only: it changes no grade or price, and nothing is stored.
  */
-export function SurfacePanel({ photos }: { photos: ReviewPhoto[] }) {
-  const shown = photos.filter((p) => p.side === 'FRONT' || p.side === 'BACK')
+export function SurfacePanel({ photos, audience = 'reviewer' }: { photos: SurfacePhoto[]; audience?: SurfaceAudience }) {
+  const shown = photos.filter((p) => (p.side === 'FRONT' || p.side === 'BACK') && surfaceSrc(p) != null)
   if (shown.length === 0) return null
+  const words = WORDS[audience]
   return (
-    <ToolPanel title="Surface view" summary="Contrast, edge and emboss filters over the crops, with zoom. Nothing is saved.">
-      <SurfaceTool shown={shown} />
+    <ToolPanel title={words.title} summary={words.summary}>
+      <SurfaceTool shown={shown} audience={audience} />
     </ToolPanel>
   )
 }
 
-function SurfaceTool({ shown }: { shown: ReviewPhoto[] }) {
+function surfaceSrc(p: SurfacePhoto) {
+  return safeHref(p.wideUrl) ?? safeHref(p.cropUrl) ?? safeHref(p.url)
+}
+
+function SurfaceTool({ shown, audience }: { shown: SurfacePhoto[]; audience: SurfaceAudience }) {
   const [mode, setMode] = useState<SurfaceMode>('off')
   const [percent, setPercent] = useState(60)
   const strengthId = useId()
-  const hint = MODES.find((m) => m.mode === mode)?.hint
+  const hint = MODES.find((m) => m.mode === mode)?.hint[audience]
+  const words = WORDS[audience]
   return (
     <>
-      <p className="muted small">Filters over the card crop, in your browser only. Tap a crop to zoom in on that spot.</p>
+      <p className="muted small">{words.intro}</p>
       <div className="surface-controls">
         <Segmented label="Surface filter" options={MODES.map((m) => ({ value: m.mode, label: m.label }))} value={mode} onChange={setMode} />
         <span className="surface-strength small">
@@ -140,10 +197,10 @@ function SurfaceTool({ shown }: { shown: ReviewPhoto[] }) {
       {hint && <p className="muted small">{hint}</p>}
       <div className="surface-grid">
         {shown.map((p) => {
-          const src = safeHref(p.cropUrl) ?? safeHref(p.url)
+          const src = surfaceSrc(p)
           return src ? (
             <figure key={p.id}>
-              <SurfaceView src={src} alt={`${SIDE_LABEL[p.side]} crop, surface view`} mode={mode} strength={percent / 100} />
+              <SurfaceView src={src} alt={`${SIDE_LABEL[p.side]} ${words.image}, surface view`} mode={mode} strength={percent / 100} />
               <figcaption className="small">{SIDE_LABEL[p.side]}</figcaption>
             </figure>
           ) : null

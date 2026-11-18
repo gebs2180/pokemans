@@ -37,6 +37,11 @@ class CardDetector {
     static final double CARD_ASPECT = 63.0 / 88.0;
     static final int CROP_WIDTH = 1000;
     static final int CROP_HEIGHT = (int) Math.round(CROP_WIDTH / CARD_ASPECT);
+    /**
+     * Clear space past each card edge in the wide crop, as a share of the card's width (and height): enough to see the
+     * edge line against the background, and well inside the 6% the quality check leaves between card and frame.
+     */
+    static final double WIDE_MARGIN = 0.04;
     /** Widest printed border as a share of its inner box's width: a 90/10 card's wide border is about 5.5 mm of 57. */
     private static final double MAX_BORDER_SHARE = 0.10;
 
@@ -58,9 +63,10 @@ class CardDetector {
      * @param blurScore     variance of the Laplacian on the card crop
      * @param glareFraction share of blown-out pixels on the card crop
      * @param cropJpeg      the perspective-corrected card, JPEG
+     * @param wideCropJpeg  the same with {@link #WIDE_MARGIN} of background past each edge, JPEG: what people look at
      */
     record Detection(List<Corner> corners, double coverage, double aspect, double blurScore, double glareFraction,
-                     byte[] cropJpeg) {
+                     byte[] cropJpeg, byte[] wideCropJpeg) {
 
         /** The card's width in full-resolution pixels: the mean of its top and bottom edges. */
         double widthPx() {
@@ -97,7 +103,8 @@ class CardDetector {
                     aspect(fullQuad),
                     blurScore(cropGray, owned),
                     glareFraction(cropGray, properties.glareLuma(), owned),
-                    jpeg(crop)));
+                    jpeg(crop),
+                    jpeg(wideWarp(full, fullQuad, owned))));
         } finally {
             owned.forEach(Mat::release);
         }
@@ -384,6 +391,45 @@ class CardDetector {
             }
         }
         return true;
+    }
+
+    /**
+     * The wide crop for a photo whose corners were found before (photos checked before wide crops were kept), from the
+     * stored original. Null if it doesn't decode. Call only on images {@link com.pokemans.app.storage.ImageGuard} let through.
+     */
+    static byte[] wideCrop(byte[] imageBytes, List<Corner> corners) {
+        if (corners == null || corners.size() != 4) {
+            return null;
+        }
+        MatOfByte encoded = new MatOfByte(imageBytes);
+        Mat full = Imgcodecs.imdecode(encoded, Imgcodecs.IMREAD_COLOR);
+        List<Mat> owned = new ArrayList<>(List.of(encoded, full));
+        try {
+            if (full.empty()) {
+                return null;
+            }
+            return jpeg(wideWarp(full, corners.stream().map(c -> new Point(c.x(), c.y())).toArray(Point[]::new), owned));
+        } finally {
+            owned.forEach(Mat::release);
+        }
+    }
+
+    /**
+     * The card upright with {@link #WIDE_MARGIN} past each edge, so its outer edges and corners show against the
+     * background. The tight crop ends exactly on the detected outline, a few pixels either side of the true edge, so it
+     * can cut the edge off. Anything past the photo's frame repeats the frame's edge.
+     */
+    private static Mat wideWarp(Mat full, Point[] quad, List<Mat> owned) {
+        double mx = CROP_WIDTH * WIDE_MARGIN;
+        double my = CROP_HEIGHT * WIDE_MARGIN;
+        Mat src = track(owned, new MatOfPoint2f(quad));
+        Mat dst = track(owned, new MatOfPoint2f(
+                new Point(mx, my), new Point(mx + CROP_WIDTH, my), new Point(mx + CROP_WIDTH, my + CROP_HEIGHT), new Point(mx, my + CROP_HEIGHT)));
+        Mat transform = track(owned, Imgproc.getPerspectiveTransform(src, dst));
+        Mat crop = track(owned, new Mat());
+        Imgproc.warpPerspective(full, crop, transform, new Size(Math.round(CROP_WIDTH + 2 * mx), Math.round(CROP_HEIGHT + 2 * my)),
+                Imgproc.INTER_AREA, Core.BORDER_REPLICATE);
+        return crop;
     }
 
     private static Mat warp(Mat full, Point[] quad, List<Mat> owned) {

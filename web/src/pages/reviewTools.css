@@ -1,4 +1,4 @@
-/* Reviewer and labelling tools: surface view, centering lines, grader allowances. Styled with the Ledger tokens from index.css. */
+/* Reviewer and labelling tools (the surface view is on the collector's card too): surface view, centering lines, grader allowances. Styled with the Ledger tokens from index.css. */
 .surface-defs {
   position: absolute;
   width: 0;
@@ -81,7 +81,10 @@
   margin: 0;
 }
 
-/* Tap to zoom 3× at that spot; the box keeps its size and the zoomed image follows the pointer. */
+/*
+ * Tap to zoom 2× (SURFACE_ZOOM, set inline) at that spot; the box keeps its size and the zoomed image follows the
+ * pointer. The image is the wide crop, so unzoomed the whole card shows with a little background past each edge.
+ */
 .surface-zoom {
   display: block;
   width: 100%;
@@ -108,10 +111,6 @@
   display: block;
   width: 100%;
   height: auto;
-}
-
-.surface-zoom[aria-pressed='true'] .surface-image {
-  transform: scale(3);
 }
 
 /* One pick-one control: joined buttons, the pressed one filled. */

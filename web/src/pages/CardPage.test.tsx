@@ -96,6 +96,28 @@ describe('CardPage', () => {
     expect(screen.getByLabelText('Choose a front photo')).not.toHaveAttribute('capture')
   })
 
+  it('lets the collector look the card over with the surface view, the whole card with its edges, saying it changes nothing', async () => {
+    const user = userEvent.setup()
+    const view = card()
+    view.photos[0] = { ...view.photos[0], wideUrl: 'https://photos.example/front-wide.jpg' }
+    renderCard(view)
+    await user.click(await screen.findByText('Take a closer look'))
+    expect(screen.getByText(/doesn't change your offer/)).toBeInTheDocument()
+    // The current photos only, the wide crop where there is one; never the rejected try.
+    expect(screen.getByRole('img', { name: 'Front photo, surface view' })).toHaveAttribute('src', 'https://photos.example/front-wide.jpg')
+    expect(screen.getByRole('img', { name: 'Back photo, surface view' })).toHaveAttribute('src', 'https://photos.example/back.jpg')
+    expect(screen.getAllByRole('img', { name: /surface view/ })).toHaveLength(2)
+    expect(screen.queryByText(/crop/i)).not.toBeInTheDocument()
+    // Not the reviewer's centering lines: a collector's own lines would argue with the firm price.
+    expect(screen.queryByText('Centering lines')).not.toBeInTheDocument()
+  })
+
+  it('has no surface view for a lot', async () => {
+    renderCard(card({ lot: true, quantity: 5, photos: [photo({})] }))
+    expect(await screen.findByText(/Lot of 5/)).toBeInTheDocument()
+    expect(screen.queryByText('Take a closer look')).not.toBeInTheDocument()
+  })
+
   it('says what happens next, and who does it', async () => {
     renderCard(card(), { ...status, stage: 'ASSESSING', identity: 'Pikachu VMAX · Vivid Voltage 188 · EN · holo', nextStep: "We're reviewing its condition from the photos." })
     expect(await screen.findByText('Pikachu VMAX · Vivid Voltage 188 · EN · holo')).toBeInTheDocument()

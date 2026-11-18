@@ -59,10 +59,13 @@ describe('SurfacePanel', () => {
     fireEvent.click(zoom, { clientX: 50, clientY: 300, detail: 1 })
     expect(zoom).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getAllByRole('img')[0].style.transformOrigin).toBe('25% 75%')
+    // 2×, not more: a corner tapped on stays in the box with its edge line.
+    expect(screen.getAllByRole('img')[0].style.transform).toBe('scale(2)')
 
     await user.click(screen.getByRole('button', { name: /Zoom out of Front crop/ }))
     expect(zoom).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getAllByRole('img')[0].style.transformOrigin).toBe('')
+    expect(screen.getAllByRole('img')[0].style.transform).toBe('')
   })
 
   it('zooms on the middle from the keyboard', async () => {
@@ -73,6 +76,25 @@ describe('SurfacePanel', () => {
     screen.getByRole('button', { name: /Zoom in on Back crop/ }).focus()
     await user.keyboard('{Enter}')
     expect(screen.getAllByRole('img')[1].style.transformOrigin).toBe('50% 50%')
+  })
+
+  it('shows the wide crop when there is one, so the edges show past the card', async () => {
+    const user = userEvent.setup()
+    render(<SurfacePanel photos={[{ ...photos[0], wideUrl: 'https://img.example/front-wide.jpg' }, photos[1]]} />)
+    await user.click(screen.getByText('Surface view'))
+    expect(screen.getAllByRole('img').map((i) => i.getAttribute('src'))).toEqual(['https://img.example/front-wide.jpg', 'https://img.example/back.jpg'])
+  })
+
+  it('speaks plainly to a collector, and says it changes nothing about the offer', async () => {
+    const user = userEvent.setup()
+    render(<SurfacePanel audience="collector" photos={photos} />)
+    expect(screen.queryByText('Surface view')).not.toBeInTheDocument()
+    await user.click(screen.getByText('Take a closer look'))
+    expect(screen.getByText(/doesn't change your offer, and nothing is saved or sent/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Zoom in on Front photo/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Edges' }))
+    expect(screen.getByText(/whitening on the edges and corners/)).toBeInTheDocument()
+    expect(screen.queryByText(/crop/i)).not.toBeInTheDocument()
   })
 
   it('shows nothing without front or back photos', () => {

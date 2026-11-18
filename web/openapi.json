@@ -1804,9 +1804,13 @@
           "url" : {
             "format" : "uri",
             "type" : "string"
+          },
+          "wideUrl" : {
+            "format" : "uri",
+            "type" : "string"
           }
         },
-        "required" : [ "capturedAt", "cropUrl", "id", "side", "url" ]
+        "required" : [ "capturedAt", "cropUrl", "id", "side", "url", "wideUrl" ]
       },
       "ConditionControllerPredictionView" : {
         "properties" : {
@@ -2534,12 +2538,16 @@
             "format" : "uri",
             "type" : "string"
           },
+          "wideUrl" : {
+            "format" : "uri",
+            "type" : "string"
+          },
           "width" : {
             "format" : "int32",
             "type" : "integer"
           }
         },
-        "required" : [ "blurScore", "capturedAt", "card", "current", "glareFraction", "height", "id", "retakeReasons", "side", "status", "uploadedAt", "url", "width" ]
+        "required" : [ "blurScore", "capturedAt", "card", "current", "glareFraction", "height", "id", "retakeReasons", "side", "status", "uploadedAt", "url", "wideUrl", "width" ]
       },
       "IntakeViewsReasonView" : {
         "properties" : {
@@ -3759,6 +3767,27 @@
           }
         },
         "required" : [ "checked", "clean", "failed", "missing", "remaining", "rewritten" ]
+      },
+      "PhotoWideCropBackfillResult" : {
+        "properties" : {
+          "checked" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "failed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "made" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "remaining" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "checked", "failed", "made", "remaining" ]
       },
       "PokeTraceControllerMapRequest" : {
         "properties" : {
@@ -6809,7 +6838,7 @@
     },
     "/api/admin/photos/remove-location" : {
       "post" : {
-        "operationId" : "run",
+        "operationId" : "run_1",
         "parameters" : [ {
           "in" : "query",
           "name" : "limit",
@@ -6833,6 +6862,34 @@
           }
         },
         "tags" : [ "photo-location-controller" ]
+      }
+    },
+    "/api/admin/photos/wide-crops" : {
+      "post" : {
+        "operationId" : "run",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 200,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PhotoWideCropBackfillResult"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "photo-wide-crop-controller" ]
       }
     },
     "/api/admin/poketrace/pull-gaps" : {

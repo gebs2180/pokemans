@@ -33,8 +33,8 @@ class PreGradeFailuresTest {
     private void photosInUse(UUID f, UUID b) {
         Instant at = Instant.parse("2026-11-01T10:00:00Z");
         when(cardItems.passedPhotos(card)).thenReturn(List.of(
-                new CardItems.PhotoRef(f, card, "FRONT", "k1", "image/jpeg", null, at, at, "a"),
-                new CardItems.PhotoRef(b, card, "BACK", "k2", "image/jpeg", null, at, at, "b")));
+                new CardItems.PhotoRef(f, card, "FRONT", "k1", "image/jpeg", null, at, at, "a", null),
+                new CardItems.PhotoRef(b, card, "BACK", "k2", "image/jpeg", null, at, at, "b", null)));
     }
 
     private PredictionRequest request(String providerName, List<UUID> photos) {

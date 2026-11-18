@@ -115,7 +115,8 @@ class ConditionFlowTest {
                 .andExpect(jsonPath("$.enabledProviders[0]").value("FAKE"))
                 .andExpect(jsonPath("$.requests[0].status").value("PENDING"))
                 .andExpect(jsonPath("$.photos.length()").value(2))
-                .andExpect(jsonPath("$.photos[0].cropUrl").isNotEmpty());
+                .andExpect(jsonPath("$.photos[0].cropUrl").isNotEmpty())
+                .andExpect(jsonPath("$.photos[0].wideUrl").isNotEmpty());
 
         runWorker(); // submit
         runWorker(); // poll: still working

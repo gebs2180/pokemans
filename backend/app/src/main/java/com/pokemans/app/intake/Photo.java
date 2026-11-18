@@ -51,6 +51,7 @@ class Photo extends AssignedIdEntity<UUID> {
     private Double cardBlurScore;
     private Double cardGlareFraction;
     private String cropKey;
+    private String wideCropKey;
     private Instant capturedAt;
     private UUID createdBy;
     private Instant createdAt;
@@ -79,6 +80,16 @@ class Photo extends AssignedIdEntity<UUID> {
     /** Key for this photo's card crop, a derivative stored next to the original. */
     String cropStorageKey() {
         return storageKey + ".card.jpg";
+    }
+
+    /** Key for the wide card crop: the card with a little background past each edge, for people to look at. */
+    String wideCropStorageKey() {
+        return storageKey + ".wide.jpg";
+    }
+
+    /** Records where the wide card crop was stored. */
+    void wideCropStored(String key) {
+        this.wideCropKey = key;
     }
 
     /** Key for the copy of a photo without a crop that others are shown: re-encoded, so without the upload's metadata. */
@@ -224,6 +235,10 @@ class Photo extends AssignedIdEntity<UUID> {
 
     String getCropKey() {
         return cropKey;
+    }
+
+    String getWideCropKey() {
+        return wideCropKey;
     }
 
     Instant getCapturedAt() {

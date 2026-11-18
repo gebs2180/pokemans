@@ -152,6 +152,11 @@ class PhotoService {
         }
         boolean wasComplete = IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId())).captureComplete();
         photo.checked(stored.size(), sha256, result, ExifReader.capturedAt(bytes), extra, cropKey);
+        if (result.card() != null) {
+            String wideKey = photo.wideCropStorageKey();
+            blobs.putIfAbsent(storage.photoBucket(), wideKey, result.card().wideCropJpeg(), "image/jpeg");
+            photo.wideCropStored(wideKey);
+        }
         if (cropKey == null && photo.getStatus() == Photo.Status.PASSED) {
             // Buyers are shown this copy (CardItems.shownKey), never the upload with its EXIF location.
             byte[] clean = CardDetector.withoutMetadata(bytes);

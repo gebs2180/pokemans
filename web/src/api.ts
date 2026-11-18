@@ -44,6 +44,8 @@ export type PhotoView = {
   current: boolean
   /** A short-lived thumbnail link (the card crop if there is one); null in lists. */
   url: string | null
+  /** The card with a little background past each edge, for the surface view; null in lists and for photos checked before these were kept. */
+  wideUrl?: string | null
 }
 
 /** A card's label until the collector says what it is (the backend's CardItem.PLACEHOLDER_LABEL). */
@@ -347,7 +349,15 @@ export type IdentifiedCard = {
   identifiedSince: string
 }
 
-export type ReviewPhoto = { id: string; side: Side; url: string; cropUrl: string | null; capturedAt: string | null }
+export type ReviewPhoto = {
+  id: string
+  side: Side
+  url: string
+  cropUrl: string | null
+  capturedAt: string | null
+  /** The card with a little background past each edge, for the surface view; null for photos checked before these were kept. */
+  wideUrl?: string | null
+}
 
 // Centering labels (admin): the printed frame read by hand
 

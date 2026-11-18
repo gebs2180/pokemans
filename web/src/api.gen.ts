@@ -749,6 +749,22 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        post: operations["run_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/photos/wide-crops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         post: operations["run"];
         delete?: never;
         options?: never;
@@ -2431,6 +2447,8 @@ export interface components {
             side: string;
             /** Format: uri */
             url: string;
+            /** Format: uri */
+            wideUrl: string;
         };
         ConditionControllerPredictionView: {
             /** Format: double */
@@ -2721,6 +2739,8 @@ export interface components {
             uploadedAt: string;
             /** Format: uri */
             url: string;
+            /** Format: uri */
+            wideUrl: string;
             /** Format: int32 */
             width: number;
         };
@@ -3190,6 +3210,16 @@ export interface components {
             remaining: number;
             /** Format: int32 */
             rewritten: number;
+        };
+        PhotoWideCropBackfillResult: {
+            /** Format: int32 */
+            checked: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int32 */
+            made: number;
+            /** Format: int64 */
+            remaining: number;
         };
         PokeTraceControllerMapRequest: {
             overrideReason: string;
@@ -4924,7 +4954,7 @@ export interface operations {
             };
         };
     };
-    run: {
+    run_1: {
         parameters: {
             query?: {
                 limit?: number;
@@ -4942,6 +4972,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PhotoLocationBackfillResult"];
+                };
+            };
+        };
+    };
+    run: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PhotoWideCropBackfillResult"];
                 };
             };
         };
