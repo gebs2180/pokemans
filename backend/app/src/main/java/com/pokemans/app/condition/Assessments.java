@@ -62,8 +62,13 @@ public class Assessments {
                           MeasuredCentering centering) {
     }
 
-    /** Our own centering measurement. A side that wasn't measured is null. */
-    public record MeasuredCentering(SideCentering front, SideCentering back) {
+    /**
+     * Our own centering measurement. A side that wasn't measured is null.
+     *
+     * @param bestPsaGrade the best PSA grade the measured sides' centering allows (the cap it puts on the grade), or null
+     *                     when the measurement didn't give one
+     */
+    public record MeasuredCentering(SideCentering front, SideCentering back, Integer bestPsaGrade) {
     }
 
     /**
@@ -243,7 +248,7 @@ public class Assessments {
         return latest.stream().filter(ProviderPrediction::isOwnMeasurement).findFirst().map(p -> {
             SideCentering front = side(p.getDetails(), "frontCentering");
             SideCentering back = side(p.getDetails(), "backCentering");
-            return front == null && back == null ? null : new MeasuredCentering(front, back);
+            return front == null && back == null ? null : new MeasuredCentering(front, back, p.centeringCap());
         }).orElse(null);
     }
 

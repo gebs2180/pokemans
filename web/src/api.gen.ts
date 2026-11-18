@@ -1808,6 +1808,8 @@ export interface components {
         };
         AssessmentsMeasuredCentering: {
             back: components["schemas"]["AssessmentsSideCentering"];
+            /** Format: int32 */
+            bestPsaGrade: number;
             front: components["schemas"]["AssessmentsSideCentering"];
         };
         AssessmentsSideCentering: {

@@ -73,7 +73,12 @@ class CenteringFlowTest {
         api.get(seller, collector)
                 .andExpect(jsonPath("$.condition.mostLikely").value(0))
                 .andExpect(jsonPath("$.condition.centering.front.leftRight").value(matchesPattern("\\d+/\\d+")))
-                .andExpect(jsonPath("$.condition.centering.back.topBottom").value(matchesPattern("\\d+/\\d+")));
+                .andExpect(jsonPath("$.condition.centering.back.topBottom").value(matchesPattern("\\d+/\\d+")))
+                .andExpect(jsonPath("$.condition.centering.bestPsaGrade").value(10));
+        // Only the card's own org sees it.
+        JwtRequestPostProcessor stranger = api.user("auth0|centering-stranger", List.of());
+        api.collectorOrg("Centering Stranger", "auth0|centering-stranger");
+        api.get(seller, stranger).andExpect(status().isNotFound());
 
         runWorker(); // fake: still working
         runWorker(); // fake: done, and the assessment is built from both

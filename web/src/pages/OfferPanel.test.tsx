@@ -613,6 +613,23 @@ describe('HowPriced', () => {
     render(<OfferPanel orgId="org1" cardId="card1" />)
   }
 
+  it('shows our centering measurement on the offer, from the card status', async () => {
+    const side = { leftRight: '58/42', topBottom: '50/50' }
+    stubApi([{ offer: offer(), listing: null }], address, undefined, {
+      ...ready,
+      condition: { low: 8, high: 10, mostLikely: 9, mayBeUngradable: false, holdingBack: [], centering: { front: side, back: null, bestPsaGrade: 9 } },
+    })
+    render(<OfferPanel orgId="org1" cardId="card1" />)
+
+    expect(await screen.findByText('Centering measured 58/42 front, so the best PSA grade for centering is 9.')).toBeInTheDocument()
+  })
+
+  it('says nothing about centering on the offer without our measurement', async () => {
+    renderOffer(offer())
+
+    expect(await screen.findByTestId('offer-reveal')).not.toHaveTextContent('Centering measured')
+  })
+
   it('shows what each likely grade recently sold for, and the confidence in words', async () => {
     renderOffer(offer())
 

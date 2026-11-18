@@ -142,4 +142,30 @@ describe('OfferReveal', () => {
     expect(screen.getByTestId('offer-reveal')).toHaveTextContent('$636.12')
     vi.restoreAllMocks()
   })
+
+  it('shows our centering measurement and the best grade it allows beside the grade chances', () => {
+    reducedMotion(true)
+    render(
+      <OfferReveal
+        offer={offer}
+        centering={{ front: { leftRight: '58/42', topBottom: '52/48' }, back: { leftRight: '50/50', topBottom: '55/45' }, bestPsaGrade: 9 }}
+      />,
+    )
+    expect(screen.getByTestId('offer-reveal')).toHaveTextContent(
+      'Centering measured 58/42 front, 55/45 back, so the best PSA grade for centering is 9.',
+    )
+  })
+
+  it('shows only the side that was measured, and no grade when the measurement gave none', () => {
+    reducedMotion(true)
+    render(<OfferReveal offer={offer} centering={{ front: null, back: { leftRight: '60/40', topBottom: '50/50' }, bestPsaGrade: null }} />)
+    expect(screen.getByTestId('offer-reveal')).toHaveTextContent('Centering measured 60/40 back.')
+  })
+
+  it('says nothing about centering when we did not measure it', () => {
+    reducedMotion(true)
+    render(<OfferReveal offer={offer} centering={null} />)
+    expect(screen.getByTestId('offer-reveal')).not.toHaveTextContent('Centering')
+    expect(document.querySelector('.centering-note')).toBeNull()
+  })
 })

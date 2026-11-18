@@ -103,8 +103,11 @@ export const STAGE_LABEL: Record<CardStage, string> = {
 /** One side's measured ratios in whole percent, left or top border first, e.g. "49/51". */
 export type SideCentering = { leftRight: string; topBottom: string }
 
-/** Our own centering measurement; a side that wasn't measured is null. */
-export type MeasuredCentering = { front: SideCentering | null; back: SideCentering | null }
+/**
+ * Our own centering measurement; a side that wasn't measured is null. bestPsaGrade is the best PSA grade the measured
+ * centering allows, null when the measurement gave none.
+ */
+export type MeasuredCentering = { front: SideCentering | null; back: SideCentering | null; bestPsaGrade?: number | null }
 
 /** mostLikely is 0 before there's an assessment; a centering measurement can come first. */
 export type ConditionSummary = {

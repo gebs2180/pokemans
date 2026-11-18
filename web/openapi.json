@@ -142,11 +142,15 @@
           "back" : {
             "$ref" : "#/components/schemas/AssessmentsSideCentering"
           },
+          "bestPsaGrade" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
           "front" : {
             "$ref" : "#/components/schemas/AssessmentsSideCentering"
           }
         },
-        "required" : [ "back", "front" ]
+        "required" : [ "back", "bestPsaGrade", "front" ]
       },
       "AssessmentsSideCentering" : {
         "properties" : {
