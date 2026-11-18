@@ -1,6 +1,12 @@
 # Methodology doc sync, November 2026
 
-2026-11-18 · proposed edits for Zach to approve. **Nothing here has been written into the Claude Doc yet.**
+2026-11-18 · approved by Zach on 2026-11-18, with the four decisions below, and applied to the Claude Doc the same day (revision 46 → 73). The doc's "Changes since 2026-10-15" table has one row per date and section, citing these item numbers. Dates and sources are in that table; "defaults to confirm" and starting-guess labels stay inline next to each rule.
+
+**Zach's decisions (2026-11-18):**
+1. **Repricing (item 34):** the 10% threshold is Zach's decision, confirmed 2026-11-18. The rule came from the 2026-11-09 deep review (B3).
+2. **Tighter spread (item 9):** the rule is Zach's (2026-11-10); its weights are defaults to confirm, as the code says.
+3. **Code-only rules (items 37–46):** all ten belong in the methodology. The numbers in 37–40 and 43 are labelled starting guesses to calibrate against returned grades.
+4. **Worked example (item 36A):** option 1. Keep $64 as the advance on the card's FLV before concentration caps, and show that pledged alone it counts $21, an advance of $13.
 
 The [Raw Collection Valuation Methodology](https://claude.ai/artifact/1XVmPmLtueJk37u2hXgDmL) Claude Doc (revision 46, header date 2026-10-18) is behind `CLAUDE.md`: 34 rules are missing from it or disagree with it (item 21 was withdrawn), and 10 more are in the code but in neither (items 37–46). This file lists each one under the doc section it belongs in, with the text to add or replace. It supersedes [methodology-changes-2026-10-26.md](methodology-changes-2026-10-26.md), which covered 15 of them and was never applied; its wording is reused here where it still holds.
 
@@ -119,10 +125,10 @@ The doc folds a half grade down "unless that half grade has its own sales histor
 The doc describes only "a photo-based model". **Add after Photo confidence:**
 > **Pre-grade providers.** A single provider moves no probability down for that alone, and its answer on whole-card photos is confidence A. A valuation or offer counts that A as B when the card's FMV (central distribution, net prices, same run) is above $1,000 (`confidence.oneProviderMaxFmvForA`; the threshold and FMV as the measure are defaults to confirm), and the trace records when it does. Providers more than a grade apart (B) and photos not showing the whole card (C) still move probability down.
 
-### 9. Spread from subgrades (Zach, 2026-11-10)
+### 9. Spread from subgrades (Zach, 2026-11-10; weights are defaults to confirm, decided 2026-11-18)
 
 **Add after item 8:**
-> **Spread from subgrades.** When the provider's lowest of corners, edges and surface, folded down, is at or above its overall grade, its grade gets a tighter spread: +1 10%, 0 60%, −1 25%, −2 5%. A lower subgrade, or none given, keeps the default spread. The provider's centering subgrade is never read.
+> **Spread from subgrades.** When the provider's lowest of corners, edges and surface, folded down, is at or above its overall grade, its grade gets a tighter spread: +1 10%, 0 60%, −1 25%, −2 5% (weights are defaults to confirm). A lower subgrade, or none given, keeps the default spread. The provider's centering subgrade is never read.
 
 ### 10. No default surface shift (Zach, 2026-11-04)
 
@@ -285,12 +291,12 @@ All of `CLAUDE.md` Pipeline 8. `docs/offers.md` holds the implementation detail;
 **Add:**
 > No offer for lots, doubted cards, confidence D, FMV under $25, or a price above the maximum, EasyPost's $5,000 insurance limit, so every label is insured for the full price (`pokemans.offers.max-price`; the $500 beta maximum of 2026-10-21 was lifted 2026-10-26 because too many cards were above it). Unverified high-risk cards get an offer subject to authentication in hand.
 
-### 34. Repricing and the raw-comp flag (both from the 2026-11-09 deep review; the flag is a default to confirm, not Zach's decision yet)
+### 34. Repricing and the raw-comp flag (both from the 2026-11-09 deep review; 10% confirmed by Zach 2026-11-18; the flag is a default to confirm, not Zach's decision yet)
 
-*Code check, attribution:* an earlier draft credited repricing to "Zach, 2026-10-21", reading `CLAUDE.md`'s closing attribution as covering it. The code says otherwise: `OffersProperties.repriceThreshold` cites "Deep review 2026-11-09, B3", and both were built in the commit "Offers: flag offers below raw sales, re-price at post and accept" (2026-11-09). `CLAUDE.md` labels the raw-comp flag "defaults to confirm", but not the reprice rule or its 10%. **Zach: is repricing at 10% your decision, or a default to confirm?** Until you say, the wording below doesn't label it either way.
+*Code check, attribution:* an earlier draft credited repricing to "Zach, 2026-10-21", reading `CLAUDE.md`'s closing attribution as covering it. The code says otherwise: `OffersProperties.repriceThreshold` cites "Deep review 2026-11-09, B3", and both were built in the commit "Offers: flag offers below raw sales, re-price at post and accept" (2026-11-09). Zach confirmed the 10% on 2026-11-18.
 
 **Add:**
-> At post and at accept, the offer's ladder is re-run on today's prices. A move of more than 10% either way (`pokemans.offers.reprice-threshold`) voids the offer by appending rows and refuses with "The price has changed. Get a new offer."
+> At post and at accept, the offer's ladder is re-run on today's prices. A move of more than 10% either way (`pokemans.offers.reprice-threshold`) voids the offer by appending rows and refuses with "The price has changed. Get a new offer." (Deep review B3, 2026-11-09; 10% confirmed by Zach, 2026-11-18.)
 >
 > An offer below the card's lowest raw near-mint comp of the last 90 days is flagged to the admin and seller, never refused. (Default to confirm from the 2026-11-09 deep review; not Zach's decision yet.)
 
@@ -301,9 +307,9 @@ All of `CLAUDE.md` Pipeline 8. `docs/offers.md` holds the implementation detail;
 
 ## Worked example, limitations and changes table
 
-### 36. Needs a decision, plus two wording fixes
+### 36. The advance line, plus two wording fixes
 
-**A. The advance line no longer follows the caps (open since 2026-10-26).** The example says "A one-card collection is under 10 eligible cards, so the concentration caps don't apply and the advance is α × FLV" and gives $64. Under item 24 one card counts at most 20% of its FLV: $107 × 20% ≈ $21, an advance of about $13 at α = 60%. `CLAUDE.md`'s regression check keeps $64, and the golden test gets it by applying α to the card's FLV directly. Options:
+**A. The advance line no longer follows the caps (open since 2026-10-26; Zach chose option 1 on 2026-11-18).** The example says "A one-card collection is under 10 eligible cards, so the concentration caps don't apply and the advance is α × FLV" and gives $64. Under item 24 one card counts at most 20% of its FLV: $107 × 20% ≈ $21, an advance of about $13 at α = 60%. `CLAUDE.md`'s regression check keeps $64, and the golden test gets it by applying α to the card's FLV directly. Options:
 1. Keep $64 and reword: "Advance on this card's FLV at α = 60%, before concentration caps: $64. Pledged alone, it would count for 20% of its FLV ($21), an advance of $13."
 2. Change the example and the regression check to $13.
 
@@ -316,14 +322,14 @@ Option 1 changes no numbers or tests. Either way, delete the "under 10 eligible 
 
 ## Rules in the code but in neither `CLAUDE.md` nor the doc
 
-Found by the code check. Each one is built and running, but no written rule covers it. The code comments call most of these numbers starting guesses to calibrate against returned grades; they're labelled that way below. **Zach: confirm these belong in the methodology** (they decide prices and confidence).
+Found by the code check. Each one is built and running, but no written rule covers it. The code comments call most of these numbers starting guesses to calibrate against returned grades; they're labelled that way below. Zach confirmed on 2026-11-18 that all ten belong in the methodology.
 
 ### 37. Default spread of a provider grade (`ConditionProperties.DEFAULT_SPREAD`)
 
 **Add to Step 2, before item 9's tighter spread:**
 > **Spread.** Each provider's grade, half grades folded down, is spread over neighbouring grades, more below than above: +1 10%, 0 50%, −1 25%, −2 10%, −3 5%. Providers that answered are averaged. (Starting values, to calibrate against returned grades.)
 
-*Also:* the code labels item 9's tighter spread weights "defaults to confirm" (`ConditionProperties`, `tightSpread`); `CLAUDE.md` doesn't. This file keeps `CLAUDE.md`'s labels as they are, so Zach should say which label is right.
+*Also:* the code labels item 9's tighter spread weights "defaults to confirm" (`ConditionProperties`, `tightSpread`); `CLAUDE.md` didn't. Zach chose the code's label on 2026-11-18, so item 9 now carries it.
 
 ### 38. Cap on the probability of a 10 (review B2; `pokemans.condition.max-ten-probability` 0.25)
 
