@@ -1047,6 +1047,16 @@ class OffersFlowTest {
                 .andExpect(jsonPath("$.refusalCode").value("NOT_IDENTIFIED"))
                 .andExpect(jsonPath("$.confidence").isEmpty());
         api.get("/api/admin/cards/" + UUID.randomUUID() + "/offer-preview", api.admin()).andExpect(status().isNotFound());
+
+        // Over the $5,000 maximum the seller gets no offer, but the admin still sees the price it would have been.
+        String grail = pricedCard("Preview Grail", 30000);
+        String over = api.get("/api/admin/cards/" + grail + "/offer-preview", api.admin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.offered").value(false))
+                .andExpect(jsonPath("$.refusalCode").value("OVER_MAXIMUM"))
+                .andExpect(jsonPath("$.rawSales").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(((Number) JsonPath.read(over, "$.price")).doubleValue()).isGreaterThan(5000);
+        assertThat(jdbc.queryForObject("select count(*) from card_offer where card_item_id = ?::uuid", Integer.class, grail)).isZero();
     }
 
     @Test
