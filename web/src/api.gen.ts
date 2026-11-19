@@ -3294,8 +3294,10 @@ export interface components {
             buyerMargin: number;
             confidence: string;
             fmv: number;
+            fmvFromTen: number;
             offered: boolean;
             price: number;
+            rawMedian: number;
             rawSales: components["schemas"]["ListingViewsRawSalesView"];
             refusal: string;
             /** @enum {string} */

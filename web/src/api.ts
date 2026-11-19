@@ -1278,6 +1278,10 @@ export type OfferPreview = {
   rawSales?: RawSales | null
   /** Set when the offer's 10 rung was capped at M times its 9 rung (parameter set 1.4.0 on). */
   tenCap?: TenCap | null
+  /** The middle of the card's raw near-mint sales in the raw check's window, or null when there were none or no offer. */
+  rawMedian?: number | null
+  /** The part of FMV that is the chance of a PSA 10 (P(10) x its net price), or null when the card can't be valued. */
+  fmvFromTen?: number | null
 }
 
 /** The offer's 10 rung, capped: what it would have paid, what it pays (M x the 9 rung), and M. */

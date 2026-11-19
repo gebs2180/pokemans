@@ -103,7 +103,13 @@ class OfferStalenessTest {
         api.get("/api/admin/cards/" + card.cardId() + "/offer-preview", api.admin())
                 .andExpect(jsonPath("$.offered").value(true))
                 .andExpect(jsonPath("$.rawSales.below").value(true))
-                .andExpect(jsonPath("$.rawSales.lowest").value(500.0));
+                .andExpect(jsonPath("$.rawSales.lowest").value(500.0))
+                // The lower middle of $500 and $650: never an average of the two.
+                .andExpect(jsonPath("$.rawMedian").value(500.0))
+                .andExpect(jsonPath("$.fmvFromTen").isNumber());
+        org.assertj.core.api.Assertions.assertThat(new java.math.BigDecimal(TestApi.read(
+                api.get("/api/admin/cards/" + card.cardId() + "/offer-preview", api.admin()), "$.fmvFromTen").toString()))
+                .isPositive();
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
                 "select below_raw_sales from card_offer where id = ?::uuid", Boolean.class, card.offerId())).isTrue();
         // Flagged against the $500 sale through the offer's own haircut, which is under the sale itself.

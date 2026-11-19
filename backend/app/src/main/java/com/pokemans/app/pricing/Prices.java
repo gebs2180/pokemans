@@ -58,10 +58,12 @@ public class Prices {
      *
      * @param lowest the lowest of them, or null when there were none. A PokeTrace comp is a day's
      *               average, so this is the lowest day, not necessarily the lowest single sale
+     * @param median the middle of them, the lower middle for an even count (never an average of two), or null when
+     *               there were none. Like {@code lowest}, a PokeTrace comp is a day's average
      * @param sales  comps in the window (for PokeTrace, sale days)
      * @param since  first day of the window
      */
-    public record RawSales(BigDecimal lowest, int sales, LocalDate since, List<UUID> compIds) {
+    public record RawSales(BigDecimal lowest, BigDecimal median, int sales, LocalDate since, List<UUID> compIds) {
     }
 
     private final PriceSnapshotRepository snapshots;
@@ -90,8 +92,10 @@ public class Prices {
                         PriceSource.RawCondition.NEAR_MINT, since).stream()
                 .filter(c -> properties.currency().equals(c.getCurrency()))
                 .toList(), params).current();
-        BigDecimal lowest = sold.stream().map(SoldComp::getPrice).min(BigDecimal::compareTo).orElse(null);
-        return new RawSales(lowest, sold.size(), since, sold.stream().map(SoldComp::getId).toList());
+        List<BigDecimal> sorted = sold.stream().map(SoldComp::getPrice).sorted().toList();
+        BigDecimal lowest = sorted.isEmpty() ? null : sorted.getFirst();
+        BigDecimal median = sorted.isEmpty() ? null : sorted.get((sorted.size() - 1) / 2);
+        return new RawSales(lowest, median, sold.size(), since, sold.stream().map(SoldComp::getId).toList());
     }
 
     /**

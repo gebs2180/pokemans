@@ -85,6 +85,7 @@ These defaults are the reviewing session's picks, not Zach's decisions yet.
   - The window is `pokemans.offers.raw-sales-days` (90).
   - **The flag never refuses the offer and never changes the formula.**
   - The admin's offer preview on the review page shows the raw comps and the flag.
+  - **FMV explained beside the offer (Zach, 2026-11-19).** The preview also sets the offer beside the median of the same raw near-mint sales ("That's 83% of the card's raw near-mint median, $41.00"), the lower middle for an even count, and says FMV is the value if graded, with how much of it is the chance of a PSA 10 (P(10) × the 10's net price). Display only: neither is stored and the formula is unchanged. It came from a Charizard VMAX SWSH261 offer of $34.14 against an FMV of $94.60, where $57.94 of the FMV was a 9.8% chance of a $636 PSA 10 and the offer was 83% of raw sales. Zach looked at leaving grading cost out of offers that day and kept it: without it that offer would be $55.75, above most raw near-mint sales, so a buyer would lose about $20 a card whether they sell raw or grade.
   - The seller is told "This offer is below recent raw sales of $X" on the card's offer.
   - Buyers never see it: the market and their deals leave it out.
   - It is hidden with the sold prices (`pokemans.offers.show-sold-prices`).

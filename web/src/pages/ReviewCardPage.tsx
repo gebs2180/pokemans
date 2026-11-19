@@ -160,6 +160,18 @@ export function OfferPreviewPanel({ cardId }: { cardId: string }) {
             )}
           </>
         ))}
+      {data?.price != null && data.rawMedian != null && (
+        <p className="small" role="status">
+          That's {Math.round((data.price / data.rawMedian) * 100)}% of the card's raw near-mint median, {money(data.rawMedian)}: what it
+          sells for ungraded.
+        </p>
+      )}
+      {data?.fmv != null && data.fmvFromTen != null && data.fmvFromTen > 0 && (
+        <p className="muted small">
+          FMV is the value if graded: each likely grade at its PSA sale, after grading cost. {money(data.fmvFromTen)} of the{' '}
+          {money(data.fmv)} is the chance of a PSA 10.
+        </p>
+      )}
       {data?.price != null && data.tenCap && (
         <p className="muted small" role="status">
           The grade 10 rung is capped at {data.tenCap.multiple}× the grade 9 rung: {money(data.tenCap.cap)} instead of{' '}

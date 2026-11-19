@@ -233,6 +233,24 @@ describe('OfferPreviewPanel', () => {
     expect(screen.getByText(/would have been \$7,210\.50 at confidence B, leaving the buyer 13% \(FMV \$12,000\.00\)/)).toBeInTheDocument()
   })
 
+  it('sets the offer beside the raw median and says how much of FMV is the chance of a 10', async () => {
+    stub({
+      offered: true, refusal: null, refusalCode: null, price: 34.14, fmv: 94.6, confidence: 'A', buyerMargin: 0.1, why: [],
+      rawSales: { lowest: 32.03, sales: 148, since: '2026-08-21', below: false }, rawMedian: 41, fmvFromTen: 57.94,
+    })
+    render(<OfferPreviewPanel cardId="card1" />)
+    expect(await screen.findByText(/That's 83% of the card's raw near-mint median, \$41\.00: what it sells for ungraded/)).toBeInTheDocument()
+    expect(screen.getByText(/FMV is the value if graded.*\$57\.94 of the \$94\.60 is the chance of a PSA 10/)).toBeInTheDocument()
+  })
+
+  it('leaves out the raw median and the 10 share when there are none', async () => {
+    stub({ offered: true, refusal: null, refusalCode: null, price: 100.54, fmv: 160.68, confidence: 'B', buyerMargin: 0.13, why: [], rawMedian: null, fmvFromTen: 0 })
+    render(<OfferPreviewPanel cardId="card1" />)
+    expect(await screen.findByText(/Offer \$100.54/)).toBeInTheDocument()
+    expect(screen.queryByText(/raw near-mint median/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/chance of a PSA 10/)).not.toBeInTheDocument()
+  })
+
   it('says when the 10 rung was capped at M times the 9', async () => {
     stub({
       offered: true, refusal: null, refusalCode: null, price: 344.25, fmv: 750, confidence: 'A', buyerMargin: 0.1, why: [],
