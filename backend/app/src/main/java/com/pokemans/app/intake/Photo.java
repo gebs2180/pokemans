@@ -54,6 +54,16 @@ class Photo extends AssignedIdEntity<UUID> {
     private String wideCropKey;
     private String surfaceKey;
     private String surfaceDetailKey;
+    private String surfaceCleanKey;
+    private Integer cleanBackReferenceVersion;
+    private Integer cleanBackMatches;
+    private Integer cleanBackInliers;
+    private Double cleanBackInlierRatio;
+    private Double cleanBackCornerShift;
+    private Double cleanBackCorrelation;
+    private Double cleanBackResidual;
+    private String cleanBackFailure;
+    private Instant cleanBackCheckedAt;
     private Instant capturedAt;
     private UUID createdBy;
     private Instant createdAt;
@@ -108,6 +118,41 @@ class Photo extends AssignedIdEntity<UUID> {
     void surfaceStored(String surfaceKey, String detailKey) {
         this.surfaceKey = surfaceKey;
         this.surfaceDetailKey = detailKey;
+    }
+
+    /** Key for the clean back made against reference version {@code version} (the surface view's "Clean back" mode). */
+    String surfaceCleanStorageKey(int version) {
+        return storageKey + ".clean-v" + version + ".jpg";
+    }
+
+    /**
+     * Records a clean back check against a reference version: the image's key, or null with why there is none, and the
+     * alignment and mismatch scores either way. A check against a newer reference replaces the last one's (its image
+     * stays in storage).
+     */
+    void cleanBackChecked(int referenceVersion, String cleanKey, CleanBack.Scores scores, CleanBack.Failure failure) {
+        this.cleanBackReferenceVersion = referenceVersion;
+        this.surfaceCleanKey = cleanKey;
+        this.cleanBackMatches = scores.matches();
+        this.cleanBackInliers = scores.inliers();
+        this.cleanBackInlierRatio = scores.inlierRatio();
+        this.cleanBackCornerShift = scores.cornerShift();
+        this.cleanBackCorrelation = scores.correlation();
+        this.cleanBackResidual = scores.residual();
+        this.cleanBackFailure = failure == null ? null : failure.name();
+        this.cleanBackCheckedAt = Instant.now();
+    }
+
+    String getSurfaceCleanKey() {
+        return surfaceCleanKey;
+    }
+
+    Integer getCleanBackReferenceVersion() {
+        return cleanBackReferenceVersion;
+    }
+
+    String getCleanBackFailure() {
+        return cleanBackFailure;
     }
 
     /** Key for the copy of a photo without a crop that others are shown: re-encoded, so without the upload's metadata. */

@@ -97,6 +97,40 @@ describe('SurfacePanel', () => {
     expect(screen.queryByText(/crop/i)).not.toBeInTheDocument()
   })
 
+  it('offers Clean back only when a back has one, and shows it on the back alone', async () => {
+    const user = userEvent.setup()
+    const withClean: ReviewPhoto[] = [
+      { ...photos[0], cleanUrl: 'https://img.example/front-clean.jpg' },
+      { ...photos[1], cleanUrl: 'https://img.example/back-clean.jpg' },
+    ]
+    render(<SurfacePanel photos={withClean} />)
+    await user.click(screen.getByText('Surface view'))
+    await user.click(screen.getByRole('button', { name: 'Clean back' }))
+
+    const images = screen.getAllByRole('img')
+    // The front never shows a clean image, even one sent by mistake: it stays the plain crop.
+    expect(images.map((i) => i.getAttribute('src'))).toEqual(['https://img.example/front-crop.jpg', 'https://img.example/back-clean.jpg'])
+    expect(images.map((i) => i.dataset.mode)).toEqual(['off', 'clean'])
+    expect(screen.getByLabelText('Filter strength')).toBeDisabled()
+    expect(screen.getByText(/printed back design subtracted/)).toBeInTheDocument()
+    expect(screen.getByText(/A viewing aid only/)).toBeInTheDocument()
+  })
+
+  it('has no Clean back button when no back has a clean image', async () => {
+    const user = userEvent.setup()
+    render(<SurfacePanel photos={[{ ...photos[0], cleanUrl: 'https://img.example/front-clean.jpg' }, photos[1]]} />)
+    await user.click(screen.getByText('Surface view'))
+    expect(screen.queryByRole('button', { name: 'Clean back' })).not.toBeInTheDocument()
+  })
+
+  it('tells a collector Clean back takes away the shared printing', async () => {
+    const user = userEvent.setup()
+    render(<SurfacePanel audience="collector" photos={[photos[0], { ...photos[1], cleanUrl: 'https://img.example/back-clean.jpg' }]} />)
+    await user.click(screen.getByText('Take a closer look'))
+    await user.click(screen.getByRole('button', { name: 'Clean back' }))
+    expect(screen.getByText(/Takes away the printing every card back shares/)).toBeInTheDocument()
+  })
+
   it('shows nothing without front or back photos', () => {
     const { container } = render(<SurfacePanel photos={[]} />)
     expect(container).toBeEmptyDOMElement()

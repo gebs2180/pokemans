@@ -35,12 +35,12 @@ public class CardItems {
      */
     public record PhotoRef(UUID id, UUID cardItemId, String side, String storageKey, String contentType, String cropKey,
                            Instant capturedAt, Instant uploadedAt, String sha256, String wideCropKey, String surfaceKey,
-                           String surfaceDetailKey) {
+                           String surfaceDetailKey, String surfaceCleanKey) {
 
         /** A photo without a surface crop (made before they were kept). */
         public PhotoRef(UUID id, UUID cardItemId, String side, String storageKey, String contentType, String cropKey,
                         Instant capturedAt, Instant uploadedAt, String sha256, String wideCropKey) {
-            this(id, cardItemId, side, storageKey, contentType, cropKey, capturedAt, uploadedAt, sha256, wideCropKey, null, null);
+            this(id, cardItemId, side, storageKey, contentType, cropKey, capturedAt, uploadedAt, sha256, wideCropKey, null, null, null);
         }
     }
 
@@ -200,7 +200,7 @@ public class CardItems {
     private static PhotoRef ref(Photo p) {
         return new PhotoRef(p.getId(), p.getCardItemId(), p.getSide().name(), p.getStorageKey(), p.getContentType(),
                 p.getCropKey(), p.getCapturedAt(), p.getUploadedAt(), p.getSha256(), p.getWideCropKey(),
-                p.getSurfaceKey(), p.getSurfaceDetailKey());
+                p.getSurfaceKey(), p.getSurfaceDetailKey(), p.getSurfaceCleanKey());
     }
 
     /**

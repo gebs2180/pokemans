@@ -196,6 +196,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/clean-backs/reference": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["current"];
+        put?: never;
+        post: operations["rebuild_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/deal-outcomes": {
         parameters: {
             query?: never;
@@ -2370,6 +2386,25 @@ export interface components {
             /** Format: double */
             top: number;
         };
+        CleanBackControllerRebuildRequest: {
+            photoIds: string[];
+        };
+        CleanBackServiceReferenceView: {
+            built: boolean;
+            candidates: string[];
+            /** Format: date-time */
+            createdAt: string;
+            message: string;
+            /** Format: int32 */
+            needed: number;
+            rejected: {
+                [key: string]: string;
+            };
+            seeded: boolean;
+            used: string[];
+            /** Format: int32 */
+            version: number;
+        };
         ConditionCalibrationGradeCount: {
             expected: number;
             grade: string;
@@ -2490,6 +2525,8 @@ export interface components {
         ConditionControllerPhotoLink: {
             /** Format: date-time */
             capturedAt: string;
+            /** Format: uri */
+            cleanUrl: string;
             /** Format: uri */
             cropUrl: string;
             /** Format: uri */
@@ -2828,6 +2865,8 @@ export interface components {
             /** Format: date-time */
             capturedAt: string;
             card: components["schemas"]["IntakeViewsCardFit"];
+            /** Format: uri */
+            cleanUrl: string;
             current: boolean;
             /** Format: uri */
             detailUrl: string;
@@ -3324,9 +3363,21 @@ export interface components {
             /** Format: int32 */
             checked: number;
             /** Format: int32 */
+            cleanChecked: number;
+            /** Format: int32 */
+            cleanFailed: number;
+            /** Format: int32 */
+            cleanMade: number;
+            /** Format: int32 */
+            cleanRefused: number;
+            /** Format: int64 */
+            cleanRemaining: number;
+            /** Format: int32 */
             failed: number;
             /** Format: int32 */
             made: number;
+            /** Format: int32 */
+            referenceVersion: number;
             /** Format: int64 */
             remaining: number;
         };
@@ -4166,6 +4217,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["GraderCenteringStandard"][];
+                };
+            };
+        };
+    };
+    current: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CleanBackServiceReferenceView"];
+                };
+            };
+        };
+    };
+    rebuild_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CleanBackControllerRebuildRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CleanBackServiceReferenceView"];
                 };
             };
         };

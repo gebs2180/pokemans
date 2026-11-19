@@ -39,7 +39,8 @@ final class IntakeViews {
      */
     record PhotoView(UUID id, Photo.Side side, Photo.Status status, List<ReasonView> retakeReasons,
                      Integer width, Integer height, Double blurScore, Double glareFraction, CardFit card,
-                     Instant capturedAt, Instant uploadedAt, boolean current, URI url, URI wideUrl, URI surfaceUrl, URI detailUrl) {
+                     Instant capturedAt, Instant uploadedAt, boolean current, URI url, URI wideUrl, URI surfaceUrl, URI detailUrl,
+                     URI cleanUrl) {
     }
 
     /**
@@ -48,10 +49,12 @@ final class IntakeViews {
      * @param wide    the card with a little background past each edge (1000 px)
      * @param surface the same at full resolution (about 2000 px wide)
      * @param detail  the full-resolution crop with its local contrast evened out, greyscale
+     * @param clean   a back with the standard printed back design subtracted (the "Clean back"), in the surface crop's
+     *                layout; null for fronts and for backs that didn't match the reference back
      */
-    record SurfaceLinks(URI wide, URI surface, URI detail) {
+    record SurfaceLinks(URI wide, URI surface, URI detail, URI clean) {
 
-        static final SurfaceLinks NONE = new SurfaceLinks(null, null, null);
+        static final SurfaceLinks NONE = new SurfaceLinks(null, null, null, null);
     }
 
     record CardFit(double coverage, double aspect, double blurScore, double glareFraction) {
@@ -73,7 +76,8 @@ final class IntakeViews {
         CardFit card = p.getCardCoverage() == null ? null
                 : new CardFit(p.getCardCoverage(), p.getCardAspect(), p.getCardBlurScore(), p.getCardGlareFraction());
         return new PhotoView(p.getId(), p.getSide(), p.getStatus(), reasons, p.getWidth(), p.getHeight(),
-                p.getBlurScore(), p.getGlareFraction(), card, p.getCapturedAt(), p.getUploadedAt(), current, url, surface.wide(), surface.surface(), surface.detail());
+                p.getBlurScore(), p.getGlareFraction(), card, p.getCapturedAt(), p.getUploadedAt(), current, url, surface.wide(), surface.surface(), surface.detail(),
+                surface.clean());
     }
 
     static CardView card(CardItem card, List<Photo> photos) {

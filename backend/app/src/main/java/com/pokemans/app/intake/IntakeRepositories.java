@@ -103,4 +103,29 @@ interface PhotoRepository extends JpaRepository<Photo, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Photo p where p.id = :id")
     Optional<Photo> findLockedById(UUID id);
+
+    /** Passed BACK photos with a surface crop not yet checked against reference {@code version}, oldest first. */
+    @Query("select p.id from Photo p where p.side = com.pokemans.app.intake.Photo.Side.BACK"
+            + " and p.status = com.pokemans.app.intake.Photo.Status.PASSED and p.surfaceKey is not null"
+            + " and (p.cleanBackReferenceVersion is null or p.cleanBackReferenceVersion < :version) order by p.createdAt")
+    List<UUID> findIdsWithoutCleanBack(int version, org.springframework.data.domain.Limit limit);
+
+    @Query("select count(p) from Photo p where p.side = com.pokemans.app.intake.Photo.Side.BACK"
+            + " and p.status = com.pokemans.app.intake.Photo.Status.PASSED and p.surfaceKey is not null"
+            + " and (p.cleanBackReferenceVersion is null or p.cleanBackReferenceVersion < :version)")
+    long countWithoutCleanBack(int version);
+
+    /**
+     * Candidates for an automatic reference back: passed BACK photos with a surface crop, the sharpest and least glary
+     * first. The service keeps one per card.
+     */
+    @Query("select p from Photo p where p.side = com.pokemans.app.intake.Photo.Side.BACK"
+            + " and p.status = com.pokemans.app.intake.Photo.Status.PASSED and p.surfaceKey is not null"
+            + " order by coalesce(p.cardGlareFraction, 1) asc, coalesce(p.cardBlurScore, 0) desc, p.createdAt asc")
+    List<Photo> findReferenceCandidates(org.springframework.data.domain.Limit limit);
+}
+
+interface BackReferenceRepository extends JpaRepository<BackReference, Integer> {
+
+    Optional<BackReference> findFirstByOrderByVersionDesc();
 }
