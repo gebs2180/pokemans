@@ -18,6 +18,11 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                             less mass goes below. Its centering sub-grade is never read (only our own
  *                             measurement caps). Must sum to 1 and put no more above the grade than
  *                             {@code spread} does (Zach, 2026-11-10; weights are defaults to confirm)
+ * @param highSpread           the spread used instead for a provider 9 whose corners, edges and surface are each
+ *                             9.5 or better, as given, with at least two of them 10. It puts more above the grade
+ *                             than {@code spread}: the subgrades are evidence the provider saw. P(10) is still
+ *                             capped and our own centering still caps (Zach, 2026-11-19; weights are defaults
+ *                             to confirm). Must sum to 1
  * @param disagreementForB     largest gap between provider grades that still allows confidence B
  * @param confidencePenaltyB   share of each grade's probability moved one grade down at confidence B
  * @param confidencePenaltyC   the same at confidence C
@@ -32,6 +37,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 record ConditionProperties(
         Map<Integer, BigDecimal> spread,
         Map<Integer, BigDecimal> tightSpread,
+        Map<Integer, BigDecimal> highSpread,
         @DefaultValue("1.5") double disagreementForB,
         @DefaultValue("0.10") BigDecimal confidencePenaltyB,
         @DefaultValue("0.25") BigDecimal confidencePenaltyC,
@@ -50,11 +56,16 @@ record ConditionProperties(
     static final Map<Integer, BigDecimal> DEFAULT_TIGHT_SPREAD = Map.of(
             1, new BigDecimal("0.10"), 0, new BigDecimal("0.60"), -1, new BigDecimal("0.25"), -2, new BigDecimal("0.05"));
 
+    static final Map<Integer, BigDecimal> DEFAULT_HIGH_SPREAD = Map.of(
+            1, new BigDecimal("0.25"), 0, new BigDecimal("0.50"), -1, new BigDecimal("0.20"), -2, new BigDecimal("0.05"));
+
     ConditionProperties {
         spread = spread == null || spread.isEmpty() ? DEFAULT_SPREAD : Map.copyOf(spread);
         tightSpread = tightSpread == null || tightSpread.isEmpty() ? DEFAULT_TIGHT_SPREAD : Map.copyOf(tightSpread);
         requireSumsToOne("spread", spread);
+        highSpread = highSpread == null || highSpread.isEmpty() ? DEFAULT_HIGH_SPREAD : Map.copyOf(highSpread);
         requireSumsToOne("tight-spread", tightSpread);
+        requireSumsToOne("high-spread", highSpread);
         // Never more probability above the provider's grade than the default spread allows.
         if (above(tightSpread).compareTo(above(spread)) > 0) {
             throw new IllegalArgumentException("pokemans.condition.tight-spread puts " + above(tightSpread)
