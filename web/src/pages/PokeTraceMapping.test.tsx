@@ -45,6 +45,43 @@ describe('PokeTraceMapping', () => {
     expect(screen.queryByRole('button', { name: 'Pull sales now' })).not.toBeInTheDocument()
   })
 
+  it('pages long results, lists matches first and keeps a typed reason across pages', async () => {
+    const user = userEvent.setup()
+    const many = Array.from({ length: 25 }, (_, i) => ({
+      poketraceId: `pt-${i}`, name: 'Charizard', cardNumber: `${i}/102`, variant: 'Holofoil', setName: 'Base Set',
+      disagreements: i === 0 ? ['edition: differs'] : [],
+    }))
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => respond(200, url.endsWith('/candidates') ? many : unmapped)))
+    render(<PokeTraceMapping catalogCardId="c1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Find on PokeTrace' }))
+    expect(await screen.findByText('1–10 of 25')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Prev' })).toBeDisabled()
+    expect(screen.getAllByRole('button', { name: /^Map to / })).toHaveLength(10)
+    expect(screen.queryByLabelText('Reason to map pt-0 anyway')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByText('11–20 of 25')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByText('21–25 of 25')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    await user.type(screen.getByLabelText('Reason to map pt-0 anyway'), 'kept')
+    await user.click(screen.getByRole('button', { name: 'Prev' }))
+    await user.click(screen.getByRole('button', { name: 'Prev' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByLabelText('Reason to map pt-0 anyway')).toHaveValue('kept')
+  })
+
+  it('shows no page controls for ten or fewer results', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => respond(200, url.endsWith('/candidates') ? candidates : unmapped)))
+    render(<PokeTraceMapping catalogCardId="c1" />)
+    await user.click(await screen.findByRole('button', { name: 'Find on PokeTrace' }))
+    await screen.findByText(/ours is 1st Edition/)
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+  })
+
   it('maps a matching card, and a mismatching one only with a reason', async () => {
     const user = userEvent.setup()
     const fetch = vi.fn(async (url: string, init?: RequestInit) => {
