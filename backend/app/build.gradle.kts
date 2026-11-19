@@ -52,6 +52,8 @@ tasks.withType<Test>().configureEach {
     systemProperty("golden.update", System.getProperty("golden.update") ?: "false")
     // ./gradlew test -Dopenapi.update=true rewrites web/openapi.json (OpenApiSpecTest); then npm run api:types in web/.
     systemProperty("openapi.update", System.getProperty("openapi.update") ?: "false")
+    // ./gradlew test --tests '*CleanBackHarness' -Dcleanback.dir=<folder> runs the clean back over local back crops.
+    System.getProperty("cleanback.dir")?.let { systemProperty("cleanback.dir", it) }
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
