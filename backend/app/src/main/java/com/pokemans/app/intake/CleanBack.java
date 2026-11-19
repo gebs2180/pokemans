@@ -24,6 +24,7 @@ import org.opencv.features2d.BFMatcher;
 import org.opencv.features2d.ORB;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.video.DISOpticalFlow;
 
 /**
  * The surface view's "Clean back": a card back with the standard printed back design subtracted, so only physical marks
@@ -82,6 +83,27 @@ final class CleanBack {
     private static final double OUTSIDE_HIGH_PASS_SHARE = 0.006;
     /** A light blur of both before differencing, so sub-pixel misalignment and JPEG noise don't outline the print. */
     private static final double PRE_BLUR_SIGMA = 1.0;
+    // The edge settings below aren't final only so CleanBackHarness can switch them off for a before and after on real
+    // backs; nothing else writes them.
+    /**
+     * Extra blur tried on whichever of the photo and the reference is sharper, the one leaving the least difference kept:
+     * a sharp phone photo against a softer median (or the reverse) otherwise leaves a light and dark line along every
+     * printed edge.
+     */
+    static double[] SHARPNESS_SIGMAS = {0, 0.5, 1.0, 1.5, 2.0, 3.0};
+    /**
+     * Local alignment after the homography: dense optical flow from the reference to the photo, smoothed over this many
+     * px so it follows lens bulge and card bow but not a dent, and capped at {@link #FLOW_MAX_PX}.
+     */
+    static double FLOW_SMOOTH_PX = 12;
+    static double FLOW_MAX_PX = 4;
+    /**
+     * Along the reference's own printed edges the difference is turned down: by k² / (k² + g²), with g the reference's
+     * gradient in grey levels per px. Flat card keeps its full difference; a dent crossing a printed edge shows less there.
+     */
+    static double EDGE_DAMP_GRADIENT = 6;
+    /** The least share of the difference kept on a printed edge, so the card's texture (and a mark) still shows there. */
+    static double EDGE_DAMP_FLOOR = 0.4;
     /** The card's rounded corner, as a share of its width (about 3 mm of 63). */
     private static final double CORNER_RADIUS_SHARE = 0.05;
 
@@ -194,6 +216,7 @@ final class CleanBack {
             Mat warped = track(owned, new Mat());
             Imgproc.warpPerspective(photo, warped, h, new Size(WIDTH, HEIGHT), Imgproc.INTER_LINEAR, Core.BORDER_CONSTANT, new Scalar(0));
             Mat inside = track(owned, insideMask(h, owned));
+            warped = refine(warped, reference.grey, owned);
 
             Comparison c = compare(warped, reference.grey, inside, owned);
             if (c == null || c.correlation() < MIN_CORRELATION) {
@@ -318,6 +341,7 @@ final class CleanBack {
                 Imgproc.warpPerspective(frames[i], warped, a.homography(), new Size(WIDTH, HEIGHT), Imgproc.INTER_LINEAR,
                         Core.BORDER_REPLICATE);
                 Mat inside = track(owned, insideMask(a.homography(), owned));
+                warped = refine(warped, frames[anchor], owned);
                 Comparison c = compare(warped, frames[anchor], inside, owned);
                 if (c == null || c.correlation() < MIN_CORRELATION) {
                     rejected.put(i, Failure.DESIGN_MISMATCH.name());
@@ -476,12 +500,57 @@ final class CleanBack {
         Imgproc.GaussianBlur(y, y, new Size(0, 0), PRE_BLUR_SIGMA);
         Imgproc.GaussianBlur(x, x, new Size(0, 0), PRE_BLUR_SIGMA);
         int size = WIDTH * HEIGHT;
+        byte[] ms = new byte[size];
+        mask.get(0, 0, ms);
+
+        // Sharpness: blur the sharper of the two a little more, by whichever amount leaves the least difference.
         float[] ys = new float[size];
         float[] xs = new float[size];
-        byte[] ms = new byte[size];
         y.get(0, 0, ys);
         x.get(0, 0, xs);
-        mask.get(0, 0, ms);
+        double best = misfit(ys, xs, ms);
+        float[] bestYs = ys;
+        float[] bestXs = xs;
+        Mat trial = track(owned, new Mat());
+        for (double sigma : SHARPNESS_SIGMAS) {
+            if (sigma <= 0) {
+                continue;
+            }
+            Imgproc.GaussianBlur(y, trial, new Size(0, 0), sigma);
+            float[] softer = new float[size];
+            trial.get(0, 0, softer);
+            double m = misfit(softer, xs, ms);
+            if (m < best) {
+                best = m;
+                bestYs = softer;
+                bestXs = xs;
+            }
+            Imgproc.GaussianBlur(x, trial, new Size(0, 0), sigma);
+            softer = new float[size];
+            trial.get(0, 0, softer);
+            m = misfit(ys, softer, ms);
+            if (m < best) {
+                best = m;
+                bestYs = ys;
+                bestXs = softer;
+            }
+        }
+        ys = bestYs;
+        xs = bestXs;
+        // The reference's own gradient, for turning the difference down along printed edges.
+        Mat xUsed = track(owned, new Mat(HEIGHT, WIDTH, CvType.CV_32F));
+        xUsed.put(0, 0, xs);
+        Mat gx = track(owned, new Mat());
+        Mat gy = track(owned, new Mat());
+        Imgproc.Sobel(xUsed, gx, CvType.CV_32F, 1, 0, 3, 0.125);
+        Imgproc.Sobel(xUsed, gy, CvType.CV_32F, 0, 1, 3, 0.125);
+        Mat gradient = track(owned, new Mat());
+        Core.magnitude(gx, gy, gradient);
+        // Spread a little, so the damping covers both sides of a printed edge's ghost line.
+        Imgproc.dilate(gradient, gradient, track(owned, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(5, 5))));
+        Imgproc.GaussianBlur(gradient, gradient, new Size(0, 0), 1.0);
+        float[] gs = new float[size];
+        gradient.get(0, 0, gs);
 
         double n = 0;
         double sx = 0;
@@ -548,12 +617,91 @@ final class CleanBack {
         float[] cleaned = new float[size];
         d.get(0, 0, cleaned);
         double squares = 0;
+        double k2 = EDGE_DAMP_GRADIENT * EDGE_DAMP_GRADIENT;
         for (int p = 0; p < size; p++) {
             if (ms[p] != 0) {
                 squares += (double) cleaned[p] * cleaned[p];
+                double g = gs[p];
+                cleaned[p] = (float) (cleaned[p] * (EDGE_DAMP_FLOOR + (1 - EDGE_DAMP_FLOOR) * k2 / (k2 + g * g)));
             }
         }
+        d.put(0, 0, cleaned);
         return new Comparison(slope, intercept, correlation, Math.sqrt(squares / n), d, w);
+    }
+
+    /** Mean squared difference inside the mask after a least-squares brightness and contrast match; for picking a blur. */
+    private static double misfit(float[] ys, float[] xs, byte[] ms) {
+        double n = 0;
+        double sx = 0;
+        double sy = 0;
+        double sxx = 0;
+        double syy = 0;
+        double sxy = 0;
+        for (int p = 0; p < ms.length; p += 2) {
+            if (ms[p] != 0) {
+                double a = xs[p];
+                double b = ys[p];
+                n++;
+                sx += a;
+                sy += b;
+                sxx += a * a;
+                syy += b * b;
+                sxy += a * b;
+            }
+        }
+        if (n == 0) {
+            return Double.MAX_VALUE;
+        }
+        double vx = sxx - sx * sx / n;
+        double vy = syy - sy * sy / n;
+        double cxy = sxy - sx * sy / n;
+        if (vx <= 0 || vy <= 0) {
+            return Double.MAX_VALUE;
+        }
+        // Residual of y on x, in the reference's units (divided by the slope²), so blurring y doesn't win by shrinking it.
+        double slope = cxy / vx;
+        return (vy - cxy * cxy / vx) / (slope * slope) / n;
+    }
+
+    /**
+     * The aligned photo nudged onto the reference by dense optical flow, smoothed so only slow warps (lens, a bowed card)
+     * are followed and a dent is not, and capped at {@link #FLOW_MAX_PX}. Returns the input when there is nothing to do.
+     */
+    private static Mat refine(Mat warped, Mat reference, List<Mat> owned) {
+        if (FLOW_MAX_PX <= 0) {
+            return warped;
+        }
+        Mat flow = track(owned, new Mat());
+        DISOpticalFlow dis = DISOpticalFlow.create(DISOpticalFlow.PRESET_MEDIUM);
+        dis.calc(reference, warped, flow);
+        Imgproc.GaussianBlur(flow, flow, new Size(0, 0), FLOW_SMOOTH_PX);
+        List<Mat> parts = new ArrayList<>();
+        Core.split(flow, parts);
+        owned.addAll(parts);
+        Mat fx = parts.get(0);
+        Mat fy = parts.get(1);
+        Core.min(fx, new Scalar(FLOW_MAX_PX), fx);
+        Core.max(fx, new Scalar(-FLOW_MAX_PX), fx);
+        Core.min(fy, new Scalar(FLOW_MAX_PX), fy);
+        Core.max(fy, new Scalar(-FLOW_MAX_PX), fy);
+        // reference(x) ≈ warped(x + flow(x)): sample the photo there.
+        Mat mapX = track(owned, new Mat(HEIGHT, WIDTH, CvType.CV_32F));
+        Mat mapY = track(owned, new Mat(HEIGHT, WIDTH, CvType.CV_32F));
+        float[] xs = new float[WIDTH * HEIGHT];
+        float[] ys = new float[WIDTH * HEIGHT];
+        fx.get(0, 0, xs);
+        fy.get(0, 0, ys);
+        for (int r = 0, p = 0; r < HEIGHT; r++) {
+            for (int col = 0; col < WIDTH; col++, p++) {
+                xs[p] += col;
+                ys[p] += r;
+            }
+        }
+        mapX.put(0, 0, xs);
+        mapY.put(0, 0, ys);
+        Mat out = track(owned, new Mat());
+        Imgproc.remap(warped, out, mapX, mapY, Imgproc.INTER_LINEAR, Core.BORDER_REPLICATE);
+        return out;
     }
 
     /** The card's outline in the frame with rounded corners, {@code inset} px in from the edge. */
