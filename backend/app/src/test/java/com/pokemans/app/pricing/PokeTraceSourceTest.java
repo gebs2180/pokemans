@@ -128,6 +128,17 @@ class PokeTraceSourceTest {
     }
 
     @Test
+    void promoSetsMatchAcrossTheirTwoNames() {
+        assertThat(PokeTraceMappings.disagreements(card("SWSH261", "SWSH Black Star Promos", null, Variant.HOLO, "en", null),
+                detail("SWSH261", "SWSH: Sword & Shield Promo Cards", "Holofoil"))).isEmpty();
+        // Another era's promos, or the same era's main set, are still a different set.
+        assertThat(PokeTraceMappings.disagreements(card("SWSH261", "SWSH Black Star Promos", null, Variant.HOLO, "en", null),
+                detail("SWSH261", "SM: Sun & Moon Promo Cards", "Holofoil"))).singleElement().asString().startsWith("set");
+        assertThat(PokeTraceMappings.disagreements(card("SWSH261", "SWSH Black Star Promos", null, Variant.HOLO, "en", null),
+                detail("SWSH261", "SWSH: Sword & Shield", "Holofoil"))).singleElement().asString().startsWith("set");
+    }
+
+    @Test
     void identityDisagreementsAreListed() {
         // PokeTrace's one "Holofoil" Base Set Charizard can't be our 1st Edition.
         assertThat(PokeTraceMappings.disagreements(card("4", "Base Set", Edition.FIRST_EDITION, Variant.HOLO, "en", null),

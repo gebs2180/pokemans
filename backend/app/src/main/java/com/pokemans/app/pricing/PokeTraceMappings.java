@@ -102,7 +102,8 @@ class PokeTraceMappings {
         }
         String theirSet = norm(detail.get("set") instanceof Map<?, ?> s ? string(s.get("name")) : null);
         String ourSet = norm(card.setName());
-        if (!ourSet.isEmpty() && (theirSet.isEmpty() || !(theirSet.contains(ourSet) || ourSet.contains(theirSet)))) {
+        if (!ourSet.isEmpty() && (theirSet.isEmpty()
+                || !(theirSet.contains(ourSet) || ourSet.contains(theirSet) || samePromoSet(ourSet, theirSet)))) {
             out.add("set " + (theirSet.isEmpty() ? "missing" : string(((Map<?, ?>) detail.get("set")).get("name"))) + ", ours "
                     + card.setName());
         }
@@ -143,6 +144,21 @@ class PokeTraceMappings {
             out.add("stamp: ours has \"" + card.stamp() + "\", which PokeTrace doesn't record");
         }
         return out;
+    }
+
+    /**
+     * Promo sets go by different names on each side ("SWSH Black Star Promos" here, "SWSH: Sword &amp; Shield Promo
+     * Cards" on PokeTrace), so two promo sets count as one when both names say promo and start with the same era
+     * prefix. The card number still has to match on its own, and promo numbers carry their era (SWSH261).
+     */
+    static boolean samePromoSet(String ours, String theirs) {
+        List<String> a = List.of(ours.split(" "));
+        List<String> b = List.of(theirs.split(" "));
+        return a.size() > 1 && b.size() > 1 && a.getFirst().equals(b.getFirst()) && isPromo(a) && isPromo(b);
+    }
+
+    private static boolean isPromo(List<String> words) {
+        return words.contains("promo") || words.contains("promos");
     }
 
     private static String variantName(Map<String, Object> detail) {
