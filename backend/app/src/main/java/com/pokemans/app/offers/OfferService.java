@@ -68,13 +68,14 @@ class OfferService {
      * @param refused why the card gets no offer, as a code, or null
      * @param refusal the same in words for the seller, or null
      * @param offer   the firm price and its ladder, or null when refused (kept over the maximum, for the admin's preview)
-     * @param raw     the card's raw near-mint sales of the last {@code pokemans.offers.raw-sales-days}, or null when refused
+     * @param raw       the card's raw near-mint sales of the last {@code pokemans.offers.raw-sales-days}, or null when refused
+     * @param rawMedian the middle of those sales, for the admin's preview only (never stored), or null
      */
     record Quote(Valuations.CurrentValue value, OfferRefusal refused, String refusal, BigDecimal margin, OfferLadder.Offer offer,
-                 CardOffer.RawCheck raw) {
+                 CardOffer.RawCheck raw, BigDecimal rawMedian) {
 
         Quote(Valuations.CurrentValue value, OfferRefusal refused, String refusal) {
-            this(value, refused, refusal, null, null, null);
+            this(value, refused, refusal, null, null, null, null);
         }
 
         /** The firm price is under what a card sure to be near mint would be offered: a flag, not a refusal. */
@@ -93,9 +94,14 @@ class OfferService {
      * @param why        the trace steps that set the offer's confidence (base, price penalties, derived grades) and the parameter set
      * @param rawSales   the card's raw near-mint sales of the last {@code pokemans.offers.raw-sales-days}, or null when it gets no offer
      * @param tenCap     the 10 rung's cap when it bound (parameter set 1.4.0 on): the uncapped rung, the cap and M; else null
+     * @param rawMedian  the middle of the card's raw near-mint sales in the same window as {@code rawSales}, or null when there
+     *                   were none or it gets no offer: what the card sells for ungraded, to set the offer beside (Zach, 2026-11-19)
+     * @param fmvFromTen the part of FMV that is the chance of a PSA 10, P(10) x the 10's net price, or null when the card
+     *                   can't be valued. FMV prices every grade at its graded sale, so a small chance of a 10 can be most of it
      */
     record Preview(boolean offered, String refusal, OfferRefusal refusalCode, BigDecimal price, BigDecimal fmv, String confidence, BigDecimal buyerMargin,
-                   List<Trace.Step> why, ListingViews.RawSalesView rawSales, OfferLadder.TenCap tenCap) {
+                   List<Trace.Step> why, ListingViews.RawSalesView rawSales, OfferLadder.TenCap tenCap, BigDecimal rawMedian,
+                   BigDecimal fmvFromTen) {
     }
 
     @Transactional(readOnly = true)
@@ -131,11 +137,12 @@ class OfferService {
         if (offer.price().compareTo(properties.maxPrice()) > 0) {
             // Refused, but the price is kept so the admin's preview can show what it would have been.
             return new Quote(value, OfferRefusal.OVER_MAXIMUM, "Instant offers go up to $" + String.format(Locale.US, "%,d", properties.maxPrice().longValue())
-                    + ", the most a shipping label can insure, and this card is worth more than that, so it gets no offer.", margin, offer, null);
+                    + ", the most a shipping label can insure, and this card is worth more than that, so it gets no offer.", margin, offer, null, null);
         }
         Prices.RawSales raw = prices.rawNearMint(in.identity().catalogCardId(), properties.rawSalesDays());
         return new Quote(value, null, null, margin, offer,
-                new CardOffer.RawCheck(raw.lowest(), raw.sales(), raw.since(), netLowest(raw.lowest(), value.params(), offer, margin)));
+                new CardOffer.RawCheck(raw.lowest(), raw.sales(), raw.since(), netLowest(raw.lowest(), value.params(), offer, margin)),
+                raw.median());
     }
 
     /**
@@ -163,7 +170,18 @@ class OfferService {
         return new Preview(q.refused() == null, q.refusal(), q.refused(), q.offer() == null ? null : q.offer().price(), v == null ? null : v.fmv(),
                 v == null ? null : v.offerConfidence().name(), q.margin(), why,
                 q.raw() == null ? null : new ListingViews.RawSalesView(q.raw().lowest(), q.raw().sales(), q.raw().since(), q.belowRawSales()),
-                q.offer() == null ? null : q.offer().tenCap());
+                q.offer() == null ? null : q.offer().tenCap(), q.raw() == null ? null : q.rawMedian(),
+                v == null ? null : fmvFromTen(q.value()));
+    }
+
+    /** P(10) x the 10's net price: the share of FMV that rides on the card grading a 10. */
+    static BigDecimal fmvFromTen(Valuations.CurrentValue value) {
+        if (value.distribution() == null || value.prices() == null) {
+            return null;
+        }
+        com.pokemans.valuation.GradePrice ten = value.prices().get(Grade.G10);
+        BigDecimal net = ten == null ? null : ten.net();
+        return net == null ? null :value.distribution().p(Grade.G10).multiply(net).setScale(2, RoundingMode.HALF_EVEN);
     }
 
     /** A new offer on the card, or 409 with the reason it gets none. */

@@ -3804,10 +3804,16 @@
           "fmv" : {
             "type" : "number"
           },
+          "fmvFromTen" : {
+            "type" : "number"
+          },
           "offered" : {
             "type" : "boolean"
           },
           "price" : {
+            "type" : "number"
+          },
+          "rawMedian" : {
             "type" : "number"
           },
           "rawSales" : {
@@ -3830,7 +3836,7 @@
             "type" : "array"
           }
         },
-        "required" : [ "buyerMargin", "confidence", "fmv", "offered", "price", "rawSales", "refusal", "refusalCode", "tenCap", "why" ]
+        "required" : [ "buyerMargin", "confidence", "fmv", "fmvFromTen", "offered", "price", "rawMedian", "rawSales", "refusal", "refusalCode", "tenCap", "why" ]
       },
       "OutcomeControllerOutcomeView" : {
         "properties" : {
