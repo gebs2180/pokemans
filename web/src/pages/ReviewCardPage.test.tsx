@@ -430,6 +430,14 @@ describe('spreadLine', () => {
     expect(
       spreadLine({ spreadUsed: { CARDGRADE: 'default' }, foldedGrades: { CARDGRADE: 9 }, minSubgrades: { CARDGRADE: 8 } }),
     ).toBe('Cardgrade: default spread (lowest of corners, edges and surface 8 < grade 9).')
+    expect(
+      spreadLine({
+        spreadUsed: { CARDGRADE: 'high' },
+        foldedGrades: { CARDGRADE: 9 },
+        minSubgrades: { CARDGRADE: 9 },
+        subgrades: { CARDGRADE: { corners: 9.5, edges: 10, surface: 10 } },
+      }),
+    ).toBe('Cardgrade: high spread (corners 9.5, edges 10, surface 10: none below 9.5 and two or more 10s).')
     expect(spreadLine({ spreadUsed: { CARDGRADE: 'default' }, foldedGrades: { CARDGRADE: 9 }, minSubgrades: { CARDGRADE: null } })).toBe(
       'Cardgrade: default spread (no corners, edges and surface given).',
     )

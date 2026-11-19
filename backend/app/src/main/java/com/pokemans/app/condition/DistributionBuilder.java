@@ -22,7 +22,10 @@ import java.util.TreeMap;
  *       neighbouring grades, more below than above. When the provider's lowest of corners, edges and
  *       surface (folded) is at or above that grade, the tighter {@link ConditionProperties#tightSpread()} is
  *       used; a lower subgrade, or none given, keeps {@link ConditionProperties#spread()}. The provider's
- *       centering subgrade is never read: only our own measurement caps (Zach, 2026-11-10).</li>
+ *       centering subgrade is never read: only our own measurement caps (Zach, 2026-11-10). A provider 9
+ *       whose corners, edges and surface are each 9.5 or better, read as given, with at least two of them 10,
+ *       gets the {@link ConditionProperties#highSpread()} instead, with more on 10: the subgrades are what
+ *       it saw (Zach, 2026-11-19; weights are defaults to confirm).</li>
  *   <li>Providers are averaged.</li>
  *   <li>P(10) is capped ({@link ConditionProperties#maxTenProbability()}): the excess moves down to 9. A
  *       provider 10 would otherwise put 0.60 on 10 (its own 0.50 plus the +1 mass the edge keeps), and the
@@ -56,16 +59,51 @@ final class DistributionBuilder {
      * @param centeringCap       the best grade measured centering allows, or null when it wasn't measured
      * @param minSubgrades       per provider, the lowest of its corners, edges and surface grades, present only
      *                           when it gave all three; never its centering
+     * @param subgrades          per provider, its corners, edges and surface as given (not folded), present only
+     *                           when it gave all three; read for the high spread
      */
     record Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, Integer centeringCap,
-                 Map<String, Double> minSubgrades) {
+                 Map<String, Double> minSubgrades, Map<String, Subgrades> subgrades) {
 
         Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, Integer centeringCap) {
-            this(providerGrades, wholeCardInPhotos, centeringCap, Map.of());
+            this(providerGrades, wholeCardInPhotos, centeringCap, Map.of(), Map.of());
+        }
+
+        Input(Map<String, Double> providerGrades, boolean wholeCardInPhotos, Integer centeringCap,
+              Map<String, Double> minSubgrades) {
+            this(providerGrades, wholeCardInPhotos, centeringCap, minSubgrades, Map.of());
         }
 
         Input {
             minSubgrades = minSubgrades == null ? Map.of() : minSubgrades;
+            subgrades = subgrades == null ? Map.of() : subgrades;
+        }
+    }
+
+    /** A provider's corners, edges and surface as it gave them. Centering is left out. */
+    record Subgrades(double corners, double edges, double surface) {
+
+        /** Null unless all three are given. */
+        static Subgrades of(Double corners, Double edges, Double surface) {
+            return corners == null || edges == null || surface == null ? null : new Subgrades(corners, edges, surface);
+        }
+
+        /**
+         * The high spread's test (Zach, 2026-11-19): every one at least 9.5 and at least two of them 10, read as
+         * given, half grades not folded down.
+         */
+        boolean high() {
+            double[] all = {corners, edges, surface};
+            int tens = 0;
+            for (double g : all) {
+                if (g < 9.5) {
+                    return false;
+                }
+                if (g >= 10.0) {
+                    tens++;
+                }
+            }
+            return tens >= 2;
         }
     }
 
@@ -101,9 +139,16 @@ final class DistributionBuilder {
             Double minSub = input.minSubgrades().get(provider);
             Integer wholeMinSub = minSub == null ? null : fold(minSub);
             foldedMinSub.put(provider, wholeMinSub);
+            Subgrades subs = input.subgrades().get(provider);
+            boolean high = whole == 9 && subs != null && subs.high();
             boolean tight = wholeMinSub != null && wholeMinSub >= whole;
-            spreadUsed.put(provider, tight ? "tight" : "default");
-            perProvider.add(spread(whole, tight ? properties.tightSpread() : properties.spread()));
+            String used = high ? "high" : tight ? "tight" : "default";
+            spreadUsed.put(provider, used);
+            perProvider.add(spread(whole, switch (used) {
+                case "high" -> properties.highSpread();
+                case "tight" -> properties.tightSpread();
+                default -> properties.spread();
+            }));
         });
         GradeDistribution distribution = capTen(average(perProvider), properties.maxTenProbability());
         // Before the confidence shift, so it still moves mass below the cap.
@@ -138,6 +183,16 @@ final class DistributionBuilder {
         basis.put("providerGrades", input.providerGrades());
         basis.put("foldedGrades", folded);
         basis.put("minSubgrades", foldedMinSub);
+        if (spreadUsed.containsValue("high")) {
+            Map<String, Object> given = new LinkedHashMap<>();
+            input.subgrades().forEach((provider, subs) -> {
+                if ("high".equals(spreadUsed.get(provider))) {
+                    given.put(provider, Map.of("corners", subs.corners(), "edges", subs.edges(), "surface", subs.surface()));
+                }
+            });
+            basis.put("subgrades", given);
+            basis.put("highSpread", new TreeMap<>(properties.highSpread()));
+        }
         basis.put("spreadUsed", spreadUsed);
         basis.put("providerGap", gap);
         basis.put("centeringCap", input.centeringCap());

@@ -229,13 +229,20 @@ class ConditionService {
                 minSubgrades.put(provider, min);
             }
         });
+        Map<String, DistributionBuilder.Subgrades> subgrades = new LinkedHashMap<>();
+        latest.forEach((provider, p) -> {
+            DistributionBuilder.Subgrades subs = DistributionBuilder.Subgrades.of(p.getCorners(), p.getEdges(), p.getSurface());
+            if (subs != null && grades.containsKey(provider)) {
+                subgrades.put(provider, subs);
+            }
+        });
         Integer centeringCap = ProviderPrediction.centeringCap(all);
 
         boolean wholeCard = latest(photos, "FRONT").map(p -> p.cropKey() != null).orElse(false)
                 && latest(photos, "BACK").map(p -> p.cropKey() != null).orElse(false);
         Optional<Catalog.IdentifiedCard> identity = catalog.current(cardId);
 
-        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades, wholeCard, centeringCap, minSubgrades));
+        DistributionBuilder.Result result = builder.build(new DistributionBuilder.Input(grades, wholeCard, centeringCap, minSubgrades, subgrades));
         if (result == null) {
             return Optional.empty();
         }

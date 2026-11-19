@@ -18,7 +18,7 @@ class DistributionBuilderTest {
     }
 
     static ConditionProperties properties(BigDecimal maxTenProbability, BigDecimal ungradableFloor) {
-        return new ConditionProperties(null, null, 1.5, new BigDecimal("0.10"), new BigDecimal("0.25"), maxTenProbability, ungradableFloor,
+        return new ConditionProperties(null, null, null, 1.5, new BigDecimal("0.10"), new BigDecimal("0.25"), maxTenProbability, ungradableFloor,
                 new ConditionProperties.Worker(false, Duration.ofSeconds(15), 8, Duration.ofHours(24), Duration.ofMinutes(10), 10,
                         Duration.ofDays(7), Duration.ofMinutes(2)),
                 new ConditionProperties.CardGrade(false, null, null, "PSA", Duration.ofSeconds(30), 10, 50, Duration.ofHours(1)),
@@ -119,6 +119,56 @@ class DistributionBuilderTest {
     }
 
     @Test
+    void cardGradeNineWithTwoTenSubgradesAndNoneBelowNineAndAHalfGetsTheHighSpread() {
+        // The 151 Charizard ex: corners 9.5, edges 10, surface 10 (Zach, 2026-11-19).
+        var input = new DistributionBuilder.Input(grades("CARDGRADE", 9.0), true, 10,
+                Map.of("CARDGRADE", DistributionBuilder.minSubgrade(9.5, 10.0, 10.0)),
+                Map.of("CARDGRADE", new DistributionBuilder.Subgrades(9.5, 10.0, 10.0)));
+        var result = guarded.build(input);
+        var d = result.distribution();
+
+        assertThat(d.p(Grade.G10)).isEqualByComparingTo("0.245");
+        assertThat(d.p(Grade.G9)).isEqualByComparingTo("0.49");
+        assertThat(d.p(Grade.G8)).isEqualByComparingTo("0.196");
+        assertThat(d.p(Grade.G7)).isEqualByComparingTo("0.049");
+        assertThat(d.p(Grade.U)).isEqualByComparingTo("0.02");
+        assertThat(sum(d)).isEqualByComparingTo("1");
+        assertThat(result.basis()).containsEntry("spreadUsed", Map.of("CARDGRADE", "high"))
+                .containsEntry("subgrades", Map.of("CARDGRADE", Map.of("corners", 9.5, "edges", 10.0, "surface", 10.0)));
+    }
+
+    @Test
+    void theHighSpreadStillYieldsToOurCentering() {
+        var result = guarded.build(new DistributionBuilder.Input(grades("CARDGRADE", 9.0), true, 9,
+                Map.of("CARDGRADE", 9.5), Map.of("CARDGRADE", new DistributionBuilder.Subgrades(9.5, 10.0, 10.0))));
+
+        assertThat(result.basis()).containsEntry("spreadUsed", Map.of("CARDGRADE", "high"));
+        assertThat(result.distribution().p(Grade.G10)).isZero();
+    }
+
+    @Test
+    void theHighSpreadNeedsTwoTensAndNothingBelowNineAndAHalf() {
+        assertThat(new DistributionBuilder.Subgrades(9.5, 10.0, 10.0).high()).isTrue();
+        assertThat(new DistributionBuilder.Subgrades(10.0, 10.0, 10.0).high()).isTrue();
+        // The SWSH261 promo: corners 9, surface 9.
+        assertThat(new DistributionBuilder.Subgrades(9.0, 10.0, 9.0).high()).isFalse();
+        // One 10 isn't enough.
+        assertThat(new DistributionBuilder.Subgrades(9.5, 9.5, 10.0).high()).isFalse();
+        // A 9 anywhere rules it out, however many 10s.
+        assertThat(new DistributionBuilder.Subgrades(10.0, 10.0, 9.0).high()).isFalse();
+        assertThat(DistributionBuilder.Subgrades.of(10.0, null, 10.0)).isNull();
+    }
+
+    @Test
+    void onlyANineGetsTheHighSpread() {
+        // An 8 with perfect subgrades keeps the tight spread: the overall says something the subgrades don't.
+        var result = builder.build(new DistributionBuilder.Input(grades("A", 8.0), true, null,
+                Map.of("A", 10.0), Map.of("A", new DistributionBuilder.Subgrades(10.0, 10.0, 10.0))));
+
+        assertThat(result.basis()).containsEntry("spreadUsed", Map.of("A", "tight")).doesNotContainKey("subgrades");
+    }
+
+    @Test
     void aSubgradeBelowTheOverallKeepsTheDefaultSpread() {
         // Corners 8.5 folds to 8, below the overall 9.
         var result = builder.build(new DistributionBuilder.Input(grades("A", 9.0), true, null,
@@ -152,11 +202,11 @@ class DistributionBuilderTest {
     @Test
     void theTightSpreadNeverPutsMoreAboveTheGradeThanTheDefault() {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ConditionProperties(null,
-                        Map.of(1, new BigDecimal("0.20"), 0, new BigDecimal("0.80")), 1.5, new BigDecimal("0.10"),
+                        Map.of(1, new BigDecimal("0.20"), 0, new BigDecimal("0.80")), null, 1.5, new BigDecimal("0.10"),
                         new BigDecimal("0.25"), BigDecimal.ONE, BigDecimal.ZERO, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ConditionProperties(null,
-                        Map.of(1, new BigDecimal("0.10"), 0, new BigDecimal("0.80")), 1.5, new BigDecimal("0.10"),
+                        Map.of(1, new BigDecimal("0.10"), 0, new BigDecimal("0.80")), null, 1.5, new BigDecimal("0.10"),
                         new BigDecimal("0.25"), BigDecimal.ONE, BigDecimal.ZERO, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
