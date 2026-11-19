@@ -158,7 +158,8 @@ class IntakeService {
         CardItem card = requireCard(orgId, cardId);
         return IntakeViews.card(card, photos.findByCardItemIdOrderByCreatedAtAsc(card.getId()),
                 p -> blobs.presignDownload(storage.photoBucket(), p.getCropKey() != null ? p.getCropKey() : p.getStorageKey()),
-                p -> new IntakeViews.SurfaceLinks(link(p.getWideCropKey()), link(p.getSurfaceKey()), link(p.getSurfaceDetailKey())),
+                p -> new IntakeViews.SurfaceLinks(link(p.getWideCropKey()), link(p.getSurfaceKey()), link(p.getSurfaceDetailKey()),
+                        link(p.getSurfaceCleanKey())),
                 frozenReason(card.getId()));
     }
 

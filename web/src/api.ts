@@ -50,6 +50,8 @@ export type PhotoView = {
   surfaceUrl?: string | null
   /** The full-resolution version with its local contrast raised on the server ("Detail" in the surface view). */
   detailUrl?: string | null
+  /** Backs only: the standard printed back design subtracted, so only physical marks are left ("Clean back"); null where the back didn't match the reference. */
+  cleanUrl?: string | null
 }
 
 /** A card's label until the collector says what it is (the backend's CardItem.PLACEHOLDER_LABEL). */
@@ -366,6 +368,8 @@ export type ReviewPhoto = {
   wideUrl?: string | null
   surfaceUrl?: string | null
   detailUrl?: string | null
+  /** Backs only: the standard printed back design subtracted, so only physical marks are left ("Clean back"); null where the back didn't match the reference. */
+  cleanUrl?: string | null
 }
 
 // Defect marks (admin adds them; the collector reads them): where on a surface view a reviewer saw a flaw

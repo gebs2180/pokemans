@@ -64,7 +64,8 @@ class ConditionController {
      * @param surfaceUrl the same at full resolution (about 2000 px wide), for the surface view; null until the backfill
      * @param detailUrl  the full-resolution crop with its local contrast evened out (CLAHE plus a high-pass layer), or null
      */
-    record PhotoLink(UUID id, String side, URI url, URI cropUrl, Instant capturedAt, URI wideUrl, URI surfaceUrl, URI detailUrl) {
+    record PhotoLink(UUID id, String side, URI url, URI cropUrl, Instant capturedAt, URI wideUrl, URI surfaceUrl, URI detailUrl,
+                     URI cleanUrl) {
     }
 
     record RequestView(UUID id, String provider, PredictionRequest.Status status, int attempts, String lastError,
@@ -162,7 +163,7 @@ class ConditionController {
         List<PhotoLink> photos = cardItems.currentPhotos(cardId).stream()
                 .map(p -> new PhotoLink(p.id(), p.side(), blobs.presignDownload(storage.photoBucket(), p.storageKey()),
                         p.cropKey() == null ? null : blobs.presignDownload(storage.photoBucket(), p.cropKey()), p.capturedAt(),
-                        link(p.wideCropKey()), link(p.surfaceKey()), link(p.surfaceDetailKey())))
+                        link(p.wideCropKey()), link(p.surfaceKey()), link(p.surfaceDetailKey()), link(p.surfaceCleanKey())))
                 .toList();
         java.util.Optional<ConditionAssessment> current = assessmentRepository.findByCardItemIdAndIsCurrentTrue(cardId);
         return new CardConditionView(card.id(), card.orgId(), card.label(), condition.enabledProviders(), photos,

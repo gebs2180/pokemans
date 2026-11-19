@@ -5,8 +5,11 @@ import { safeHref } from '../safeHref'
 import { Segmented, ToolPanel } from './reviewTools'
 import './reviewTools.css'
 
-/** 'detail' is the server's local-contrast image; the others are filters drawn in the browser. */
-export type SurfaceMode = 'off' | 'contrast' | 'edges' | 'emboss' | 'detail'
+/**
+ * 'detail' and 'clean' are images made on the server (local contrast; a back with the printed back design subtracted);
+ * the others are filters drawn in the browser.
+ */
+export type SurfaceMode = 'off' | 'contrast' | 'edges' | 'emboss' | 'detail' | 'clean'
 
 /** Who is looking: a reviewer on the admin page, or the collector on their own card. Only the wording differs. */
 export type SurfaceAudience = 'reviewer' | 'collector'
@@ -45,6 +48,16 @@ const MODES: { mode: SurfaceMode; label: string; hint: Record<SurfaceAudience, s
       collector: 'Turns the card grey and lights it from one corner, so dents, creases and roller lines cast a shadow. The printing stands out too.',
     },
   },
+  {
+    mode: 'clean',
+    label: 'Clean back',
+    hint: {
+      reviewer:
+        "The back with the standard printed back design subtracted (a reference made from our own backs), on mid-grey: what's left is physical, like dents, scratches, whitening, roller lines and print defects. Shading in the Poké Ball is print and drops out. Fronts, and backs that didn't match the reference, show as the photo. A viewing aid only.",
+      collector:
+        "Takes away the printing every card back shares, so only what's on your card is left: dents, scratches, whitening and roller lines. Back only: the front shows as your photo.",
+    },
+  },
 ]
 
 /** The zoom a tap gives: enough to see whitening, while an edge or corner tapped on stays in the box with its edge line. */
@@ -64,6 +77,8 @@ export type SurfacePhoto = {
   surfaceUrl?: string | null
   /** That crop with its local contrast raised on the server: what the Detail mode shows. */
   detailUrl?: string | null
+  /** Backs only: the back with the printed back design subtracted, when it matched the reference. What Clean back shows. */
+  cleanUrl?: string | null
 }
 
 /**
@@ -193,7 +208,7 @@ export function SurfaceView({
             ...(on ? { filter: `url(#${id})` } : {}),
             ...stage,
           }}
-          data-mode={on || mode === 'detail' ? mode : 'off'}
+          data-mode={on || mode === 'detail' || mode === 'clean' ? mode : 'off'}
         />
         {(marks.length > 0 || pending) && (
           <span className="surface-marks" style={stage} aria-hidden="true">
@@ -263,10 +278,19 @@ export function SurfacePanel({
   )
 }
 
-/** The most detailed image there is for the mode: the server's Detail image, else the full-resolution crop, the wide crop, the card crop, the photo. */
+/** A back's clean image, if it has one. */
+function cleanSrc(p: SurfacePhoto) {
+  return p.side === 'BACK' ? safeHref(p.cleanUrl) : null
+}
+
+/**
+ * The most detailed image there is for the mode: the server's Detail or Clean back image, else the full-resolution crop,
+ * the wide crop, the card crop, the photo.
+ */
 function surfaceSrc(p: SurfacePhoto, mode: SurfaceMode = 'off') {
   return (
     (mode === 'detail' ? safeHref(p.detailUrl) : null) ??
+    (mode === 'clean' ? cleanSrc(p) : null) ??
     safeHref(p.surfaceUrl) ??
     safeHref(p.wideUrl) ??
     safeHref(p.cropUrl) ??
@@ -292,8 +316,11 @@ function SurfaceTool({
   const [mode, setMode] = useState<SurfaceMode>('off')
   const [percent, setPercent] = useState(60)
   const strengthId = useId()
-  // Detail needs the server's image: offered only where some photo has one.
-  const modes = MODES.filter((m) => m.mode !== 'detail' || shown.some((p) => safeHref(p.detailUrl)))
+  // Detail and Clean back need the server's image: offered only where some photo has one.
+  const modes = MODES.filter(
+    (m) =>
+      (m.mode !== 'detail' || shown.some((p) => safeHref(p.detailUrl))) && (m.mode !== 'clean' || shown.some((p) => cleanSrc(p))),
+  )
   const hint = modes.find((m) => m.mode === mode)?.hint[audience]
   const words = WORDS[audience]
   return (
@@ -309,7 +336,7 @@ function SurfaceTool({
             min={0}
             max={100}
             value={percent}
-            disabled={mode === 'off' || mode === 'detail'}
+            disabled={mode === 'off' || mode === 'detail' || mode === 'clean'}
             onChange={(e) => setPercent(Number(e.target.value))}
             aria-label="Filter strength"
           />
@@ -326,7 +353,7 @@ function SurfaceTool({
               <SurfaceView
                 src={src}
                 alt={`${SIDE_LABEL[p.side]} ${words.image}, surface view`}
-                mode={mode}
+                mode={mode === 'clean' && !cleanSrc(p) ? 'off' : mode}
                 strength={percent / 100}
                 marks={mine.map((m) => ({ n: marks.indexOf(m) + 1, x: m.x, y: m.y, label: markWords(m) }))}
                 pending={pending?.photoId === p.id ? pending : null}

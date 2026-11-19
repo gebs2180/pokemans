@@ -54,11 +54,14 @@ class PhotoService {
     private final OrgAccess access;
     private final Consents consents;
     private final PhotoDecodes decodes;
+    private final CleanBackService cleanBacks;
     private final TransactionTemplate transaction;
 
     PhotoService(IntakeService intake, CurrentUser currentUser, PhotoRepository photos, BlobStore blobs,
                  StorageProperties storage, QualityProperties qualityProperties, ApplicationEventPublisher events,
-                 OrgAccess access, Consents consents, PhotoDecodes decodes, PlatformTransactionManager transactions) {
+                 OrgAccess access, Consents consents, PhotoDecodes decodes, CleanBackService cleanBacks,
+                 PlatformTransactionManager transactions) {
+        this.cleanBacks = cleanBacks;
         this.intake = intake;
         this.currentUser = currentUser;
         this.photos = photos;
@@ -123,6 +126,15 @@ class PhotoService {
         photo.surfaceStored(photo.surfaceStorageKey(), photo.surfaceDetailStorageKey());
     }
 
+    /** A viewing aid: never fails the confirm. A photo it fails on is picked up by the backfill. */
+    private void makeCleanBack(Photo photo, byte[] surfaceJpeg) {
+        try {
+            cleanBacks.make(photo, surfaceJpeg);
+        } catch (RuntimeException e) {
+            log.warn("Photo {}: clean back failed", photo.getId(), e);
+        }
+    }
+
     private PhotoView check(UUID orgId, UUID photoId) {
         if (access.require(orgId, OrgType.values()).getType() != OrgType.PARTNER) {
             consents.requireAccepted(orgId);
@@ -165,6 +177,9 @@ class PhotoService {
             CardDetector.Surface surface = CardDetector.surface(bytes, result.card().corners());
             if (surface != null) {
                 storeSurface(photo, surface);
+                if (photo.getSide() == Photo.Side.BACK && photo.getStatus() == Photo.Status.PASSED) {
+                    makeCleanBack(photo, surface.hiResJpeg());
+                }
             }
         }
         if (cropKey == null && photo.getStatus() == Photo.Status.PASSED) {
