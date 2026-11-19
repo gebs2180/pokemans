@@ -41,8 +41,8 @@ const MODES: { mode: SurfaceMode; label: string; hint: Record<SurfaceAudience, s
     mode: 'emboss',
     label: 'Emboss',
     hint: {
-      reviewer: 'Lit from one corner: indents, creases and roller lines.',
-      collector: 'Lights the card from one corner, so dents, creases and roller lines cast a shadow.',
+      reviewer: 'Flat grey relief lit from one corner: indents, creases and roller lines. Printed edges stand out too, so compare with the photo.',
+      collector: 'Turns the card grey and lights it from one corner, so dents, creases and roller lines cast a shadow. The printing stands out too.',
     },
   },
 ]
@@ -64,6 +64,31 @@ export type SurfacePhoto = {
   surfaceUrl?: string | null
   /** That crop with its local contrast raised on the server: what the Detail mode shows. */
   detailUrl?: string | null
+}
+
+/**
+ * A relief: mid-grey wherever the card is flat, lit from the top left wherever the brightness changes, so the
+ * photo's own colours and darks drop out and only edges, dents, creases and print lines keep any shading. It is
+ * 0.5 + gain · (lit − shadowed), with the diagonal gradient split into its positive half (lit) and negative half
+ * (shadowed), because filter results are clamped to 0..1 between steps. The shadowed half goes in inverted,
+ * 1 − shadowed, so the sum's alpha (0.5 + gain) stays at 1 for any gain from 0.5 up. A light blur first keeps
+ * sensor noise from turning into grain.
+ */
+function Relief({ gain }: { gain: number }) {
+  return (
+    <>
+      <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="grey" />
+      <feGaussianBlur in="grey" stdDeviation="0.6" result="soft" />
+      <feConvolveMatrix in="soft" order="3" kernelMatrix="-1 -1 0 -1 0 1 0 1 1" divisor="3" preserveAlpha="true" result="lit" />
+      <feConvolveMatrix in="soft" order="3" kernelMatrix="1 1 0 1 0 -1 0 -1 -1" divisor="3" preserveAlpha="true" result="shadowed" />
+      <feComponentTransfer in="shadowed" result="unshadowed">
+        <feFuncR type="linear" slope="-1" intercept="1" />
+        <feFuncG type="linear" slope="-1" intercept="1" />
+        <feFuncB type="linear" slope="-1" intercept="1" />
+      </feComponentTransfer>
+      <feComposite in="lit" in2="unshadowed" operator="arithmetic" k1="0" k2={gain} k3={gain} k4={0.5 - gain} />
+    </>
+  )
 }
 
 /** Where a tap on the crop landed, and which photo. */
@@ -95,13 +120,7 @@ function SurfaceFilter({ id, mode, strength }: { id: string; mode: SurfaceMode; 
             <feComposite in="SourceGraphic" in2="edges" operator="arithmetic" k1="0" k2={1 - strength} k3={3 * strength} k4="0" />
           </>
         )}
-        {mode === 'emboss' && (
-          <>
-            <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="grey" />
-            <feConvolveMatrix in="grey" order="3" kernelMatrix="-2 -1 0 -1 1 1 0 1 2" preserveAlpha="true" result="emboss" />
-            <feComposite in="SourceGraphic" in2="emboss" operator="arithmetic" k1="0" k2={1 - strength} k3={strength} k4="0" />
-          </>
-        )}
+        {mode === 'emboss' && <Relief gain={0.5 + 1.5 * strength} />}
       </filter>
     </svg>
   )
