@@ -3,6 +3,8 @@ import { apiPath, useApi, type PokeTraceCandidate, type PokeTraceMappingView, ty
 import { message } from '../format'
 import { useLoad } from '../useLoad'
 
+const PAGE_SIZE = 10
+
 /**
  * Admin: which PokeTrace card this catalog card is. PokeTrace's search doesn't split editions, so every
  * mapping is confirmed here, and one that disagrees with our card needs a reason. Hidden when PokeTrace
@@ -14,6 +16,7 @@ export function PokeTraceMapping({ catalogCardId, onChanged }: { catalogCardId: 
   const { data, reload } = useLoad(() => api<PokeTraceMappingView>('GET', url), [api, url])
   const [candidates, setCandidates] = useState<PokeTraceCandidate[] | null>(null)
   const [reasons, setReasons] = useState<Record<string, string>>({})
+  const [page, setPage] = useState(0)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [pulling, setPulling] = useState(false)
@@ -33,7 +36,13 @@ export function PokeTraceMapping({ catalogCardId, onChanged }: { catalogCardId: 
     }
   }
 
-  const search = () => run(async () => setCandidates(await api<PokeTraceCandidate[]>('GET', `${url}/candidates`)))
+  const search = () =>
+    run(async () => {
+      const found = await api<PokeTraceCandidate[]>('GET', `${url}/candidates`)
+      // Matches first so they land on page 1; Array.sort is stable, so PokeTrace's order holds within each group.
+      setCandidates([...found].sort((a, b) => Number(a.disagreements.length > 0) - Number(b.disagreements.length > 0)))
+      setPage(0)
+    })
   const map = (c: PokeTraceCandidate) =>
     run(async () => {
       await api('PUT', url, { poketraceId: c.poketraceId, overrideReason: reasons[c.poketraceId]?.trim() || null })
@@ -61,6 +70,9 @@ export function PokeTraceMapping({ catalogCardId, onChanged }: { catalogCardId: 
     })
 
   const card = data.poketraceCard
+  const total = candidates?.length ?? 0
+  const first = page * PAGE_SIZE
+  const shown = candidates?.slice(first, first + PAGE_SIZE) ?? []
   return (
     <div>
       <h3>PokeTrace</h3>
@@ -113,7 +125,7 @@ export function PokeTraceMapping({ catalogCardId, onChanged }: { catalogCardId: 
             </tr>
           </thead>
           <tbody>
-            {candidates.map((c) => (
+            {shown.map((c) => (
               <tr key={c.poketraceId}>
                 <td>
                   {c.name} #{c.cardNumber} · {c.setName} · {c.variant}
@@ -151,6 +163,19 @@ export function PokeTraceMapping({ catalogCardId, onChanged }: { catalogCardId: 
             ))}
           </tbody>
         </table>
+      )}
+      {total > PAGE_SIZE && (
+        <p className="small">
+          <button onClick={() => setPage(page - 1)} disabled={page === 0}>
+            Prev
+          </button>{' '}
+          <span>
+            {first + 1}–{Math.min(first + PAGE_SIZE, total)} of {total}
+          </span>{' '}
+          <button onClick={() => setPage(page + 1)} disabled={first + PAGE_SIZE >= total}>
+            Next
+          </button>
+        </p>
       )}
       {err && <p className="error" role="alert">{err}</p>}
     </div>
