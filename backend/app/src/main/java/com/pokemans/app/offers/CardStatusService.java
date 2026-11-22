@@ -176,7 +176,8 @@ class CardStatusService {
         UnvaluedReason reason = UnvaluedReason.of(in.unvaluedReason());
         if (in.identity() == null) {
             return new CardStatus(cardId, Stage.IDENTIFYING, null,
-                    "We identify each card by hand from its photos, usually within a couple of days." + NO_NOTIFICATIONS, false);
+                    "We're identifying your card from its photos, usually within minutes. If we can't tell, a person looks at it, "
+                            + "which can take a couple of days." + NO_NOTIFICATIONS, false);
         }
         if (reason == UnvaluedReason.NO_ASSESSMENT) {
             if (preGradeFailures.failed(cardId)) {
@@ -197,8 +198,8 @@ class CardStatusService {
         }
         if (reason != null) {
             return new CardStatus(cardId, Stage.PRICING, identity,
-                    "We don't have enough sold prices for this card yet. We add them by hand, so it may take a while, "
-                            + "and some cards won't get an offer. You're free to sell it elsewhere." + NO_NOTIFICATIONS, false);
+                    "We're looking up recent sold prices for this card. If we don't have enough yet, a person adds them by hand, "
+                            + "which may take a while, and some cards won't get an offer. You're free to sell it elsewhere." + NO_NOTIFICATIONS, false);
         }
         if (quote.refused() != null) {
             return new CardStatus(cardId, Stage.NO_OFFER, identity, quote.refusal() + nextStep(quote.refused()), false);

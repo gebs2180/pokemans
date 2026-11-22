@@ -220,6 +220,29 @@ describe('CardPage', () => {
     expect(await screen.findAllByText("We don't have enough sold prices for this card yet.")).toHaveLength(1)
   })
 
+  it('checks back by itself while we work on the card, then shows the instant offer button once it is ready', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const live: CardStatus = { ...status, stage: 'ASSESSING', identity: 'Pikachu VMAX · Vivid Voltage 188 · EN', nextStep: "We're reviewing its condition from the photos." }
+      renderCard(card(), live)
+      expect(await screen.findByText(/We're checking its condition\. This page updates by itself\./)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Get your instant offer' })).not.toBeInTheDocument()
+
+      Object.assign(live, { stage: 'READY', canOffer: true, nextStep: 'Ready for an instant offer.' })
+      await vi.advanceTimersByTimeAsync(3500)
+      expect(await screen.findByRole('button', { name: 'Get your instant offer' })).toBeInTheDocument()
+      expect(screen.getByText('Your card is ready: get your instant offer below.')).toBeInTheDocument()
+      expect(screen.queryByText(/This page updates by itself/)).not.toBeInTheDocument()
+      // Settled: no more checks.
+      const statusCalls = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/status')).length
+      const before = statusCalls()
+      await vi.advanceTimersByTimeAsync(60000)
+      expect(statusCalls()).toBe(before)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('asks contributors for raw photos first, and keeps selling out of the way', async () => {
     renderCard(card({ captureComplete: false, missingSides: ['FRONT', 'BACK'], photos: [] }), status, 'CONTRIBUTOR')
     expect(await screen.findByText(/from before it was graded: the raw card, out of the slab/)).toBeInTheDocument()

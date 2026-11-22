@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import {
   apiPath,
@@ -18,7 +18,7 @@ import {
   type UploadSlot,
 } from '../api'
 import { safeHref } from '../safeHref'
-import { useLoad } from '../useLoad'
+import { useLoad, usePollBackoff } from '../useLoad'
 import { useOrg } from '../useOrg'
 import { Chip, Loading, PageError, StageChip } from '../ui'
 import { IdentifyPanel } from './IdentifyPanel'
@@ -37,6 +37,14 @@ const SIDE_HINT: Record<Side, string> = {
 /** Stages whose next step the offer panel says, right below the status line, in place of its button. */
 const SAID_BY_OFFER_PANEL = new Set<CardStage>(['IDENTIFYING', 'ASSESSING', 'PRICING', 'NO_OFFER', 'READY', 'LISTED', 'SOLD', 'SHIPPED', 'ARRIVED', 'PAID', 'RETURNED'])
 
+/** Stages we're working through ourselves, so the page checks back by itself. */
+const WORKING_ON_IT = new Set<CardStage>(['IDENTIFYING', 'ASSESSING', 'PRICING'])
+const WORKING_WORDS = {
+  IDENTIFYING: 'We\'re identifying your card from its photos.',
+  ASSESSING: 'We\'re checking its condition.',
+  PRICING: 'We\'re finding recent sold prices for it.',
+}
+
 /** Capture screen for one card: take each required side, see pass or retake right away. */
 export function CardPage() {
   const { orgId = '', cardId = '' } = useParams()
@@ -53,6 +61,9 @@ export function CardPage() {
   const [photoVersion, setPhotoVersion] = useState(0)
   // Bumped when the offer panel posts or withdraws: photos freeze or thaw, and the stage moves on.
   const [saleVersion, setSaleVersion] = useState(0)
+  // Bumped when polling sees the card finish being worked on, so the offer panel reloads its status.
+  const [settledVersion, setSettledVersion] = useState(0)
+  const onSettled = useCallback(() => setSettledVersion((v) => v + 1), [])
 
   async function capture(side: Side, e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -84,7 +95,7 @@ export function CardPage() {
   const sides: Side[] = card.lot ? ['FRONT', 'DETAIL'] : ['FRONT', 'BACK', 'DETAIL']
   const offerPanel = seller && !card.lot && (
     <OfferPanel
-      key={photoVersion}
+      key={`${photoVersion}:${settledVersion}`}
       orgId={orgId}
       cardId={cardId}
       frontUrl={safeHref(card.photos.find((p) => p.side === 'FRONT' && p.current)?.url)}
@@ -106,7 +117,7 @@ export function CardPage() {
       <h1>{card.label}</h1>
       {org != null && !card.lot && <IdentifyPanel orgId={orgId} cardId={cardId} photoVersion={photoVersion} onAnswer={reload} />}
       {seller && !contributor && !card.lot && (
-        <StatusLine key={`${photoVersion}:${saleVersion}`} orgId={orgId} cardId={cardId} offerFirst={offerFirst} />
+        <StatusLine key={`${photoVersion}:${saleVersion}`} orgId={orgId} cardId={cardId} offerFirst={offerFirst} onSettled={onSettled} />
       )}
       {contributor && !card.lot && (
         <p className="alert alert-info">
@@ -226,9 +237,22 @@ export function CardPage() {
 }
 
 /** Where the card is on the way to a sale, the card as we identified it, and what happens next. */
-function StatusLine({ orgId, cardId, offerFirst }: { orgId: string; cardId: string; offerFirst: boolean }) {
+function StatusLine({ orgId, cardId, offerFirst, onSettled }: { orgId: string; cardId: string; offerFirst: boolean; onSettled?: () => void }) {
   const api = useApi()
-  const { data } = useLoad(() => api<CardStatus>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}/status`), [api, orgId, cardId])
+  const { data, reload } = useLoad(() => api<CardStatus>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}/status`), [api, orgId, cardId])
+  const working = data != null && WORKING_ON_IT.has(data.stage)
+  const gaveUp = usePollBackoff(working, reload)
+  // Once polling has seen the card move on from a working stage, the offer panel loads its status again.
+  const wasWorking = useRef(false)
+  useEffect(() => {
+    if (!data) return
+    if (WORKING_ON_IT.has(data.stage)) {
+      wasWorking.current = true
+    } else if (wasWorking.current) {
+      wasWorking.current = false
+      onSettled?.()
+    }
+  }, [data, onSettled])
   if (!data) return null
   const deadline = deadlineText(data)
   return (
@@ -242,6 +266,17 @@ function StatusLine({ orgId, cardId, offerFirst }: { orgId: string; cardId: stri
       <p>
         <StageChip stage={data.stage} />
       </p>
+      {working && !gaveUp && (
+        <p role="status" className="small">
+          {WORKING_WORDS[data.stage as keyof typeof WORKING_WORDS]} This page updates by itself.
+        </p>
+      )}
+      {working && gaveUp && <p className="muted small">This is taking longer than usual. Reload the page to check again.</p>}
+      {data.stage === 'READY' && (
+        <p role="status">
+          <strong>Your card is ready: get your instant offer below.</strong>
+        </p>
+      )}
       {deadline && (
         <p>
           <strong>{deadline}</strong>

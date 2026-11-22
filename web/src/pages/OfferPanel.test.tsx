@@ -82,7 +82,7 @@ describe('OfferPanel', () => {
     const posts = stubApi([{ offer: null, listing: null }, { offer: offer(), listing: null }], address)
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
-    await user.click(await screen.findByRole('button', { name: 'Get an offer' }))
+    await user.click(await screen.findByRole('button', { name: 'Get your instant offer' }))
     expect(await screen.findByTestId('offer-reveal')).toHaveTextContent('$419.98')
     expect(screen.getByText(/isn't sold until a buyer accepts/)).toBeInTheDocument()
     expect(screen.getByText(/The buyer pays you directly, not us/)).toBeInTheDocument()
@@ -135,11 +135,11 @@ describe('OfferPanel', () => {
     stubApi([{ offer: null, listing: null }], address, () => respond(409, { detail: "There isn't enough sales data to make a firm offer on this card yet." }))
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
-    await user.click(await screen.findByRole('button', { name: 'Get an offer' }))
+    await user.click(await screen.findByRole('button', { name: 'Get your instant offer' }))
     expect(await screen.findByRole('alert')).toHaveTextContent("There isn't enough sales data")
   })
 
-  it("hides Get an offer until it can work, and says what happens first", async () => {
+  it("hides Get your instant offer until it can work, and says what happens first", async () => {
     const identifying: CardStatus = {
       cardId: 'card1',
       stage: 'IDENTIFYING',
@@ -153,7 +153,7 @@ describe('OfferPanel', () => {
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
     expect(await screen.findByText(/We identify each card by hand/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Get an offer' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Get your instant offer' })).not.toBeInTheDocument()
   })
 
   it('lets the seller change the ship-from address', async () => {
