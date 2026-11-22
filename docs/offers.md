@@ -103,6 +103,24 @@ These defaults are the reviewing session's picks, not Zach's decisions yet.
   - The self-dealing and address refusals at accept come before the re-price, so a refused buyer doesn't take the card off the market.
   - A listing voided this way counts as `VOIDED` in the track record.
 
+## Automatic gates (Zach, 2026-11-22; defaults to confirm)
+
+The goal is an offer within minutes of upload. Two steps used to wait on the admin; each now has an automatic path for the clear cases. Both are off unless their flag is on, and anything unclear still goes to the admin. Both rules are in the methodology doc.
+
+- **Identity confirmation** (`AutoConfirm`, flag `pokemans.catalog.auto-confirm.enabled`, threshold `pokemans.catalog.auto-confirm.min-confidence`, default 0.90). After the collector's answer commits, the card is confirmed by the system only when all of these hold:
+  - the answer is the reader's suggestion from the card's latest reading;
+  - that suggestion is the top one and isn't tied;
+  - its confidence is at or above the threshold;
+  - edition, finish and stamp are all settled ("Not sure" to any means no);
+  - where the reader named an edition or finish, it matches the collector's;
+  - the card isn't a lot and has no confirmed identity yet.
+- **How it's stored.** It is an ordinary CONFIRMED `card_identification` row with source `SYSTEM`. The row has no user. It records the rule version (`auto-confirm-1 (2026-11-22)`), the proposal, the suggestion, the reading and the confidence. The admin overrides it by identifying the card again (a newer row).
+- **PokeTrace mapping** (`PokeTraceAutoMap`, flag `pokemans.pricing.poketrace.auto-map.enabled`). Each newly CONFIRMED identity publishes `Catalog.CardIdentified`, whether the system or the admin confirmed it. On that event the card is searched on PokeTrace. It is mapped as the system only when all of these hold:
+  - exactly one candidate has no disagreements (number, set, edition, finish and language; any stamp always disagrees);
+  - that candidate still agrees when fetched again;
+  - the card has never been mapped, including by an admin who later unmapped it.
+- **After an automatic mapping.** The mapping row has `automatic` set, no user and the rule version (`auto-map-1 (2026-11-22)`). The first pull and reprice then run in the background, the same as "Pull sales now": the PokeTrace rate limits apply, the pull is logged in `comp_pull`, and searches and maps run one at a time. With zero or several clean candidates nothing is mapped, and the card waits on the admin's queue. There is never an override.
+
 ## Undo (Zach, 2026-10-21)
 
 Before the closed beta, the admin can take back a mistake (a wrong identification, a bad price, a deal that fell through). Nothing is edited: each undo is a new row with who, when and why, so the record shows the mistake and its correction.

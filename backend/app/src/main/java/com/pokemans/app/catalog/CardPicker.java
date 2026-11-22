@@ -15,6 +15,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,8 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * The collector's card picker: search the catalog as they type, see which prints the card came in,
  * and store their pick as a proposed identity. A proposal is never an identification: the admin
- * still confirms it, and only a confirmed identity is priced, flagged or verified.
+ * confirms it, or {@link AutoConfirm} does when the collector confirmed the reader's top suggestion and
+ * nothing is left to guess; only a confirmed identity is priced, flagged or verified.
  *
  * <p>Photo-first: the card is added with no name and photographed, the reader's suggestions are shown
  * as "Is this your card?" ({@link IdentifyService}), and the collector's answer is stored with
@@ -80,10 +82,12 @@ class CardPicker {
     private final CardIdentificationRepository identifications;
     private final CatalogCardRepository catalogCards;
     private final CardReadingRepository readings;
+    private final ApplicationEventPublisher events;
 
     CardPicker(Optional<CatalogProvider> provider, IdentityProposalRepository proposals, CardItems cardItems,
                CurrentUser currentUser, CatalogProperties properties, CardIdentificationRepository identifications,
-               CatalogCardRepository catalogCards, CardReadingRepository readings) {
+               CatalogCardRepository catalogCards, CardReadingRepository readings, ApplicationEventPublisher events) {
+        this.events = events;
         this.provider = provider;
         this.proposals = proposals;
         this.cardItems = cardItems;
@@ -185,6 +189,8 @@ class CardPicker {
         IdentityProposal saved = proposals.save(new IdentityProposal(item.orgId(), cardId, c, edition, variant, stamp,
                 stampUnsure, readingId, suggestionId, currentUser.id()));
         name(cardId, label(c.name(), c.setName(), printed(c.number(), c.setOfficialCount()), c.language(), edition, variant, stamp));
+        // After commit, the automatic gate may confirm it (AutoConfirm); otherwise the admin does, as always.
+        events.publishEvent(new AutoConfirm.ProposalStored(saved.getId(), c));
         return saved;
     }
 

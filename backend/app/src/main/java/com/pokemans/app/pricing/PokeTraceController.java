@@ -37,8 +37,11 @@ class PokeTraceController {
     }
 
     /** @param poketraceId null when never mapped or unmapped */
+    /**
+     * @param automatic the system mapped it (no {@code mappedBy}); {@code ruleVersion} says under which rule
+     */
     record MappingView(boolean enabled, String poketraceId, Map<String, Object> poketraceCard, String overrideReason,
-                       UUID mappedBy, Instant mappedAt) {
+                       UUID mappedBy, Instant mappedAt, boolean automatic, String ruleVersion) {
     }
 
     /** What a pull stored; {@code repriced} false when another refresh held the lock (the comps are stored either way). */
@@ -124,8 +127,8 @@ class PokeTraceController {
         boolean enabled = api.getIfAvailable() != null;
         return mappings.current(catalogCardId).filter(m -> m.getPoketraceId() != null)
                 .map(m -> new MappingView(enabled, m.getPoketraceId(), m.getPoketraceCard(), m.getOverrideReason(), m.getMappedBy(),
-                        m.getCreatedAt()))
-                .orElse(new MappingView(enabled, null, null, null, null, null));
+                        m.getCreatedAt(), m.isAutomatic(), m.getRuleVersion()))
+                .orElse(new MappingView(enabled, null, null, null, null, null, false, null));
     }
 
     private PokeTraceApi api() {

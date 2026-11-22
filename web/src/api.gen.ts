@@ -2107,7 +2107,7 @@ export interface components {
             id: string;
             note: string;
             /** @enum {string} */
-            source: "REVIEWER" | "PROVIDER";
+            source: "REVIEWER" | "PROVIDER" | "SYSTEM";
             /** @enum {string} */
             status: "SUGGESTED" | "CONFIRMED";
         };
@@ -3388,6 +3388,7 @@ export interface components {
             poketraceId: string;
         };
         PokeTraceControllerMappingView: {
+            automatic: boolean;
             enabled: boolean;
             /** Format: date-time */
             mappedAt: string;
@@ -3398,6 +3399,7 @@ export interface components {
                 [key: string]: Record<string, never>;
             };
             poketraceId: string;
+            ruleVersion: string;
         };
         PokeTraceControllerPullView: {
             /** Format: int32 */
