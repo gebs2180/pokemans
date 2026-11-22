@@ -35,8 +35,15 @@ public class Catalog {
                               String number, String name, Edition edition, Variant variant, String stamp, boolean promo) {
     }
 
-    /** Published after a reviewer's identification commits. */
-    public record CardIdentified(UUID catalogCardId) {
+    /**
+     * Published whenever a physical card's identity becomes CONFIRMED, by the admin or automatically
+     * ({@code automatic}), for listeners to act on after the transaction commits
+     * ({@code @TransactionalEventListener(phase = AFTER_COMMIT)}). The name is relied on by other modules: keep it.
+     *
+     * @param catalogCardId the identity the card was confirmed as
+     * @param automatic     confirmed by the system's rule rather than the admin
+     */
+    public record CardIdentified(UUID catalogCardId, UUID orgId, UUID cardItemId, boolean automatic) {
     }
 
     /** A physical card that is currently identified as {@code catalogCardId}. */

@@ -10,7 +10,10 @@ import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** One admin's mapping of a catalog card to a PokeTrace card, or unmapping (no PokeTrace id). Append-only. */
+/**
+ * One admin's mapping of a catalog card to a PokeTrace card, or unmapping (no PokeTrace id), or the system's automatic
+ * mapping ({@link #automatic}: no user, the rule version instead, never an override). Append-only.
+ */
 @Entity
 @Table(name = "poketrace_card")
 class PokeTraceCard extends AssignedIdEntity<UUID> {
@@ -23,6 +26,8 @@ class PokeTraceCard extends AssignedIdEntity<UUID> {
     private Map<String, Object> poketraceCard;
     private String overrideReason;
     private UUID mappedBy;
+    private boolean automatic;
+    private String ruleVersion;
     private Instant createdAt;
 
     protected PokeTraceCard() {
@@ -36,6 +41,14 @@ class PokeTraceCard extends AssignedIdEntity<UUID> {
         this.overrideReason = overrideReason;
         this.mappedBy = mappedBy;
         this.createdAt = Instant.now();
+    }
+
+    /** A mapping the system made under {@code ruleVersion}, with no disagreements and so no override reason. */
+    static PokeTraceCard automatic(UUID catalogCardId, String poketraceId, Map<String, Object> poketraceCard, String ruleVersion) {
+        PokeTraceCard c = new PokeTraceCard(catalogCardId, poketraceId, poketraceCard, null, null);
+        c.automatic = true;
+        c.ruleVersion = ruleVersion;
+        return c;
     }
 
     @Override
@@ -61,6 +74,14 @@ class PokeTraceCard extends AssignedIdEntity<UUID> {
 
     UUID getMappedBy() {
         return mappedBy;
+    }
+
+    boolean isAutomatic() {
+        return automatic;
+    }
+
+    String getRuleVersion() {
+        return ruleVersion;
     }
 
     Instant getCreatedAt() {

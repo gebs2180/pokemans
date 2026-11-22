@@ -84,7 +84,7 @@ class IdentificationService {
         cardItems.nameIfUnnamed(cardId, CardPicker.label(catalogCard.getName(), catalogCard.getSetName(),
                 catalogCard.getNumber(), catalogCard.getLanguage(), catalogCard.getEdition(), catalogCard.getVariant(),
                 catalogCard.getStamp()));
-        events.publishEvent(new Catalog.CardIdentified(catalogCard.getId()));
+        events.publishEvent(new Catalog.CardIdentified(catalogCard.getId(), orgId, cardId, false));
         return saved;
     }
 

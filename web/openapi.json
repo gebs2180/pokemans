@@ -771,7 +771,7 @@
             "type" : "string"
           },
           "source" : {
-            "enum" : [ "REVIEWER", "PROVIDER" ],
+            "enum" : [ "REVIEWER", "PROVIDER", "SYSTEM" ],
             "type" : "string"
           },
           "status" : {
@@ -4039,6 +4039,9 @@
       },
       "PokeTraceControllerMappingView" : {
         "properties" : {
+          "automatic" : {
+            "type" : "boolean"
+          },
           "enabled" : {
             "type" : "boolean"
           },
@@ -4061,9 +4064,12 @@
           },
           "poketraceId" : {
             "type" : "string"
+          },
+          "ruleVersion" : {
+            "type" : "string"
           }
         },
-        "required" : [ "enabled", "mappedAt", "mappedBy", "overrideReason", "poketraceCard", "poketraceId" ]
+        "required" : [ "automatic", "enabled", "mappedAt", "mappedBy", "overrideReason", "poketraceCard", "poketraceId", "ruleVersion" ]
       },
       "PokeTraceControllerPullView" : {
         "properties" : {

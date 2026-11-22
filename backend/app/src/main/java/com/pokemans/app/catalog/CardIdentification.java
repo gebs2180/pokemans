@@ -18,7 +18,8 @@ import java.util.UUID;
 @Table(name = "card_identification")
 class CardIdentification extends AssignedIdEntity<UUID> {
 
-    enum Source { REVIEWER, PROVIDER }
+    /** REVIEWER: the admin. PROVIDER: the reader's suggestion. SYSTEM: confirmed automatically ({@link AutoConfirm}). */
+    enum Source { REVIEWER, PROVIDER, SYSTEM }
 
     enum Status { SUGGESTED, CONFIRMED }
 
@@ -34,6 +35,9 @@ class CardIdentification extends AssignedIdEntity<UUID> {
     private String note;
     private BigDecimal confidence;
     private UUID readingId;
+    private String ruleVersion;
+    private UUID proposalId;
+    private UUID suggestionId;
     private UUID createdBy;
     private Instant createdAt;
 
@@ -69,6 +73,41 @@ class CardIdentification extends AssignedIdEntity<UUID> {
         i.note = note;
         i.createdAt = Instant.now();
         return i;
+    }
+
+    /**
+     * Confirmed by the system under {@code ruleVersion}: the collector's proposal confirmed the reader's
+     * top suggestion. It keeps the suggestion's confidence and reading, so what decided it stays on record.
+     */
+    static CardIdentification confirmedBySystem(UUID orgId, UUID cardItemId, UUID catalogCardId, String ruleVersion,
+                                                UUID proposalId, CardIdentification suggestion, String note) {
+        CardIdentification i = new CardIdentification();
+        i.id = UUID.randomUUID();
+        i.orgId = orgId;
+        i.cardItemId = cardItemId;
+        i.catalogCardId = catalogCardId;
+        i.source = Source.SYSTEM;
+        i.status = Status.CONFIRMED;
+        i.ruleVersion = ruleVersion;
+        i.proposalId = proposalId;
+        i.suggestionId = suggestion.getId();
+        i.readingId = suggestion.getReadingId();
+        i.confidence = suggestion.getConfidence();
+        i.note = note;
+        i.createdAt = Instant.now();
+        return i;
+    }
+
+    String getRuleVersion() {
+        return ruleVersion;
+    }
+
+    UUID getProposalId() {
+        return proposalId;
+    }
+
+    UUID getSuggestionId() {
+        return suggestionId;
     }
 
     BigDecimal getConfidence() {

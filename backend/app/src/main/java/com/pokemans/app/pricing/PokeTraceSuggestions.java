@@ -27,7 +27,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * PokeTrace candidates for a catalog card, searched automatically when a card is identified, and the
  * admin's queue of cards still to map. A suggestion never prices anything: only a mapping does, and
- * every mapping is an admin's ({@link PokeTraceMappings#map}). A card gets a one-click suggestion only
+ * every mapping is an admin's ({@link PokeTraceMappings#map}), unless automatic mapping is on and the
+ * search found exactly one clean candidate ({@link PokeTraceAutoMap}). A card gets a one-click suggestion only
  * when exactly one candidate agrees with ours on everything we check; mismatches and several matches
  * are decided on the card page.
  */
@@ -77,10 +78,14 @@ class PokeTraceSuggestions {
     private final PokeTraceSuggestionRepository suggestions;
     private final Catalog catalog;
     private final TaskExecutor executor;
+    private final PokeTraceAutoMap autoMap;
     private final AtomicBoolean searching = new AtomicBoolean();
+    /** Searches and automatic maps started on identification run one at a time, against PokeTrace's rate limits. */
+    private final Object identifiedLock = new Object();
 
     PokeTraceSuggestions(ObjectProvider<PokeTraceApi> api, PokeTraceMappings mappings, PokeTraceSuggestionRepository suggestions,
-                         Catalog catalog, @Qualifier("applicationTaskExecutor") TaskExecutor executor) {
+                         Catalog catalog, @Qualifier("applicationTaskExecutor") TaskExecutor executor, PokeTraceAutoMap autoMap) {
+        this.autoMap = autoMap;
         this.api = api;
         this.mappings = mappings;
         this.suggestions = suggestions;
@@ -113,7 +118,10 @@ class PokeTraceSuggestions {
         return matching.isEmpty() ? candidates : matching;
     }
 
-    /** Searches PokeTrace in the background once a newly identified card's identity has committed. */
+    /**
+     * Searches PokeTrace in the background once a newly identified card's identity has committed, and with
+     * automatic mapping on, maps a card that has exactly one clean candidate and pulls its sales.
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void onIdentified(Catalog.CardIdentified event) {
         PokeTraceApi a = api.getIfAvailable();
@@ -121,15 +129,36 @@ class PokeTraceSuggestions {
             return;
         }
         executor.execute(() -> {
-            try {
-                UUID id = event.catalogCardId();
-                if (mappings.poketraceId(id).isEmpty() && !suggestions.existsByCatalogCardId(id)) {
-                    catalog.cards(List.of(id)).forEach(card -> suggest(a, card));
-                }
-            } catch (RuntimeException e) {
-                log.warn("Suggesting a PokeTrace card for {} failed; Find suggestions on the queue retries it", event.catalogCardId(), e);
+            synchronized (identifiedLock) {
+                identified(a, event.catalogCardId());
             }
         });
+    }
+
+    /** What {@link #onIdentified} does, on the calling thread. */
+    void identified(PokeTraceApi a, UUID id) {
+        try {
+            // Mapped already: nothing to do. (One the admin unmapped may be searched, but PokeTraceAutoMap never maps it.)
+            if (mappings.poketraceId(id).isPresent()) {
+                return;
+            }
+            Catalog.CardSummary card = catalog.cards(List.of(id)).stream().findFirst().orElse(null);
+            if (card == null) {
+                return;
+            }
+            PokeTraceSuggestion latest = suggestions.findFirstByCatalogCardIdOrderByCreatedAtDesc(id).orElse(null);
+            if (latest == null) {
+                latest = suggest(a, card);
+            } else if (autoMap.enabled() && (latest.getError() != null || latest.getSuggestedId() != null)) {
+                // Search again: a failed search, or a clean match PokeTrace may have since been joined by another.
+                latest = suggest(a, card);
+            }
+            if (autoMap.enabled() && latest.getSuggestedId() != null) {
+                autoMap.map(a, card, latest.getSuggestedId());
+            }
+        } catch (RuntimeException e) {
+            log.warn("Suggesting a PokeTrace card for {} failed; Find suggestions on the queue retries it", id, e);
+        }
     }
 
     /** Searches PokeTrace for the card and stores what it found, or why it failed. */

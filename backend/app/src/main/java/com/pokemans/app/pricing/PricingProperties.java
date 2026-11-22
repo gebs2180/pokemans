@@ -73,6 +73,7 @@ record PricingProperties(
      * @param apiKey   from the PokeTrace dashboard; in the server's env, never in the repo
      * @param backfill history asked for a card's first pull; later pulls ask for {@code recent}
      * @param recent   history asked for once a card has PokeTrace comps; duplicates are skipped
+     * @param autoMap  mapping a newly identified card without the admin (docs/offers.md "Automatic gates")
      */
     record PokeTrace(@DefaultValue("false") boolean enabled,
                      String apiKey,
@@ -80,6 +81,15 @@ record PricingProperties(
                      @DefaultValue("20s") Duration timeout,
                      @DefaultValue("1y") String backfill,
                      @DefaultValue("30d") String recent,
-                     @DefaultValue("2") int pullGapDays) {
+                     @DefaultValue("2") int pullGapDays,
+                     @DefaultValue AutoMap autoMap) {
+    }
+
+    /**
+     * Automatic PokeTrace mapping: when a card is identified and exactly one PokeTrace candidate agrees with it on
+     * everything {@link PokeTraceMappings#disagreements} checks, map it as the system and pull its sales. Off by
+     * default; a default to confirm (Zach, 2026-11-22).
+     */
+    record AutoMap(@DefaultValue("false") boolean enabled) {
     }
 }

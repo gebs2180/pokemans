@@ -16,7 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Which PokeTrace card each catalog card is. An admin confirms every mapping: PokeTrace's search
+ * Which PokeTrace card each catalog card is. An admin confirms every mapping, except the system's automatic one when
+ * exactly one candidate agrees on everything ({@link PokeTraceAutoMap}): PokeTrace's search
  * doesn't reliably split editions (Base Set Charizard comes back as one "Holofoil" card), and pricing
  * a 1st Edition from Unlimited sales is exactly the identity error that must not happen. A mapping
  * whose number, set, edition, variant or language disagrees with ours is refused unless the admin
@@ -77,6 +78,26 @@ class PokeTraceMappings {
             throw new IllegalArgumentException("PokeTrace's card doesn't match ours: " + String.join("; ", disagreements)
                     + ". Give a reason to map it anyway.");
         }
+        return mappings.save(new PokeTraceCard(card.catalogCardId(), poketraceId, seen(detail, disagreements),
+                disagreements.isEmpty() ? null : reason, by));
+    }
+
+    /**
+     * Maps the card as the system: only when PokeTrace's card agrees with ours on everything checked. There is no
+     * override: a disagreement is always the admin's to decide.
+     *
+     * @throws IllegalArgumentException listing the disagreements, if there are any
+     */
+    @Transactional
+    PokeTraceCard mapAutomatically(Catalog.CardSummary card, String poketraceId, Map<String, Object> detail, String ruleVersion) {
+        List<String> disagreements = disagreements(card, detail);
+        if (!disagreements.isEmpty()) {
+            throw new IllegalArgumentException("PokeTrace's card doesn't match ours: " + String.join("; ", disagreements));
+        }
+        return mappings.save(PokeTraceCard.automatic(card.catalogCardId(), poketraceId, seen(detail, disagreements), ruleVersion));
+    }
+
+    private static Map<String, Object> seen(Map<String, Object> detail, List<String> disagreements) {
         Map<String, Object> seen = new LinkedHashMap<>();
         for (String key : List.of("id", "name", "cardNumber", "variant", "rarity", "language", "set", "refs")) {
             if (detail.get(key) != null) {
@@ -84,7 +105,7 @@ class PokeTraceMappings {
             }
         }
         seen.put("disagreements", disagreements);
-        return mappings.save(new PokeTraceCard(card.catalogCardId(), poketraceId, seen, disagreements.isEmpty() ? null : reason, by));
+        return seen;
     }
 
     @Transactional
