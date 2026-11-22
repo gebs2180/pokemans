@@ -92,6 +92,11 @@ pokemans:
       enabled: ${CARD_READER_ENABLED:false}
       api-key: ${ANTHROPIC_API_KEY:}
       model: ${CARD_READER_MODEL:claude-sonnet-5-5}
+    # Automatic identity confirmation (AutoConfirm, docs/offers.md "Automatic gates"): the collector
+    # picked the reader's top suggestion at or above min-confidence, with edition and finish settled.
+    # Needs the reader on. Defaults to confirm.
+    auto-confirm:
+      enabled: ${AUTO_CONFIRM_ENABLED:false}
   condition:
     worker:
       poll-interval: 15s
@@ -130,6 +135,10 @@ pokemans:
       # A mapped card with no successful pull for this many days (since it was mapped) is flagged on the
       # admin PokeTrace page and fails the pricing healthcheck (a PR #114 follow-up). Default to confirm.
       pull-gap-days: 2
+      # Map automatically when exactly one PokeTrace candidate agrees on everything, then pull at once
+      # (PokeTraceAutoMap). Otherwise the card waits on the admin. Defaults to confirm.
+      auto-map:
+        enabled: ${POKETRACE_AUTO_MAP_ENABLED:false}
   offers:
     # Instant offers (Zach, 2026-10-19): one firm price, the expected value over the card's grades of the
     # quick-sale value less the buyer's margin, which the parameter set sets by confidence (1.2.0 on: A 10%,
