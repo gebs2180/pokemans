@@ -257,7 +257,7 @@ class CardStatusService {
         }
         if (reason != null) {
             return new CardStatus(cardId, Stage.PRICING, identity,
-                    "We can't price this card yet, and we're looking into why. Some cards won't get an offer. "
+                    "We're looking up recent sold prices for this card, usually within minutes. Some cards won't get an offer. "
                             + "You're free to sell it elsewhere." + OFFER_EMAIL, false).withWaitingSince(pricingSince);
         }
         if (quote.refused() == OfferRefusal.OVER_MAXIMUM) {
