@@ -132,7 +132,7 @@ async function sellACard(browser: Browser, testInfo: TestInfo, admin: Page, card
 
   // 4. The collector gets the offer and posts it, after saying where it ships from and how they get paid.
   await collector.goto(cardUrl)
-  await collector.getByRole('button', { name: /get an offer/i }).click()
+  await collector.getByRole('button', { name: /get (an|your instant) offer/i }).click()
   await fillAddress(collector, 'E2E Seller', handle)
   // The offer shows its evidence: what each grade recently sold for, and the confidence in words (UX review finding 11).
   await expect(collector.getByText(/^(Fairly|Less) sure, because the photos leave its condition less certain/)).toBeVisible()
