@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * Two photos chosen at once: the first is taken as the front and the second as the back, with a swap in case they
@@ -28,15 +28,33 @@ export function PhotoPair({ files, onUse, onCancel }: { files: [File, File]; onU
   )
 }
 
+const PREVIEW_WIDTH = 120
+
 function PairShot({ label, file }: { label: string; file: File }) {
-  // Not every test DOM can preview a file: the name says which it is.
-  const url = useMemo(() => (typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : null), [file])
-  useEffect(() => () => {
-    if (url) URL.revokeObjectURL(url)
-  }, [url])
+  // Drawn on a canvas rather than through an object URL in an <img>, so nothing from the chosen file becomes markup.
+  // Not every test DOM can decode a file: the name says which it is.
+  const canvas = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    if (typeof createImageBitmap !== 'function') return
+    let current = true
+    createImageBitmap(file)
+      .then((bitmap) => {
+        const c = canvas.current
+        if (current && c) {
+          c.width = PREVIEW_WIDTH
+          c.height = Math.round((PREVIEW_WIDTH * bitmap.height) / bitmap.width)
+          c.getContext('2d')?.drawImage(bitmap, 0, 0, c.width, c.height)
+        }
+        bitmap.close()
+      })
+      .catch(() => {})
+    return () => {
+      current = false
+    }
+  }, [file])
   return (
     <figure className="pair-shot">
-      {url && <img src={url} alt={`${label}: ${file.name}`} width={120} />}
+      <canvas ref={canvas} width={PREVIEW_WIDTH} height={0} role="img" aria-label={`${label}: ${file.name}`} />
       <figcaption>
         <strong>{label}</strong> <span className="muted small">{file.name}</span>
       </figcaption>
