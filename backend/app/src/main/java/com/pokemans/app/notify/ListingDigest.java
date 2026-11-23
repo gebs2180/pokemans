@@ -1,5 +1,6 @@
 package com.pokemans.app.notify;
 
+import com.pokemans.app.identity.Buying;
 import com.pokemans.app.identity.Directory;
 import com.pokemans.app.identity.OrgAccess;
 import com.pokemans.app.identity.OrgType;
@@ -33,6 +34,7 @@ class ListingDigest {
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("MMM d", Locale.US).withZone(ZoneOffset.UTC);
 
     private final Directory directory;
+    private final Buying buying;
     private final OrgAccess orgAccess;
     private final Deals deals;
     private final EmailOutbox outbox;
@@ -40,9 +42,10 @@ class ListingDigest {
     private final Notifier notifier;
     private final EmailProperties properties;
 
-    ListingDigest(Directory directory, OrgAccess orgAccess, Deals deals, EmailOutbox outbox, EmailPreferences preferences, Notifier notifier,
+    ListingDigest(Directory directory, Buying buying, OrgAccess orgAccess, Deals deals, EmailOutbox outbox, EmailPreferences preferences, Notifier notifier,
                   EmailProperties properties) {
         this.directory = directory;
+        this.buying = buying;
         this.orgAccess = orgAccess;
         this.deals = deals;
         this.outbox = outbox;
@@ -57,6 +60,9 @@ class ListingDigest {
         String date = LocalDate.ofInstant(now, ZoneOffset.UTC).toString();
         int queued = 0;
         for (UUID buyerOrgId : directory.orgsOfType(OrgType.BUYER)) {
+            if (!buying.isApproved(buyerOrgId)) {
+                continue; // Waiting for, or declined, approval to buy: the market isn't open to them yet.
+            }
             Map<UUID, Boolean> sharesMember = new HashMap<>();
             for (UUID userId : directory.members(buyerOrgId)) {
                 if (!preferences.digest(userId)) {

@@ -6,6 +6,7 @@ import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
 import { containerKind, soleOrg, useOrg } from '../useOrg'
 import { focusHeading } from '../useRouteFocus'
+import { BuyingNotice } from './AccountPage'
 import { AddressPanel } from './AddressForm'
 import { ContainerView } from './ContainerPage'
 import { HowItWorksGuide, type GuideFor } from './HowItWorksPage'
@@ -35,6 +36,7 @@ export function OrgHome({ orgId, title, lead }: { orgId: string; title?: string;
     return (
       <ConsentGate orgId={orgId} title="Before you buy" intro="Please read what accepting an offer commits you to." accepted="buyer terms" guide="buyer">
         <h1>{org.name}</h1>
+        <BuyingNotice orgId={orgId} />
         <ul className="tile-list">
           <li className="tile">
             <Link to={`/orgs/${orgId}/market`}>Cards for sale</Link> <span className="muted">raw cards at one firm price each</span>

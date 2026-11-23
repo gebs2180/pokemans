@@ -527,6 +527,35 @@ export const OUTCOMES = ['U', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
 
 export type ConsentStatus = { version: string; text: string; acceptedAt: string | null }
 
+/** Where the person stands on buying: NOT_STARTED until they ask, then WAITING on the admin, APPROVED or DECLINED. */
+export type BuyingStatus = 'NOT_STARTED' | 'WAITING' | 'APPROVED' | 'DECLINED'
+/** @param terms the buyer terms they accept to start, shown before they do */
+export type BuyingState = {
+  status: BuyingStatus
+  orgId: string | null
+  orgName: string | null
+  appliedAt: string | null
+  decidedAt: string | null
+  /** Why buying was declined. */
+  note: string | null
+  terms: { version: string; text: string; sha256: string }
+}
+/** A request to buy, in the admin's queue. sellerOrgs are the person's other orgs; approved is null until answered. */
+export type BuyerRequest = {
+  id: string
+  orgId: string
+  orgName: string | null
+  userId: string
+  email: string | null
+  attempt: number
+  appliedAt: string
+  sellerOrgs: string[]
+  approved: boolean | null
+  decidedAt: string | null
+  decidedBy: string | null
+  note: string | null
+}
+
 export type Grader = 'PSA' | 'BGS' | 'CGC' | 'SGC' | 'TAG'
 
 export type OutcomeView = {

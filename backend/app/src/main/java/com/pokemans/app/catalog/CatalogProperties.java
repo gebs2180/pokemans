@@ -7,7 +7,20 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /** Card catalog providers. */
 @ConfigurationProperties("pokemans.catalog")
-record CatalogProperties(@DefaultValue Tcgdex tcgdex, @DefaultValue Reader reader, @DefaultValue Picker picker) {
+record CatalogProperties(@DefaultValue Tcgdex tcgdex, @DefaultValue Reader reader, @DefaultValue Picker picker,
+                         @DefaultValue AutoConfirm autoConfirm) {
+
+    /**
+     * Confirming an identity automatically when the collector confirmed the reader's top suggestion
+     * ({@link com.pokemans.app.catalog.AutoConfirm}, docs/offers.md "Automatic gates"). Both values are
+     * defaults to confirm with Zach (methodology doc, 2026-11-22).
+     *
+     * @param enabled       off until Zach confirms the rule
+     * @param minConfidence the reader's suggestion confidence at or above which it may confirm; 0.90 takes
+     *                      number, set size and exact name all matching ({@link SuggestionMatcher#score})
+     */
+    record AutoConfirm(@DefaultValue("false") boolean enabled, @DefaultValue("0.90") java.math.BigDecimal minConfidence) {
+    }
 
     /**
      * The collector's card picker.

@@ -72,7 +72,7 @@ class PokeTraceSourceTest {
         SoldCompRepository comps = mock(SoldCompRepository.class);
         when(comps.existsBySourceAndExternalSaleIdStartingWith(eq(PokeTraceSource.NAME), anyString())).thenReturn(stored);
         PricingProperties properties = new PricingProperties("USD", 3, 12, null, null,
-                new PricingProperties.PokeTrace(true, "k", URI.create("http://localhost"), Duration.ofSeconds(1), "1y", "30d", 2));
+                new PricingProperties.PokeTrace(true, "k", URI.create("http://localhost"), Duration.ofSeconds(1), "1y", "30d", 2, null));
         return new PokeTraceSource(api, mappings, comps, properties);
     }
 

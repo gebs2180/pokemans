@@ -4,6 +4,54 @@
  */
 
 export interface paths {
+    "/api/admin/buyers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["requests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/buyers/{requestId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approve_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/buyers/{requestId}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/cards/{cardId}/offer-preview": {
         parameters: {
             query?: never;
@@ -1124,6 +1172,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/buying": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["state"];
+        put?: never;
+        post: operations["startBuying"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/email-preferences": {
         parameters: {
             query?: never;
@@ -1891,6 +1955,42 @@ export interface components {
             /** Format: int32 */
             mostLikely: number;
         };
+        BuyingControllerDeclineBody: {
+            note: string;
+        };
+        BuyingRequest: {
+            /** Format: date-time */
+            appliedAt: string;
+            approved: boolean;
+            /** Format: int32 */
+            attempt: number;
+            /** Format: date-time */
+            decidedAt: string;
+            decidedBy: string;
+            email: string;
+            /** Format: uuid */
+            id: string;
+            note: string;
+            /** Format: uuid */
+            orgId: string;
+            orgName: string;
+            sellerOrgs: string[];
+            /** Format: uuid */
+            userId: string;
+        };
+        BuyingState: {
+            /** Format: date-time */
+            appliedAt: string;
+            /** Format: date-time */
+            decidedAt: string;
+            note: string;
+            /** Format: uuid */
+            orgId: string;
+            orgName: string;
+            /** @enum {string} */
+            status: "NOT_STARTED" | "WAITING" | "APPROVED" | "DECLINED";
+            terms: components["schemas"]["ConsentsTerms"];
+        };
         CardInputs: {
             assessment: components["schemas"]["CardInputsAssessment"];
             /** Format: uuid */
@@ -2107,7 +2207,7 @@ export interface components {
             id: string;
             note: string;
             /** @enum {string} */
-            source: "REVIEWER" | "PROVIDER";
+            source: "REVIEWER" | "PROVIDER" | "SYSTEM";
             /** @enum {string} */
             status: "SUGGESTED" | "CONFIRMED";
         };
@@ -2606,6 +2706,11 @@ export interface components {
         ConsentControllerConsentStatus: {
             /** Format: date-time */
             acceptedAt: string;
+            text: string;
+            version: string;
+        };
+        ConsentsTerms: {
+            sha256: string;
             text: string;
             version: string;
         };
@@ -3270,6 +3375,11 @@ export interface components {
             /** @enum {string} */
             reason: "NOT_GENUINE" | "NOT_THE_LISTED_CARD" | "DOES_NOT_MATCH_PHOTOS";
         };
+        OfferControllerStartBuyingBody: {
+            name: string;
+            shipTo: components["schemas"]["OfferControllerAddressBody"];
+            version: string;
+        };
         OfferLadderTenCap: {
             cap: number;
             multiple: number;
@@ -3388,6 +3498,7 @@ export interface components {
             poketraceId: string;
         };
         PokeTraceControllerMappingView: {
+            automatic: boolean;
             enabled: boolean;
             /** Format: date-time */
             mappedAt: string;
@@ -3398,6 +3509,7 @@ export interface components {
                 [key: string]: Record<string, never>;
             };
             poketraceId: string;
+            ruleVersion: string;
         };
         PokeTraceControllerPullView: {
             /** Format: int32 */
@@ -3909,6 +4021,74 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    requests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BuyingRequest"][];
+                };
+            };
+        };
+    };
+    approve_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BuyingRequest"];
+                };
+            };
+        };
+    };
+    decline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BuyingControllerDeclineBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BuyingRequest"];
+                };
+            };
+        };
+    };
     offerPreview: {
         parameters: {
             query?: never;
@@ -5709,6 +5889,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["MeControllerMe"];
+                };
+            };
+        };
+    };
+    state: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BuyingState"];
+                };
+            };
+        };
+    };
+    startBuying: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferControllerStartBuyingBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BuyingState"];
                 };
             };
         };
