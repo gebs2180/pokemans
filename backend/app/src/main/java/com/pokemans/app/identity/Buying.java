@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -50,6 +51,13 @@ public class Buying {
                           List<String> sellerOrgs, Boolean approved, Instant decidedAt, String decidedBy, String note) {
     }
 
+    /**
+     * The admin answered a request to buy, published in the transaction that recorded the answer. {@code note} is the
+     * reason given for a decline.
+     */
+    public record Decided(UUID requestId, UUID orgId, UUID userId, boolean approved, String note, Instant at) {
+    }
+
     private static final Comparator<Status> STANDING = Comparator.comparingInt(s -> switch (s) {
         case APPROVED -> 0;
         case WAITING -> 1;
@@ -64,9 +72,11 @@ public class Buying {
     private final AppUserRepository users;
     private final CurrentUser currentUser;
     private final Consents consents;
+    private final ApplicationEventPublisher events;
 
     Buying(BuyerApplicationRepository applications, BuyerDecisionRepository decisions, MembershipRepository memberships,
-           OrgRepository orgs, AppUserRepository users, CurrentUser currentUser, Consents consents) {
+           OrgRepository orgs, AppUserRepository users, CurrentUser currentUser, Consents consents,
+           ApplicationEventPublisher events) {
         this.applications = applications;
         this.decisions = decisions;
         this.memberships = memberships;
@@ -74,6 +84,7 @@ public class Buying {
         this.users = users;
         this.currentUser = currentUser;
         this.consents = consents;
+        this.events = events;
     }
 
     /** Where the current person stands: their best-placed buyer org, approved before waiting before declined. */
@@ -193,6 +204,7 @@ public class Buying {
         } catch (DataIntegrityViolationException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This request has already been answered.");
         }
+        events.publishEvent(new Decided(requestId, a.getOrgId(), a.getUserId(), approved, reason, Instant.now()));
         return request(a);
     }
 
