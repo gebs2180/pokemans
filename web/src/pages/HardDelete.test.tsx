@@ -42,7 +42,7 @@ describe('HardDelete', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delete card…' }))
     expect(await screen.findByText('2 photo records')).toBeInTheDocument()
-    expect(screen.getByText('1 offers')).toBeInTheDocument()
+    expect(screen.getByText('1 offer')).toBeInTheDocument()
     const submit = screen.getByRole('button', { name: 'Delete card for good' })
     expect(submit).toBeDisabled()
 

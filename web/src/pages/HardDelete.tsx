@@ -2,22 +2,27 @@ import { useState, type FormEvent } from 'react'
 import { useApi, type DeletionDone, type DeletionPlan } from '../api'
 import { message } from '../format'
 
-/** Table names in words, for the list of what goes. Anything not here shows as its table name. */
-const ROW_LABEL: Record<string, string> = {
-  card_item: 'cards',
-  photo: 'photo records',
-  card_offer: 'offers',
-  card_offer_void: 'offer voids',
-  sale_listing: 'listings',
-  listing_event: 'deal steps',
-  shipping_label: 'shipping labels',
-  label_refund: 'label refunds',
-  deal_outcome: 'deal outcomes',
-  condition_assessment: 'condition assessments',
-  card_identification: 'identifications',
-  membership: 'memberships',
-  invite: 'invites',
-  org: 'org',
+/** Table names in words, one and many (review finding 20). Anything not here shows as its table name. */
+const ROW_LABEL: Record<string, [one: string, many: string]> = {
+  card_item: ['card', 'cards'],
+  photo: ['photo record', 'photo records'],
+  card_offer: ['offer', 'offers'],
+  card_offer_void: ['offer void', 'offer voids'],
+  sale_listing: ['listing', 'listings'],
+  listing_event: ['deal step', 'deal steps'],
+  shipping_label: ['shipping label', 'shipping labels'],
+  label_refund: ['label refund', 'label refunds'],
+  deal_outcome: ['deal outcome', 'deal outcomes'],
+  condition_assessment: ['condition assessment', 'condition assessments'],
+  card_identification: ['identification', 'identifications'],
+  membership: ['membership', 'memberships'],
+  invite: ['invite', 'invites'],
+  org: ['org', 'orgs'],
+}
+
+function rowLabel(table: string, n: number) {
+  const words = ROW_LABEL[table]
+  return words ? words[n === 1 ? 0 : 1] : table.replaceAll('_', ' ')
 }
 
 /**
@@ -105,7 +110,7 @@ export function HardDelete({
           <ul className="small">
             {rows.map(([table, n]) => (
               <li key={table}>
-                {n} {ROW_LABEL[table] ?? table.replaceAll('_', ' ')}
+                {n} {rowLabel(table, n)}
               </li>
             ))}
           </ul>

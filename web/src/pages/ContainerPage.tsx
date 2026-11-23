@@ -66,6 +66,11 @@ export function ContainerView({
 
   async function addCard(e: FormEvent) {
     e.preventDefault()
+    // A single card is made with its first photo, so a mis-tap leaves nothing behind (review finding 10).
+    if (!lot) {
+      navigate(`/orgs/${encodeURIComponent(orgId)}/${kind}/${encodeURIComponent(containerId)}/new`)
+      return
+    }
     setAddError(null)
     setAdding(true)
     try {

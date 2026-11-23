@@ -183,6 +183,12 @@ public class Assessments {
         return p.getPhotoIds() != null && p.getPhotoIds().stream().map(UUID::toString).collect(Collectors.toSet()).equals(photoIds);
     }
 
+    /** When the card's current assessment was made, if it has one: the start of a wait for prices that follows it. */
+    @Transactional(readOnly = true)
+    public Optional<java.time.Instant> assessedAt(UUID cardItemId) {
+        return assessments.findByCardItemIdAndIsCurrentTrue(cardItemId).map(ConditionAssessment::getCreatedAt);
+    }
+
     /** The seller's view of the card's condition, once it has a current assessment. */
     @Transactional(readOnly = true)
     public Optional<Summary> summary(UUID cardItemId) {

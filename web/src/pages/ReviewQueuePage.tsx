@@ -47,12 +47,24 @@ export function ReviewQueuePage() {
   )
 }
 
+/** How long a card has waited, roughly: "5h", "3d". Review finding 3. */
+function age(since: string, now = Date.now()) {
+  const hours = Math.max(0, Math.floor((now - new Date(since).getTime()) / 3_600_000))
+  return hours < 24 ? `${hours}h` : `${Math.floor(hours / 24)}d`
+}
+
+/** Comps added by hand have a 3-day target (Zach, 2026-11-23). */
+function overdue(since: string) {
+  return Date.now() - new Date(since).getTime() > 3 * 86_400_000
+}
+
 function QueueTable({ items }: { items: QueueItem[] }) {
   if (items.length === 0) return <p className="muted">Nothing here.</p>
   return (
     <table className="table">
       <thead>
         <tr>
+          <th>Waiting</th>
           <th>Card</th>
           <th>Identity</th>
           <th>Condition</th>
@@ -61,6 +73,9 @@ function QueueTable({ items }: { items: QueueItem[] }) {
       <tbody>
         {items.map((i) => (
           <tr key={i.cardId}>
+            <td className={i.identified && !i.priced && overdue(i.waitingSince) ? 'warn' : ''} title={new Date(i.waitingSince).toLocaleString()}>
+              {age(i.waitingSince)}
+            </td>
             <td>
               <Link to={`/admin/review/${i.orgId}/${i.cardId}`}>{i.label}</Link>
               <div className="muted small">

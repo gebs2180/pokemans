@@ -54,9 +54,12 @@ class ConditionController {
      *                   since the current one: it no longer counts until the card is assessed again
      * @param orgName whose card it is, so the reviewer can tell collectors apart
      * @param priced  true once its catalog card has a PSA price table: raw cards are valued on PSA's table only
+     * @param waitingSince when its current wait began: the latest of its last photo, its identification and its current
+     *                     assessment (review finding 3)
      */
     record QueueItem(UUID cardId, UUID orgId, String label, Instant createdAt, boolean identified, String identifiedAs,
-                     String assessment, Confidence confidence, int openRequests, String orgName, boolean priced) {
+                     String assessment, Confidence confidence, int openRequests, String orgName, boolean priced,
+                     Instant waitingSince) {
     }
 
     /**
@@ -119,7 +122,7 @@ class ConditionController {
     }
 
     /**
-     * Single cards whose capture is complete, oldest first, with what each still needs: an
+     * Single cards whose capture is complete, longest waiting first, with what each still needs: an
      * identification, a reviewer's look at the system's distribution, and sold comps.
      */
     @GetMapping("/review-queue")
@@ -138,14 +141,19 @@ class ConditionController {
         return cards.stream().map(c -> {
             Catalog.IdentifiedCard id = identities.get(c.id());
             ConditionAssessment a = current.get(c.id());
+            Instant waitingSince = java.util.stream.Stream.of(
+                            cardItems.passedPhotos(c.id()).stream().map(CardItems.PhotoRef::uploadedAt).filter(java.util.Objects::nonNull)
+                                    .max(java.util.Comparator.naturalOrder()).orElse(null),
+                            id == null ? null : id.identifiedSince(), a == null ? null : a.getCreatedAt())
+                    .filter(java.util.Objects::nonNull).max(java.util.Comparator.naturalOrder()).orElse(c.createdAt());
             return new QueueItem(c.id(), c.orgId(), c.label(), c.createdAt(), id != null,
                     id == null ? null : id.name() + " · " + id.setName() + " " + id.number(),
                     a == null ? "NONE" : assessments.photosChanged(a) ? "PHOTOS_CHANGED"
                             : Assessments.builtOnRetiredProvider(a) ? "PROVIDER_RETIRED" : a.getAuthorType().name(),
                     a == null ? null : a.getConfidence(),
                     open.getOrDefault(c.id(), 0L).intValue(), orgNames.get(c.orgId()),
-                    id != null && prices.latest(id.catalogCardId(), "PSA").isPresent());
-        }).toList();
+                    id != null && prices.latest(id.catalogCardId(), "PSA").isPresent(), waitingSince);
+        }).sorted(java.util.Comparator.comparing(QueueItem::waitingSince)).toList();
     }
 
     /**

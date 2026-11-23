@@ -333,7 +333,7 @@ export function MarketPage() {
                 </p>
               )}
               <Photos photos={item.photos} />
-              {item.offer.subjectToAuthentication && <p className="alert alert-warning small">Not yet authenticated: check it in hand.</p>}
+              {item.offer.subjectToAuthentication && <p className="alert alert-warning small">Not yet authenticated: check it in hand. If it isn't genuine, you return it at your cost and don't pay.</p>}
               <HowPriced offer={item.offer} />
               <p className="meta">
                 Posted {new Date(item.listedAt).toLocaleDateString()}, open until {new Date(item.expiresAt).toLocaleDateString()}.

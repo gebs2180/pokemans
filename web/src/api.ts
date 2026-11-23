@@ -138,6 +138,8 @@ export type CardStatus = {
   condition: ConditionSummary | null
   /** When the stage runs out: the last day to ship, or when the offer or posting ends. */
   deadline: string | null
+  /** While the card waits on us (identifying, assessing, pricing), since when; else null. */
+  waitingSince?: string | null
 }
 
 /** A deadline as a date nobody can misread: "Nov 5". */
@@ -156,7 +158,7 @@ export function deadlineText({ stage, deadline }: Pick<CardStatus, 'stage' | 'de
 export type NeedsYouItem = {
   cardId: string
   label: string
-  need: 'LABEL_READY' | 'PAYMENT_DUE' | 'PAYMENT_CHECK' | 'CARD_RETURNING' | 'OFFER_EXPIRING' | 'OFFER_READY' | 'GET_OFFER' | 'RETAKE'
+  need: 'LABEL_READY' | 'PAYMENT_DUE' | 'PAYMENT_CHECK' | 'CARD_RETURNING' | 'OFFER_EXPIRING' | 'OFFER_READY' | 'GET_OFFER' | 'RETAKE' | 'CONFIRM_CARD' | 'CHECKING'
   due: string | null
   sides: Side[]
 }
@@ -311,6 +313,8 @@ export type QueueItem = {
   priced: boolean
   /** Whose card it is. */
   orgName: string | null
+  /** When its current wait began; the queue is oldest first. */
+  waitingSince: string
 }
 
 export type CatalogHit = {

@@ -80,11 +80,12 @@ async function sellACard(browser: Browser, testInfo: TestInfo, admin: Page, card
   // Photo-first: the card has no name until its photos are taken.
   await collector.getByRole('button', { name: /add card/i }).click()
   await expect(collector.getByRole('heading', { level: 1, name: 'New card' })).toBeVisible()
+  // The card is made with its first photo, so its page (and URL) exists only after the front.
+  await collector.getByLabel('Choose front photo, or front and back').setInputFiles(await cardPhoto(collector, 'front'))
+  await expect(collector.getByRole('img', { name: /^front photo you took/i })).toBeVisible()
   const cardUrl = collector.url()
-  for (const side of ['front', 'back'] as const) {
-    await collector.getByLabel(`Choose a ${side} photo`).setInputFiles(await cardPhoto(collector, side))
-    await expect(collector.getByRole('img', { name: new RegExp(`^${side} photo you took`, 'i') })).toBeVisible()
-  }
+  await collector.getByLabel('Choose a back photo').setInputFiles(await cardPhoto(collector, 'back'))
+  await expect(collector.getByRole('img', { name: /^back photo you took/i })).toBeVisible()
   // The browser tests run without the card reader or the catalog: the search comes next, says it isn't
   // available, and the collector describes the card.
   await collector.getByRole('combobox', { name: 'Find your card' }).fill(label)

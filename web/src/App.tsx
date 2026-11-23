@@ -4,6 +4,7 @@ import { Link, Route, Routes, useLocation } from 'react-router'
 import { AccountPage } from './pages/AccountPage'
 import { CardPage } from './pages/CardPage'
 import { ContainerPage } from './pages/ContainerPage'
+import { NewCardPage } from './pages/NewCardPage'
 import { HomePage } from './pages/HomePage'
 import { InvitePage } from './pages/InvitePage'
 import { HowItWorksPage } from './pages/HowItWorksPage'
@@ -107,6 +108,7 @@ function App() {
               <Route path="/orgs/:orgId" element={<OrgPage />} />
               <Route path="/orgs/:orgId/terms" element={<TermsPage />} />
               <Route path="/orgs/:orgId/:kind/:containerId" element={<ContainerPage />} />
+              <Route path="/orgs/:orgId/:kind/:containerId/new" element={<NewCardPage />} />
               <Route path="/orgs/:orgId/cards/:cardId" element={<CardPage />} />
               <Route path="/orgs/:orgId/market" element={<MarketPage />} />
               <Route path="/orgs/:orgId/deals" element={<DealsPage />} />

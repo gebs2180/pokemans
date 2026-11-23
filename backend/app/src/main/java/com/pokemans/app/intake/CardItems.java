@@ -131,13 +131,13 @@ public class CardItems {
     /** The collection's cards, oldest first. No access check. */
     @Transactional(readOnly = true)
     public List<CardItemRef> inCollection(UUID collectionId) {
-        return cards.findByCollectionIdOrderByCreatedAtAsc(collectionId).stream().map(CardItems::ref).toList();
+        return cards.findByCollectionIdAndArchivedAtIsNullOrderByCreatedAtAsc(collectionId).stream().map(CardItems::ref).toList();
     }
 
     /** The cards in all of the org's collections, oldest first. No access check. */
     @Transactional(readOnly = true)
     public List<CardItemRef> inCollectionsOf(UUID orgId) {
-        return cards.findByOrgIdAndCollectionIdNotNullOrderByCreatedAtAsc(orgId).stream().map(CardItems::ref).toList();
+        return cards.findByOrgIdAndCollectionIdNotNullAndArchivedAtIsNullOrderByCreatedAtAsc(orgId).stream().map(CardItems::ref).toList();
     }
 
     /** The card if the caller may see its org, else 404. */
@@ -175,6 +175,18 @@ public class CardItems {
         CardItem card = cards.findById(cardId).orElseThrow(() -> IntakeService.notFound("Card"));
         if (!card.isLot() && label != null && !label.isBlank()) {
             card.name(trimmed(label));
+        }
+    }
+
+    /**
+     * Takes the card off its collector's list and the review queue. Its photos and predictions stay. No access check:
+     * the caller has established that the collector may, and that no offer or listing depends on the card.
+     */
+    @Transactional
+    public void archive(UUID cardId, UUID by) {
+        CardItem card = cards.findLockedById(cardId).orElseThrow(() -> IntakeService.notFound("Card"));
+        if (!card.isArchived()) {
+            card.archive(by);
         }
     }
 
@@ -226,6 +238,12 @@ public class CardItems {
     @Transactional
     public void lockForCapture(UUID cardId) {
         cards.findLockedById(cardId).orElseThrow(() -> IntakeService.notFound("Card"));
+    }
+
+    /** Who added the card. No access check. */
+    @Transactional(readOnly = true)
+    public UUID addedBy(UUID cardId) {
+        return cards.findById(cardId).map(CardItem::getCreatedBy).orElseThrow(() -> IntakeService.notFound("Card"));
     }
 
     /** Every card, across orgs, whose capture is complete, oldest first. No access check. */

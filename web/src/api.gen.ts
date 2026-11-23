@@ -1268,6 +1268,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{orgId}/cards/{cardId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{orgId}/cards/{cardId}/custody-records": {
         parameters: {
             query?: never;
@@ -2151,6 +2167,8 @@ export interface components {
             sellersWord: boolean;
             /** @enum {string} */
             stage: "PHOTOS" | "LOT" | "IDENTIFYING" | "ASSESSING" | "PRICING" | "NO_OFFER" | "OVER_LIMIT" | "READY" | "OFFERED" | "LISTED" | "SOLD" | "SHIPPED" | "ARRIVED" | "PAID" | "RETURNED";
+            /** Format: date-time */
+            waitingSince: string;
         };
         CardStatusServiceNeedsYou: {
             /** Format: uuid */
@@ -2159,7 +2177,7 @@ export interface components {
             due: string;
             label: string;
             /** @enum {string} */
-            need: "LABEL_READY" | "PAYMENT_DUE" | "PAYMENT_CHECK" | "CARD_RETURNING" | "OFFER_EXPIRING" | "OFFER_READY" | "GET_OFFER" | "RETAKE";
+            need: "LABEL_READY" | "PAYMENT_DUE" | "PAYMENT_CHECK" | "CARD_RETURNING" | "OFFER_EXPIRING" | "OFFER_READY" | "GET_OFFER" | "RETAKE" | "CONFIRM_CARD" | "CHECKING";
             sides: string[];
         };
         CatalogControllerCardIdentificationView: {
@@ -2687,6 +2705,8 @@ export interface components {
             orgId: string;
             orgName: string;
             priced: boolean;
+            /** Format: date-time */
+            waitingSince: string;
         };
         ConditionControllerRequestView: {
             /** Format: int32 */
@@ -6103,6 +6123,27 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["IntakeViewsCardView"];
                 };
+            };
+        };
+    };
+    archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                cardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

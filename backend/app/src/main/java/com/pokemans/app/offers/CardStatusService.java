@@ -1,5 +1,7 @@
 package com.pokemans.app.offers;
 
+import com.pokemans.app.catalog.Catalog;
+import com.pokemans.app.catalog.IdentifyWaits;
 import com.pokemans.app.condition.Assessments;
 import com.pokemans.app.condition.PreGradeFailures;
 import com.pokemans.app.intake.CardItems;
@@ -7,10 +9,13 @@ import com.pokemans.app.valuation.CardInputs;
 import com.pokemans.app.valuation.UnvaluedReason;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,30 +38,42 @@ class CardStatusService {
      *                  measurement if there is one; else null
      * @param deadline  when the stage runs out: the seller's last day to ship, the buyer's last day to pay, or when the
      *                  offer or posting ends; else null
-     * @param sellersWord true after a sale while the deal waits on the seller saying something: paid, or the card's back
+     * @param sellersWord true while the card waits on the seller saying something: after a sale, that they were paid or
+     *                    the card's back; while identifying, which card it is
+     * @param waitingSince while the card waits on us (identifying, assessing, pricing), since when; else null
      */
     record CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer, Assessments.Summary condition,
-                      Instant deadline, boolean sellersWord) {
+                      Instant deadline, boolean sellersWord, Instant waitingSince) {
 
         CardStatus(UUID cardId, Stage stage, String identity, String nextStep, boolean canOffer) {
-            this(cardId, stage, identity, nextStep, canOffer, null, null, false);
+            this(cardId, stage, identity, nextStep, canOffer, null, null, false, null);
         }
 
         CardStatus withCondition(Assessments.Summary summary) {
-            return new CardStatus(cardId, stage, identity, nextStep, canOffer, summary, deadline, sellersWord);
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, summary, deadline, sellersWord, waitingSince);
         }
 
         CardStatus withDeadline(Instant at) {
-            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, at, sellersWord);
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, at, sellersWord, waitingSince);
         }
 
         CardStatus withSellersWord(boolean waiting) {
-            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, deadline, waiting);
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, deadline, waiting, waitingSince);
+        }
+
+        CardStatus withWaitingSince(Instant since) {
+            return new CardStatus(cardId, stage, identity, nextStep, canOffer, condition, deadline, sellersWord, since);
         }
     }
 
-    /** What's waiting on the seller, for the home page. Everything else on the way to a sale is waiting on us or a buyer. */
-    enum Need { LABEL_READY, PAYMENT_DUE, PAYMENT_CHECK, CARD_RETURNING, OFFER_EXPIRING, OFFER_READY, GET_OFFER, RETAKE }
+    /**
+     * What's waiting on the seller, for the home page. Everything else on the way to a sale is waiting on us or a buyer,
+     * and the one exception, {@link #CHECKING}, is only counted there: a card we're identifying, assessing or pricing.
+     */
+    enum Need { LABEL_READY, PAYMENT_DUE, PAYMENT_CHECK, CARD_RETURNING, OFFER_EXPIRING, OFFER_READY, GET_OFFER, RETAKE, CONFIRM_CARD, CHECKING }
+
+    /** Stages where the card waits on us. */
+    static final Set<Stage> OUR_REVIEW = EnumSet.of(Stage.IDENTIFYING, Stage.ASSESSING, Stage.PRICING);
 
     /** Only a collector is nudged to sell. */
     private static final Set<Need> OFFER_NUDGES = EnumSet.of(Need.OFFER_EXPIRING, Need.OFFER_READY, Need.GET_OFFER);
@@ -71,8 +88,15 @@ class CardStatusService {
     /** An offer this close to ending says so, on top of saying it's ready. */
     static final Duration EXPIRING_SOON = Duration.ofHours(48);
 
-    /** We email deal steps and buyers' digests, but nothing when a card's condition or offer is ready. */
-    private static final String NO_NOTIFICATIONS = " We email you about a sale, but not when a card's condition or offer is ready, so check back here for those.";
+    /** We email the collector once per card when its offer is ready (Zach, 2026-11-23). */
+    static final String OFFER_EMAIL = " We'll email you when its offer is ready.";
+
+    /**
+     * A card waiting only on sold prices we add by hand: our target for adding them, and when it gets no offer instead
+     * of waiting on (methodology Step 8; defaults to confirm; Zach, 2026-11-23).
+     */
+    static final Duration COMPS_TARGET = Duration.ofDays(3);
+    static final Duration COMPS_GIVE_UP = Duration.ofDays(14);
 
     private final OfferService offers;
     private final SaleListingRepository listings;
@@ -83,10 +107,14 @@ class CardStatusService {
     private final Shipping shipping;
     private final OfferPolicy policy;
     private final PreGradeFailures preGradeFailures;
+    private final IdentifyWaits identifyWaits;
+    private final Catalog catalog;
 
     CardStatusService(OfferService offers, SaleListingRepository listings, ListingEventRepository events, CardItems cardItems,
                       CardOfferVoidRepository voids, Assessments assessments, Shipping shipping, OfferPolicy policy,
-                      PreGradeFailures preGradeFailures) {
+                      PreGradeFailures preGradeFailures, IdentifyWaits identifyWaits, Catalog catalog) {
+        this.identifyWaits = identifyWaits;
+        this.catalog = catalog;
         this.preGradeFailures = preGradeFailures;
         this.policy = policy;
         this.offers = offers;
@@ -115,12 +143,19 @@ class CardStatusService {
             CardStatus status = stage(card.id());
             List<String> sides = status.stage() == Stage.PHOTOS ? cardItems.sidesToRetake(card.id()) : List.of();
             Need need = need(status, !sides.isEmpty(), now);
+            if (need == null && OUR_REVIEW.contains(status.stage())) {
+                need = Need.CHECKING;
+            }
             boolean wanted = need != null && (selling || !OFFER_NUDGES.contains(need));
-            return wanted ? new NeedsYou(card.id(), card.label(), need, status.deadline(), sides) : null;
-        }).filter(java.util.Objects::nonNull).toList();
+            Instant due = need == Need.CHECKING ? status.waitingSince() : status.deadline();
+            return wanted ? new NeedsYou(card.id(), card.label(), need, due, sides) : null;
+        }).filter(Objects::nonNull).toList();
     }
 
-    /** What a card in this state needs from its seller, or null. A sold card needs them until they say it shipped, or an arrival shows it did. */
+    /**
+     * What a card in this state needs from its seller, or null. A sold card needs them until they say it shipped, or an
+     * arrival shows it did; a card being identified, while the reader's suggestion or the search waits on their answer.
+     */
     static Need need(CardStatus status, boolean retake, Instant now) {
         return switch (status.stage()) {
             case SOLD -> status.deadline() == null ? null : Need.LABEL_READY;
@@ -130,11 +165,16 @@ class CardStatusService {
             case OFFERED -> status.deadline().isBefore(now.plus(EXPIRING_SOON)) ? Need.OFFER_EXPIRING : Need.OFFER_READY;
             case READY -> Need.GET_OFFER;
             case PHOTOS -> retake ? Need.RETAKE : null;
+            case IDENTIFYING -> status.sellersWord() ? Need.CONFIRM_CARD : null;
             default -> null;
         };
     }
 
     private CardStatus stage(UUID cardId) {
+        return stage(cardId, Instant.now());
+    }
+
+    private CardStatus stage(UUID cardId, Instant now) {
         CardItems.CardItemRef card = cardItems.get(cardId);
         if (card.lot()) {
             return new CardStatus(cardId, Stage.LOT, null, "Lots don't get offers: add the cards worth " + policy.minFmvText() + " or more one by one.", false);
@@ -149,7 +189,7 @@ class CardStatusService {
             return afterTheSale(cardId, offeredAs(listing.orElseThrow()), deal, listing.orElseThrow().getId());
         }
         if (listed == ListingStateMachine.Status.BACK && deal.held()) {
-            return new CardStatus(cardId, Stage.RETURNED, offeredAs(listing.orElseThrow()), ListingStateMachine.HELD + NO_NOTIFICATIONS, false);
+            return new CardStatus(cardId, Stage.RETURNED, offeredAs(listing.orElseThrow()), ListingStateMachine.HELD, false);
         }
         if (listed == ListingStateMachine.Status.OPEN) {
             return new CardStatus(cardId, Stage.LISTED, offeredAs(listing.orElseThrow()),
@@ -174,40 +214,95 @@ class CardStatusService {
             return new CardStatus(cardId, Stage.PHOTOS, identity, "Take the front and back photos. We review the card from them.", false);
         }
         UnvaluedReason reason = UnvaluedReason.of(in.unvaluedReason());
+        Instant photographed = photos.stream().map(CardItems.PhotoRef::uploadedAt).filter(Objects::nonNull)
+                .max(Comparator.naturalOrder()).orElse(null);
         if (in.identity() == null) {
+            if (identifyWaits.onCollector(cardId)) {
+                return new CardStatus(cardId, Stage.IDENTIFYING, null,
+                        "Tell us which card it is under “Which card is it?”. Then we check your answer against the photos, "
+                                + "and then its condition." + OFFER_EMAIL, false).withSellersWord(true);
+            }
             return new CardStatus(cardId, Stage.IDENTIFYING, null,
-                    "Confirm which card it is under “Which card is it?”. Once you have, we check your answer against the photos, then its condition." + NO_NOTIFICATIONS, false);
+                    "We're checking which card it is from your photos. It usually takes a few minutes, or up to a day if a "
+                            + "person needs to look." + OFFER_EMAIL, false).withWaitingSince(photographed);
         }
+        Instant identified = latest(photographed, catalog.current(cardId).map(Catalog.IdentifiedCard::identifiedSince).orElse(null));
         if (reason == UnvaluedReason.NO_ASSESSMENT) {
             if (preGradeFailures.failed(cardId)) {
                 // No provider name, error or credit status: the collector only needs to know a person will look.
                 return new CardStatus(cardId, Stage.ASSESSING, identity,
-                        "The automatic condition check didn't work for this card, so we'll check it by hand." + NO_NOTIFICATIONS, false);
+                        "The automatic condition check didn't work for this card, so we'll check it by hand, usually within a "
+                                + "day or two." + OFFER_EMAIL, false).withWaitingSince(identified);
             }
             return new CardStatus(cardId, Stage.ASSESSING, identity,
-                    "We're reviewing its condition from the photos." + NO_NOTIFICATIONS, false);
+                    "We're reviewing its condition from the photos. It usually takes a few minutes, or a day or two if a "
+                            + "person needs to look." + OFFER_EMAIL, false).withWaitingSince(identified);
         }
         if (reason == UnvaluedReason.PROVIDER_RETIRED) {
             return new CardStatus(cardId, Stage.ASSESSING, identity,
-                    "We changed how we check condition, so we're checking this card again." + NO_NOTIFICATIONS, false);
+                    "We changed how we check condition, so we're checking this card again." + OFFER_EMAIL, false)
+                    .withWaitingSince(identified);
         }
         if (reason == UnvaluedReason.PHOTOS_CHANGED) {
             return new CardStatus(cardId, Stage.ASSESSING, identity,
-                    "Your photos changed, so we're checking its condition again." + NO_NOTIFICATIONS, false);
+                    "Your photos changed, so we're checking its condition again." + OFFER_EMAIL, false).withWaitingSince(identified);
+        }
+        Instant pricingSince = latest(identified, assessments.assessedAt(cardId).orElse(null));
+        if (reason == UnvaluedReason.NO_PRICE_TABLE) {
+            if (gaveUpOnComps(pricingSince, now)) {
+                return new CardStatus(cardId, Stage.NO_OFFER, identity, GAVE_UP, false);
+            }
+            return new CardStatus(cardId, Stage.PRICING, identity, "We don't have enough sold prices for this card yet. " + compsWait()
+                    + OFFER_EMAIL, false).withWaitingSince(pricingSince);
         }
         if (reason != null) {
             return new CardStatus(cardId, Stage.PRICING, identity,
-                    "We're looking up recent sold prices for this card. If we don't have enough yet, a person adds them by hand, "
-                            + "which may take a while, and some cards won't get an offer. You're free to sell it elsewhere." + NO_NOTIFICATIONS, false);
+                    "We're looking up recent sold prices for this card, usually within minutes. Some cards won't get an offer. "
+                            + "You're free to sell it elsewhere." + OFFER_EMAIL, false).withWaitingSince(pricingSince);
         }
         if (quote.refused() == OfferRefusal.OVER_MAXIMUM) {
             // Not "no offer yet": no instant offer comes later for a card worth more than the limit.
-            return new CardStatus(cardId, Stage.OVER_LIMIT, identity, quote.refusal() + " You're free to sell it elsewhere.", false);
+            // Over the maximum: its FMV estimate and that it can be sold elsewhere; no manual offers (methodology Step 8,
+            // Zach, 2026-11-23).
+            return new CardStatus(cardId, Stage.OVER_LIMIT, identity, quote.refusal() + fmvEstimate(quote)
+                    + " You're free to sell it elsewhere.", false);
+        }
+        if (quote.refused() == OfferRefusal.THIN_SALES) {
+            return gaveUpOnComps(pricingSince, now) ? new CardStatus(cardId, Stage.NO_OFFER, identity, GAVE_UP, false)
+                    : new CardStatus(cardId, Stage.NO_OFFER, identity, quote.refusal() + " " + compsWait()
+                            + OFFER_EMAIL, false).withWaitingSince(pricingSince);
         }
         if (quote.refused() != null) {
             return new CardStatus(cardId, Stage.NO_OFFER, identity, quote.refusal() + nextStep(quote.refused()), false);
         }
         return new CardStatus(cardId, Stage.READY, identity, "Ready for an instant offer.", true);
+    }
+
+    private static final String GAVE_UP = "We couldn't find enough sold prices for this card within " + COMPS_GIVE_UP.toDays()
+            + " days, so it gets no offer. You're free to sell it elsewhere.";
+
+    /** The wait for sold prices we add by hand, in words: our target, and the point where we stop. */
+    private static String compsWait() {
+        return "We're adding more by hand, which we aim to do within " + COMPS_TARGET.toDays() + " days. If we can't "
+                + "find enough within " + COMPS_GIVE_UP.toDays() + " days, it gets no offer. You're free to sell it elsewhere meanwhile.";
+    }
+
+    /** True once a card has waited on sold prices added by hand for as long as we wait. An unknown start never gives up. */
+    /** " We estimate it's worth about $5,200.", from the card's FMV; empty when there's none. */
+    static String fmvEstimate(OfferService.Quote quote) {
+        if (quote.value() == null || quote.value().valuation() == null || quote.value().valuation().fmv() == null) {
+            return "";
+        }
+        long dollars = quote.value().valuation().fmv().setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+        return " We estimate it's worth about $" + String.format(java.util.Locale.US, "%,d", dollars) + " (fair market value).";
+    }
+
+    static boolean gaveUpOnComps(Instant since, Instant now) {
+        return since != null && !now.isBefore(since.plus(COMPS_GIVE_UP));
+    }
+
+    private static Instant latest(Instant... times) {
+        return Stream.of(times).filter(Objects::nonNull).max(Comparator.naturalOrder()).orElse(null);
     }
 
     /** The card as identified when the listing's offer was made. */
@@ -234,7 +329,6 @@ class CardStatusService {
 
     private String nextStep(OfferRefusal refused) {
         return switch (refused) {
-            case THIN_SALES -> " We add sold prices by hand, and it may qualify then." + NO_NOTIFICATIONS;
             case UNDER_MINIMUM -> " Instant offers are for cards worth " + policy.minFmvText() + " or more.";
             default -> "";
         };

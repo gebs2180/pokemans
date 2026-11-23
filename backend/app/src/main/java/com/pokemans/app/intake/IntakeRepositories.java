@@ -28,9 +28,10 @@ interface CardItemRepository extends JpaRepository<CardItem, UUID> {
 
     List<CardItem> findByBatchIdOrderByCreatedAtAsc(UUID batchId);
 
-    List<CardItem> findByCollectionIdOrderByCreatedAtAsc(UUID collectionId);
+    /** The collection's cards a collector still sees: not archived. */
+    List<CardItem> findByCollectionIdAndArchivedAtIsNullOrderByCreatedAtAsc(UUID collectionId);
 
-    List<CardItem> findByOrgIdAndCollectionIdNotNullOrderByCreatedAtAsc(UUID orgId);
+    List<CardItem> findByOrgIdAndCollectionIdNotNullAndArchivedAtIsNullOrderByCreatedAtAsc(UUID orgId);
 
     Optional<CardItem> findByIdAndOrgId(UUID id, UUID orgId);
 
@@ -43,13 +44,14 @@ interface CardItemRepository extends JpaRepository<CardItem, UUID> {
 
     long countByBatchId(UUID batchId);
 
-    long countByCollectionId(UUID collectionId);
+    long countByCollectionIdAndArchivedAtIsNull(UUID collectionId);
 
     /** Cards with a passing front, and a passing back unless they are a lot. */
     @Query(nativeQuery = true, value = """
             select c.* from card_item c
             where exists (select 1 from photo p where p.card_item_id = c.id and p.side = 'FRONT' and p.status = 'PASSED')
               and (c.is_lot or exists (select 1 from photo p where p.card_item_id = c.id and p.side = 'BACK' and p.status = 'PASSED'))
+              and c.archived_at is null
             order by c.created_at""")
     List<CardItem> findCaptureComplete();
 
@@ -60,6 +62,7 @@ interface CardItemRepository extends JpaRepository<CardItem, UUID> {
               and (c.is_lot or exists (select 1 from photo p where p.card_item_id = c.id and p.side = 'BACK' and p.status = 'PASSED'))
               and (select max(p.checked_at) from photo p where p.card_item_id = c.id and p.status = 'PASSED') >= :since
               and (select max(p.checked_at) from photo p where p.card_item_id = c.id and p.status = 'PASSED') < :before
+              and c.archived_at is null
             order by c.created_at""")
     List<CardItem> findCaptureCompletedBetween(Instant since, Instant before);
 }

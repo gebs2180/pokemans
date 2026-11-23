@@ -7,6 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.pokemans.app.catalog.Catalog;
+import com.pokemans.app.catalog.IdentifyWaits;
 import com.pokemans.app.condition.Assessments;
 import com.pokemans.app.condition.PreGradeFailures;
 import com.pokemans.app.intake.CardItems;
@@ -15,6 +17,7 @@ import com.pokemans.app.offers.CardStatusService.Need;
 import com.pokemans.app.offers.CardStatusService.Stage;
 import com.pokemans.app.valuation.CardInputs;
 import com.pokemans.app.valuation.Valuations;
+import com.pokemans.valuation.CardValuation;
 import com.pokemans.valuation.ParameterSet;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -91,7 +94,8 @@ class CardStatusServiceTest {
         CardItems cardItems = mock(CardItems.class);
         CardStatusService service = new CardStatusService(mock(OfferService.class), mock(SaleListingRepository.class),
                 mock(ListingEventRepository.class), cardItems, mock(CardOfferVoidRepository.class), mock(Assessments.class),
-                mock(Shipping.class), POLICY, mock(PreGradeFailures.class));
+                mock(Shipping.class), POLICY, mock(PreGradeFailures.class),
+                mock(IdentifyWaits.class), mock(Catalog.class));
         UUID lot = UUID.randomUUID();
         when(cardItems.get(lot)).thenReturn(new CardItems.CardItemRef(lot, UUID.randomUUID(), "Binder", true, 40, NOW));
 
@@ -106,16 +110,22 @@ class CardStatusServiceTest {
 
     /** An identified card with front and back photos, valued or not, and the offer flow's answer for it. */
     private static CardStatus identified(String unvaluedReason, OfferRefusal refused, String refusal, boolean preGradeFailed) {
+        return identified(unvaluedReason, refused, refusal, preGradeFailed, Instant.now());
+    }
+
+    private static CardStatus identified(String unvaluedReason, OfferRefusal refused, String refusal, boolean preGradeFailed,
+                                         Instant photographed) {
         OfferService offers = mock(OfferService.class);
         CardItems cardItems = mock(CardItems.class);
         PreGradeFailures failures = mock(PreGradeFailures.class);
         CardStatusService service = new CardStatusService(offers, mock(SaleListingRepository.class), mock(ListingEventRepository.class),
-                cardItems, mock(CardOfferVoidRepository.class), mock(Assessments.class), mock(Shipping.class), POLICY, failures);
+                cardItems, mock(CardOfferVoidRepository.class), mock(Assessments.class), mock(Shipping.class), POLICY, failures,
+                mock(IdentifyWaits.class), mock(Catalog.class));
         UUID card = UUID.randomUUID();
         when(cardItems.get(card)).thenReturn(new CardItems.CardItemRef(card, UUID.randomUUID(), "Umbreon", false, 1, NOW));
         when(cardItems.passedPhotos(card)).thenReturn(List.of(
-                new CardItems.PhotoRef(UUID.randomUUID(), card, "FRONT", "k1", "image/jpeg", null, NOW, NOW, "a", null),
-                new CardItems.PhotoRef(UUID.randomUUID(), card, "BACK", "k2", "image/jpeg", null, NOW, NOW, "b", null)));
+                new CardItems.PhotoRef(UUID.randomUUID(), card, "FRONT", "k1", "image/jpeg", null, photographed, photographed, "a", null),
+                new CardItems.PhotoRef(UUID.randomUUID(), card, "BACK", "k2", "image/jpeg", null, photographed, photographed, "b", null)));
         CardInputs.Identity umbreon = new CardInputs.Identity(UUID.randomUUID(), "Umbreon", "Evolving Skies", "215", "en", null,
                 "UNLIMITED", "NORMAL", false, null, List.of());
         CardInputs inputs = mock(CardInputs.class);
@@ -132,7 +142,7 @@ class CardStatusServiceTest {
     void aCardWhosePreGradeFailedSaysSoPlainlyWithoutProviderDetail() {
         CardStatus status = unassessed(true);
         assertThat(status.stage()).isEqualTo(Stage.ASSESSING);
-        assertThat(status.nextStep()).startsWith("The automatic condition check didn't work for this card, so we'll check it by hand.")
+        assertThat(status.nextStep()).startsWith("The automatic condition check didn't work for this card, so we'll check it by hand, usually within a day or two.")
                 .doesNotContainIgnoringCase("cardgrade").doesNotContainIgnoringCase("credit");
     }
 
@@ -149,6 +159,19 @@ class CardStatusServiceTest {
         assertThat(identified(null, OfferRefusal.THIN_SALES, "There isn't enough sales data.", false).stage()).isEqualTo(Stage.NO_OFFER);
     }
 
+    /** Methodology Step 8 (Zach, 2026-11-23): a card over the maximum shows its FMV estimate; no manual offers. */
+    @Test
+    void aCardOverTheLimitShowsItsFmvEstimate() {
+        Valuations.CurrentValue value = mock(Valuations.CurrentValue.class);
+        CardValuation valuation = mock(CardValuation.class);
+        when(value.valuation()).thenReturn(valuation);
+        when(valuation.fmv()).thenReturn(new BigDecimal("6249.50"));
+        assertThat(CardStatusService.fmvEstimate(new OfferService.Quote(value, OfferRefusal.OVER_MAXIMUM, "Over.")))
+                .isEqualTo(" We estimate it's worth about $6,250 (fair market value).");
+        assertThat(CardStatusService.fmvEstimate(new OfferService.Quote(mock(Valuations.CurrentValue.class), OfferRefusal.OVER_MAXIMUM, "Over.")))
+                .isEmpty();
+    }
+
     @Test
     void aCardStillWaitingForItsPreGradeKeepsTheUsualText() {
         assertThat(unassessed(false).nextStep()).startsWith("We're reviewing its condition from the photos.");
@@ -156,9 +179,90 @@ class CardStatusServiceTest {
 
     @Test
     void theNotificationNoteIsTrueNow() {
-        String note = unassessed(false).nextStep();
-        assertThat(note).doesNotContain("don't send notifications")
-                .contains("not when a card's condition or offer is ready, so check back here for those.");
+        // Review finding 1: we now email when the offer is ready (OfferReadyEmails).
+        assertThat(unassessed(false).nextStep()).endsWith(CardStatusService.OFFER_EMAIL).doesNotContain("check back here");
+    }
+
+    @Test
+    void aCardWaitingOnUsSaysSinceWhen() {
+        Instant photographed = Instant.now().minus(Duration.ofHours(3));
+        CardStatus status = identified("no condition assessment", OfferRefusal.NOT_ASSESSED, "Not assessed.", false, photographed);
+        assertThat(status.waitingSince()).isEqualTo(photographed);
+        assertThat(status.nextStep()).contains("usually takes a few minutes");
+    }
+
+    /** Methodology Step 8 (Zach, 2026-11-23): comps added by hand have a 3-day target, and no offer after 14 days. */
+    @Test
+    void aCardWaitingOnlyOnCompsSaysTheTargetThenGetsNoOfferAfterTwoWeeks() {
+        Instant recent = Instant.now().minus(Duration.ofDays(2));
+        CardStatus waiting = identified("no PSA price table", null, null, false, recent);
+        assertThat(waiting.stage()).isEqualTo(Stage.PRICING);
+        assertThat(waiting.waitingSince()).isEqualTo(recent);
+        assertThat(waiting.nextStep()).contains("within 3 days").contains("within 14 days, it gets no offer");
+
+        CardStatus gaveUp = identified("no PSA price table", null, null, false, Instant.now().minus(Duration.ofDays(15)));
+        assertThat(gaveUp.stage()).isEqualTo(Stage.NO_OFFER);
+        assertThat(gaveUp.waitingSince()).isNull();
+        assertThat(gaveUp.nextStep()).startsWith("We couldn't find enough sold prices").endsWith("You're free to sell it elsewhere.");
+
+        CardStatus thin = identified(null, OfferRefusal.THIN_SALES, "There isn't enough sales data.", false, recent);
+        assertThat(thin.stage()).isEqualTo(Stage.NO_OFFER);
+        assertThat(thin.nextStep()).startsWith("There isn't enough sales data. We're adding more by hand");
+        assertThat(identified(null, OfferRefusal.THIN_SALES, "There isn't enough sales data.", false,
+                Instant.now().minus(Duration.ofDays(15))).nextStep()).startsWith("We couldn't find enough sold prices");
+    }
+
+    @Test
+    void comps14DaysIsTheEdge() {
+        assertThat(CardStatusService.gaveUpOnComps(NOW.minus(Duration.ofDays(14)), NOW)).isTrue();
+        assertThat(CardStatusService.gaveUpOnComps(NOW.minus(Duration.ofDays(14)).plusSeconds(1), NOW)).isFalse();
+        assertThat(CardStatusService.gaveUpOnComps(null, NOW)).isFalse();
+    }
+
+    /** Review finding 2: Home lists a card whose identity waits on the collector's answer. */
+    @Test
+    void aCardWaitingOnTheCollectorsAnswerNeedsThem() {
+        CardStatus waiting = new CardStatus(UUID.randomUUID(), Stage.IDENTIFYING, null, "", false);
+        assertThat(CardStatusService.need(waiting.withSellersWord(true), false, NOW)).isEqualTo(Need.CONFIRM_CARD);
+        assertThat(CardStatusService.need(waiting, false, NOW)).isNull();
+    }
+
+    @Test
+    void anUnidentifiedCardSaysWhoseTurnItIs() {
+        OfferService offers = mock(OfferService.class);
+        CardItems cardItems = mock(CardItems.class);
+        IdentifyWaits waits = mock(IdentifyWaits.class);
+        CardStatusService service = new CardStatusService(offers, mock(SaleListingRepository.class), mock(ListingEventRepository.class),
+                cardItems, mock(CardOfferVoidRepository.class), mock(Assessments.class), mock(Shipping.class), POLICY,
+                mock(PreGradeFailures.class), waits, mock(Catalog.class));
+        UUID card = UUID.randomUUID();
+        UUID org = UUID.randomUUID();
+        when(cardItems.get(card)).thenReturn(new CardItems.CardItemRef(card, org, "New card", false, 1, NOW));
+        when(cardItems.inCollectionsOf(org)).thenReturn(List.of(new CardItems.CardItemRef(card, org, "New card", false, 1, NOW)));
+        when(cardItems.passedPhotos(card)).thenReturn(List.of(
+                new CardItems.PhotoRef(UUID.randomUUID(), card, "FRONT", "k1", "image/jpeg", null, NOW, NOW, "a", null),
+                new CardItems.PhotoRef(UUID.randomUUID(), card, "BACK", "k2", "image/jpeg", null, NOW, NOW, "b", null)));
+        CardInputs inputs = mock(CardInputs.class);
+        when(inputs.unvaluedReason()).thenReturn("not identified");
+        Valuations.CurrentValue value = mock(Valuations.CurrentValue.class);
+        when(value.inputs()).thenReturn(inputs);
+        when(offers.quote(card)).thenReturn(new OfferService.Quote(value, OfferRefusal.NOT_ASSESSED, "Not identified."));
+
+        when(waits.onCollector(card)).thenReturn(true);
+        CardStatus yours = service.status(card);
+        assertThat(yours.stage()).isEqualTo(Stage.IDENTIFYING);
+        assertThat(yours.sellersWord()).isTrue();
+        assertThat(yours.nextStep()).startsWith("Tell us which card it is");
+        assertThat(service.needsYou(org, true)).extracting(CardStatusService.NeedsYou::need).containsExactly(Need.CONFIRM_CARD);
+
+        when(waits.onCollector(card)).thenReturn(false);
+        CardStatus ours = service.status(card);
+        assertThat(ours.sellersWord()).isFalse();
+        assertThat(ours.waitingSince()).isEqualTo(NOW);
+        assertThat(service.needsYou(org, false)).singleElement().satisfies(n -> {
+            assertThat(n.need()).isEqualTo(Need.CHECKING);
+            assertThat(n.due()).isEqualTo(NOW);
+        });
     }
 
     @Test
@@ -169,7 +273,8 @@ class CardStatusServiceTest {
         SaleListingRepository listings = mock(SaleListingRepository.class);
         CardItems cardItems = mock(CardItems.class);
         CardStatusService service = new CardStatusService(offers, listings, mock(ListingEventRepository.class), cardItems,
-                mock(CardOfferVoidRepository.class), mock(Assessments.class), mock(Shipping.class), POLICY, mock(PreGradeFailures.class));
+                mock(CardOfferVoidRepository.class), mock(Assessments.class), mock(Shipping.class), POLICY, mock(PreGradeFailures.class),
+                mock(IdentifyWaits.class), mock(Catalog.class));
         CardInputs.Identity umbreon = new CardInputs.Identity(UUID.randomUUID(), "Umbreon", "Evolving Skies", "215", "en", null,
                 "UNLIMITED", "NORMAL", false, null, List.of());
 
