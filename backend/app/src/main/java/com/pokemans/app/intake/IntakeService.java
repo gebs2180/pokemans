@@ -111,7 +111,7 @@ class IntakeService {
     List<ContainerSummary> listCollections(UUID orgId) {
         access.require(orgId, COLLECTION_ORGS);
         return collections.findByOrgIdOrderByCreatedAtDesc(orgId).stream()
-                .map(c -> new ContainerSummary(c.getId(), c.getName(), c.getCreatedAt(), cards.countByCollectionId(c.getId())))
+                .map(c -> new ContainerSummary(c.getId(), c.getName(), c.getCreatedAt(), cards.countByCollectionIdAndArchivedAtIsNull(c.getId())))
                 .toList();
     }
 
@@ -120,7 +120,7 @@ class IntakeService {
         access.require(orgId, COLLECTION_ORGS);
         CardCollection collection = collections.findByIdAndOrgId(collectionId, orgId).orElseThrow(() -> notFound("Collection"));
         return new ContainerDetail(collection.getId(), collection.getName(), collection.getCreatedAt(),
-                cardViews(cards.findByCollectionIdOrderByCreatedAtAsc(collectionId)));
+                cardViews(cards.findByCollectionIdAndArchivedAtIsNullOrderByCreatedAtAsc(collectionId)));
     }
 
     @Transactional

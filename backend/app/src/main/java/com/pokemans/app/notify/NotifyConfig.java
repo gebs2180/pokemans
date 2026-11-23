@@ -38,10 +38,24 @@ class NotifyConfig {
 
         private final EmailSender sender;
         private final ListingDigest digest;
+        private final OfferReadyEmails offerReady;
 
-        Jobs(EmailSender sender, ListingDigest digest) {
+        Jobs(EmailSender sender, ListingDigest digest, OfferReadyEmails offerReady) {
             this.sender = sender;
             this.digest = digest;
+            this.offerReady = offerReady;
+        }
+
+        @Scheduled(fixedDelayString = "${pokemans.notify.email.offer-ready-interval:5m}", initialDelayString = "1m")
+        void offerReady() {
+            try {
+                int queued = offerReady.run(Instant.now());
+                if (queued > 0) {
+                    log.info("Queued {} offer-ready email(s)", queued);
+                }
+            } catch (RuntimeException e) {
+                log.error("Offer-ready pass failed", e);
+            }
         }
 
         @Scheduled(fixedDelayString = "${pokemans.notify.email.poll-interval:20s}", initialDelayString = "${pokemans.notify.email.poll-interval:20s}")

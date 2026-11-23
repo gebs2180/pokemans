@@ -77,21 +77,10 @@ class IdentifyService {
         if (item.lot()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lots aren't identified card by card");
         }
-        boolean identified = identifications.findByCardItemIdOrderByCreatedAtDesc(cardId).stream()
-                .anyMatch(i -> i.getStatus() == CardIdentification.Status.CONFIRMED);
         Optional<IdentityProposal> proposal = proposals.findFirstByCardItemIdOrderByCreatedAtDesc(cardId);
-        List<CardItems.PhotoRef> photos = cardItems.passedPhotos(cardId);
-        boolean captureComplete = photos.stream().anyMatch(p -> "FRONT".equals(p.side()))
-                && photos.stream().anyMatch(p -> "BACK".equals(p.side()));
-        Instant capturedAt = photos.stream().map(CardItems.PhotoRef::uploadedAt).filter(t -> t != null)
-                .max(Comparator.naturalOrder()).orElse(null);
         Optional<CardReading> reading = recognition.latestReading(cardId);
         List<CardIdentification> suggested = reading.map(r -> recognition.suggestions(r.getId())).orElse(List.of());
-        IdentifyPolicy.ReadingState state = reading.map(r -> new IdentifyPolicy.ReadingState(r.getStatus(), r.getCreatedAt(),
-                r.getFinishedAt(), r.getStatus() == CardReading.Status.DONE && r.getLastError() != null, suggested.size()))
-                .orElse(null);
-        IdentifyPolicy.Decision decision = IdentifyPolicy.decide(identified, proposal.isPresent() && !again, captureComplete, capturedAt,
-                recognition.enabled(), provider.isPresent(), state, Instant.now());
+        IdentifyPolicy.Decision decision = decide(cardId, proposal.isPresent() && !again, reading, suggested);
 
         String readQuery = null;
         String readLanguage = null;
@@ -105,6 +94,32 @@ class IdentifyService {
         List<SuggestedCard> suggestions = decision.step() == IdentifyPolicy.Step.SUGGEST ? suggestions(suggested) : List.of();
         return new IdentifyView(decision.step(), decision.why(), reading.map(CardReading::getId).orElse(null), readQuery,
                 readLanguage, suggestions, proposal.map(CatalogController::view).orElse(null));
+    }
+
+    /**
+     * Where identifying the card stands, without fetching the suggestions' details: for the home page, which only needs
+     * to know whether the collector's answer is awaited. No access check.
+     */
+    IdentifyPolicy.Step step(UUID cardId) {
+        Optional<CardReading> reading = recognition.latestReading(cardId);
+        List<CardIdentification> suggested = reading.map(r -> recognition.suggestions(r.getId())).orElse(List.of());
+        boolean proposed = proposals.findFirstByCardItemIdOrderByCreatedAtDesc(cardId).isPresent();
+        return decide(cardId, proposed, reading, suggested).step();
+    }
+
+    private IdentifyPolicy.Decision decide(UUID cardId, boolean proposed, Optional<CardReading> reading, List<CardIdentification> suggested) {
+        boolean identified = identifications.findByCardItemIdOrderByCreatedAtDesc(cardId).stream()
+                .anyMatch(i -> i.getStatus() == CardIdentification.Status.CONFIRMED);
+        List<CardItems.PhotoRef> photos = cardItems.passedPhotos(cardId);
+        boolean captureComplete = photos.stream().anyMatch(p -> "FRONT".equals(p.side()))
+                && photos.stream().anyMatch(p -> "BACK".equals(p.side()));
+        Instant capturedAt = photos.stream().map(CardItems.PhotoRef::uploadedAt).filter(t -> t != null)
+                .max(Comparator.naturalOrder()).orElse(null);
+        IdentifyPolicy.ReadingState state = reading.map(r -> new IdentifyPolicy.ReadingState(r.getStatus(), r.getCreatedAt(),
+                r.getFinishedAt(), r.getStatus() == CardReading.Status.DONE && r.getLastError() != null, suggested.size()))
+                .orElse(null);
+        return IdentifyPolicy.decide(identified, proposed, captureComplete, capturedAt, recognition.enabled(), provider.isPresent(),
+                state, Instant.now());
     }
 
     /** One per catalog card, best first: the reader may suggest two prints of the same card. */

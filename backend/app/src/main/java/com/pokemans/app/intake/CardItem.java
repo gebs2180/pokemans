@@ -35,6 +35,8 @@ class CardItem extends AssignedIdEntity<UUID> {
     private int quantity;
     private UUID createdBy;
     private Instant createdAt;
+    private Instant archivedAt;
+    private UUID archivedBy;
 
     protected CardItem() {
     }
@@ -62,6 +64,10 @@ class CardItem extends AssignedIdEntity<UUID> {
     @Override
     public UUID getId() {
         return id;
+    }
+
+    UUID getCreatedBy() {
+        return createdBy;
     }
 
     UUID getOrgId() {
@@ -99,5 +105,15 @@ class CardItem extends AssignedIdEntity<UUID> {
 
     Instant getCreatedAt() {
         return createdAt;
+    }
+
+    boolean isArchived() {
+        return archivedAt != null;
+    }
+
+    /** Takes the card off its collector's list. Its photos and predictions stay. */
+    void archive(UUID by) {
+        this.archivedAt = Instant.now();
+        this.archivedBy = by;
     }
 }

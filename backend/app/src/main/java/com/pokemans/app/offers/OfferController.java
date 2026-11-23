@@ -101,9 +101,11 @@ class OfferController {
     private final CardStatusService statuses;
     private final Buying buying;
     private final BuyerSignup signup;
+    private final CardArchive archive;
 
     OfferController(OfferService offers, ListingService listings, DealService deals, ListingViews views, Shipping shipping, OrgAccess access, CardItems cardItems,
-                    Consents consents, CardStatusService statuses, Buying buying, BuyerSignup signup) {
+                    Consents consents, CardStatusService statuses, Buying buying, BuyerSignup signup, CardArchive archive) {
+        this.archive = archive;
         this.offers = offers;
         this.listings = listings;
         this.deals = deals;
@@ -182,6 +184,17 @@ class OfferController {
     @GetMapping("/api/orgs/{orgId}/needs-you")
     List<CardStatusService.NeedsYou> needsYou(@PathVariable UUID orgId) {
         return statuses.needsYou(orgId, access.require(orgId, SELLER_ORGS).getType() == OrgType.COLLECTOR);
+    }
+
+    /**
+     * Takes the card off the collector's list, keeping its photos (review finding 10). 409 once it has a live offer
+     * or has been posted.
+     */
+    @PostMapping("/api/orgs/{orgId}/cards/{cardId}/archive")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void archive(@PathVariable UUID orgId, @PathVariable UUID cardId) {
+        requireSellerCard(orgId, cardId);
+        archive.archive(cardId);
     }
 
     /** Prices the card now. 409 with the reason when it gets no offer. */
