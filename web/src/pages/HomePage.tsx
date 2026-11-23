@@ -3,6 +3,7 @@ import { ORG_TYPE_LABEL, useApi, type Me } from '../api'
 import { EmptyState, Loading, PageError } from '../ui'
 import { useLoad } from '../useLoad'
 import { soleOrg } from '../useOrg'
+import { HomeBuying } from './BuyingLinks'
 import { NeedsYou } from './NeedsYou'
 import { OrgHome } from './OrgPage'
 
@@ -16,13 +17,22 @@ export function HomePage() {
   const needs = <NeedsYou orgs={me.memberships.filter((m) => m.orgType === 'COLLECTOR' || m.orgType === 'CONTRIBUTOR')} />
   // Most people have one org and no reason to see the word: home is their org.
   const sole = soleOrg(me)
-  if (sole) return <OrgHome orgId={sole.orgId} title="Your cards" lead={needs} />
+  if (sole) {
+    const lead = (
+      <>
+        {needs}
+        {sole.orgType !== 'BUYER' && <HomeBuying me={me} soleSeller />}
+      </>
+    )
+    return <OrgHome orgId={sole.orgId} title="Your cards" lead={lead} />
+  }
 
   const admin = me.roles.includes('ADMIN')
   return (
     <>
       <h1>Your cards</h1>
       {needs}
+      <HomeBuying me={me} soleSeller={false} />
       {me.memberships.length === 0 && !admin && (
         <EmptyState title="You're not set up yet.">Ask for an invite link and open it while signed in.</EmptyState>
       )}

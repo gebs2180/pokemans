@@ -3,7 +3,6 @@ package com.pokemans.app.offers;
 import static com.pokemans.app.offers.ListingStateMachine.progress;
 import static com.pokemans.app.offers.ListingStateMachine.status;
 
-import com.pokemans.app.identity.Directory;
 import com.pokemans.app.intake.CardItems;
 import com.pokemans.app.offers.ListingStateMachine.DealStage;
 import com.pokemans.app.offers.ListingStateMachine.Progress;
@@ -90,7 +89,8 @@ class ListingViews {
     enum LessSure { PHOTOS, FEW_SALES, OLD_SALES, ESTIMATED_GRADES, HIGH_VALUE }
 
     /**
-     * The other side of a deal as a buyer or seller sees it: the org's name and nothing else. Their email is never shown to
+     * The other side of a deal as a buyer or seller sees it. A seller sees "a buyer": the name is null, because only the admin
+     * sees who bought (Zach, 2026-11-23). A buyer still sees the seller's org name. Their email is never shown to
      * the other side (Zach, 2026-11-12); payment goes to the seller's payment handle, shipping through the prepaid label,
      * and problems to us. Admin views use {@link AdminParty}, which is the only type with an email.
      */
@@ -174,16 +174,14 @@ class ListingViews {
 
     private final CardOfferVoidRepository voids;
     private final OffersProperties properties;
-    private final Directory directory;
     private final Shipping shipping;
     private final BlobStore blobs;
     private final StorageProperties storage;
 
-    ListingViews(CardOfferVoidRepository voids, OffersProperties properties, Directory directory, Shipping shipping, BlobStore blobs,
+    ListingViews(CardOfferVoidRepository voids, OffersProperties properties, Shipping shipping, BlobStore blobs,
                  StorageProperties storage) {
         this.voids = voids;
         this.properties = properties;
-        this.directory = directory;
         this.shipping = shipping;
         this.blobs = blobs;
         this.storage = storage;
@@ -195,11 +193,8 @@ class ListingViews {
                 .filter(e -> e.getType() == ListingEvent.Type.ACCEPTED || e.getType() == ListingEvent.Type.WITHDRAWN
                         || e.getType() == ListingEvent.Type.VOIDED)
                 .findFirst().orElse(null);
-        Party buyer = null;
-        if (closed != null && closed.getType() == ListingEvent.Type.ACCEPTED) {
-            Directory.Contact c = directory.contact(closed.getActorOrgId(), closed.getActorUserId());
-            buyer = new Party(c.orgName());
-        }
+        // Sellers see "a buyer", never the buyer's name; only the admin sees who bought (Zach, 2026-11-23).
+        Party buyer = closed != null && closed.getType() == ListingEvent.Type.ACCEPTED ? new Party(null) : null;
         UndoView undone = status == Status.CANCELLED ? undone(history, ListingEvent.Type.CANCELLED)
                 : status == Status.VOIDED ? undone(history, ListingEvent.Type.VOIDED) : null;
         Progress progress = progress(history);

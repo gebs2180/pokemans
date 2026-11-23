@@ -140,6 +140,26 @@ describe('Home', () => {
     expect(await screen.findByText("You're not set up yet.")).toBeInTheDocument()
   })
 
+  it('offers Start buying only while buying has not been started', async () => {
+    const buying = (status: string) => ({ status, orgId: null, orgName: null, appliedAt: null, decidedAt: null, note: null, terms: { version: 'v', text: 't', sha256: 's' } })
+    stub({ ...seller(), '/api/me/buying': buying('NOT_STARTED') })
+    page('/')
+    expect(await screen.findByRole('link', { name: /Start buying/ })).toHaveAttribute('href', '/account')
+  })
+
+  it('shows no Start buying link once they asked to buy', async () => {
+    const buying = { status: 'WAITING', orgId: 'b1', orgName: 'Sam buys', appliedAt: null, decidedAt: null, note: null, terms: { version: 'v', text: 't', sha256: 's' } }
+    stub({ ...seller(), '/api/me': me('COLLECTOR', { memberships: [
+      { orgId: 'org1', orgName: 'Sam Test', orgType: 'COLLECTOR', role: 'COLLECTOR' },
+      { orgId: 'b1', orgName: 'Sam buys', orgType: 'BUYER', role: 'BUYER' },
+    ] }), '/api/me/buying': buying })
+    page('/')
+    // Home is still the seller's cards, with a Buying section beside them.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your cards' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Buying' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Start buying/ })).not.toBeInTheDocument()
+  })
+
   it('sends someone with one org from its page to home', async () => {
     stub(seller())
     page('/orgs/org1')

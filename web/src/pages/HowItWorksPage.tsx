@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router'
 import { useApi, type Me, type OrgType } from '../api'
 import { CONTACT } from '../contact'
 import { useLoad } from '../useLoad'
+import { StartBuyingLink } from './BuyingLinks'
 import { days, dollars, usePolicy } from '../policy'
 
 const TERMS_LABEL: Partial<Record<OrgType, string>> = { COLLECTOR: 'seller terms', CONTRIBUTOR: 'contributor terms', BUYER: 'buyer terms' }
@@ -80,6 +81,7 @@ function Buying() {
   return (
     <section>
       <h2>Buying a card</h2>
+      <StartBuyingLink />
       <ul>
         <li>
           <strong>Cards for sale</strong> shows the photos each price was based on. The first buyer to accept gets the card at that price.
@@ -131,8 +133,8 @@ function WrongAndWho() {
       <section id="email">
         <h2>Where your email goes</h2>
         <p>
-          Auth0 holds it for logging in, and Resend sends the emails Rawmark sends you. The other side of a deal never sees it: buyer and
-          seller see each other's name only. Payment goes through the seller's payment handle, shipping through the prepaid label, and
+          Auth0 holds it for logging in, and Resend sends the emails Rawmark sends you. The other side of a deal never sees it: a seller
+          never sees who bought, only “a buyer”, and the buyer sees the seller's name. Payment goes through the seller's payment handle, shipping through the prepaid label, and
           anything else through us. We never sell it.
         </p>
       </section>
