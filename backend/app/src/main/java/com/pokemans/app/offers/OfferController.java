@@ -1,5 +1,6 @@
 package com.pokemans.app.offers;
 
+import com.pokemans.app.identity.Buying;
 import com.pokemans.app.identity.Consents;
 import com.pokemans.app.identity.OrgAccess;
 import com.pokemans.app.identity.OrgType;
@@ -62,6 +63,16 @@ class OfferController {
                        String country, String phone, PaymentHandle.Method paymentMethod, String paymentHandle, Instant recordedAt) {
     }
 
+    /**
+     * Turning buying on from a login that sells.
+     *
+     * @param name    what the buyer account is called; sellers never see it
+     * @param version the buyer terms version the person read and accepts
+     * @param shipTo  where bought cards ship to (no payment handle: buyers pay sellers directly)
+     */
+    record StartBuyingBody(@NotBlank @Size(max = 200) String name, @NotBlank String version, @NotNull @Valid AddressBody shipTo) {
+    }
+
     record ReceivedBody(@Size(max = 2000) String note) {
     }
 
@@ -88,9 +99,11 @@ class OfferController {
     private final CardItems cardItems;
     private final Consents consents;
     private final CardStatusService statuses;
+    private final Buying buying;
+    private final BuyerSignup signup;
 
     OfferController(OfferService offers, ListingService listings, DealService deals, ListingViews views, Shipping shipping, OrgAccess access, CardItems cardItems,
-                    Consents consents, CardStatusService statuses) {
+                    Consents consents, CardStatusService statuses, Buying buying, BuyerSignup signup) {
         this.offers = offers;
         this.listings = listings;
         this.deals = deals;
@@ -100,6 +113,8 @@ class OfferController {
         this.cardItems = cardItems;
         this.consents = consents;
         this.statuses = statuses;
+        this.buying = buying;
+        this.signup = signup;
     }
 
     // Addresses: where a seller ships from, or a buyer ships to.
@@ -114,9 +129,23 @@ class OfferController {
     @ResponseStatus(HttpStatus.CREATED)
     AddressView recordAddress(@PathVariable UUID orgId, @Valid @RequestBody AddressBody body) {
         boolean seller = access.require(orgId, SHIPPING_ORGS).getType() != OrgType.BUYER;
-        return view(shipping.record(orgId, new ShippingProvider.Address(body.name().strip(), blankToNull(body.company()),
-                body.street1().strip(), blankToNull(body.street2()), body.city().strip(), body.state(), body.zip(), "US",
-                blankToNull(body.phone())), seller ? payment(body) : null));
+        return view(shipping.record(orgId, address(body), seller ? payment(body) : null));
+    }
+
+    private static ShippingProvider.Address address(AddressBody body) {
+        return new ShippingProvider.Address(body.name().strip(), blankToNull(body.company()), body.street1().strip(),
+                blankToNull(body.street2()), body.city().strip(), body.state(), body.zip(), "US", blankToNull(body.phone()));
+    }
+
+    /**
+     * "Start buying" from a login that sells (Zach, 2026-11-22): opens the person's buyer org with the buyer terms
+     * accepted and the ship-to address on file, and puts it in the admin's approval queue. Where it stands is
+     * {@code GET /api/me/buying}.
+     */
+    @PostMapping("/api/me/buying")
+    @ResponseStatus(HttpStatus.CREATED)
+    Buying.State startBuying(@Valid @RequestBody StartBuyingBody body) {
+        return signup.start(body.name(), body.version(), address(body.shipTo()));
     }
 
     private static PaymentHandle payment(AddressBody body) {
@@ -216,7 +245,7 @@ class OfferController {
     @GetMapping("/api/orgs/{orgId}/market")
     List<ListingViews.MarketItem> market(@PathVariable UUID orgId) {
         requireBuyer(orgId);
-        return listings.market();
+        return listings.market(orgId);
     }
 
     /** What the label would cost, shown in the confirm step before accepting (UX review finding 8). Buys nothing. */
@@ -290,6 +319,7 @@ class OfferController {
     private void requireBuyer(UUID orgId) {
         access.require(orgId, OrgType.BUYER);
         consents.requireAccepted(orgId);
+        buying.requireApproved(orgId);
     }
 
     private static AddressView view(ShipAddress a) {

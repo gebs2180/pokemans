@@ -297,6 +297,21 @@ class EmailOutboxTest {
         assertThat(digests(buyer)).hasSize(1);
     }
 
+    @Test
+    void aBuyerWaitingForApprovalGetsNoDigestUntilApproved() throws Exception {
+        Buyer waiting = market.startBuying(market.seller());
+        market.posted(market.seller(), "Waiting Squirtle");
+        Instant now = Instant.now();
+
+        digest.run(now);
+        assertThat(digests(waiting)).isEmpty();
+
+        market.approve(waiting);
+        digest.run(now);
+        assertThat(digests(waiting)).singleElement()
+                .satisfies(r -> assertThat((String) r.get("text_body")).contains("Waiting Squirtle"));
+    }
+
     private List<Map<String, Object>> digests(Buyer buyer) {
         return jdbc.queryForList("select * from email_message where template = 'NEW_LISTINGS' and org_id = ?::uuid", buyer.orgId());
     }

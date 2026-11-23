@@ -1,6 +1,7 @@
 import { useAuth0 } from '@auth0/auth0-react'
 import { lazy, Suspense } from 'react'
 import { Link, Route, Routes, useLocation } from 'react-router'
+import { AccountPage } from './pages/AccountPage'
 import { CardPage } from './pages/CardPage'
 import { ContainerPage } from './pages/ContainerPage'
 import { HomePage } from './pages/HomePage'
@@ -20,6 +21,7 @@ const AdminDealOutcomesPage = lazy(() => import('./pages/AdminDealOutcomesPage')
 const AdminOffersPage = lazy(() => import('./pages/AdminOffersPage').then((m) => ({ default: m.AdminOffersPage })))
 const OfferTrackRecordPage = lazy(() => import('./pages/OfferTrackRecordPage').then((m) => ({ default: m.OfferTrackRecordPage })))
 const AdminLabelsPage = lazy(() => import('./pages/AdminLabelsPage').then((m) => ({ default: m.AdminLabelsPage })))
+const AdminBuyersPage = lazy(() => import('./pages/AdminBuyersPage').then((m) => ({ default: m.AdminBuyersPage })))
 const ShippingChargesPage = lazy(() => import('./pages/ShippingChargesPage').then((m) => ({ default: m.ShippingChargesPage })))
 const PokeTraceQueuePage = lazy(() => import('./pages/PokeTraceQueuePage').then((m) => ({ default: m.PokeTraceQueuePage })))
 const ReviewQueuePage = lazy(() => import('./pages/ReviewQueuePage').then((m) => ({ default: m.ReviewQueuePage })))
@@ -45,7 +47,10 @@ function App() {
         </Link>
         {isAuthenticated && (
           <span className="who">
-            <span className="email">{user?.email ?? user?.name}</span>{' '}
+            {/* The email is the way to the account page: a separate link wouldn't fit beside it on a phone. */}
+            <Link to="/account" className="email" title="Your account">
+              {user?.email ?? user?.name}
+            </Link>{' '}
             <button className="link" onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>
               Log out
             </button>
@@ -82,6 +87,7 @@ function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/how-it-works" element={<HowItWorksPage />} />
+              <Route path="/account" element={<AccountPage />} />
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/review" element={<ReviewQueuePage />} />
               <Route path="/admin/outcomes" element={<AdminOutcomesPage />} />
@@ -90,6 +96,7 @@ function App() {
               <Route path="/admin/deals" element={<AdminOffersPage />} />
               <Route path="/admin/shipping" element={<ShippingChargesPage />} />
               <Route path="/admin/poketrace" element={<PokeTraceQueuePage />} />
+              <Route path="/admin/buyers" element={<AdminBuyersPage />} />
               <Route path="/admin/labels" element={<AdminLabelsPage />} />
               <Route path="/admin/centering" element={<CenteringLabelsPage />} />
               <Route path="/admin/centering/:orgId/:cardId" element={<CenteringLabelCardPage />} />

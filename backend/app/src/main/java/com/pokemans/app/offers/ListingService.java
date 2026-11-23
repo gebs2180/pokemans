@@ -159,9 +159,14 @@ class ListingService {
         close(ListingEvent.withdrawn(listingId, orgId, currentUser.id()), "A buyer took this card before it was withdrawn.");
     }
 
+    /**
+     * Every open listing, newest first, to every approved buyer at once: nobody gets a head start (Zach, 2026-11-22).
+     * Cards this buyer couldn't take are left out: those of any org the caller or a member of the buyer org is in.
+     */
     @Transactional(readOnly = true)
-    List<MarketItem> market() {
-        List<SaleListing> open = listings.findOpen(Instant.now());
+    List<MarketItem> market(UUID buyerOrgId) {
+        Set<UUID> own = access.ownOrgs(buyerOrgId);
+        List<SaleListing> open = listings.findOpen(Instant.now()).stream().filter(l -> !own.contains(l.getOrgId())).toList();
         Map<UUID, CardOffer> byId = offers.findAllById(open.stream().map(SaleListing::getOfferId).toList()).stream()
                 .collect(Collectors.toMap(CardOffer::getId, o -> o));
         List<MarketItem> items = new ArrayList<>();
@@ -209,7 +214,8 @@ class ListingService {
                 Status.WITHDRAWN, "The seller withdrew this card.", Status.EXPIRED, "This listing has expired.",
                 Status.VOIDED, "This card is no longer for sale.", Status.CANCELLED, "Another buyer took this card first.",
                 Status.BACK, "Another buyer took this card first."));
-        if (access.shareMember(listing.getOrgId(), buyerOrgId)) {
+        // Per person, across every org they belong to: the caller (the admin included) and every member of the buyer org.
+        if (access.ownOrgs(buyerOrgId).contains(listing.getOrgId())) {
             throw conflict("You can't buy your own card.");
         }
         if (shipping.address(buyerOrgId).isEmpty()) {

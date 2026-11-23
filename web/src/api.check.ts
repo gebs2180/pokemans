@@ -97,6 +97,8 @@ export type ApiTypesMatchTheBackend = {
   Assessment: Ok<Covers<S['ConditionControllerAssessmentView'], A.Assessment>>
   CardCondition: Ok<Covers<S['ConditionControllerCardConditionView'], A.CardCondition>>
   ConsentStatus: Ok<Covers<S['ConsentControllerConsentStatus'], A.ConsentStatus>>
+  BuyingState: Ok<Covers<S['BuyingState'], A.BuyingState>>
+  BuyerRequest: Ok<Covers<S['BuyingRequest'], A.BuyerRequest>>
   OutcomeView: Ok<Covers<S['OutcomeControllerOutcomeView'], A.OutcomeView>>
   CatalogCardView: Ok<Covers<S['CatalogControllerCatalogCardView'], A.CatalogCardView>>
   CardReadingView: Ok<Covers<S['CatalogControllerReadingView'], A.CardReadingView>>

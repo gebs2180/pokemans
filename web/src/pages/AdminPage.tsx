@@ -151,7 +151,7 @@ export function AdminPage() {
         <Link to="/admin/deal-outcomes">Deal outcomes →</Link> ·{' '}
         <Link to="/admin/labels">Labels to buy →</Link> ·{' '}
         <Link to="/admin/shipping">Postage to bill →</Link> · <Link to="/admin/centering">Centering labels →</Link> ·{' '}
-        <Link to="/admin/poketrace">PokeTrace mapping →</Link>
+        <Link to="/admin/poketrace">PokeTrace mapping →</Link> · <Link to="/admin/buyers">Requests to buy →</Link>
       </p>
       <NeedsAttention deals={attention ?? null} dealsError={attentionError ?? null} />
       <h1>Orgs</h1>

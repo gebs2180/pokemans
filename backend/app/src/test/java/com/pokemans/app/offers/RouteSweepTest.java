@@ -52,7 +52,7 @@ class RouteSweepTest {
 
     /** The routes open to any signed-in user, each with its own check. */
     private static final List<String> NOT_ORG_SCOPED = List.of("/api/me", "/api/invites/{token}", "/api/invites/{token}/accept",
-            "/api/policy", "/api/me/email-preferences",
+            "/api/policy", "/api/me/email-preferences", "/api/me/buying",
             "/api/catalog/search", "/api/catalog/cards/{externalId}", "/api/catalog/price-hint");
 
     /** A valid body for each route that needs one: validation runs before the controller, so a bad body proves nothing. */
@@ -95,6 +95,7 @@ class RouteSweepTest {
     private Posted sold;
     private String photoId;
     private String batchId;
+    private String buyerRequestId;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -112,6 +113,8 @@ class RouteSweepTest {
         batchId = UUID.randomUUID().toString();
         jdbc.update("insert into submission_batch (id, org_id, name, created_by, created_at) "
                 + "values (?::uuid, ?::uuid, 'Victim batch', (select id from app_user limit 1), now())", batchId, victimSeller.orgId());
+        // The victim seller asked to buy too: their request waits in the admin's queue.
+        buyerRequestId = market.request(market.startBuying(victimSeller));
     }
 
     @Test
@@ -227,7 +230,7 @@ class RouteSweepTest {
         Map<String, String> ids = Map.ofEntries(Map.entry("orgId", org), Map.entry("cardId", sold.cardId()),
                 Map.entry("collectionId", victimSeller.collectionId()), Map.entry("listingId", sold.listingId()),
                 Map.entry("offerId", sold.offerId()), Map.entry("photoId", photoId),
-                Map.entry("batchId", batchId),
+                Map.entry("batchId", batchId), Map.entry("requestId", buyerRequestId),
                 // No fixture seeds these yet (valuation runs, reports, memberships, ...), so each is named here on purpose:
                 // a new path variable fails the sweep until someone adds it, instead of silently getting a random id.
                 Map.entry("reportId", UNSEEDED), Map.entry("runId", UNSEEDED), Map.entry("outcomeId", UNSEEDED),
