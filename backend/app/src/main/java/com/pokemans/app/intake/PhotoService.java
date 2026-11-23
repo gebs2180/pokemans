@@ -160,8 +160,17 @@ class PhotoService {
         if (stored.size() != photo.getDeclaredSize()) {
             extra.add(RetakeReason.SIZE_MISMATCH);
         }
-        if (photos.existsByOrgIdAndSha256AndCardItemIdNot(orgId, sha256, photo.getCardItemId())) {
+        if (photos.existsByOrgIdAndSha256AndCardItemIdNot(orgId, sha256, photo.getCardItemId())
+                || (photo.getSide() != Photo.Side.DETAIL
+                    && photos.existsByCardItemIdAndSha256AndSideNot(photo.getCardItemId(), sha256, photo.getSide()))) {
             extra.add(RetakeReason.DUPLICATE);
+        }
+        if (photo.getSide() == Photo.Side.FRONT && result.dHash() != null) {
+            // Fronts only: every card back is the same design, so backs shot on one mat would all look alike.
+            photos.findHashes(orgId, Photo.Side.FRONT, photo.getCardItemId()).stream()
+                    .filter(other -> ImageHash.distance(result.dHash(), other.getDhash()) <= ImageHash.LOOKALIKE_DISTANCE)
+                    .min(java.util.Comparator.comparingInt(other -> ImageHash.distance(result.dHash(), other.getDhash())))
+                    .ifPresent(other -> photo.lookalikeOf(other.getCardItemId()));
         }
         String cropKey = null;
         if (result.card() != null) {

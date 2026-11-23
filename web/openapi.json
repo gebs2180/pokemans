@@ -713,7 +713,7 @@
             "type" : "boolean"
           },
           "stage" : {
-            "enum" : [ "PHOTOS", "LOT", "IDENTIFYING", "ASSESSING", "PRICING", "NO_OFFER", "READY", "OFFERED", "LISTED", "SOLD", "SHIPPED", "ARRIVED", "PAID", "RETURNED" ],
+            "enum" : [ "PHOTOS", "LOT", "IDENTIFYING", "ASSESSING", "PRICING", "NO_OFFER", "OVER_LIMIT", "READY", "OFFERED", "LISTED", "SOLD", "SHIPPED", "ARRIVED", "PAID", "RETURNED" ],
             "type" : "string"
           }
         },
@@ -1958,6 +1958,10 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "lookalikeCardId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
           "side" : {
             "type" : "string"
           },
@@ -1974,7 +1978,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "capturedAt", "cleanUrl", "cropUrl", "detailUrl", "id", "side", "surfaceUrl", "url", "wideUrl" ]
+        "required" : [ "capturedAt", "cleanUrl", "cropUrl", "detailUrl", "id", "lookalikeCardId", "side", "surfaceUrl", "url", "wideUrl" ]
       },
       "ConditionControllerPredictionView" : {
         "properties" : {
@@ -2818,6 +2822,10 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "lookalikeCardId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
           "retakeReasons" : {
             "items" : {
               "$ref" : "#/components/schemas/IntakeViewsReasonView"
@@ -2853,7 +2861,7 @@
             "type" : "integer"
           }
         },
-        "required" : [ "blurScore", "capturedAt", "card", "cleanUrl", "current", "detailUrl", "glareFraction", "height", "id", "retakeReasons", "side", "status", "surfaceUrl", "uploadedAt", "url", "wideUrl", "width" ]
+        "required" : [ "blurScore", "capturedAt", "card", "cleanUrl", "current", "detailUrl", "glareFraction", "height", "id", "lookalikeCardId", "retakeReasons", "side", "status", "surfaceUrl", "uploadedAt", "url", "wideUrl", "width" ]
       },
       "IntakeViewsReasonView" : {
         "properties" : {

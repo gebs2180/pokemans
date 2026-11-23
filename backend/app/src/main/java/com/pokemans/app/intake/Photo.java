@@ -38,6 +38,8 @@ class Photo extends AssignedIdEntity<UUID> {
     private long declaredSize;
     private Long sizeBytes;
     private String sha256;
+    private String dhash;
+    private UUID lookalikeCardId;
     private Integer width;
     private Integer height;
     private Double blurScore;
@@ -179,6 +181,7 @@ class Photo extends AssignedIdEntity<UUID> {
         Instant now = Instant.now();
         this.sizeBytes = sizeBytes;
         this.sha256 = sha256;
+        this.dhash = quality.dHash();
         this.width = quality.width();
         this.height = quality.height();
         this.blurScore = quality.blurScore();
@@ -254,6 +257,23 @@ class Photo extends AssignedIdEntity<UUID> {
 
     String getSha256() {
         return sha256;
+    }
+
+    /** The whole frame's {@link ImageHash}, or null for photos checked before it was kept or that couldn't be read. */
+    String getDhash() {
+        return dhash;
+    }
+
+    /**
+     * Another card whose front photo looks like this one (a near-identical {@link ImageHash}), or null. A warning for
+     * the seller and the reviewer, not a retake: two copies of one card shot the same way can look alike too.
+     */
+    UUID getLookalikeCardId() {
+        return lookalikeCardId;
+    }
+
+    void lookalikeOf(UUID cardId) {
+        this.lookalikeCardId = cardId;
     }
 
     Integer getWidth() {

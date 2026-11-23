@@ -320,6 +320,29 @@ describe('ReviewCardPage', () => {
     expect(screen.queryByRole('option', { name: 'Choose a variant' })).not.toBeInTheDocument()
   })
 
+  it('warns the reviewer when a front looks like the photo of another card', async () => {
+    const withLookalike: CardCondition = {
+      ...card,
+      photos: [{ id: 'p1', side: 'FRONT', url: 'https://photos.example/front.jpg', cropUrl: null, capturedAt: null, lookalikeCardId: 'card7' }],
+    }
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/condition')) return respond(200, withLookalike)
+      if (url.endsWith('/provenance')) return respond(200, provenance('NOT_IDENTIFIED'))
+      if (url.endsWith('/prices')) return respond(200, { catalogCardId: 'cat1', comps: [], tables: [], skipped: [] })
+      if (url.endsWith('/offer-preview')) return respond(200, { offered: false, refusal: 'x', refusalCode: 'UNPRICED', price: null, fmv: null, confidence: null, buyerMargin: null, why: [] })
+      return respond(200, { cardId: 'card1', current: null, recognition: false, reading: null, suggestions: [] })
+    }))
+    render(
+      <MemoryRouter initialEntries={['/admin/review/org1/card1']}>
+        <Routes>
+          <Route path="/admin/review/:orgId/:cardId" element={<ReviewCardPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText(/front photo looks like the same photo as the front of/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'another card in this org' })).toHaveAttribute('href', '/admin/review/org1/card7')
+  })
+
   const identified: IdentifiedCard = {
     cardItemId: 'card1', catalogCardId: 'cat1', language: 'en', setName: 'Base Set', seriesName: 'Base', setReleaseDate: '1999-01-09',
     number: '4', name: 'Charizard', rarity: 'Rare Holo', edition: 'UNLIMITED', variant: 'HOLO', stamp: null, promo: false,

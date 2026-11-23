@@ -17,6 +17,7 @@ const STAGE_TONE: Record<CardStage, Tone> = {
   ASSESSING: 'neutral',
   PRICING: 'neutral',
   NO_OFFER: 'warning',
+  OVER_LIMIT: 'neutral',
   READY: 'info',
   OFFERED: 'info',
   LISTED: 'info',

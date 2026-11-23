@@ -1419,6 +1419,36 @@ button.photo-button:hover {
   width: 100%;
 }
 
+/* The other candidates: a plain list of rows, not bullets of primary buttons (green made the set line unreadable). */
+.suggestion-others {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.suggestion-others li + li {
+  border-top: 1px solid var(--color-line);
+}
+
+.suggestion-others button.picker-option {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  font-weight: inherit;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.suggestion-others button.picker-option:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+  border: 0;
+}
+
 /* Valuation run summary: a row of figures that wraps on narrow screens. */
 .tiles {
   gap: var(--space-3);

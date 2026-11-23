@@ -35,7 +35,7 @@ const SIDE_HINT: Record<Side, string> = {
 }
 
 /** Stages whose next step the offer panel says, right below the status line, in place of its button. */
-const SAID_BY_OFFER_PANEL = new Set<CardStage>(['IDENTIFYING', 'ASSESSING', 'PRICING', 'NO_OFFER', 'READY', 'LISTED', 'SOLD', 'SHIPPED', 'ARRIVED', 'PAID', 'RETURNED'])
+const SAID_BY_OFFER_PANEL = new Set<CardStage>(['IDENTIFYING', 'ASSESSING', 'PRICING', 'NO_OFFER', 'OVER_LIMIT', 'READY', 'LISTED', 'SOLD', 'SHIPPED', 'ARRIVED', 'PAID', 'RETURNED'])
 
 /** Capture screen for one card: take each required side, see pass or retake right away. */
 export function CardPage() {
@@ -165,9 +165,17 @@ export function CardPage() {
                   </p>
                 )}
                 {current && attempts.length > 1 && <p className="muted small">{attempts.length} attempts, all kept; the one shown is used.</p>}
+                {current?.lookalikeCardId && (
+                  <p className="warn small" role="note">
+                    This looks like the same photo as the front of{' '}
+                    <Link to={`/orgs/${orgId}/cards/${current.lookalikeCardId}`}>another of your cards</Link>. If it's the wrong
+                    card, take a new photo of this one.
+                  </p>
+                )}
               </div>
             </div>
-            {retake && <RetakeResult side={side} photo={retake} keeping={current !== null} />}
+            {/* A new upload replaces the last verdict: don't leave the old "retake" up while it's checked. */}
+            {retake && busy !== side && <RetakeResult side={side} photo={retake} keeping={current !== null} />}
             {uploadError?.side === side && <p className="error" role="alert">{uploadError.message}</p>}
             {!card.photosFrozen &&
               (busy === side ? (

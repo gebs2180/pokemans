@@ -80,7 +80,7 @@ class CardStatusServiceTest {
     @Test
     void cardsWaitingOnUsOrABuyerAreNotTheSellers() {
         assertThat(need(Stage.READY, null, false)).isEqualTo(Need.GET_OFFER);
-        for (Stage stage : new Stage[] {Stage.LOT, Stage.IDENTIFYING, Stage.ASSESSING, Stage.PRICING, Stage.NO_OFFER, Stage.LISTED}) {
+        for (Stage stage : new Stage[] {Stage.LOT, Stage.IDENTIFYING, Stage.ASSESSING, Stage.PRICING, Stage.NO_OFFER, Stage.OVER_LIMIT, Stage.LISTED}) {
             assertThat(need(stage, null, false)).isNull();
         }
     }
@@ -101,6 +101,11 @@ class CardStatusServiceTest {
 
     /** An identified card with front and back photos and no assessment, as the status service sees it. */
     private static CardStatus unassessed(boolean preGradeFailed) {
+        return identified("no condition assessment", OfferRefusal.NOT_ASSESSED, "Its condition hasn't been assessed yet.", preGradeFailed);
+    }
+
+    /** An identified card with front and back photos, valued or not, and the offer flow's answer for it. */
+    private static CardStatus identified(String unvaluedReason, OfferRefusal refused, String refusal, boolean preGradeFailed) {
         OfferService offers = mock(OfferService.class);
         CardItems cardItems = mock(CardItems.class);
         PreGradeFailures failures = mock(PreGradeFailures.class);
@@ -115,10 +120,10 @@ class CardStatusServiceTest {
                 "UNLIMITED", "NORMAL", false, null, List.of());
         CardInputs inputs = mock(CardInputs.class);
         when(inputs.identity()).thenReturn(umbreon);
-        when(inputs.unvaluedReason()).thenReturn("no condition assessment");
+        when(inputs.unvaluedReason()).thenReturn(unvaluedReason);
         Valuations.CurrentValue value = mock(Valuations.CurrentValue.class);
         when(value.inputs()).thenReturn(inputs);
-        when(offers.quote(card)).thenReturn(new OfferService.Quote(value, OfferRefusal.NOT_ASSESSED, "Its condition hasn't been assessed yet."));
+        when(offers.quote(card)).thenReturn(new OfferService.Quote(value, refused, refusal));
         when(failures.failed(card)).thenReturn(preGradeFailed);
         return service.status(card);
     }
@@ -129,6 +134,19 @@ class CardStatusServiceTest {
         assertThat(status.stage()).isEqualTo(Stage.ASSESSING);
         assertThat(status.nextStep()).startsWith("The automatic condition check didn't work for this card, so we'll check it by hand.")
                 .doesNotContainIgnoringCase("cardgrade").doesNotContainIgnoringCase("credit");
+    }
+
+    /** Walkthrough 2026-11-23: a card over the limit said "No offer yet", but no instant offer ever comes for it. */
+    @Test
+    void aCardOverTheOfferLimitSaysSoInsteadOfNoOfferYet() {
+        CardStatus status = identified(null, OfferRefusal.OVER_MAXIMUM, "Instant offers go up to $5,000, the most a shipping label "
+                + "can insure, and this card is worth more than that, so it gets no offer.", false);
+        assertThat(status.stage()).isEqualTo(Stage.OVER_LIMIT);
+        assertThat(status.canOffer()).isFalse();
+        assertThat(status.nextStep()).startsWith("Instant offers go up to $5,000").endsWith("You're free to sell it elsewhere.");
+        assertThat(CardStatusService.need(status, false, NOW)).isNull();
+
+        assertThat(identified(null, OfferRefusal.THIN_SALES, "There isn't enough sales data.", false).stage()).isEqualTo(Stage.NO_OFFER);
     }
 
     @Test
