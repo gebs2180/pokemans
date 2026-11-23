@@ -184,7 +184,7 @@ export function OfferPanel({
       {!offer && (
         <>
           <p className="muted">One firm price for this card, based on the grade it's likely to be. No listing, no haggling.</p>
-          {askButton('Get an offer')}
+          {askButton('Get your instant offer')}
         </>
       )}
       {offer && (

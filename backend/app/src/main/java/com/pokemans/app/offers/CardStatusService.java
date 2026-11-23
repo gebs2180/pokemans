@@ -197,8 +197,8 @@ class CardStatusService {
         }
         if (reason != null) {
             return new CardStatus(cardId, Stage.PRICING, identity,
-                    "We don't have enough sold prices for this card yet. We add them by hand, so it may take a while, "
-                            + "and some cards won't get an offer. You're free to sell it elsewhere." + NO_NOTIFICATIONS, false);
+                    "We're looking up recent sold prices for this card. If we don't have enough yet, a person adds them by hand, "
+                            + "which may take a while, and some cards won't get an offer. You're free to sell it elsewhere." + NO_NOTIFICATIONS, false);
         }
         if (quote.refused() == OfferRefusal.OVER_MAXIMUM) {
             // Not "no offer yet": no instant offer comes later for a card worth more than the limit.

@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { useLoad, usePoll } from './useLoad'
+import { useLoad, usePoll, usePollBackoff } from './useLoad'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -46,6 +46,35 @@ describe('useLoad', () => {
     act(() => result.current.reload())
     expect(result.current.error).toBeNull()
     await waitFor(() => expect(result.current.data).toBe('ok'))
+  })
+})
+
+describe('usePollBackoff', () => {
+  it('waits longer each time, stops when inactive, and gives up after the limit', () => {
+    vi.useFakeTimers()
+    const reload = vi.fn()
+    const { result, rerender, unmount } = renderHook(({ active }) => usePollBackoff(active, reload, 1000, 4000, 20000), {
+      initialProps: { active: true },
+    })
+    vi.advanceTimersByTime(1000) // first at 1s
+    expect(reload).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(1500) // then 1.5s later
+    expect(reload).toHaveBeenCalledTimes(2)
+    vi.advanceTimersByTime(2250) // then 2.25s
+    expect(reload).toHaveBeenCalledTimes(3)
+    expect(result.current).toBe(false)
+    act(() => {
+      vi.advanceTimersByTime(60000)
+    })
+    expect(result.current).toBe(true)
+    const calls = reload.mock.calls.length
+    vi.advanceTimersByTime(60000)
+    expect(reload).toHaveBeenCalledTimes(calls)
+    rerender({ active: false })
+    vi.advanceTimersByTime(60000)
+    expect(reload).toHaveBeenCalledTimes(calls)
+    unmount()
+    vi.useRealTimers()
   })
 })
 
