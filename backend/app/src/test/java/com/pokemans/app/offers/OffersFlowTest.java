@@ -1098,7 +1098,7 @@ class OffersFlowTest {
         api.uploadPhoto(orgId, card, "FRONT", TestImages.goodFront(), seller).andExpect(jsonPath("$.status").value("PASSED"));
         api.uploadPhoto(orgId, card, "BACK", TestImages.goodBack(), seller).andExpect(jsonPath("$.status").value("PASSED"));
         api.get(status, seller).andExpect(jsonPath("$.stage").value("IDENTIFYING"))
-                .andExpect(jsonPath("$.nextStep", containsString("by hand"))).andExpect(jsonPath("$.identity").isEmpty());
+                .andExpect(jsonPath("$.nextStep", containsString("a person looks at it"))).andExpect(jsonPath("$.identity").isEmpty());
         String name = "Jolteon " + UUID.randomUUID().toString().substring(0, 4);
         String catalog = identify(card, name, "2015-05-06", "HOLO", "Rare");
         api.get(status, seller).andExpect(jsonPath("$.stage").value("ASSESSING"))
