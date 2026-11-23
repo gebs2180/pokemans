@@ -50,7 +50,7 @@ const status: CardStatus = {
   cardId: 'card1',
   stage: 'IDENTIFYING',
   identity: null,
-  nextStep: 'We identify each card by hand from its photos, usually within a couple of days.',
+  nextStep: 'Confirm which card it is under “Which card is it?”. Once you have, we check your answer against the photos, then its condition.',
   canOffer: false,
   condition: null,
   deadline: null,
@@ -228,6 +228,33 @@ describe('CardPage', () => {
     // Choosing an old photo is their main button; a seller's is the camera.
     expect(screen.getByLabelText('Choose a front photo').closest('label')).not.toHaveClass('secondary')
     expect(screen.getByLabelText('Take front photo').closest('label')).toHaveClass('secondary')
+  })
+
+  it('warns, without blocking, when the front looks like the photo of another card', async () => {
+    const view = card()
+    view.photos[0] = { ...view.photos[0], lookalikeCardId: 'card7' }
+    renderCard(view)
+    const note = await screen.findByRole('note')
+    expect(note).toHaveTextContent(/looks like the same photo as the front of another of your cards/)
+    expect(within(note).getByRole('link', { name: 'another of your cards' })).toHaveAttribute('href', '/orgs/org1/cards/card7')
+    expect(screen.getByRole('img', { name: 'Front photo you took' })).toBeInTheDocument()
+  })
+
+  it('takes the old retake message down while a new photo of that side uploads', async () => {
+    const user = userEvent.setup()
+    renderCard(card())
+    expect(await screen.findByText(/Your last try needs a retake/)).toBeInTheDocument()
+    // The upload slot is refused (see renderCard), so the message comes back once the try is over.
+    let release: () => void = () => {}
+    const fetchMock = vi.mocked(fetch)
+    const original = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation((url: string | URL | Request, init?: RequestInit) =>
+      String(url).endsWith('/photos') ? new Promise((resolve) => (release = () => resolve(respond(400, { detail: 'Photos must be JPEG or PNG' })))) : original(url as string, init),
+    )
+    await user.upload(screen.getByLabelText('Retake front photo'), new File(['x'], 'front.jpg', { type: 'image/jpeg' }))
+    expect(screen.queryByText(/Your last try needs a retake/)).not.toBeInTheDocument()
+    release()
+    expect(await screen.findByText(/Your last try needs a retake/)).toBeInTheDocument()
   })
 
   it('hides Retake once the card is posted or sold', async () => {

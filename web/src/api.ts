@@ -52,6 +52,8 @@ export type PhotoView = {
   detailUrl?: string | null
   /** Backs only: the standard printed back design subtracted, so only physical marks are left ("Clean back"); null where the back didn't match the reference. */
   cleanUrl?: string | null
+  /** Fronts only: another card in the org whose front photo looks like this one (the same photo uploaded again?). A warning, never a retake. */
+  lookalikeCardId?: string | null
 }
 
 /** A card's label until the collector says what it is (the backend's CardItem.PLACEHOLDER_LABEL). */
@@ -80,6 +82,7 @@ export type CardStage =
   | 'ASSESSING'
   | 'PRICING'
   | 'NO_OFFER'
+  | 'OVER_LIMIT'
   | 'READY'
   | 'OFFERED'
   | 'LISTED'
@@ -96,6 +99,7 @@ export const STAGE_LABEL: Record<CardStage, string> = {
   ASSESSING: 'Waiting for condition review',
   PRICING: 'Waiting for prices',
   NO_OFFER: 'No offer yet',
+  OVER_LIMIT: 'Over the instant-offer limit',
   READY: 'Ready for an offer',
   OFFERED: 'Offer ready',
   LISTED: 'Posted to buyers',
@@ -370,6 +374,8 @@ export type ReviewPhoto = {
   detailUrl?: string | null
   /** Backs only: the standard printed back design subtracted, so only physical marks are left ("Clean back"); null where the back didn't match the reference. */
   cleanUrl?: string | null
+  /** Fronts only: another card in the org whose front photo looks like this one (the same photo uploaded again?). A warning, never a retake. */
+  lookalikeCardId?: string | null
 }
 
 // Defect marks (admin adds them; the collector reads them): where on a surface view a reviewer saw a flaw

@@ -21,9 +21,17 @@ import javax.imageio.ImageIO;
  */
 class QualityChecker {
 
-    /** @param card the detected card, or null when no whole card was found */
+    /**
+     * @param card  the detected card, or null when no whole card was found
+     * @param dHash the whole frame's {@link ImageHash}, or null when the image couldn't be read
+     */
     record Result(Integer width, Integer height, Double blurScore, Double glareFraction, CardDetector.Detection card,
-                  List<RetakeReason> reasons) {
+                  List<RetakeReason> reasons, String dHash) {
+
+        Result(Integer width, Integer height, Double blurScore, Double glareFraction, CardDetector.Detection card,
+               List<RetakeReason> reasons) {
+            this(width, height, blurScore, glareFraction, card, reasons, null);
+        }
     }
 
     private final QualityProperties properties;
@@ -64,7 +72,8 @@ class QualityChecker {
             reasons.add(RetakeReason.RESOLUTION_TOO_LOW);
         }
 
-        int[][] luma = luma(downscale(image, properties.analysisLongSidePx()));
+        BufferedImage analysed = downscale(image, properties.analysisLongSidePx());
+        int[][] luma = luma(analysed);
         double blur = laplacianVariance(luma);
         double glare = glareFraction(luma, properties.glareLuma());
 
@@ -92,7 +101,7 @@ class QualityChecker {
         if (glary) {
             reasons.add(RetakeReason.GLARE);
         }
-        return new Result(width, height, blur, glare, card, reasons);
+        return new Result(width, height, blur, glare, card, reasons, ImageHash.of(analysed));
     }
 
     private static BufferedImage downscale(BufferedImage image, int longSide) {

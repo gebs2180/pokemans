@@ -98,7 +98,11 @@ class TcgdexCatalogProviderTest {
                 .satisfies(hit -> assertThat(hit.externalId()).isEqualTo("swsh6-112"));
         assertThat(provider.search("metagross holo", null, "en")).isEmpty();
         assertThat(TcgdexCatalogProvider.normalizeNumber(" 011/113 ")).isEqualTo("11");
-        assertThat(TcgdexCatalogProvider.normalizeNumber("SWSH050")).isEqualTo("swsh050");
+        assertThat(TcgdexCatalogProvider.normalizeNumber("SWSH050")).isEqualTo("swsh50");
+        // Skyridge's holo subset: the catalog's H09 is the reader's H9 or H09/H32.
+        assertThat(TcgdexCatalogProvider.normalizeNumber("H09")).isEqualTo("h9");
+        assertThat(TcgdexCatalogProvider.normalizeNumber("H9/H32")).isEqualTo("h9");
+        assertThat(TcgdexCatalogProvider.normalizeNumber("0")).isEqualTo("0");
     }
 
     @Test

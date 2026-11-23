@@ -161,6 +161,19 @@ class SuggestionMatcher {
             score += 0.35;
             why.add("set size");
         }
+        // A subset numbered apart from the main set (Skyridge's H09/H32 holos): the letter the read number or total
+        // carries tells it from the plain card of the same name, which otherwise scores the same.
+        String readPrefix = subsetPrefix(reading);
+        String cardPrefix = numberPrefix(card.number());
+        if (readPrefix != null && readPrefix.equals(cardPrefix)) {
+            score += 0.1;
+            why.add("subset number");
+        }
+        boolean holoRead = saysHolo(reading);
+        if (holoRead && card.variants().contains(Variant.HOLO)) {
+            score += 0.05;
+            why.add("holo");
+        }
         if (sameSet(reading.setName(), card.setName())) {
             score += SET_NAME_SCORE;
             why.add("set name");
@@ -183,9 +196,56 @@ class SuggestionMatcher {
                 ? Edition.FIRST_EDITION : Edition.UNLIMITED;
         // Some catalog entries are sparse (no rarity, only "normal" listed); there the reader's eye wins.
         boolean sparse = card.rarity() == null || card.rarity().equalsIgnoreCase("none");
-        Variant variant = Optional.ofNullable(reading.finish()).filter(f -> sparse || card.variants().contains(f))
+        Variant variant = Optional.ofNullable(reading.finish()).or(() -> Optional.ofNullable(holoRead ? Variant.HOLO : null))
+                .filter(f -> sparse || card.variants().contains(f))
                 .orElse(card.variants().isEmpty() ? Variant.NORMAL : card.variants().getFirst());
         return new Match(card, Math.max(0, Math.min(0.95, score)), edition, variant, String.join(", ", why));
+    }
+
+    private static final Pattern PREFIXED = Pattern.compile("^\\s*([A-Za-z]+)\\s*\\d");
+    private static final Pattern PREFIXED_TOTAL = Pattern.compile("/\\s*([A-Za-z]+)\\s*\\d");
+    private static final Pattern HOLO = Pattern.compile("(?i)(?<!non[- ]?)(?<!reverse[- ]?)\\bholo");
+
+    /**
+     * The letter prefix of a subset number the reader saw, upper case ("H" for H09 or /H32), or null. Taken from the
+     * number, else from a total the reader gave as text (which can't fill {@code setTotal}), else from its notes.
+     */
+    static String subsetPrefix(CardReader.Reading reading) {
+        String fromNumber = numberPrefix(reading.number());
+        if (fromNumber != null) {
+            return fromNumber;
+        }
+        if (reading.raw() != null && reading.raw().get("input") instanceof java.util.Map<?, ?> input
+                && input.get("set_total") instanceof String total) {
+            String fromTotal = numberPrefix(total);
+            if (fromTotal != null) {
+                return fromTotal;
+            }
+        }
+        if (reading.notes() != null) {
+            java.util.regex.Matcher m = PREFIXED_TOTAL.matcher(reading.notes());
+            if (m.find()) {
+                return m.group(1).toUpperCase(Locale.ROOT);
+            }
+        }
+        return null;
+    }
+
+    /** The letters before a collector number's digits, upper case ("H" for "H09", "SV" for "SV65"), or null. */
+    static String numberPrefix(String number) {
+        if (number == null) {
+            return null;
+        }
+        java.util.regex.Matcher m = PREFIXED.matcher(number);
+        return m.find() ? m.group(1).toUpperCase(Locale.ROOT) : null;
+    }
+
+    /** Whether the reader saw a holo: its finish, or "holo" in its notes (not "non-holo" or "reverse holo"). */
+    static boolean saysHolo(CardReader.Reading reading) {
+        if (reading.finish() != null) {
+            return reading.finish() == Variant.HOLO;
+        }
+        return reading.notes() != null && HOLO.matcher(reading.notes()).find();
     }
 
     private static boolean sameNumber(String read, String catalog) {

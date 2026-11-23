@@ -1,6 +1,8 @@
 package com.pokemans.app.intake;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -67,8 +69,13 @@ class IntakeFlowTest {
 
     /** Requests an upload slot, PUTs the bytes to storage, and confirms. Returns the confirm response. */
     private ResultActions uploadPhoto(String orgId, String cardId, String side, byte[] png, JwtRequestPostProcessor who) throws Exception {
+        return uploadPhoto(orgId, cardId, side, png, "image/png", who);
+    }
+
+    private ResultActions uploadPhoto(String orgId, String cardId, String side, byte[] png, String contentType,
+                                      JwtRequestPostProcessor who) throws Exception {
         ResultActions slot = postJson("/api/orgs/" + orgId + "/cards/" + cardId + "/photos",
-                "{\"side\":\"" + side + "\",\"contentType\":\"image/png\",\"sizeBytes\":" + png.length + "}", who)
+                "{\"side\":\"" + side + "\",\"contentType\":\"" + contentType + "\",\"sizeBytes\":" + png.length + "}", who)
                 .andExpect(status().isCreated());
         String body = slot.andReturn().getResponse().getContentAsString();
         String photoId = JsonPath.read(body, "$.photoId");
@@ -169,5 +176,43 @@ class IntakeFlowTest {
                 .andExpect(jsonPath("$.status").value("PASSED"));
         mvc.perform(get("/api/orgs/" + orgId + "/cards/" + cardId).with(admin()))
                 .andExpect(jsonPath("$.captureComplete").value(true));
+    }
+
+    /** Walkthrough 2026-11-23: the same photo uploaded twice went through. */
+    @Test
+    void theSamePhotoUploadedAgainIsCaught() throws Exception {
+        String orgId = read(postJson("/api/admin/orgs", "{\"name\":\"Twice\",\"type\":\"COLLECTOR\"}", admin()), "$.id");
+        String collectionId = read(postJson("/api/orgs/" + orgId + "/collections", "{\"name\":\"Binder\"}", admin()), "$.id");
+        String a = card(orgId, collectionId, "Gengar H09");
+        String b = card(orgId, collectionId, "Gengar H09 again");
+        String c = card(orgId, collectionId, "Gengar H09 third");
+        BufferedImage photo = ImageHashTest.card(1);
+        byte[] png = QualityCheckerTest.png(photo);
+
+        uploadPhoto(orgId, a, "FRONT", png, admin())
+                .andExpect(jsonPath("$.lookalikeCardId").value(nullValue()));
+
+        // Saved again smaller as a JPEG for another card: not the same bytes, so only a warning naming the first card.
+        byte[] resent = ImageHashTest.jpeg(ImageHashTest.resentAsJpeg(photo), 0.85f);
+        uploadPhoto(orgId, b, "FRONT", resent, "image/jpeg", admin())
+                .andExpect(jsonPath("$.lookalikeCardId").value(a));
+
+        // The very same file as the back of that card, or as another card's front, needs a retake.
+        uploadPhoto(orgId, b, "BACK", resent, "image/jpeg", admin())
+                .andExpect(jsonPath("$.status").value("RETAKE"))
+                .andExpect(jsonPath("$.retakeReasons[*].code", hasItem("DUPLICATE")));
+        uploadPhoto(orgId, c, "FRONT", png, admin())
+                .andExpect(jsonPath("$.status").value("RETAKE"))
+                .andExpect(jsonPath("$.retakeReasons[*].code", hasItem("DUPLICATE")));
+
+        // A different card's front raises nothing.
+        String d = card(orgId, collectionId, "Something else");
+        uploadPhoto(orgId, d, "FRONT", QualityCheckerTest.png(ImageHashTest.card(4)), admin())
+                .andExpect(jsonPath("$.lookalikeCardId").value(nullValue()));
+    }
+
+    private String card(String orgId, String collectionId, String label) throws Exception {
+        return read(postJson("/api/orgs/" + orgId + "/collections/" + collectionId + "/cards",
+                "{\"label\":\"" + label + "\",\"lot\":false}", admin()), "$.id");
     }
 }

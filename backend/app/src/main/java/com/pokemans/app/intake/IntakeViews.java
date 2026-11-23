@@ -40,7 +40,7 @@ final class IntakeViews {
     record PhotoView(UUID id, Photo.Side side, Photo.Status status, List<ReasonView> retakeReasons,
                      Integer width, Integer height, Double blurScore, Double glareFraction, CardFit card,
                      Instant capturedAt, Instant uploadedAt, boolean current, URI url, URI wideUrl, URI surfaceUrl, URI detailUrl,
-                     URI cleanUrl) {
+                     URI cleanUrl, UUID lookalikeCardId) {
     }
 
     /**
@@ -77,7 +77,7 @@ final class IntakeViews {
                 : new CardFit(p.getCardCoverage(), p.getCardAspect(), p.getCardBlurScore(), p.getCardGlareFraction());
         return new PhotoView(p.getId(), p.getSide(), p.getStatus(), reasons, p.getWidth(), p.getHeight(),
                 p.getBlurScore(), p.getGlareFraction(), card, p.getCapturedAt(), p.getUploadedAt(), current, url, surface.wide(), surface.surface(), surface.detail(),
-                surface.clean());
+                surface.clean(), p.getLookalikeCardId());
     }
 
     static CardView card(CardItem card, List<Photo> photos) {
