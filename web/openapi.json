@@ -715,9 +715,13 @@
           "stage" : {
             "enum" : [ "PHOTOS", "LOT", "IDENTIFYING", "ASSESSING", "PRICING", "NO_OFFER", "OVER_LIMIT", "READY", "OFFERED", "LISTED", "SOLD", "SHIPPED", "ARRIVED", "PAID", "RETURNED" ],
             "type" : "string"
+          },
+          "waitingSince" : {
+            "format" : "date-time",
+            "type" : "string"
           }
         },
-        "required" : [ "canOffer", "cardId", "condition", "deadline", "identity", "nextStep", "sellersWord", "stage" ]
+        "required" : [ "canOffer", "cardId", "condition", "deadline", "identity", "nextStep", "sellersWord", "stage", "waitingSince" ]
       },
       "CardStatusServiceNeedsYou" : {
         "properties" : {
@@ -733,7 +737,7 @@
             "type" : "string"
           },
           "need" : {
-            "enum" : [ "LABEL_READY", "PAYMENT_DUE", "PAYMENT_CHECK", "CARD_RETURNING", "OFFER_EXPIRING", "OFFER_READY", "GET_OFFER", "RETAKE" ],
+            "enum" : [ "LABEL_READY", "PAYMENT_DUE", "PAYMENT_CHECK", "CARD_RETURNING", "OFFER_EXPIRING", "OFFER_READY", "GET_OFFER", "RETAKE", "CONFIRM_CARD", "CHECKING" ],
             "type" : "string"
           },
           "sides" : {
@@ -2078,9 +2082,13 @@
           },
           "priced" : {
             "type" : "boolean"
+          },
+          "waitingSince" : {
+            "format" : "date-time",
+            "type" : "string"
           }
         },
-        "required" : [ "assessment", "cardId", "confidence", "createdAt", "identified", "identifiedAs", "label", "openRequests", "orgId", "orgName", "priced" ]
+        "required" : [ "assessment", "cardId", "confidence", "createdAt", "identified", "identifiedAs", "label", "openRequests", "orgId", "orgName", "priced", "waitingSince" ]
       },
       "ConditionControllerRequestView" : {
         "properties" : {
@@ -8311,6 +8319,34 @@
           }
         },
         "tags" : [ "intake-controller" ]
+      }
+    },
+    "/api/orgs/{orgId}/cards/{cardId}/archive" : {
+      "post" : {
+        "operationId" : "archive",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orgId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "tags" : [ "offer-controller" ]
       }
     },
     "/api/orgs/{orgId}/cards/{cardId}/custody-records" : {

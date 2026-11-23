@@ -25,6 +25,10 @@ function describe(item: NeedsYouItem): { chip: string; tone: Tone; detail: strin
       return { chip: `Good until ${due}`, tone: 'info', detail: 'You have an offer: sell at it, or let it expire.' }
     case 'GET_OFFER':
       return { chip: 'Get your offer', tone: 'info', detail: "We've reviewed it, so it's ready to price." }
+    case 'CONFIRM_CARD':
+      return { chip: 'Which card is it?', tone: 'warning', detail: 'Tell us which card this is, so we can price it.' }
+    case 'CHECKING':
+      return { chip: 'Checking', tone: 'neutral', detail: "We're checking it." }
     case 'RETAKE':
       return {
         chip: `Retake ${item.sides.map((s) => SIDE_LABEL[s].toLowerCase()).join(' and ')}`,
@@ -34,7 +38,10 @@ function describe(item: NeedsYouItem): { chip: string; tone: Tone; detail: strin
   }
 }
 
-/** Everything waiting on the seller, soonest first, across their orgs. There are no notifications yet, so this is how they find out. */
+/**
+ * Everything waiting on the seller, soonest first, across their orgs, then a quiet count of the cards we're checking
+ * (review finding 2).
+ */
 export function NeedsYou({ orgs }: { orgs: Membership[] }) {
   const api = useApi()
   const { data, error } = useLoad(async () => {
@@ -50,12 +57,15 @@ export function NeedsYou({ orgs }: { orgs: Membership[] }) {
 
   if (error) return <p className="error" role="alert">We couldn't load what needs you: {error}</p>
   if (!data || data.length === 0) return null
+  const waiting = data.filter((item) => item.need !== 'CHECKING')
+  const checking = data.length - waiting.length
 
   return (
     <section aria-label="Needs you">
       <h2>Needs you</h2>
+      {waiting.length === 0 && <p className="muted">Nothing needs you right now.</p>}
       <ul className="tile-list">
-        {data.map((item) => {
+        {waiting.map((item) => {
           const { chip, tone, detail } = describe(item)
           return (
             <li key={item.cardId} className="tile">
@@ -68,7 +78,11 @@ export function NeedsYou({ orgs }: { orgs: Membership[] }) {
           )
         })}
       </ul>
-      <p className="muted small">We email you about a sale, but not when a card's condition or offer is ready, so check back here for those.</p>
+      {checking > 0 && (
+        <p className="muted">
+          We're checking {checking === 1 ? '1 card' : `${checking} cards`}. We'll email you when each offer is ready.
+        </p>
+      )}
     </section>
   )
 }

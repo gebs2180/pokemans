@@ -6,6 +6,7 @@ import {
   money,
   PAYMENT_METHOD,
   useApi,
+  type CardStage,
   type CardStatus,
   type Offer,
   type Sale,
@@ -103,6 +104,12 @@ export function HowPriced({ offer }: { offer: Offer }) {
   )
 }
 
+/** Stages that get no offer now or ever, where "one firm price" would read as a promise taken back (review finding 8). */
+const NO_LEAD = new Set<CardStage>(['OVER_LIMIT', 'NO_OFFER', 'LOT', 'PRICING'])
+
+/** Said on both sides of a sale (review finding 9). */
+const NOT_GENUINE = "If it isn't genuine, the buyer returns it at their cost and doesn't pay."
+
 /**
  * A member's card: get our instant offer, sell at it, and follow the sale through to the buyer.
  *
@@ -183,14 +190,16 @@ export function OfferPanel({
       <h2>Your offer</h2>
       {!offer && (
         <>
-          <p className="muted">One firm price for this card, based on the grade it's likely to be. No listing, no haggling.</p>
+          {status && !NO_LEAD.has(status.stage) && (
+            <p className="muted">One firm price for this card, based on the grade it's likely to be. No listing, no haggling.</p>
+          )}
           {askButton('Get your instant offer')}
         </>
       )}
       {offer && (
         <>
           <OfferReveal key={offer.id} offer={offer} frontUrl={frontUrl} centering={status?.condition?.centering} />
-          {offer.subjectToAuthentication && <p className="muted small">Subject to the buyer authenticating the card in hand.</p>}
+          {offer.subjectToAuthentication && <p className="muted small">Subject to the buyer authenticating the card in hand. {NOT_GENUINE}</p>}
           {offer.rawSales?.below && offer.rawSales.lowest != null && (
             <p className="alert alert-warning">
               This offer is below recent raw sales of {money(offer.rawSales.lowest)}: that's the lowest near-mint ungraded sale we

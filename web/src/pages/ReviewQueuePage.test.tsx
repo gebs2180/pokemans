@@ -17,6 +17,7 @@ const item = (over: Partial<QueueItem>): QueueItem => ({
   confidence: 'B',
   openRequests: 0,
   priced: true,
+  waitingSince: new Date(Date.now() - 5 * 86_400_000).toISOString(),
   ...over,
 })
 
@@ -34,5 +35,20 @@ describe('ReviewQueuePage', () => {
 
     expect(await screen.findByText(/1 to review \(1 need comps\), 1 done/)).toBeInTheDocument()
     expect(screen.getByText('Needs comps: no PSA prices yet')).toBeInTheDocument()
+  })
+
+  it('shows how long each card has waited, and flags comps past the 3-day target', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(respond(200, [item({ priced: false })]))),
+    )
+    render(
+      <MemoryRouter>
+        <ReviewQueuePage />
+      </MemoryRouter>,
+    )
+
+    const waited = await screen.findByText('5d')
+    expect(waited).toHaveClass('warn')
   })
 })

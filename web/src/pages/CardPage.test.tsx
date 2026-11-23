@@ -120,7 +120,10 @@ describe('CardPage', () => {
 
   it('says what happens next, and who does it', async () => {
     renderCard(card(), { ...status, stage: 'ASSESSING', identity: 'Pikachu VMAX · Vivid Voltage 188 · EN · holo', nextStep: "We're reviewing its condition from the photos." })
-    expect(await screen.findByText('Pikachu VMAX · Vivid Voltage 188 · EN · holo')).toBeInTheDocument()
+    // Only what the heading leaves out, and the way to say it's wrong: not the name twice (review finding 17).
+    expect(await screen.findByText(/^Vivid Voltage 188 · EN · holo/)).toBeInTheDocument()
+    expect(screen.queryByText(/Identified as/)).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Wrong card? Tell us' })).toBeInTheDocument()
     expect(screen.getByText('Waiting for condition review')).toBeInTheDocument()
     expect(screen.getAllByText("We're reviewing its condition from the photos.").length).toBeGreaterThan(0)
   })
@@ -145,9 +148,21 @@ describe('CardPage', () => {
       stage: 'READY',
       condition: { low: 7, high: 9, mostLikely: 8, mayBeUngradable: false, holdingBack: [], centering: { front, back: null } },
     })
-    const line = (await screen.findByText(/measured from your photos/)).closest('p')!
+    expect(await screen.findByText('Centering measured from your photos')).toBeInTheDocument()
+    const line = screen.getByText(/^front 49\/51/)
     expect(line).toHaveTextContent('front 49/51 left-right, 48/52 top-bottom')
     expect(line).not.toHaveTextContent('back')
+  })
+
+  it('leads the centering with the best grade it allows, the ratios behind a disclosure', async () => {
+    const side = { leftRight: '55/45', topBottom: '50/50' }
+    renderCard(card(), {
+      ...status,
+      stage: 'READY',
+      condition: { low: 8, high: 10, mostLikely: 9, mayBeUngradable: false, holdingBack: [], centering: { front: side, back: side, bestPsaGrade: 10 } },
+    })
+    expect((await screen.findByText(/Centering allows up to a/)).closest('p')).toHaveTextContent('Centering allows up to a PSA 10')
+    expect(screen.getByText('The measurements').closest('details')).not.toHaveAttribute('open')
   })
 
   it('shows both sides of a measurement before there is a likely grade', async () => {
@@ -157,8 +172,8 @@ describe('CardPage', () => {
       stage: 'ASSESSING',
       condition: { low: 0, high: 0, mostLikely: 0, mayBeUngradable: false, holdingBack: [], centering: { front: side, back: side } },
     })
-    const line = (await screen.findByText(/measured from your photos/)).closest('p')!
-    expect(line).toHaveTextContent('front 52/48 left-right, 46/54 top-bottom · back 52/48 left-right, 46/54 top-bottom')
+    expect(await screen.findByText('Centering measured from your photos')).toBeInTheDocument()
+    expect(screen.getByText(/^front 52\/48/)).toHaveTextContent('front 52/48 left-right, 46/54 top-bottom · back 52/48 left-right, 46/54 top-bottom')
     expect(screen.queryByText(/Likely grade/)).not.toBeInTheDocument()
     expect(screen.queryByText(/not a grade/)).not.toBeInTheDocument()
   })
@@ -182,7 +197,61 @@ describe('CardPage', () => {
   it('shows a rejected photo beside its reason, and says how to get a good one before the first try', async () => {
     renderCard(card({ captureComplete: false, missingSides: ['FRONT', 'BACK'], photos: [] }))
     expect(await screen.findByText(/For a good first shot/)).toBeInTheDocument()
-    expect(screen.getAllByText('No photo yet')).toHaveLength(3)
+    expect(screen.getAllByText('No photo yet')).toHaveLength(2)
+  })
+
+  it('says one thing until front and back pass, and nothing else asks for them', async () => {
+    // Review finding 11: one instruction above the front; no status, offer, close-up or authenticity panels yet.
+    renderCard(card({ captureComplete: false, named: false, label: 'New card', missingSides: ['FRONT', 'BACK'], photos: [] }))
+    expect(await screen.findByText("Take the front first, then the back. We'll work out which card it is from them.")).toBeInTheDocument()
+    expect(screen.queryByText(/Still needed/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Close-up photo' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Waiting for us to identify it')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Authenticity/)).not.toBeInTheDocument()
+    // Front and back can be chosen in one go.
+    expect(screen.getByLabelText('Choose a front photo')).toHaveAttribute('multiple')
+  })
+
+  it('takes two chosen photos as front then back, with a swap before they upload', async () => {
+    const user = userEvent.setup()
+    renderCard(card({ captureComplete: false, named: false, label: 'New card', missingSides: ['FRONT', 'BACK'], photos: [] }))
+    const sent: string[] = []
+    const fetchMock = vi.mocked(fetch)
+    const original = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation((url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).endsWith('/photos')) {
+        sent.push(JSON.parse(String(init?.body)).side)
+        return Promise.resolve(respond(400, { detail: 'Photos must be JPEG or PNG' }))
+      }
+      return original(url as string, init)
+    })
+    await user.upload(await screen.findByLabelText('Choose a front photo'), [
+      new File(['b'], 'back.jpg', { type: 'image/jpeg' }),
+      new File(['f'], 'front.jpg', { type: 'image/jpeg' }),
+    ])
+    const pair = screen.getByRole('group', { name: 'Front and back' })
+    expect(within(pair).getAllByRole('figure')[0]).toHaveTextContent('Front back.jpg')
+    await user.click(within(pair).getByRole('button', { name: 'Swap front and back' }))
+    expect(within(pair).getAllByRole('figure')[0]).toHaveTextContent('Front front.jpg')
+    await user.click(within(pair).getByRole('button', { name: 'Use these' }))
+    // The front's upload is refused here, so the back isn't tried.
+    expect(await screen.findByText('Photos must be JPEG or PNG')).toBeInTheDocument()
+    expect(sent).toEqual(['FRONT'])
+  })
+
+  it('lets a collector remove a card, saying when it cannot', async () => {
+    const user = userEvent.setup()
+    renderCard(card())
+    const fetchMock = vi.mocked(fetch)
+    const original = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation((url: string | URL | Request, init?: RequestInit) =>
+      String(url).endsWith('/archive')
+        ? Promise.resolve(respond(409, { detail: 'This card has an offer: let it expire before you archive it.' }))
+        : original(url as string, init),
+    )
+    await user.click(await screen.findByText('Remove this card'))
+    await user.click(screen.getByRole('button', { name: 'Remove card' }))
+    expect(await screen.findByText('This card has an offer: let it expire before you archive it.')).toBeInTheDocument()
   })
 
   it('shows the photo that failed where no photo passed', async () => {
@@ -231,6 +300,7 @@ describe('CardPage', () => {
       Object.assign(live, { stage: 'READY', canOffer: true, nextStep: 'Ready for an instant offer.' })
       await vi.advanceTimersByTimeAsync(3500)
       expect(await screen.findByRole('button', { name: 'Get your instant offer' })).toBeInTheDocument()
+
       expect(screen.getByText('Your card is ready: get your instant offer below.')).toBeInTheDocument()
       expect(screen.queryByText(/This page updates by itself/)).not.toBeInTheDocument()
       // Settled: no more checks.
@@ -246,7 +316,8 @@ describe('CardPage', () => {
   it('asks contributors for raw photos first, and keeps selling out of the way', async () => {
     renderCard(card({ captureComplete: false, missingSides: ['FRONT', 'BACK'], photos: [] }), status, 'CONTRIBUTOR')
     expect(await screen.findByText(/from before it was graded: the raw card, out of the slab/)).toBeInTheDocument()
-    expect(screen.getByText('Selling this card instead?')).toBeInTheDocument()
+    // Until the photos pass, selling isn't even mentioned.
+    expect(screen.queryByText('Selling this card instead?')).not.toBeInTheDocument()
     expect(screen.queryByText('Waiting for us to identify it')).not.toBeInTheDocument()
     // Choosing an old photo is their main button; a seller's is the camera.
     expect(screen.getByLabelText('Choose a front photo').closest('label')).not.toHaveClass('secondary')
@@ -327,7 +398,7 @@ describe('ContainerPage', () => {
       <MemoryRouter initialEntries={['/orgs/org1/collections/c1']}>
         <Routes>
           <Route path="/orgs/:orgId/:kind/:containerId" element={<ContainerPage />} />
-          <Route path="/orgs/:orgId/cards/:cardId" element={<p>Card page</p>} />
+          <Route path="/orgs/:orgId/:kind/:containerId/new" element={<p>New card page</p>} />
         </Routes>
       </MemoryRouter>,
     )
@@ -347,8 +418,8 @@ describe('ContainerPage', () => {
     expect(await screen.findByText(/Couldn't load where each card is/)).toBeInTheDocument()
   })
 
-  it('adds a card with no name and goes straight to its photos', async () => {
-    // Photo-first: which card it is comes from its photos, on the card page.
+  it('goes straight to the first photo, making no card until there is one', async () => {
+    // Photo-first: which card it is comes from its photos. A mis-tap leaves nothing behind (review finding 10).
     const user = userEvent.setup()
     const posts: unknown[] = []
     renderCollection(posts)
@@ -357,8 +428,8 @@ describe('ContainerPage', () => {
     // Lots never get an offer, so a seller isn't asked about them.
     expect(screen.queryByLabelText('Lot of cheaper cards')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add card' }))
-    expect(await screen.findByText('Card page')).toBeInTheDocument()
-    expect(posts).toEqual([{ url: '/api/orgs/org1/collections/c1/cards', label: null, lot: false, quantity: 1 }])
+    expect(await screen.findByText('New card page')).toBeInTheDocument()
+    expect(posts).toEqual([])
   })
 })
 

@@ -17,6 +17,7 @@ import com.pokemans.app.offers.CardStatusService.Need;
 import com.pokemans.app.offers.CardStatusService.Stage;
 import com.pokemans.app.valuation.CardInputs;
 import com.pokemans.app.valuation.Valuations;
+import com.pokemans.valuation.CardValuation;
 import com.pokemans.valuation.ParameterSet;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -156,6 +157,19 @@ class CardStatusServiceTest {
         assertThat(CardStatusService.need(status, false, NOW)).isNull();
 
         assertThat(identified(null, OfferRefusal.THIN_SALES, "There isn't enough sales data.", false).stage()).isEqualTo(Stage.NO_OFFER);
+    }
+
+    /** Methodology Step 8 (Zach, 2026-11-23): a card over the maximum shows its FMV estimate; no manual offers. */
+    @Test
+    void aCardOverTheLimitShowsItsFmvEstimate() {
+        Valuations.CurrentValue value = mock(Valuations.CurrentValue.class);
+        CardValuation valuation = mock(CardValuation.class);
+        when(value.valuation()).thenReturn(valuation);
+        when(valuation.fmv()).thenReturn(new BigDecimal("6249.50"));
+        assertThat(CardStatusService.fmvEstimate(new OfferService.Quote(value, OfferRefusal.OVER_MAXIMUM, "Over.")))
+                .isEqualTo(" We estimate it's worth about $6,250 (fair market value).");
+        assertThat(CardStatusService.fmvEstimate(new OfferService.Quote(mock(Valuations.CurrentValue.class), OfferRefusal.OVER_MAXIMUM, "Over.")))
+                .isEmpty();
     }
 
     @Test

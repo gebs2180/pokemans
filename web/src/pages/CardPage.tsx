@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import {
   apiPath,
   deadlineText,
+  shortDate,
   SIDE_LABEL,
-  uploadToStorage,
   useApi,
   type CardStage,
   type CardStatus,
@@ -15,7 +15,6 @@ import {
   type OutcomeView,
   type PhotoView,
   type Side,
-  type UploadSlot,
 } from '../api'
 import { safeHref } from '../safeHref'
 import { useLoad, usePollBackoff } from '../useLoad'
@@ -26,6 +25,8 @@ import { OfferPanel } from './OfferPanel'
 import { ProvenancePanel } from './ProvenancePanel'
 import { MarkedSurfacePanel } from './DefectMarks'
 import { message } from '../format'
+import { PhotoPair } from './PhotoPair'
+import { pairOf, STEP_WORDS, uploadPhoto, type UploadStep } from './photoUpload'
 
 /** What each side should show, so a back in the Front slot is caught before it's sent. */
 const SIDE_HINT: Record<Side, string> = {
@@ -51,7 +52,14 @@ export function CardPage() {
   const api = useApi()
   const navigate = useNavigate()
   const { data: card, error, reload } = useLoad(() => api<CardView>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}`), [api, orgId, cardId])
+  const location = useLocation()
   const [busy, setBusy] = useState<Side | null>(null)
+  const [step, setStep] = useState<UploadStep>('UPLOADING')
+  // Front and back chosen in one go, waiting on the collector to check which is which.
+  const [pair, setPair] = useState<[File, File] | null>(null)
+  // After the front passes, the back's Take control comes next (review finding 13).
+  const focusBack = useRef((location.state as { focusBack?: boolean } | null)?.focusBack === true)
+  const backTake = useRef<HTMLInputElement>(null)
   // Shown in the side's own panel: on a phone the top of the page is off-screen.
   const [uploadError, setUploadError] = useState<{ side: Side; message: string } | null>(null)
   const { data: org } = useOrg(orgId)
@@ -65,28 +73,40 @@ export function CardPage() {
   const [settledVersion, setSettledVersion] = useState(0)
   const onSettled = useCallback(() => setSettledVersion((v) => v + 1), [])
 
-  async function capture(side: Side, e: ChangeEvent<HTMLInputElement>) {
+  useEffect(() => {
+    if (!focusBack.current || !card) return
+    const frontPassed = card.photos.some((p) => p.side === 'FRONT' && p.current)
+    if (frontPassed && card.missingSides.includes('BACK') && backTake.current) {
+      backTake.current.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+      backTake.current.focus()
+    }
+    if (frontPassed || !card.missingSides.includes('FRONT')) focusBack.current = false
+  }, [card])
+
+  function chosen(side: Side, e: ChangeEvent<HTMLInputElement>) {
+    const both = side === 'FRONT' ? pairOf(e.target.files) : null
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (!file) return
-    setBusy(side)
+    if (both) setPair(both)
+    else if (file) void capture([[side, file]])
+  }
+
+  async function capture(shots: [Side, File][]) {
+    setPair(null)
     setUploadError(null)
-    try {
-      const slot = await api<UploadSlot>('POST', apiPath`/api/orgs/${orgId}/cards/${cardId}/photos`, {
-        side,
-        // Some browsers leave the type blank for a format they don't know: the API's answer says what to do.
-        contentType: file.type || 'application/octet-stream',
-        sizeBytes: file.size,
-      })
-      await uploadToStorage(slot, file)
-      await api<PhotoView>('POST', apiPath`/api/orgs/${orgId}/photos/${slot.photoId}/confirm`)
-      reload()
-      setPhotoVersion((v) => v + 1)
-    } catch (err) {
-      setUploadError({ side, message: message(err) })
-    } finally {
-      setBusy(null)
+    for (const [side, file] of shots) {
+      setBusy(side)
+      try {
+        await uploadPhoto(api, orgId, cardId, side, file, setStep)
+      } catch (err) {
+        setUploadError({ side, message: message(err) })
+        break
+      }
     }
+    if (shots.length === 1 && shots[0][0] === 'FRONT') focusBack.current = true
+    setBusy(null)
+    reload()
+    setPhotoVersion((v) => v + 1)
   }
 
   if (error) return <PageError message={error} />
@@ -95,7 +115,7 @@ export function CardPage() {
   const sides: Side[] = card.lot ? ['FRONT', 'DETAIL'] : ['FRONT', 'BACK', 'DETAIL']
   const offerPanel = seller && !card.lot && (
     <OfferPanel
-      key={`${photoVersion}:${settledVersion}`}
+      key={`offer:${photoVersion}:${settledVersion}`}
       orgId={orgId}
       cardId={cardId}
       frontUrl={safeHref(card.photos.find((p) => p.side === 'FRONT' && p.current)?.url)}
@@ -107,6 +127,9 @@ export function CardPage() {
   )
   // Once the photos pass, the offer is the next thing to do: it comes first, above the photos.
   const offerFirst = card.captureComplete && !contributor
+  // Until front and back pass there's one thing to do: one instruction, and nothing else asking for them (review finding 11).
+  const starting = !card.captureComplete && !card.lot
+  const shown = starting ? sides.filter((s) => s !== 'DETAIL') : sides
   return (
     <>
       <p className="back">
@@ -115,20 +138,36 @@ export function CardPage() {
         </button>
       </p>
       <h1>{card.label}</h1>
-      {org != null && !card.lot && <IdentifyPanel orgId={orgId} cardId={cardId} photoVersion={photoVersion} onAnswer={reload} />}
-      {seller && !contributor && !card.lot && (
-        <StatusLine key={`${photoVersion}:${saleVersion}`} orgId={orgId} cardId={cardId} offerFirst={offerFirst} onSettled={onSettled} />
+      {starting && (
+        <p className="alert alert-info" role="status">
+          {card.missingSides.includes('FRONT')
+            ? "Take the front first, then the back. We'll work out which card it is from them."
+            : 'Now the back: the blue Poké Ball side.'}
+        </p>
+      )}
+      {org != null && !starting && !card.lot && <IdentifyPanel orgId={orgId} cardId={cardId} photoVersion={photoVersion} onAnswer={reload} />}
+      {seller && !contributor && !starting && !card.lot && (
+        <StatusLine
+          key={`status:${photoVersion}:${saleVersion}`}
+          orgId={orgId}
+          cardId={cardId}
+          heading={card.label}
+          offerFirst={offerFirst}
+          onSettled={onSettled}
+        />
       )}
       {contributor && !card.lot && (
         <p className="alert alert-info">
           We need photos of this card from before it was graded: the raw card, out of the slab. Photos of the slab can't be used.
         </p>
       )}
-      <p className={`capture-summary alert ${card.captureComplete ? 'alert-success' : 'alert-warning'}`}>
-        {card.captureComplete
-          ? 'All required photos passed.'
-          : `Still needed: ${card.missingSides.map((s) => SIDE_LABEL[s].toLowerCase()).join(' and ')}.`}
-      </p>
+      {!starting && (
+        <p className={`capture-summary alert ${card.captureComplete ? 'alert-success' : 'alert-warning'}`}>
+          {card.captureComplete
+            ? 'All required photos passed.'
+            : `Still needed: ${card.missingSides.map((s) => SIDE_LABEL[s].toLowerCase()).join(' and ')}.`}
+        </p>
+      )}
       {card.photosFrozen && <p className="muted small">{card.photosFrozen}</p>}
       {card.lot && <p className="muted">Lot of {card.quantity}: one photo of the whole lot, laid out flat, is enough. Lots don't get offers.</p>}
       {offerFirst && offerPanel}
@@ -140,7 +179,7 @@ export function CardPage() {
         </p>
       )}
 
-      {sides.map((side) => {
+      {shown.map((side) => {
         const attempts = card.photos.filter((p) => p.side === side && p.status !== 'AWAITING_UPLOAD')
         const current = attempts.find((p) => p.current) ?? null
         const latest = attempts.at(-1)
@@ -190,17 +229,29 @@ export function CardPage() {
             {uploadError?.side === side && <p className="error" role="alert">{uploadError.message}</p>}
             {!card.photosFrozen &&
               (busy === side ? (
-                <Loading>Uploading and checking…</Loading>
+                <Loading>{STEP_WORDS[step]}</Loading>
+              ) : pair && side === 'FRONT' ? (
+                <PhotoPair
+                  files={pair}
+                  onUse={(f, b) =>
+                    void capture([
+                      ['FRONT', f],
+                      ['BACK', b],
+                    ])
+                  }
+                  onCancel={() => setPair(null)}
+                />
               ) : (
                 <div className="actions">
                   {/* The camera straight away, or a photo already taken (e.g. from a lightbox setup): Android opens only the camera with capture set. */}
                   <label className={current || contributor ? 'capture secondary' : 'capture'}>
                     <input
+                      ref={side === 'BACK' ? backTake : undefined}
                       type="file"
                       accept="image/jpeg,image/png"
                       capture="environment"
                       disabled={busy !== null}
-                      onChange={(e) => capture(side, e)}
+                      onChange={(e) => chosen(side, e)}
                       aria-label={`${latest ? 'Retake' : 'Take'} ${SIDE_LABEL[side].toLowerCase()} photo`}
                     />
                     {latest ? 'Retake' : 'Take photo'}
@@ -210,11 +261,13 @@ export function CardPage() {
                     <input
                       type="file"
                       accept="image/jpeg,image/png"
+                      // Front and back in one go, while neither has passed: the first is the front (review finding 13).
+                      multiple={side === 'FRONT' && !card.lot && starting && !current}
                       disabled={busy !== null}
-                      onChange={(e) => capture(side, e)}
+                      onChange={(e) => chosen(side, e)}
                       aria-label={`Choose a ${SIDE_LABEL[side].toLowerCase()} photo`}
                     />
-                    Choose a photo
+                    {side === 'FRONT' && !card.lot && starting && !current ? 'Choose photos' : 'Choose a photo'}
                   </label>
                 </div>
               ))}
@@ -222,9 +275,10 @@ export function CardPage() {
         )
       })}
       {/* A closer look at the passing photos, filters and zoom in the browser only: it changes nothing about the offer. */}
-      {!card.lot && <MarkedSurfacePanel audience="collector" orgId={orgId} cardId={cardId} photos={card.photos.filter((p) => p.current)} />}
-      {org?.type === 'CONTRIBUTOR' && !card.lot && <GradedResult orgId={orgId} cardId={cardId} ready={card.captureComplete} />}
+      {!starting && !card.lot && <MarkedSurfacePanel audience="collector" orgId={orgId} cardId={cardId} photos={card.photos.filter((p) => p.current)} />}
+      {org?.type === 'CONTRIBUTOR' && !starting && !card.lot && <GradedResult orgId={orgId} cardId={cardId} ready={card.captureComplete} />}
       {!offerFirst &&
+        !starting &&
         (contributor && offerPanel ? (
           <details className="disclosure">
             <summary>Selling this card instead?</summary>
@@ -233,8 +287,9 @@ export function CardPage() {
         ) : (
           offerPanel
         ))}
-      {/* Authenticity, and who holds the card (needed before it can back an advance; hidden while collateral is off). */}
-      {org && org.type !== 'CONTRIBUTOR' && <ProvenancePanel orgId={orgId} cardId={cardId} admin={false} />}
+      {/* Authenticity, and who holds the card: only once we know which card it is (review finding 11). */}
+      {org && org.type !== 'CONTRIBUTOR' && (card.named || card.lot) && <ProvenancePanel orgId={orgId} cardId={cardId} admin={false} />}
+      {seller && !contributor && !card.photosFrozen && <ArchiveCard orgId={orgId} cardId={cardId} />}
       {seller && (
         <p className="muted small">
           Something wrong with this card? <Link to="/how-it-works#contact">Tell us</Link>
@@ -245,7 +300,19 @@ export function CardPage() {
 }
 
 /** Where the card is on the way to a sale, the card as we identified it, and what happens next. */
-function StatusLine({ orgId, cardId, offerFirst, onSettled }: { orgId: string; cardId: string; offerFirst: boolean; onSettled?: () => void }) {
+function StatusLine({
+  orgId,
+  cardId,
+  heading,
+  offerFirst,
+  onSettled,
+}: {
+  orgId: string
+  cardId: string
+  heading: string
+  offerFirst: boolean
+  onSettled?: () => void
+}) {
   const api = useApi()
   const { data, reload } = useLoad(() => api<CardStatus>('GET', apiPath`/api/orgs/${orgId}/cards/${cardId}/status`), [api, orgId, cardId])
   const working = data != null && WORKING_ON_IT.has(data.stage)
@@ -265,18 +332,15 @@ function StatusLine({ orgId, cardId, offerFirst, onSettled }: { orgId: string; c
   const deadline = deadlineText(data)
   return (
     <div className="status-line">
-      {data.identity && (
-        <p>
-          <span className="muted">Identified as</span> <strong>{data.identity}</strong>
-        </p>
-      )}
+      {data.identity && <IdentityExtras identity={data.identity} heading={heading} />}
       {data.condition && <LikelyGrade condition={data.condition} />}
       <p>
         <StageChip stage={data.stage} />
       </p>
       {working && !gaveUp && (
         <p role="status" className="small">
-          {WORKING_WORDS[data.stage as keyof typeof WORKING_WORDS]} This page updates by itself.
+          {WORKING_WORDS[data.stage as keyof typeof WORKING_WORDS]} {data.waitingSince && `We've been on it since ${sinceText(data.waitingSince)}. `}
+          This page updates by itself.
         </p>
       )}
       {working && gaveUp && <p className="muted small">This is taking longer than usual. Reload the page to check again.</p>}
@@ -315,15 +379,86 @@ export function LikelyGrade({ condition }: { condition: ConditionSummary }) {
         </p>
       )}
       {measured.length > 0 && (
-        <p className="small">
-          <span className="muted">Centering, measured from your photos:</span> {measured.join(' · ')}
-        </p>
+        <div className="small">
+          <p>
+            {centering?.bestPsaGrade != null ? (
+              <>
+                <span className="muted">Centering allows up to a</span> <strong>PSA {centering.bestPsaGrade}</strong>
+              </>
+            ) : (
+              <span className="muted">Centering measured from your photos</span>
+            )}
+          </p>
+          <details className="disclosure">
+            <summary>The measurements</summary>
+            <p>{measured.join(' · ')}</p>
+          </details>
+        </div>
       )}
       {mayBeUngradable && <p className="small warn">It may not be gradable at all, e.g. if it's been altered or damaged.</p>}
       {graded && (
         <p className="muted small">Our estimate from your photos, not a grade. An offer's price stays the same whatever grade the card gets.</p>
       )}
     </div>
+  )
+}
+
+/**
+ * What the card's identity adds to the heading, e.g. language and edition, and the way to say it's wrong; the name
+ * isn't said twice (review finding 17).
+ */
+export function IdentityExtras({ identity, heading }: { identity: string; heading: string }) {
+  const said = new Set(heading.split('·').map((t) => t.trim().toLowerCase()))
+  const extras = identity
+    .split('·')
+    .map((t) => t.trim())
+    .filter((t) => t && !said.has(t.toLowerCase()))
+  return (
+    <p className="small">
+      {extras.length > 0 && <span className="muted">{extras.join(' · ')} · </span>}
+      <Link to="/how-it-works#contact">Wrong card? Tell us</Link>
+    </p>
+  )
+}
+
+/** When a wait began, as a time today or a date before that. */
+function sinceText(iso: string) {
+  const at = new Date(iso)
+  return at.toDateString() === new Date().toDateString()
+    ? at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : shortDate(iso)
+}
+
+/** Takes a card off the collector's list while nothing depends on it; its photos are kept (review finding 10). */
+function ArchiveCard({ orgId, cardId }: { orgId: string; cardId: string }) {
+  const api = useApi()
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function archive() {
+    setBusy(true)
+    setError(null)
+    try {
+      await api<void>('POST', apiPath`/api/orgs/${orgId}/cards/${cardId}/archive`)
+      navigate(`/orgs/${encodeURIComponent(orgId)}`, { replace: true })
+    } catch (err) {
+      setError(message(err))
+      setBusy(false)
+    }
+  }
+  return (
+    <details className="disclosure">
+      <summary>Remove this card</summary>
+      <p className="small">It comes off your list. You can't remove a card with an offer or one that's been posted to buyers.</p>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="button" className="secondary" onClick={archive} disabled={busy} aria-busy={busy}>
+        Remove card
+      </button>
+    </details>
   )
 }
 

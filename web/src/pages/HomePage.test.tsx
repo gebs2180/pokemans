@@ -82,7 +82,9 @@ describe('Home', () => {
     const label: NeedsYouItem = { cardId: 'c', label: 'Pikachu', need: 'LABEL_READY', due: '2099-11-05T12:00:00Z', sides: [] }
     const retake: NeedsYouItem = { cardId: 'd', label: 'Snorlax', need: 'RETAKE', due: null, sides: ['FRONT', 'BACK'] }
     const ready: NeedsYouItem = { cardId: 'e', label: 'Lapras', need: 'GET_OFFER', due: null, sides: [] }
-    stub(seller([retake, offer, ready, ending, label]))
+    const confirm: NeedsYouItem = { cardId: 'f', label: 'New card', need: 'CONFIRM_CARD', due: null, sides: [] }
+    const checking: NeedsYouItem = { cardId: 'g', label: 'Gengar', need: 'CHECKING', due: '2026-11-20T12:00:00Z', sides: [] }
+    stub(seller([retake, offer, checking, ready, ending, label, confirm]))
     page('/')
     const needs = await screen.findByRole('region', { name: 'Needs you' })
     const rows = within(needs).getAllByRole('listitem').map((li) => li.textContent)
@@ -92,7 +94,10 @@ describe('Home', () => {
     expect(rows.slice(3).join()).toMatch(/Snorlax.*Retake front and back/)
     expect(rows.slice(3).join()).toMatch(/Lapras.*Get your offer/)
     expect(within(needs).getByRole('link', { name: 'Pikachu' })).toHaveAttribute('href', '/orgs/org1/cards/c')
-    expect(within(needs).getByText(/check back here/)).toBeInTheDocument()
+    expect(within(needs).getByText('Which card is it?')).toBeInTheDocument()
+    // Cards we're checking are only counted: nothing to do on them (review finding 2).
+    expect(within(needs).queryByText('Gengar')).not.toBeInTheDocument()
+    expect(within(needs).getByText("We're checking 1 card. We'll email you when each offer is ready.")).toBeInTheDocument()
   })
 
   it("doesn't call a passed ship-by date a date to ship by", async () => {

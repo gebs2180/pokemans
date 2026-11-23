@@ -262,7 +262,10 @@ class CardStatusService {
         }
         if (quote.refused() == OfferRefusal.OVER_MAXIMUM) {
             // Not "no offer yet": no instant offer comes later for a card worth more than the limit.
-            return new CardStatus(cardId, Stage.OVER_LIMIT, identity, quote.refusal() + " You're free to sell it elsewhere.", false);
+            // Over the maximum: its FMV estimate and that it can be sold elsewhere; no manual offers (methodology Step 8,
+            // Zach, 2026-11-23).
+            return new CardStatus(cardId, Stage.OVER_LIMIT, identity, quote.refusal() + fmvEstimate(quote)
+                    + " You're free to sell it elsewhere.", false);
         }
         if (quote.refused() == OfferRefusal.THIN_SALES) {
             return gaveUpOnComps(pricingSince, now) ? new CardStatus(cardId, Stage.NO_OFFER, identity, GAVE_UP, false)
@@ -285,6 +288,15 @@ class CardStatusService {
     }
 
     /** True once a card has waited on sold prices added by hand for as long as we wait. An unknown start never gives up. */
+    /** " We estimate it's worth about $5,200.", from the card's FMV; empty when there's none. */
+    static String fmvEstimate(OfferService.Quote quote) {
+        if (quote.value() == null || quote.value().valuation() == null || quote.value().valuation().fmv() == null) {
+            return "";
+        }
+        long dollars = quote.value().valuation().fmv().setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+        return " We estimate it's worth about $" + String.format(java.util.Locale.US, "%,d", dollars) + " (fair market value).";
+    }
+
     static boolean gaveUpOnComps(Instant since, Instant now) {
         return since != null && !now.isBefore(since.plus(COMPS_GIVE_UP));
     }
