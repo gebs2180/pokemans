@@ -26,7 +26,7 @@ import { safeHref } from '../safeHref'
 import { Chip, EmptyState, Field, Loading, PageError } from '../ui'
 import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
-import { AddressForm } from './AddressForm'
+import { AddressForm, AddressPanel } from './AddressForm'
 import { HowPriced } from './OfferPanel'
 import { DealTimeline } from './DealTimeline'
 import { dealSteps } from '../dealSteps'
@@ -63,7 +63,7 @@ export function Photos({ photos }: { photos: PhotoLink[] }) {
     <>
       <div className="photos">
         {shown.map((p, i) => (
-          <button key={p.thumb} type="button" className="photo compact photo-button" onClick={() => setOpen(i)}>
+          <button key={p.thumb} type="button" className={`photo ${i === 0 ? 'photo-lead' : 'compact'} photo-button`} onClick={() => setOpen(i)}>
             <img src={p.thumb} alt={`${SIDE_LABEL[p.side]} photo`} className="thumb" />
             <span className="muted small">{SIDE_LABEL[p.side]}</span>
           </button>
@@ -164,19 +164,24 @@ function PostageLine({ estimate, price }: { estimate: PostageEstimate; price: nu
   )
 }
 
-/** A buyer's two lists, as tabs, with the way back to the org. */
+/** A buyer's two lists, as tabs with how many are in each, with the way back home. */
 function BuyerNav({ orgId }: { orgId: string }) {
+  const api = useApi()
+  // Counts are a convenience: quiet while loading and on failure, the tabs read fine without them.
+  const market = useLoad(() => api<unknown[]>('GET', apiPath`/api/orgs/${orgId}/market`), [api, orgId]).data
+  const deals = useLoad(() => api<unknown[]>('GET', apiPath`/api/orgs/${orgId}/deals`), [api, orgId]).data
+  const count = (list: unknown[] | null | undefined) => (Array.isArray(list) ? ` (${list.length})` : '')
   return (
     <>
       <p className="back">
-        <Link to={`/orgs/${orgId}`}>← Back</Link>
+        <Link to="/">← Home</Link>
       </p>
       <nav className="tabs" aria-label="Buying">
         <NavLink to={`/orgs/${orgId}/market`} end>
-          Cards for sale
+          Cards for sale{count(market)}
         </NavLink>
         <NavLink to={`/orgs/${orgId}/deals`} end>
-          Your deals
+          Your deals{count(deals)}
         </NavLink>
       </nav>
     </>
@@ -291,7 +296,7 @@ export function MarketPage() {
   return (
     <>
       <BuyerNav orgId={orgId} />
-      <h1>Cards for sale</h1>
+      <h1 className="sr-only">Cards for sale</h1>
       <p className="muted">
         Each raw card has one firm price, based on the grade it's likely to be. Accepting buys it at that price, whatever it grades;
         we send the seller a prepaid label to you, billed to you monthly.
@@ -374,6 +379,7 @@ export function MarketPage() {
             </section>
           )
         })}
+      <AddressPanel orgId={orgId} title="Where cards ship to" />
     </>
   )
 }
@@ -404,7 +410,7 @@ export function DealsPage() {
   return (
     <>
       <BuyerNav orgId={orgId} />
-      <h1>Your deals</h1>
+      <h1 className="sr-only">Your deals</h1>
       {record && <OutcomeRecord record={record} />}
       {labelError && <p className="error" role="alert">{labelError}</p>}
       {!data && <Loading />}

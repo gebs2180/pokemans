@@ -334,7 +334,7 @@ export function OfferPanel({
       )}
       {listing?.status === 'CANCELLED' && listing.offerId === offer?.id && (
         <p className="alert alert-danger">
-          We cancelled the sale{listing.buyer?.orgName && ` to ${listing.buyer.orgName}`}
+          We cancelled the sale
           {listing.undone && ` on ${shortDate(listing.undone.at)}: ${listing.undone.reason}`}. Don't ship the card, and
           don't use its label. If you already shipped it, tell us and we'll help get it back.
         </p>

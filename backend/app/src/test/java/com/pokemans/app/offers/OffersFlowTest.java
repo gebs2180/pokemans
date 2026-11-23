@@ -149,7 +149,9 @@ class OffersFlowTest {
         api.postJson(accept(secondOrg, listingId), "", second).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail", containsString("Another buyer took this card first")));
         api.get(sale(card), seller).andExpect(jsonPath("$.listing.status").value("ACCEPTED"))
-                .andExpect(jsonPath("$.listing.buyer.orgName").value("First Buyer"))
+                // Sellers see "a buyer", never the buyer's name (Zach, 2026-11-23).
+                .andExpect(jsonPath("$.listing.buyer").exists())
+                .andExpect(jsonPath("$.listing.buyer.orgName").doesNotExist())
                 .andExpect(jsonPath("$.listing.label.labelUrl", containsString("https://labels.example/")));
         // The ship-by date comes from the API, so the web app doesn't recompute it (review finding 17).
         String boughtAt = TestApi.read(api.get(sale(card), seller), "$.listing.label.boughtAt");

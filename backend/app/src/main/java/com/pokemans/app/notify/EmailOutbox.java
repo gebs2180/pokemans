@@ -18,7 +18,7 @@ class EmailOutbox {
     enum Status { PENDING, SENDING, SENT, FAILED, SKIPPED, CANCELLED }
 
     /** What an email is, so its rows can be found again: e.g. reminders to cancel once paid. */
-    enum Template { SALE_TAKEN, CARD_ARRIVED, BUYER_PAID, PAYMENT_DUE, PAYMENT_REMINDER, NEW_LISTINGS, OFFER_READY }
+    enum Template { SALE_TAKEN, CARD_ARRIVED, BUYER_PAID, PAYMENT_DUE, PAYMENT_REMINDER, NEW_LISTINGS, OFFER_READY, BUYER_DECISION }
 
     /** A new email. {@code sendAt} is when it's due; a reminder's is in the future. */
     record New(String dedupeKey, Template template, UUID recipientUserId, String recipientEmail, UUID orgId, UUID listingId,

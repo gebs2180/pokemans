@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
-import { apiPath, useApi, type ConsentStatus, type ContainerSummary, type Me } from '../api'
+import { apiPath, useApi, type BuyingState, type ConsentStatus, type ContainerSummary, type Me } from '../api'
 import { EmptyState, Loading, PageError } from '../ui'
 import { useFormError } from '../useFormError'
 import { useLoad } from '../useLoad'
@@ -35,17 +35,7 @@ export function OrgHome({ orgId, title, lead }: { orgId: string; title?: string;
   if (org.type === 'BUYER') {
     return (
       <ConsentGate orgId={orgId} title="Before you buy" intro="Please read what accepting an offer commits you to." accepted="buyer terms" guide="buyer">
-        <h1>{org.name}</h1>
-        <BuyingNotice orgId={orgId} />
-        <ul className="tile-list">
-          <li className="tile">
-            <Link to={`/orgs/${orgId}/market`}>Cards for sale</Link> <span className="muted">raw cards at one firm price each</span>
-          </li>
-          <li className="tile">
-            <Link to={`/orgs/${orgId}/deals`}>Your deals</Link> <span className="muted">cards you bought, labels, and arrivals to record</span>
-          </li>
-        </ul>
-        <AddressPanel orgId={orgId} title="Where cards ship to" />
+        <BuyerLanding orgId={orgId} name={org.name} />
       </ConsentGate>
     )
   }
@@ -65,6 +55,31 @@ export function OrgHome({ orgId, title, lead }: { orgId: string; title?: string;
     </ConsentGate>
   ) : (
     containers
+  )
+}
+
+/**
+ * An approved buyer lands on the market itself (UX review finding 14): the org page was two tiles with nothing to tell
+ * them apart. Anyone who can't buy yet sees the notice and the address.
+ */
+function BuyerLanding({ orgId, name }: { orgId: string; name: string }) {
+  const api = useApi()
+  const { data } = useLoad(() => api<BuyingState>('GET', '/api/me/buying'), [api])
+  if (data?.status === 'APPROVED' && data.orgId === orgId) return <Navigate to={`/orgs/${orgId}/market`} replace />
+  return (
+    <>
+      <h1>{name}</h1>
+      <BuyingNotice orgId={orgId} />
+      <ul className="tile-list">
+        <li className="tile">
+          <Link to={`/orgs/${orgId}/market`}>Cards for sale</Link> <span className="muted">raw cards at one firm price each</span>
+        </li>
+        <li className="tile">
+          <Link to={`/orgs/${orgId}/deals`}>Your deals</Link> <span className="muted">cards you bought, labels, and arrivals to record</span>
+        </li>
+      </ul>
+      <AddressPanel orgId={orgId} title="Where cards ship to" />
+    </>
   )
 }
 

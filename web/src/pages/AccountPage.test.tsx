@@ -63,7 +63,7 @@ describe('Account', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Start buying' }))
     expect(screen.getByRole('region', { name: 'Buyer terms' })).toHaveTextContent('You pay what you accept.')
-    expect(screen.getByLabelText("Name buyers' deals go under")).toHaveValue('Sam Test')
+    expect(screen.getByLabelText("Buyer name")).toHaveValue('Sam Test')
     await userEvent.type(screen.getByLabelText('Ship to (name)'), 'Sam')
     await userEvent.type(screen.getByLabelText('Street address'), '2 Oak St')
     await userEvent.type(screen.getByLabelText('City'), 'Springfield')
@@ -84,6 +84,17 @@ describe('Account', () => {
     })
   })
 
+  it('starts the ship-to from the address they ship cards from, and says so', async () => {
+    const found = { name: 'Sam Seller', street1: '9 Elm St', street2: null, city: 'Peoria', state: 'IL', zip: '61602', phone: '555-0100', company: null, paymentHandle: 'venmo' }
+    stub({ '/api/me': me(), '/api/me/buying': state(), '/api/orgs/org1/ship-address': found })
+    page('/account')
+    await userEvent.click(await screen.findByRole('button', { name: 'Start buying' }))
+    await waitFor(() => expect(screen.getByLabelText('Street address')).toHaveValue('9 Elm St'))
+    expect(screen.getByLabelText('Ship to (name)')).toHaveValue('Sam Seller')
+    expect(screen.getByText(/Filled in from the address you ship your cards from/)).toBeInTheDocument()
+    expect(screen.getByText(/How buying works/)).toBeInTheDocument()
+  })
+
   it('says it is waiting for approval', async () => {
     stub({ '/api/me': me(), '/api/me/buying': state({ status: 'WAITING', orgId: 'b1', orgName: 'Sam buys', appliedAt: '2026-11-20T10:00:00Z' }) })
     page('/account')
@@ -96,7 +107,7 @@ describe('Account', () => {
     page('/account')
     expect(await screen.findByText('Add a phone number.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Ask again' }))
-    expect(screen.getByLabelText("Name buyers' deals go under")).toHaveValue('Sam buys')
+    expect(screen.getByLabelText("Buyer name")).toHaveValue('Sam buys')
   })
 
   it('links an approved buyer to their buyer account', async () => {
@@ -109,8 +120,8 @@ describe('Account', () => {
     })
     page('/account')
     expect(await screen.findByRole('link', { name: 'Sam buys' })).toHaveAttribute('href', '/orgs/b1')
-    // Two orgs: the seller org has its own page, and the buyer org isn't listed as selling.
-    expect(screen.getByRole('link', { name: 'Sam Test' })).toHaveAttribute('href', '/orgs/org1')
+    // One seller org plus a buyer org: Home is the seller org, so it links to Home.
+    expect(screen.getByRole('link', { name: 'Sam Test' })).toHaveAttribute('href', '/')
     expect(screen.getAllByRole('link', { name: 'Sam buys' })).toHaveLength(1)
   })
 })

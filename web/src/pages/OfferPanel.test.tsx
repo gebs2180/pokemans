@@ -228,7 +228,7 @@ describe('OfferPanel', () => {
     )
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
-    expect(await screen.findByText(/Sold to Card Shop on/)).toBeInTheDocument()
+    expect(await screen.findByText(/Sold to a buyer on/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Print your prepaid label' })).toHaveAttribute('href', 'https://labels.example/l1.pdf')
     // The tracking number is said once, in the timeline's label step.
     expect(screen.getByText('Tracking 9400111')).toBeInTheDocument()
@@ -275,7 +275,7 @@ describe('OfferPanel', () => {
     )
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
-    expect(await screen.findByText(/We cancelled the sale to Card Shop on .*: buyer closed\. Don't ship the card/)).toBeInTheDocument()
+    expect(await screen.findByText(/We cancelled the sale on .*: buyer closed\. Don't ship the card/)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Print your prepaid label' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Get a new offer' })).toBeInTheDocument()
   })
