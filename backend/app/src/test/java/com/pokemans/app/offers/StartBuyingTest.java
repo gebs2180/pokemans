@@ -1,5 +1,6 @@
 package com.pokemans.app.offers;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,6 +15,7 @@ import com.pokemans.app.TestcontainersConfiguration;
 import com.pokemans.app.identity.Consents;
 import com.pokemans.app.identity.SecurityProperties;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -41,6 +44,9 @@ class StartBuyingTest {
     @Autowired
     private SecurityProperties security;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     private TestApi api;
     private TestMarket market;
 
@@ -52,6 +58,10 @@ class StartBuyingTest {
 
     private static String body(String version) {
         return "{\"name\":\"Sam buys\",\"version\":\"" + version + "\",\"shipTo\":" + TestMarket.SHIP_TO + "}";
+    }
+
+    private List<Map<String, Object>> decisionEmails(String request) {
+        return jdbc.queryForList("select * from email_message where dedupe_key = ?", "BUYER_DECISION:" + request);
     }
 
     private String marketOf(Buyer buyer) {
@@ -99,6 +109,9 @@ class StartBuyingTest {
                 .andExpect(jsonPath("$.decidedBy").hasJsonPath())
                 .andExpect(jsonPath("$.decidedAt").isNotEmpty());
         api.postJson("/api/admin/buyers/" + request + "/approve", "", api.admin()).andExpect(status().isConflict());
+        // One email tells them, and the second try that bounced queued nothing more.
+        assertThat(decisionEmails(request)).singleElement()
+                .satisfies(m -> assertThat(m.get("subject")).isEqualTo("You can buy on Rawmark now"));
         api.get("/api/me/buying", seller.who())
                 .andExpect(jsonPath("$.status").value("APPROVED"))
                 .andExpect(jsonPath("$.decidedAt").isNotEmpty());
@@ -124,6 +137,11 @@ class StartBuyingTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.approved").value(false));
         api.postJson("/api/admin/buyers/" + first + "/approve", "", api.admin()).andExpect(status().isConflict());
+        // The decline email carries the reason; the refused blank-note try queued none.
+        assertThat(decisionEmails(first)).singleElement().satisfies(m -> {
+            assertThat(m.get("subject")).isEqualTo("About your request to buy on Rawmark");
+            assertThat((String) m.get("text_body")).contains("Add a ship-to address we can label.");
+        });
 
         api.get("/api/me/buying", seller.who())
                 .andExpect(jsonPath("$.status").value("DECLINED"))

@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { ORG_TYPE_LABEL, useApi, type BuyingState, type Me } from '../api'
+import { apiPath, ORG_TYPE_LABEL, useApi, type BuyingState, type Me, type ShipAddress } from '../api'
 import { message } from '../format'
 import { Field, Loading, PageError } from '../ui'
 import { useFormError } from '../useFormError'
@@ -72,7 +72,7 @@ function BuyingSide({ state, me, onChange }: { state: BuyingState; me: Me; onCha
   if (state.status === 'WAITING') {
     return (
       <p role="status">
-        Waiting for approval. You asked on {date(state.appliedAt)}. We'll open the market to you once Zach approves it.
+        Waiting for approval. You asked on {date(state.appliedAt)}. We'll email you when Zach has answered, whether it's a yes or a no.
       </p>
     )
   }
@@ -91,7 +91,12 @@ function BuyingSide({ state, me, onChange }: { state: BuyingState; me: Me; onCha
         <p>Buy raw cards at one firm price each, from the same login. Zach approves each new buyer first.</p>
       )}
       {asking ? (
-        <StartBuying state={state} defaultName={state.orgName ?? me.memberships[0].orgName} onDone={onChange} />
+        <StartBuying
+          state={state}
+          defaultName={state.orgName ?? me.memberships[0].orgName}
+          sellerOrgIds={me.memberships.filter((m) => m.orgType !== 'BUYER').map((m) => m.orgId)}
+          onDone={onChange}
+        />
       ) : (
         <button onClick={() => setAsking(true)}>{declined ? 'Ask again' : 'Start buying'}</button>
       )}
@@ -100,14 +105,60 @@ function BuyingSide({ state, me, onChange }: { state: BuyingState; me: Me; onCha
 }
 
 /** The buyer terms, a name and a ship-to address: everything the request needs, sent together. */
-function StartBuying({ state, defaultName, onDone }: { state: BuyingState; defaultName: string; onDone: () => void }) {
+function StartBuying({
+  state,
+  defaultName,
+  sellerOrgIds,
+  onDone,
+}: {
+  state: BuyingState
+  defaultName: string
+  sellerOrgIds: string[]
+  onDone: () => void
+}) {
   const api = useApi()
+  const [prefilled, setPrefilled] = useState(false)
+  const orgKey = sellerOrgIds.join(',')
   const [name, setName] = useState(defaultName)
   const [a, setA] = useState(EMPTY)
   const [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const formError = useFormError(error)
+
+  // Someone who already sells here gave a ship-from address: start from it (never the payment fields), and say so.
+  // Quiet on failure; an empty form is the fallback. Only fills a form they haven't started typing in.
+  useEffect(() => {
+    let live = true
+    void (async () => {
+      for (const orgId of orgKey.split(',').filter(Boolean)) {
+        try {
+          const found = await api<ShipAddress | null>('GET', apiPath`/api/orgs/${orgId}/ship-address`)
+          if (!found || !live) continue
+          setA((now) =>
+            now === EMPTY
+              ? {
+                  name: found.name,
+                  street1: found.street1,
+                  street2: found.street2 ?? '',
+                  city: found.city,
+                  state: found.state,
+                  zip: found.zip,
+                  phone: found.phone ?? '',
+                }
+              : now,
+          )
+          setPrefilled(true)
+          return
+        } catch {
+          // try the next org
+        }
+      }
+    })()
+    return () => {
+      live = false
+    }
+  }, [api, orgKey])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -142,14 +193,26 @@ function StartBuying({ state, defaultName, onDone }: { state: BuyingState; defau
 
   return (
     <form onSubmit={submit} className="form" aria-describedby={formError.describedBy}>
+      <h3>How buying works</h3>
+      <ul>
+        <li>You see photos of each raw card, taken by the seller.</li>
+        <li>Every card has one firm price. The first buyer to accept gets it.</li>
+        <li>You pay the seller directly; we never hold your money.</li>
+      </ul>
+      <p className="muted">
+        <Link to="/how-it-works">Read how it works in full</Link>
+      </p>
       <h3>The buyer terms</h3>
-      <pre className="terms" tabIndex={0} role="region" aria-label="Buyer terms">
-        {state.terms.text}
-      </pre>
-      <Field label="Name buyers' deals go under" hint="Your name or your shop's. Sellers never see it.">
+      <div className="terms terms-full" role="region" aria-label="Buyer terms">
+        {state.terms.text.split(/\n\s*\n/).map((paragraph, i) => (
+          <p key={i}>{paragraph}</p>
+        ))}
+      </div>
+      <Field label="Buyer name" hint="Your name or your shop's. Sellers only ever see “a buyer”; we see this name.">
         {(control) => <input {...control} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} />}
       </Field>
       <h3>Where cards ship to</h3>
+      {prefilled && <p className="muted">Filled in from the address you ship your cards from. Change it if cards should go somewhere else.</p>}
       {field('name', 'Ship to (name)', { required: true, maxLength: 100, autoComplete: 'name' })}
       {field('street1', 'Street address', { required: true, maxLength: 200, autoComplete: 'address-line1' })}
       {field('street2', 'Apartment, suite (optional)', { maxLength: 200, autoComplete: 'address-line2' })}

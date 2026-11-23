@@ -22,10 +22,19 @@ export function useOrg(orgId: string) {
   }, [api, orgId])
 }
 
-/** The org whose page is this member's home page: they have just the one, and aren't the admin or a partner. */
+/**
+ * The org whose page is this member's home page: they have just the one, and aren't the admin or a partner. A seller who
+ * also buys has one seller org plus a buyer org, and home is still the seller org (the buyer org is a "Buying" section).
+ */
 export function soleOrg(me: Me) {
-  if (me.roles.includes('ADMIN') || me.memberships.length !== 1) return null
-  return me.memberships[0].orgType === 'PARTNER' ? null : me.memberships[0]
+  if (me.roles.includes('ADMIN')) return null
+  const only = me.memberships.length === 1 ? me.memberships[0] : sellerOrgs(me).length === 1 ? sellerOrgs(me)[0] : null
+  return only && only.orgType !== 'PARTNER' ? only : null
+}
+
+/** The memberships that aren't buyer orgs. */
+function sellerOrgs(me: Me) {
+  return me.memberships.filter((m) => m.orgType !== 'BUYER')
 }
 
 /** URL segment and labels for an org's containers: batches for partners, binders (collections in the API) for everyone else. */

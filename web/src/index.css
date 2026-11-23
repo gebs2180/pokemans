@@ -1060,6 +1060,28 @@ p.error[role='status'] {
   width: 6rem;
 }
 
+/* The front, full width of the card on a phone, with the other sides as thumbnails beside or under it (UX review 15). */
+.photo.photo-lead {
+  width: min(100%, 18rem);
+  flex-basis: 100%;
+}
+
+.photo.photo-lead .thumb {
+  width: 100%;
+}
+
+/* Kept for screen readers and the page's outline, where a tab already says it. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Card photos on instant-offer listings. */
 .thumb {
   display: block;
