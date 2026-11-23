@@ -60,6 +60,17 @@ public class OrgAccess {
         return memberships.findByOrgId(otherOrgId).stream().anyMatch(m -> members.contains(m.getUserId()));
     }
 
+    /**
+     * Every org a login in this org, or the caller, belongs to: the sellers whose cards would be this buyer org's own.
+     * Nobody buys their own card, and the check is per person across every org they belong to (methodology doc Step 8).
+     */
+    @Transactional(readOnly = true)
+    public Set<UUID> ownOrgs(UUID orgId) {
+        Set<UUID> people = memberships.findByOrgId(orgId).stream().map(Membership::getUserId).collect(Collectors.toSet());
+        people.add(currentUser.id());
+        return people.stream().flatMap(u -> memberships.findByUserId(u).stream()).map(Membership::getOrgId).collect(Collectors.toSet());
+    }
+
     private static ResponseStatusException notFound() {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "Org not found");
     }

@@ -63,6 +63,28 @@ public class TestMarket {
         return new Buyer(orgId, who);
     }
 
+    public static final String SHIP_TO = "{\"name\":\"Sam\",\"street1\":\"2 Oak St\",\"city\":\"Springfield\",\"state\":\"IL\",\"zip\":\"62701\"}";
+
+    /** "Start buying" from a seller's login: a buyer org waiting for the admin's approval. */
+    public Buyer startBuying(Seller seller) throws Exception {
+        String orgId = TestApi.read(api.postJson("/api/me/buying", "{\"name\":\"Sam buys\",\"version\":\"" + Consents.BUYER_TERMS_VERSION
+                + "\",\"shipTo\":" + SHIP_TO + "}", seller.who()).andExpect(status().isCreated()), "$.orgId");
+        return new Buyer(orgId, seller.who());
+    }
+
+    /** The id of the buyer org's request waiting in the admin's queue. */
+    public String request(Buyer buyer) throws Exception {
+        List<String> ids = com.jayway.jsonpath.JsonPath.read(api.get("/api/admin/buyers", api.admin()).andReturn().getResponse().getContentAsString(),
+                "$[?(@.orgId=='" + buyer.orgId() + "' && @.approved == null)].id");
+        return ids.getFirst();
+    }
+
+    /** The admin approves the buyer org's waiting request. */
+    public Buyer approve(Buyer buyer) throws Exception {
+        api.postJson("/api/admin/buyers/" + request(buyer) + "/approve", "", api.admin()).andExpect(status().isOk());
+        return buyer;
+    }
+
     /** Something done to the card's catalog entry (its catalog card ID) once it is priced, before the offer is made. */
     @FunctionalInterface
     public interface CatalogStep {

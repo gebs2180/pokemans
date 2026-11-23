@@ -102,6 +102,12 @@ with d as (delete from invite where org_id = (select id from forget_target) retu
 insert into forget_log (step, rows) select 'invite', count(*) from d;
 with d as (delete from membership where org_id = (select id from forget_target) returning 1)
 insert into forget_log (step, rows) select 'membership', count(*) from d;
+-- A buyer org's request to buy and the admin's answer (V43): access records, gone with the access.
+with d as (delete from buyer_decision where application_id in
+               (select id from buyer_application where org_id = (select id from forget_target)) returning 1)
+insert into forget_log (step, rows) select 'buyer_decision', count(*) from d;
+with d as (delete from buyer_application where org_id = (select id from forget_target) returning 1)
+insert into forget_log (step, rows) select 'buyer_application', count(*) from d;
 
 -- Consent stays only while the org stays: it shows the kept deals were made under the terms.
 with d as (delete from consent_record c where c.org_id = (select id from forget_target)

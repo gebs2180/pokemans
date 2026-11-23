@@ -131,6 +131,15 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
 - **Refund a label.** Only for a cancelled deal: a live deal's label is the one the seller ships with. The refund is asked of the provider that sold the label (EasyPost: `POST /shipments/{id}/refund`), and its answer is kept (`submitted`, `refunded`, `rejected`, `not_applicable`). If the provider couldn't be asked (none set up, or it failed), the request is still recorded with why, and the admin can ask again; once answered, a label isn't asked about again. EasyPost refunds unused USPS labels within its refund window; a used or late one is rejected.
 - **Track record.** A voided listing and a cancelled deal get statuses of their own in `v_offer_outcomes` (`VOIDED`, `CANCELLED`) and are left out of the acceptance and delivery numbers, which count them apart.
 
+## One login buys and sells (Zach, 2026-11-22)
+
+- **Start buying from the account you already use.** The account page (`/account`) shows both sides: the orgs the person sells from, and where they stand on buying (not started, waiting, approved, declined). "Start buying" takes the buyer terms, a name and a ship-to address in one step. Only a login that already belongs to an org can ask.
+- **The admin approves each new buyer** until shipping labels are paid at accept. Each request (`buyer_application`, V43) and its answer (`buyer_decision`: who, when, and for a decline the reason the person sees) are kept, append-only. After a decline the person may ask again on the same buyer org (a new attempt). A buyer org the admin made and invited people to has no request and counts as approved.
+- **A buyer org, not a role.** Buying opens a BUYER org the person owns rather than adding a role to their seller org, because everything a buyer does is keyed by the buyer org: its ship-to address (one per org, where a seller's row holds the ship-from address and payment handle), the market and its deals, label billing, deal outcomes and the buyer terms.
+- **No self-buy, per person.** Nobody buys a card of an org they belong to, and no buyer org buys from an org any of its members belong to; the market leaves those cards out, and accepting one is a 409 "You can't buy your own card." The admin buying on a buyer's behalf is held to the same rule for orgs the admin belongs to.
+- **Same time for everyone.** Every approved buyer, collector or dealer, sees a new listing as soon as it's posted, with no ordering or delay, and the market never names the seller. The daily digest goes only to approved buyer orgs.
+- **Track record:** any sale at our price proves liquidity, so `v_offer_outcomes` doesn't split by who bought.
+
 ## Built
 
 - **valuation-core:** `OfferLadder` returns the firm price and the ladder behind it.
@@ -142,7 +151,8 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
     - seller terms (`seller-2026-11-01`), accepted by collectors before they upload photos, get an offer or post a card. Contributors accept the same seller terms inside their own (`contributor-2026-11-01`), since they can sell too;
     - the 2026-11-01 versions add the payment handle and who sees it, recording arrival, payment and shipping in the app, the note a "not genuine" return needs, and the review before such a card gets a new offer. The 2026-10-26 versions dropped the $500 maximum;
     - the 2026-10-21 versions cover shipping within 3 days of the label, transit loss (we claim on the label's insurance and pay the seller; the buyer owes nothing), cards subject to authentication, disputes (Zach decides from the photos), the admin's undo, no dealing around the app during the test, and non-payment ending a buyer's part in the test. Zach agreed each of these on 2026-10-21, along with return postage staying with the buyer and contributors keeping their free collection report. No liability cap or "as is" wording until a lawyer drafts it;
-  - `Directory` for names and contact details.
+  - `Directory` for names and contact details;
+  - `Buying` (V43): requests to buy and the admin's answers, `requireApproved` on every buyer route (the admin is exempt), and `OrgAccess.ownOrgs` for the per-person self-buy check.
 - **`offers` module (V14, V16, V18; all append-only):**
   - `card_offer`: every input, the firm price, the ladder and the trace.
   - `sale_listing`.
@@ -161,8 +171,11 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
     - `POST /api/orgs/{org}/listings/{id}/shipped`, `.../payment-confirmed`, `.../dispute` and `.../card-back`
     - `GET /api/orgs/{org}/cards/{card}/status` and `GET /api/orgs/{org}/collections/{collection}/status`: where each card is (photos, our identification, condition review, prices, offer, posted, sold), its identity once confirmed, and what happens next
   - Both sides: `GET`/`POST /api/orgs/{org}/ship-address`.
-  - Buyer (buyer org, terms accepted):
-    - `GET /api/orgs/{org}/market`: each photo has `url` (the thumbnail) and `fullUrl` (as taken)
+  - Account:
+    - `GET /api/me/buying`: the person's buying status, their buyer org once they have one, the decline reason, and the buyer terms to accept
+    - `POST /api/me/buying` with `{"name", "version", "shipTo"}`: opens (or, after a decline, reuses) the buyer org, accepts the terms, records the ship-to address and queues the request; 409 when waiting or already approved
+  - Buyer (buyer org, terms accepted, approved; 403 while waiting or declined):
+    - `GET /api/orgs/{org}/market`: every approved buyer sees the same listings at once, minus cards of orgs the buyer org's members belong to; each photo has `url` (the thumbnail) and `fullUrl` (as taken)
     - `GET .../market/{id}/postage`: the estimate, stored nowhere and with no label bought; 409 once the card is taken
     - `POST .../market/{id}/accept`, which returns the deals and `labelPending` if the label didn't go through
     - `GET .../deals`
@@ -178,6 +191,7 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
     - `GET /api/admin/shipping/charges?month=yyyy-MM`: cancelled deals' labels are listed with `billed: false` and their refund state
     - `GET /api/admin/offers`: the newest 200 offers with their latest listing, label and any undo
     - `GET /api/admin/deals/attention` and `POST /api/admin/deals/{id}/resolve` with `{"reason": "..."}`: what's waiting on the admin after a sale
+    - `GET /api/admin/buyers`: requests to buy waiting for an answer, oldest first, then the last 50 answered; `POST /api/admin/buyers/{id}/approve` and `.../decline` with `{"note": "..."}` (required; the person sees it). Answering twice is a 409
     - `POST /api/admin/offers/{id}/void`, `POST /api/admin/deals/{id}/cancel`, `POST /api/admin/deals/{id}/label/refund`, each with `{"reason": "..."}`
   - The market never names the seller. Once a buyer accepts, each side sees the other's org name but not their email (Zach, 2026-11-12; the admin still sees both), and only the seller gets the printable label. The buyer never sees the seller's address or city, not even through the label, so the two can't meet up and deal around us (Zach, 2026-10-21). The parcel's return address still shows the seller's address on arrival: kept for the beta (Zach, 2026-10-21).
 - **Web:**
@@ -186,12 +200,15 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
   - "Cards for sale", behind the ship-to address: full-screen photos, the likely grade, and a two-step "Buy" that shows the postage estimate;
   - "Your deals": the label and tracking, retrying the label, and recording the arrival or return;
   - admin "Postage to bill";
+  - the account page (`/account`, "Account" in the top bar): the selling side, the buying status and "Start buying"; a buyer org page that can't buy yet says so and links there;
+  - admin "Requests to buy" (`/admin/buyers`): approve, or decline with a reason;
   - admin "Offers and deals" (`/admin/deals`): void, cancel and refund, each asking for a reason, and the voided, cancelled and refund states with who and when. The seller's offer panel and the buyer's deals show a voided offer or a cancelled deal with its reason.
 - **Tests:**
   - `OffersFlowTest`: the race, the label bought at once and insured at the price, a label failure that doesn't undo the sale and a retry, a return, withdrawal, every refusal including the maximum price, voiding, cancelling and refunding (with the fake provider failing and recovering), the track record, and append-only rows.
   - `EasyPostShippingProviderTest`, against EasyPost's published response shapes.
   - `CrossOrgAccessTest` covers every route.
-  - Vitest covers the offer panel (including voided and cancelled), market, deals, arrival form, track record, the admin offers page and `likelyRungs`.
+  - `StartBuyingTest`: waiting, approval opening the market, a decline and asking again, stale terms and a missing address, an invited dealer needing no approval, every buyer seeing a listing at once, and the per-person self-buy rule (own cards, a fellow member's cards, the admin's own orgs). `EmailOutboxTest`: no digest until approved.
+  - Vitest covers the offer panel (including voided and cancelled), market, deals, arrival form, track record, the admin offers page, the account page, the requests to buy and `likelyRungs`.
 
 ## Track record
 
@@ -237,6 +254,7 @@ Closes the calibration loop: after a deal, the buyer says what happened to the c
 ## Open
 
 - **Buyer terms wording:** review before inviting the first buyer.
+- **Start buying, open (2026-11-22):** nobody is emailed when the admin approves or declines a request to buy; the person sees it on their account page.
 - **EasyPost account:** create one, test with a test key (labels are fake), then set the production key. EasyPost insures up to $5,000 a parcel, and the offer maximum is set to that limit. Read its insurance terms (what's excluded, how claims are paid) before the first expensive card ships.
 - **After the sale, open (2026-11-01):** Shipped is the seller's word, since we don't read tracking yet. Nobody is told when a pay-by date passes: the seller has to look. "Arrived as shown" is final in the app, so a buyer who taps it and then finds a problem needs the admin.
 - **Undo, open (2026-10-21):** the seller sees a voided offer's reason as the admin typed it, so write it for them; a cancelled deal after the card shipped needs the card back by hand; a refund's later status (EasyPost moves `submitted` to `refunded` or `rejected`) isn't fetched yet.

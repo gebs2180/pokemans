@@ -192,6 +192,96 @@
         },
         "required" : [ "centering", "high", "holdingBack", "low", "mayBeUngradable", "mostLikely" ]
       },
+      "BuyingControllerDeclineBody" : {
+        "properties" : {
+          "note" : {
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "note" ]
+      },
+      "BuyingRequest" : {
+        "properties" : {
+          "appliedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "approved" : {
+            "type" : "boolean"
+          },
+          "attempt" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "decidedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "decidedBy" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "orgId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "orgName" : {
+            "type" : "string"
+          },
+          "sellerOrgs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "userId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "appliedAt", "approved", "attempt", "decidedAt", "decidedBy", "email", "id", "note", "orgId", "orgName", "sellerOrgs", "userId" ]
+      },
+      "BuyingState" : {
+        "properties" : {
+          "appliedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "orgId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "orgName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "NOT_STARTED", "WAITING", "APPROVED", "DECLINED" ],
+            "type" : "string"
+          },
+          "terms" : {
+            "$ref" : "#/components/schemas/ConsentsTerms"
+          }
+        },
+        "required" : [ "appliedAt", "decidedAt", "note", "orgId", "orgName", "status", "terms" ]
+      },
       "CardInputs" : {
         "properties" : {
           "assessment" : {
@@ -2043,6 +2133,20 @@
         },
         "required" : [ "acceptedAt", "text", "version" ]
       },
+      "ConsentsTerms" : {
+        "properties" : {
+          "sha256" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "sha256", "text", "version" ]
+      },
       "DealOutcomeControllerOutcomeBody" : {
         "properties" : {
           "certNumber" : {
@@ -3746,6 +3850,23 @@
         },
         "required" : [ "note", "reason" ]
       },
+      "OfferControllerStartBuyingBody" : {
+        "properties" : {
+          "name" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "shipTo" : {
+            "$ref" : "#/components/schemas/OfferControllerAddressBody"
+          },
+          "version" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "name", "shipTo", "version" ]
+      },
       "OfferLadderTenCap" : {
         "properties" : {
           "cap" : {
@@ -5413,6 +5534,91 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/admin/buyers" : {
+      "get" : {
+        "operationId" : "requests",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/BuyingRequest"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "buying-controller" ]
+      }
+    },
+    "/api/admin/buyers/{requestId}/approve" : {
+      "post" : {
+        "operationId" : "approve_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BuyingRequest"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "buying-controller" ]
+      }
+    },
+    "/api/admin/buyers/{requestId}/decline" : {
+      "post" : {
+        "operationId" : "decline",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BuyingControllerDeclineBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BuyingRequest"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "buying-controller" ]
+      }
+    },
     "/api/admin/cards/{cardId}/offer-preview" : {
       "get" : {
         "operationId" : "offerPreview",
@@ -7829,6 +8035,50 @@
           }
         },
         "tags" : [ "me-controller" ]
+      }
+    },
+    "/api/me/buying" : {
+      "get" : {
+        "operationId" : "state",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BuyingState"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "buying-controller" ]
+      },
+      "post" : {
+        "operationId" : "startBuying",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OfferControllerStartBuyingBody"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BuyingState"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "offer-controller" ]
       }
     },
     "/api/me/email-preferences" : {
