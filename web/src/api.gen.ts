@@ -2150,7 +2150,7 @@ export interface components {
             nextStep: string;
             sellersWord: boolean;
             /** @enum {string} */
-            stage: "PHOTOS" | "LOT" | "IDENTIFYING" | "ASSESSING" | "PRICING" | "NO_OFFER" | "READY" | "OFFERED" | "LISTED" | "SOLD" | "SHIPPED" | "ARRIVED" | "PAID" | "RETURNED";
+            stage: "PHOTOS" | "LOT" | "IDENTIFYING" | "ASSESSING" | "PRICING" | "NO_OFFER" | "OVER_LIMIT" | "READY" | "OFFERED" | "LISTED" | "SOLD" | "SHIPPED" | "ARRIVED" | "PAID" | "RETURNED";
         };
         CardStatusServiceNeedsYou: {
             /** Format: uuid */
@@ -2633,6 +2633,8 @@ export interface components {
             detailUrl: string;
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            lookalikeCardId: string;
             side: string;
             /** Format: uri */
             surfaceUrl: string;
@@ -2981,6 +2983,8 @@ export interface components {
             height: number;
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            lookalikeCardId: string;
             retakeReasons: components["schemas"]["IntakeViewsReasonView"][];
             /** @enum {string} */
             side: "FRONT" | "BACK" | "DETAIL";

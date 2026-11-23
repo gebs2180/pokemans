@@ -117,6 +117,63 @@ class SuggestionMatcherTest {
         assertThat(SuggestionMatcher.reprintSet("Staff stamp")).isNull();
     }
 
+    /** Skyridge's two Gengars as TCGdex lists them: the plain 10/144 and the holo subset H09/H32. */
+    private static CatalogProvider.ProviderCard skyridge(String number, String rarity, List<Variant> variants) {
+        return new CatalogProvider.ProviderCard("ecard3-" + number, "en", "ecard3", "Skyridge", null, LocalDate.of(2003, 5, 12),
+                number, "Gengar", rarity, List.of(Edition.UNLIMITED), variants, List.of(), false, null, Map.of(), 144);
+    }
+
+    private static final CatalogProvider.ProviderCard PLAIN_GENGAR = skyridge("10", "Rare", List.of(Variant.NORMAL, Variant.REVERSE_HOLO));
+    private static final CatalogProvider.ProviderCard HOLO_GENGAR = skyridge("H09", "Holo Rare", List.of(Variant.HOLO));
+
+    private static CardReader.Reading gengar(String number, Variant finish, String notes, Map<String, Object> raw) {
+        return new CardReader.Reading("Gengar", number, null, "en", false, finish, 2003, "Skyridge", notes, "test", raw);
+    }
+
+    /** The walkthrough's reading: no number read, "/H32" and "holo subset" only in the notes. Once a 36% tie, plain first. */
+    @Test
+    void anHTotalInTheNotesRanksTheHoloSubsetFirstWithHoloPicked() {
+        CardReader.Reading read = gengar(null, null, "Printed /H32 at the bottom right, holo subset (probably H10)", Map.of());
+
+        SuggestionMatcher.Match holo = SuggestionMatcher.score(read, HOLO_GENGAR, null);
+        SuggestionMatcher.Match plain = SuggestionMatcher.score(read, PLAIN_GENGAR, null);
+
+        assertThat(holo.confidence()).isGreaterThan(plain.confidence());
+        assertThat(holo.variant()).isEqualTo(Variant.HOLO);
+        assertThat(holo.why()).contains("subset number", "holo");
+        assertThat(plain.why()).doesNotContain("subset number");
+    }
+
+    @Test
+    void anHNumberOrHTotalBreaksTheTie() {
+        assertThat(SuggestionMatcher.score(gengar("H09", null, null, Map.of()), HOLO_GENGAR, null).confidence())
+                .isGreaterThan(SuggestionMatcher.score(gengar("H09", null, null, Map.of()), PLAIN_GENGAR, null).confidence());
+        // The reader gave the total as text, so it couldn't fill setTotal; the raw answer still has it.
+        CardReader.Reading textTotal = gengar(null, null, null, Map.of("input", Map.of("set_total", "H32")));
+        assertThat(SuggestionMatcher.score(textTotal, HOLO_GENGAR, null).confidence())
+                .isGreaterThan(SuggestionMatcher.score(textTotal, PLAIN_GENGAR, null).confidence());
+    }
+
+    @Test
+    void aHoloFinishAloneBreaksTheTieAndANonHoloNoteDoesNot() {
+        CardReader.Reading holo = gengar(null, Variant.HOLO, null, Map.of());
+        assertThat(SuggestionMatcher.score(holo, HOLO_GENGAR, null).confidence())
+                .isGreaterThan(SuggestionMatcher.score(holo, PLAIN_GENGAR, null).confidence());
+
+        CardReader.Reading nonHolo = gengar(null, null, "non-holo, light whitening", Map.of());
+        assertThat(SuggestionMatcher.saysHolo(nonHolo)).isFalse();
+        assertThat(SuggestionMatcher.saysHolo(gengar(null, null, "reverse holo", Map.of()))).isFalse();
+        assertThat(SuggestionMatcher.score(nonHolo, PLAIN_GENGAR, null).variant()).isEqualTo(Variant.NORMAL);
+    }
+
+    @Test
+    void numberPrefixes() {
+        assertThat(SuggestionMatcher.numberPrefix("H09")).isEqualTo("H");
+        assertThat(SuggestionMatcher.numberPrefix("h9/h32")).isEqualTo("H");
+        assertThat(SuggestionMatcher.numberPrefix("10")).isNull();
+        assertThat(SuggestionMatcher.numberPrefix(null)).isNull();
+    }
+
     @Test
     void noNameNoSuggestions() {
         assertThat(matcher.match(reading(null, "11", 113, null, null))).isEmpty();

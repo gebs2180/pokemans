@@ -144,7 +144,7 @@ describe('OfferPanel', () => {
       cardId: 'card1',
       stage: 'IDENTIFYING',
       identity: null,
-      nextStep: "We identify each card by hand from its photos, usually within a couple of days. We don't send notifications yet, so check back here.",
+      nextStep: "Confirm which card it is under “Which card is it?”. Once you have, we check your answer against the photos, then its condition. We don't send notifications yet, so check back here.",
       canOffer: false,
       condition: null,
       deadline: null,
@@ -152,7 +152,7 @@ describe('OfferPanel', () => {
     stubApi([{ offer: null, listing: null }], address, undefined, identifying)
     render(<OfferPanel orgId="org1" cardId="card1" />)
 
-    expect(await screen.findByText(/We identify each card by hand/)).toBeInTheDocument()
+    expect(await screen.findByText(/Confirm which card it is under/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Get your instant offer' })).not.toBeInTheDocument()
   })
 

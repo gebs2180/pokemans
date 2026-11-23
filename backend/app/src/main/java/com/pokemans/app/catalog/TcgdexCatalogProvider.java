@@ -161,7 +161,8 @@ class TcgdexCatalogProvider implements CatalogProvider {
             return null;
         }
         String beforeSlash = number.trim().split("/")[0].trim();
-        return beforeSlash.replaceFirst("^0+(?=.)", "").toLowerCase(Locale.ROOT);
+        // Zeros after a subset letter go too: the reader's "H9" is the catalog's "H09" (Skyridge's holo subset).
+        return beforeSlash.toLowerCase(Locale.ROOT).replaceFirst("^([a-z]*)0+(?=\\d)", "$1").replaceFirst("^0+(?=.)", "");
     }
 
     @Override

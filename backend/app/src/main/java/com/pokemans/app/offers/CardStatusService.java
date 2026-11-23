@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 class CardStatusService {
 
     /** In order: photos, then our review (identity, condition, prices), then the offer and the sale. */
-    enum Stage { PHOTOS, LOT, IDENTIFYING, ASSESSING, PRICING, NO_OFFER, READY, OFFERED, LISTED, SOLD, SHIPPED, ARRIVED, PAID, RETURNED }
+    enum Stage { PHOTOS, LOT, IDENTIFYING, ASSESSING, PRICING, NO_OFFER, OVER_LIMIT, READY, OFFERED, LISTED, SOLD, SHIPPED, ARRIVED, PAID, RETURNED }
 
     /**
      * @param identity  the card as we identified it, e.g. "Charizard · Base Set 4/102 · EN · holo", or null
@@ -176,8 +176,7 @@ class CardStatusService {
         UnvaluedReason reason = UnvaluedReason.of(in.unvaluedReason());
         if (in.identity() == null) {
             return new CardStatus(cardId, Stage.IDENTIFYING, null,
-                    "We're identifying your card from its photos, usually within minutes. If we can't tell, a person looks at it, "
-                            + "which can take a couple of days." + NO_NOTIFICATIONS, false);
+                    "Confirm which card it is under “Which card is it?”. Once you have, we check your answer against the photos, then its condition." + NO_NOTIFICATIONS, false);
         }
         if (reason == UnvaluedReason.NO_ASSESSMENT) {
             if (preGradeFailures.failed(cardId)) {
@@ -200,6 +199,10 @@ class CardStatusService {
             return new CardStatus(cardId, Stage.PRICING, identity,
                     "We're looking up recent sold prices for this card. If we don't have enough yet, a person adds them by hand, "
                             + "which may take a while, and some cards won't get an offer. You're free to sell it elsewhere." + NO_NOTIFICATIONS, false);
+        }
+        if (quote.refused() == OfferRefusal.OVER_MAXIMUM) {
+            // Not "no offer yet": no instant offer comes later for a card worth more than the limit.
+            return new CardStatus(cardId, Stage.OVER_LIMIT, identity, quote.refusal() + " You're free to sell it elsewhere.", false);
         }
         if (quote.refused() != null) {
             return new CardStatus(cardId, Stage.NO_OFFER, identity, quote.refusal() + nextStep(quote.refused()), false);

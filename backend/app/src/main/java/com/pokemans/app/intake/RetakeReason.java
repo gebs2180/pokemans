@@ -10,7 +10,7 @@ enum RetakeReason {
     CARD_TOO_SMALL("The card is too small in the frame. Move closer, keeping a little space around it."),
     BLURRY("Out of focus. Hold steady and tap to focus on the card."),
     GLARE("Glare on the card. Tilt it or move away from direct light."),
-    DUPLICATE("This exact image was already uploaded for another card.");
+    DUPLICATE("This exact image was already uploaded for another card, or for the other side of this one.");
 
     private final String message;
 

@@ -89,6 +89,14 @@ export function ReviewCardPage() {
             </a>
           ))}
         </div>
+        {data.photos
+          .filter((p) => p.lookalikeCardId)
+          .map((p) => (
+            <p key={p.id} className="warn small" role="note">
+              The {SIDE_LABEL[p.side].toLowerCase()} photo looks like the same photo as the front of{' '}
+              <Link to={`/admin/review/${orgId}/${p.lookalikeCardId}`}>another card in this org</Link>. Check it's this card.
+            </p>
+          ))}
       </section>
 
       <MarkedSurfacePanel orgId={orgId} cardId={cardId} photos={data.photos} />

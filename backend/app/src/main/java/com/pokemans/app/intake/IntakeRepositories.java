@@ -81,6 +81,21 @@ interface PhotoRepository extends JpaRepository<Photo, UUID> {
 
     boolean existsByOrgIdAndSha256AndCardItemIdNot(UUID orgId, String sha256, UUID cardItemId);
 
+    /** The same image on another side of the same card: the front uploaded again as the back. */
+    boolean existsByCardItemIdAndSha256AndSideNot(UUID cardItemId, String sha256, Photo.Side side);
+
+    /** A photo's card and {@link ImageHash}, for finding lookalikes. */
+    interface HashedPhoto {
+        UUID getCardItemId();
+
+        String getDhash();
+    }
+
+    /** The hashes of one side's photos on the org's other cards; compared in Java (a few thousand rows at most). */
+    @Query("select p.cardItemId as cardItemId, p.dhash as dhash from Photo p where p.orgId = :orgId and p.side = :side"
+            + " and p.cardItemId <> :cardItemId and p.dhash is not null")
+    List<HashedPhoto> findHashes(UUID orgId, Photo.Side side, UUID cardItemId);
+
     /** Uploaded originals not yet checked for location metadata, oldest first (the one-off backfill). */
     @Query("select p.id from Photo p where p.status <> com.pokemans.app.intake.Photo.Status.AWAITING_UPLOAD"
             + " and p.locationCheckedAt is null order by p.createdAt")

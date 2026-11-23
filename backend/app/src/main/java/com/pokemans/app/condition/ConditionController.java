@@ -63,9 +63,10 @@ class ConditionController {
      * @param wideUrl    the card with a little background past each edge (1000 px), or null for older photos
      * @param surfaceUrl the same at full resolution (about 2000 px wide), for the surface view; null until the backfill
      * @param detailUrl  the full-resolution crop with its local contrast evened out (CLAHE plus a high-pass layer), or null
+     * @param lookalikeCardId another of the org's cards whose front photo looks like this one (ImageHash), or null
      */
     record PhotoLink(UUID id, String side, URI url, URI cropUrl, Instant capturedAt, URI wideUrl, URI surfaceUrl, URI detailUrl,
-                     URI cleanUrl) {
+                     URI cleanUrl, UUID lookalikeCardId) {
     }
 
     record RequestView(UUID id, String provider, PredictionRequest.Status status, int attempts, String lastError,
@@ -163,7 +164,8 @@ class ConditionController {
         List<PhotoLink> photos = cardItems.currentPhotos(cardId).stream()
                 .map(p -> new PhotoLink(p.id(), p.side(), blobs.presignDownload(storage.photoBucket(), p.storageKey()),
                         p.cropKey() == null ? null : blobs.presignDownload(storage.photoBucket(), p.cropKey()), p.capturedAt(),
-                        link(p.wideCropKey()), link(p.surfaceKey()), link(p.surfaceDetailKey()), link(p.surfaceCleanKey())))
+                        link(p.wideCropKey()), link(p.surfaceKey()), link(p.surfaceDetailKey()), link(p.surfaceCleanKey()),
+                        p.lookalikeCardId()))
                 .toList();
         java.util.Optional<ConditionAssessment> current = assessmentRepository.findByCardItemIdAndIsCurrentTrue(cardId);
         return new CardConditionView(card.id(), card.orgId(), card.label(), condition.enabledProviders(), photos,
