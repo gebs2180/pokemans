@@ -200,7 +200,7 @@ Before the closed beta, the admin can take back a mistake (a wrong identificatio
   - "Cards for sale", behind the ship-to address: full-screen photos, the likely grade, and a two-step "Buy" that shows the postage estimate;
   - "Your deals": the label and tracking, retrying the label, and recording the arrival or return;
   - admin "Postage to bill";
-  - the account page (`/account`, "Account" in the top bar): the selling side, the buying status and "Start buying"; a buyer org page that can't buy yet says so and links there;
+  - the account page (`/account`; the email in the top bar links there): the selling side, the buying status and "Start buying"; a buyer org page that can't buy yet says so and links there;
   - admin "Requests to buy" (`/admin/buyers`): approve, or decline with a reason;
   - admin "Offers and deals" (`/admin/deals`): void, cancel and refund, each asking for a reason, and the voided, cancelled and refund states with who and when. The seller's offer panel and the buyer's deals show a voided offer or a cancelled deal with its reason.
 - **Tests:**

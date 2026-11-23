@@ -47,10 +47,10 @@ function App() {
         </Link>
         {isAuthenticated && (
           <span className="who">
-            <Link to="/account" className="nav-link">
-              Account
+            {/* The email is the way to the account page: a separate link wouldn't fit beside it on a phone. */}
+            <Link to="/account" className="email" title="Your account">
+              {user?.email ?? user?.name}
             </Link>{' '}
-            <span className="email">{user?.email ?? user?.name}</span>{' '}
             <button className="link" onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>
               Log out
             </button>
