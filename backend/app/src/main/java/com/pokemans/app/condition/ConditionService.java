@@ -36,6 +36,8 @@ class ConditionService {
 
     private final ConditionProperties properties;
     private final List<String> enabledProviders;
+    /** Shadow providers that are switched on (ProviderPrediction#SHADOW): asked after CardGrade answers, never in enabledProviders. */
+    private final List<String> shadowProviders;
     private final PredictionRequestRepository requests;
     private final ProviderPredictionRepository predictions;
     private final ConditionAssessmentRepository assessments;
@@ -53,7 +55,9 @@ class ConditionService {
                      ConditionAssessmentRepository assessments, CardItems cardItems, Catalog catalog, CurrentUser currentUser,
                      ConditionProperties properties, ApplicationEventPublisher events) {
         this.properties = properties;
-        this.enabledProviders = providers.stream().map(PreGradeProvider::name).sorted().toList();
+        this.enabledProviders = providers.stream().map(PreGradeProvider::name).filter(name -> !ProviderPrediction.SHADOW.contains(name))
+                .sorted().toList();
+        this.shadowProviders = providers.stream().map(PreGradeProvider::name).filter(ProviderPrediction.SHADOW::contains).sorted().toList();
         this.requests = requests;
         this.predictions = predictions;
         this.assessments = assessments;
@@ -130,6 +134,32 @@ class ConditionService {
             events.publishEvent(new PredictionsQueued(card.id()));
         }
         return created;
+    }
+
+    /**
+     * CardGrade answered: ask each shadow provider about the same photos, unless one is already open for
+     * the card. Shadow answers are stored only (ProviderPrediction#SHADOW), so this never holds up or
+     * changes the card. Its own transaction: the worker logs a failure here and the card carries on.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    void queueShadow(PredictionRequest finished) {
+        if (shadowProviders.isEmpty() || !CardGradePreGradeProvider.NAME.equals(finished.getProvider())
+                || finished.getStatus() != PredictionRequest.Status.DONE) {
+            return;
+        }
+        List<String> open = requests.findByCardItemIdOrderByCreatedAtDesc(finished.getCardItemId()).stream()
+                .filter(PredictionRequest::isOpen).map(PredictionRequest::getProvider).toList();
+        boolean queued = false;
+        for (String provider : shadowProviders) {
+            if (!open.contains(provider)) {
+                requests.saveAndFlush(new PredictionRequest(finished.getOrgId(), finished.getCardItemId(), provider,
+                        finished.getPhotoIds(), null));
+                queued = true;
+            }
+        }
+        if (queued) {
+            events.publishEvent(new PredictionsQueued(finished.getCardItemId()));
+        }
     }
 
     /**

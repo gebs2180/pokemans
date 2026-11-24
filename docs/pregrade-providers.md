@@ -84,6 +84,10 @@ Every accuracy figure below is self-reported on the vendor's own blog. There is 
 - **Controlled set (30 cards):** about $11 on a Ximilar top-up (or its free plan over a few months) plus one month of CardGrade.io Pro ($24.99), so about $36 in all.
 - **Per 1,000 partner cards:** about $69 (Ximilar) + $150 (CardGrade.io API Starter), so about $220. That's about 22¢ per card for both opinions. Only cards that pass quality checks and are worth over $25 get sent, and each card is sent once.
 
+## claude-vision (Anthropic API): shadow only, off by default
+
+Since 2026-11-23, Claude Opus 5.5 can grade corners, edges and surface from the photos next to CardGrade. Turn it on with `CLAUDE_VISION_ENABLED=true` and a key. It stores its answers but never feeds the distribution, prices or offers. Centering comes from our own measurement. The rubric, cost and how to compare it with CardGrade and returned PSA grades are in [claude-vision-shadow.md](claude-vision-shadow.md). Anthropic's commercial terms don't claim the outputs or train on API data by default.
+
 ## Our own: centering (RAWMARK_CENTERING), off by default
 
 The first step towards our own grader. It runs in the app, so there are no terms to clear and no cost. Turn it on with `CENTERING_ENABLED=true`.

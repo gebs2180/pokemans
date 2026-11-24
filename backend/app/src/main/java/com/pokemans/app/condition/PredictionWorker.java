@@ -256,10 +256,23 @@ class PredictionWorker {
         return request.isOpen() ? null : request;
     }
 
+    /**
+     * A shadow provider's answer changes nothing about the card. Anything else may rebuild it once no
+     * other request is open (shadow requests aren't waited for), then queues the shadow providers.
+     */
     private void afterFinished(PredictionRequest request) {
+        if (ProviderPrediction.SHADOW.contains(request.getProvider())) {
+            return;
+        }
         condition.measureRetakeMissedBy(request);
-        if (requests.findByCardItemIdOrderByCreatedAtDesc(request.getCardItemId()).stream().noneMatch(PredictionRequest::isOpen)) {
+        if (requests.findByCardItemIdOrderByCreatedAtDesc(request.getCardItemId()).stream()
+                .noneMatch(r -> r.isOpen() && !ProviderPrediction.SHADOW.contains(r.getProvider()))) {
             condition.rebuildSystemAssessment(request.getCardItemId());
+        }
+        try {
+            condition.queueShadow(request);
+        } catch (RuntimeException e) {
+            log.warn("Couldn't queue the shadow providers for card {}; the card is unaffected", request.getCardItemId(), e);
         }
     }
 

@@ -45,7 +45,8 @@ record ConditionProperties(
         @DefaultValue("0.02") BigDecimal ungradableFloor,
         @DefaultValue Worker worker,
         @DefaultValue CardGrade cardgrade,
-        @DefaultValue Centering centering) {
+        @DefaultValue Centering centering,
+        @DefaultValue ClaudeVision claudeVision) {
 
     /** Mostly on the provider's grade, more below than above: conservative by default. */
     static final Map<Integer, BigDecimal> DEFAULT_SPREAD = Map.of(
@@ -140,6 +141,44 @@ record ConditionProperties(
      */
     record Centering(@DefaultValue("false") boolean enabled,
                      @DefaultValue("1.0") double measurementMargin) {
+    }
+
+    /**
+     * Claude grading the card from photos ({@link ClaudeVisionPreGradeProvider}), in shadow: its answers
+     * are stored and compared with CardGrade and PSA returns, but never build a distribution, a price or
+     * an offer (docs/claude-vision-shadow.md). Off by default. Any switch of providers is Zach's call
+     * once PSA returns are in.
+     *
+     * @param model            a Claude model with vision
+     * @param effort           the Messages API {@code output_config.effort}; empty for the model's default
+     * @param samples          independent answers asked for per card; their median is stored, with the spread
+     * @param maxTokens        per answer, thinking included
+     * @param inputUsdPerMtok  the batch price per million input tokens, for the cost stored with each answer
+     * @param outputUsdPerMtok the same for output tokens
+     */
+    record ClaudeVision(@DefaultValue("false") boolean enabled,
+                        String apiKey,
+                        @DefaultValue("https://api.anthropic.com") URI baseUrl,
+                        @DefaultValue("claude-opus-5-5") String model,
+                        @DefaultValue("high") String effort,
+                        @DefaultValue("3") int samples,
+                        @DefaultValue("16000") int maxTokens,
+                        @DefaultValue("60s") Duration timeout,
+                        @DefaultValue("2.00") double inputUsdPerMtok,
+                        @DefaultValue("10.00") double outputUsdPerMtok) {
+
+        ClaudeVision {
+            if (samples < 1) {
+                throw new IllegalArgumentException("pokemans.condition.claude-vision.samples must be at least 1, got " + samples);
+            }
+        }
+
+        /** Never prints the key. */
+        @Override
+        public String toString() {
+            return "ClaudeVision[enabled=" + enabled + ", apiKey=" + redacted(apiKey) + ", baseUrl=" + baseUrl + ", model=" + model
+                    + ", effort=" + effort + ", samples=" + samples + "]";
+        }
     }
 
     private static void requireSumsToOne(String name, Map<Integer, BigDecimal> weights) {

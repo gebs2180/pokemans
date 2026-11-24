@@ -135,6 +135,7 @@ class ConditionController {
                 .collect(Collectors.toMap(ConditionAssessment::getCardItemId, Function.identity()));
         Map<UUID, Long> open = ids.isEmpty() ? Map.of()
                 : requestRepository.findByCardItemIdIn(ids).stream().filter(PredictionRequest::isOpen)
+                .filter(r -> !ProviderPrediction.SHADOW.contains(r.getProvider()))
                 .collect(Collectors.groupingBy(PredictionRequest::getCardItemId, Collectors.counting()));
         Map<UUID, String> orgNames = new java.util.HashMap<>();
         cards.forEach(c -> orgNames.computeIfAbsent(c.orgId(), directory::orgName));
