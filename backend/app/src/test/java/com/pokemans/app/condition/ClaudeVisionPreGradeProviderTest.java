@@ -208,6 +208,75 @@ class ClaudeVisionPreGradeProviderTest {
                 busy -> assertThat(busy.retryAfter()).isEqualTo(Duration.ofSeconds(17)));
     }
 
+    /** A provider on the stub that skips decoding photos: submit goes straight to the batch call. */
+    private ClaudeVisionPreGradeProvider stubbed(Duration timeout) {
+        ConditionProperties.ClaudeVision config = new ConditionProperties.ClaudeVision(true, "sk-test",
+                URI.create("http://127.0.0.1:" + server.getAddress().getPort()), "claude-opus-5-5", "high", 3, 16000, timeout, 2.00, 10.00);
+        return new ClaudeVisionPreGradeProvider(config, RestClient.builder().requestFactory(ClaudeVisionPreGradeProvider.requestFactory(timeout)),
+                VIEWS, CENTERING, null) {
+            @Override
+            Prepared prepare(PreGradeProvider.Photos photos) {
+                return new Prepared(List.of(new ClaudeVisionViews.View("Front — whole card", new byte[] {1, 2, 3})), Map.of());
+            }
+        };
+    }
+
+    @Test
+    void aServerErrorOnSubmitIsRefusedNotRetriedAsTheBatchMayExist() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> reply(exchange, 500, "{\"type\":\"error\",\"error\":{\"type\":\"api_error\"}}"));
+        server.start();
+
+        assertThatThrownBy(() -> stubbed(Duration.ofSeconds(5)).submit(photos(), "key-1"))
+                .isInstanceOf(PreGradeProvider.Refused.class).hasMessageContaining("may have been made").hasMessageContaining("500");
+    }
+
+    @Test
+    void aTimeoutOnSubmitIsRefusedNotRetried() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            try {
+                Thread.sleep(2_000); // the batch is being made; the answer comes too late
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            reply(exchange, 200, "{\"id\":\"msgbatch_1\"}");
+        });
+        server.start();
+
+        assertThatThrownBy(() -> stubbed(Duration.ofMillis(200)).submit(photos(), "key-1"))
+                .isInstanceOf(PreGradeProvider.Refused.class).hasMessageContaining("may have been made");
+    }
+
+    @Test
+    void aClientErrorOnSubmitIsRefusedWithoutSayingABatchMayExist() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> reply(exchange, 422, "{\"type\":\"error\"}"));
+        server.start();
+
+        assertThatThrownBy(() -> stubbed(Duration.ofSeconds(5)).submit(photos(), "key-1"))
+                .isInstanceOf(PreGradeProvider.Refused.class).hasMessageContaining("422").hasMessageNotContaining("may have been made");
+    }
+
+    @Test
+    void overloadOnSubmitStillWaitsAsNoBatchWasMade() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> reply(exchange, 529, "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\"}}"));
+        server.start();
+
+        assertThatThrownBy(() -> stubbed(Duration.ofSeconds(5)).submit(photos(), "key-1")).isInstanceOf(PreGradeProvider.Busy.class);
+    }
+
+    @Test
+    void aJobIdThatDoesntParseIsAFailedPollNotAnError() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> reply(exchange, 404, "{}"));
+        server.start();
+
+        assertThat(stubbed(Duration.ofSeconds(5)).poll("msgbatch_1|{not json")).isInstanceOfSatisfying(PreGradeProvider.Failed.class,
+                failed -> assertThat(failed.reason()).contains("doesn't parse"));
+    }
+
     @Test
     void noKeyIsAStartupError() {
         ConditionProperties.ClaudeVision noKey = new ConditionProperties.ClaudeVision(true, " ", URI.create("http://x"), "m", "high", 1,

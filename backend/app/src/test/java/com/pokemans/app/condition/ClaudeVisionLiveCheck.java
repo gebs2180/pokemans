@@ -7,8 +7,10 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 import javax.imageio.ImageIO;
@@ -31,7 +33,7 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * Without a key it prints, per card, the views and an input-token estimate from their pixel counts
  * (about w × h / 750 per picture). With a key it sends one real batch per card ({@code CLAUDE_VISION_SAMPLES}
- * samples, default 3), waits for it, prints the reading and the measured cost from the returned usage,
+ * samples, default 3), waits for it ({@code CLAUDE_VISION_LIVE_WAIT}, default 2 hours; the API allows 24), prints the reading and the measured cost from the returned usage,
  * and writes the raw answer to {@code build/claude-vision-live/} (no pictures in it).
  */
 @EnabledIfEnvironmentVariable(named = "CLAUDE_VISION_LIVE_PHOTOS", matches = ".+")
@@ -39,6 +41,9 @@ class ClaudeVisionLiveCheck {
 
     /** The rubric and the closing instruction, rounded up; counted from the text at about 4 characters a token. */
     private static final int TEXT_TOKENS = (ClaudeVisionRubric.SYSTEM.length() + 1500) / 4 + 50;
+
+    /** How long to wait per card: {@code CLAUDE_VISION_LIVE_WAIT} (e.g. PT24H), default 2 hours. */
+    private static final Duration WAIT = Duration.parse(Optional.ofNullable(System.getenv("CLAUDE_VISION_LIVE_WAIT")).orElse("PT2H"));
 
     @Test
     void gradeFolder() throws Exception {
@@ -82,15 +87,21 @@ class ClaudeVisionLiveCheck {
             String id = provider.submit(photos, UUID.randomUUID().toString());
             System.out.println(name + ": batch " + id.substring(0, id.indexOf('|')));
             PreGradeProvider.Poll poll = PreGradeProvider.Poll.pending();
-            for (int i = 0; i < 360 && poll instanceof PreGradeProvider.Pending; i++) {
-                Thread.sleep(10_000);
+            Instant until = Instant.now().plus(WAIT);
+            while (poll instanceof PreGradeProvider.Pending && Instant.now().isBefore(until)) {
+                Thread.sleep(30_000);
                 poll = provider.poll(id);
             }
             Map<String, Object> raw = switch (poll) {
                 case PreGradeProvider.Done done -> done.raw();
                 case PreGradeProvider.Failed failed -> failed.raw();
-                case PreGradeProvider.Pending pending -> throw new IllegalStateException(name + " still pending after an hour: " + id);
+                case PreGradeProvider.Pending pending -> null;
             };
+            if (raw == null) {
+                // Batches may take up to 24 hours; the batch keeps running and its results stay in the console.
+                System.out.println(name + ": still pending after " + WAIT + "; batch " + id.substring(0, id.indexOf('|')));
+                continue;
+            }
             String text = json.writeValueAsString(raw);
             if (text.contains(config.apiKey())) {
                 throw new IllegalStateException("The answer for " + name + " contains the API key; not written");

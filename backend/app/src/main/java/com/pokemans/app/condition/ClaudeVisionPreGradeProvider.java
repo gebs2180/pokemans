@@ -19,7 +19,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -31,13 +33,13 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Each side goes as the card straightened, four corner close-ups and four edge strips
  * ({@link ClaudeVisionViews}), with the fixed rubric ({@link ClaudeVisionRubric}). The same request is
- * sent {@code samples} times through the Message Batches API (half price; answers within the hour,
- * usually minutes), and the median of the answers is stored with their spread. Centering is never the
+ * sent {@code samples} times through the Message Batches API (half price; usually answers in minutes,
+ * but may take up to 24 hours), and the median of the answers is stored with their spread. Centering is never the
  * model's: it is our own measurement ({@link CenteringPreGradeProvider}), taken at submit and carried in
  * the job id until the answers are in.
  *
- * <p>A retried submit after a timeout can create a second batch (the Batches API has no idempotency
- * key); in shadow that only costs one more card's worth.
+ * <p>The Batches API has no idempotency key, so a submit that may have reached it (a timeout, a 5xx)
+ * is refused rather than retried: a retry could pay for a second batch.
  */
 @Component
 @ConditionalOnBooleanProperty("pokemans.condition.claude-vision.enabled")
@@ -84,7 +86,8 @@ class ClaudeVisionPreGradeProvider implements PreGradeProvider {
         this.decodes = decodes;
     }
 
-    private static JdkClientHttpRequestFactory requestFactory(Duration timeout) {
+    /** Package-private for tests. */
+    static JdkClientHttpRequestFactory requestFactory(Duration timeout) {
         JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(timeout).build());
         requests.setReadTimeout(timeout);
         return requests;
@@ -98,6 +101,12 @@ class ClaudeVisionPreGradeProvider implements PreGradeProvider {
     /** What submit prepared from the photos: the pictures to send and our own centering. */
     record Prepared(List<ClaudeVisionViews.View> views, Map<String, Object> centering) {
     }
+
+    /**
+     * Each submit is a paid batch, so a submit that may have reached the API is never retried: the
+     * request ends refused and an admin can look for the batch in the Anthropic console.
+     */
+    private static final String MAYBE_CREATED = "Not retried, as the batch may have been made anyway: ";
 
     @Override
     public String submit(Photos photos, String idempotencyKey) {
@@ -116,11 +125,22 @@ class ClaudeVisionPreGradeProvider implements PreGradeProvider {
                     .retrieve()
                     .body(OBJECT);
         } catch (RestClientResponseException e) {
-            throw translate(e);
+            RuntimeException translated = translate(e);
+            if (translated != e) {
+                throw translated;
+            }
+            if (e.getStatusCode().is5xxServerError()) {
+                // A 5xx can come after the batch was made: retrying could pay for it again.
+                throw new Refused(MAYBE_CREATED + "the Anthropic API said " + e.getStatusCode().value() + ": " + e.getResponseBodyAsString());
+            }
+            throw new Refused("The Anthropic API said " + e.getStatusCode().value() + ": " + e.getResponseBodyAsString());
+        } catch (RestClientException e) {
+            // A timeout or dropped connection, or an answer we can't read: the batch may exist all the same.
+            throw new Refused(MAYBE_CREATED + e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         Object id = batch == null ? null : batch.get("id");
         if (id == null) {
-            throw new IllegalStateException("The Batches API accepted the request but returned no id");
+            throw new Refused(MAYBE_CREATED + "the Batches API returned no id");
         }
         return id + SEPARATOR + JSON.writeValueAsString(prepared.centering());
     }
@@ -174,8 +194,13 @@ class ClaudeVisionPreGradeProvider implements PreGradeProvider {
     public Poll poll(String externalRequestId) {
         int split = externalRequestId.indexOf(SEPARATOR);
         String batchId = split < 0 ? externalRequestId : externalRequestId.substring(0, split);
-        Map<String, Object> ours = split < 0 ? Map.of() : JSON.readValue(externalRequestId.substring(split + 1),
-                JSON.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
+        Map<String, Object> ours;
+        try {
+            ours = split < 0 ? Map.of() : JSON.readValue(externalRequestId.substring(split + 1),
+                    JSON.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
+        } catch (JacksonException e) {
+            return Poll.failed("The stored job id doesn't parse: " + e.getOriginalMessage(), Map.of("batchId", batchId));
+        }
         try {
             Map<String, Object> batch = http.get().uri("/v1/messages/batches/{id}", batchId).retrieve().body(OBJECT);
             if (batch == null || !"ended".equals(batch.get("processing_status"))) {

@@ -34,6 +34,7 @@ class PreGradeComparisonReport {
 
     /**
      * @param withPsa      cards with a PSA grade back
+     * @param scored       of those, the cards both providers answered: every figure below is over these alone
      * @param cardGradeMae mean absolute gap between CardGrade's PSA prediction and the returned grade, null with none
      * @param claudeMae    the same for claude-vision
      * @param cardGradeWithinOne share of returned grades within ±1 of CardGrade's prediction
@@ -41,7 +42,7 @@ class PreGradeComparisonReport {
      * @param cardGradeAbove share where CardGrade predicted higher than PSA gave: the costly direction
      * @param claudeAbove    the same for claude-vision
      */
-    record Report(int cards, int withPsa, Double cardGradeMae, Double claudeMae, Double cardGradeWithinOne, Double claudeWithinOne,
+    record Report(int cards, int withPsa, int scored, Double cardGradeMae, Double claudeMae, Double cardGradeWithinOne, Double claudeWithinOne,
                   Double cardGradeAbove, Double claudeAbove, List<Row> rows) {
     }
 
@@ -115,14 +116,17 @@ class PreGradeComparisonReport {
 
     /** Package-private for tests: the summary over the rows. */
     static Report report(List<Row> rows) {
+        // Both providers are scored on the same cards: those with a PSA grade that both answered.
         List<Row> returned = rows.stream().filter(r -> r.psa() != null).toList();
-        return new Report(rows.size(), returned.size(),
-                mean(returned, r -> gap(r.cardGrade(), r.psa()) == null ? null : Math.abs(gap(r.cardGrade(), r.psa()))),
-                mean(returned, r -> gap(r.claudeVision(), r.psa()) == null ? null : Math.abs(gap(r.claudeVision(), r.psa()))),
-                mean(returned, r -> share(gap(r.cardGrade(), r.psa()), g -> Math.abs(g) <= 1)),
-                mean(returned, r -> share(gap(r.claudeVision(), r.psa()), g -> Math.abs(g) <= 1)),
-                mean(returned, r -> share(gap(r.cardGrade(), r.psa()), g -> g > 0)),
-                mean(returned, r -> share(gap(r.claudeVision(), r.psa()), g -> g > 0)),
+        List<Row> scored = returned.stream()
+                .filter(r -> gap(r.cardGrade(), r.psa()) != null && gap(r.claudeVision(), r.psa()) != null).toList();
+        return new Report(rows.size(), returned.size(), scored.size(),
+                mean(scored, r -> gap(r.cardGrade(), r.psa()) == null ? null : Math.abs(gap(r.cardGrade(), r.psa()))),
+                mean(scored, r -> gap(r.claudeVision(), r.psa()) == null ? null : Math.abs(gap(r.claudeVision(), r.psa()))),
+                mean(scored, r -> share(gap(r.cardGrade(), r.psa()), g -> Math.abs(g) <= 1)),
+                mean(scored, r -> share(gap(r.claudeVision(), r.psa()), g -> Math.abs(g) <= 1)),
+                mean(scored, r -> share(gap(r.cardGrade(), r.psa()), g -> g > 0)),
+                mean(scored, r -> share(gap(r.claudeVision(), r.psa()), g -> g > 0)),
                 rows);
     }
 

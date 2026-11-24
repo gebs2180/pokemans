@@ -4,7 +4,11 @@
 
 ## What it does
 
-After CardGrade answers for a card, the worker queues a `claude-vision` request on the same photos (`ConditionService.queueShadow`). It never runs on its own and never runs before CardGrade. The provider is `ClaudeVisionPreGradeProvider`.
+After CardGrade answers for a card, the worker queues a `claude-vision` request on the same photos (`ConditionService.queueShadow`). It never runs on its own and never runs before CardGrade. Each request is a paid batch, so:
+
+- Nothing is queued when claude-vision already has an answer on those photos, so "Ask again" on unchanged photos costs nothing more. A failed attempt is tried once more on "Ask again".
+- Only one claude-vision request is open per card. If the photos are retaken meanwhile, CardGrade's newest photos are queued when the open request ends. Photos it already tried, whether it answered or not, aren't queued again then, so a failing provider doesn't loop.
+- A submit that may have reached the API (a timeout or a 5xx) is refused, not retried, because the Batches API has no idempotency key and a retry could pay for a second batch. The provider is `ClaudeVisionPreGradeProvider`.
 
 1. **Views** (`ClaudeVisionViews`). Each side is straightened from intake's card outline onto a 63 × 88 mm canvas at 32 px/mm, with 3 mm of background past the edge so the true edge is always in the picture. Nine pictures go per side: the whole card, then four corner close-ups (14 mm square), then four edge strips (7 mm deep), each after a text label such as "Back — top edge". That makes 18 pictures for a card with both sides. If no outline is found, the whole photo goes instead and the details say so.
 2. **Rubric** (`ClaudeVisionRubric`, version `rubric-1`). The system prompt is fixed. It paraphrases PSA's 1–10 definitions and says:
@@ -17,7 +21,7 @@ After CardGrade answers for a card, the worker queues a `claude-vision` request 
    - The notes for each sub-grade name the visible defects and where they are.
 
    The answer is structured JSON (`output_config.format`, a JSON schema): each sub-grade's grade and notes, the overall grade, the limiting factor and the hidden areas. The model is never asked about centering.
-3. **Sampling.** The same request is sent `CLAUDE_VISION_SAMPLES` times (default 3) in one Message Batches API call, using Opus 5.5 at high effort. Batches cost half price and usually answer in minutes, always within the hour. The pictures carry a cache breakpoint, so later samples can read them from cache.
+3. **Sampling.** The same request is sent `CLAUDE_VISION_SAMPLES` times (default 3) in one Message Batches API call, using Opus 5.5 at high effort. Batches cost half price and usually answer in minutes, but the API allows up to 24 hours. The worker looks once a minute, and gives up on a shadow request after twice `maxPending` plus an hour (49 hours by default), because a submit deferred while the API was busy can start up to `maxPending` after the request was made. The pictures carry a cache breakpoint, so later samples can read them from cache.
 4. **Aggregation.** Grades are always rounded down to the half point.
    - **Sub-grades:** each is the median across the usable samples. With an even count, the lower of the middle two is taken, never interpolated.
    - **Overall:** the lowest of the model's median overall, the weakest median sub-grade, and our own centering cap.
@@ -88,7 +92,7 @@ It prints the reading and the usage, and writes the raw answer to `backend/build
 - CardGrade's latest answer on **the same photos**;
 - the card's latest PSA grade, when one is back. A buyer's grade that was later corrected or withdrawn is left out, as in the calibration report.
 
-The summary over cards with a PSA grade gives, for each provider:
+The summary scores both providers on the same cards: those with a PSA grade that both answered (`scored`; `withPsa` counts every card with a PSA grade). For each provider it gives:
 
 - the mean absolute gap from PSA;
 - the share within ±1 grade (the methodology's target is ≥ 80%);
@@ -98,7 +102,7 @@ The prediction compared is the provider's PSA grade, falling back to its overall
 
 How to read it once grades come back:
 
-- Look at `withPsa` first: a handful of cards says little. The validation plan wants 1,000+ partner cards plus the 20–30-card controlled PSA set.
+- Look at `scored` first: a handful of cards says little. The validation plan wants 1,000+ partner cards plus the 20–30-card controlled PSA set.
 - Check each provider's "above PSA" share against the stressed-median target (below it < 5%) before its ±1 share. A provider that is close on average but often above PSA is the worse one for us.
 - Read the notes where the two disagree. They should name the defect PSA marked down for, such as back-edge whitening or a holo scratch. If they don't, the model didn't see it.
 - Don't compare rows across rubric versions (`model_version`). A changed prompt is a new provider for this purpose.
