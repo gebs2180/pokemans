@@ -54,3 +54,10 @@
 		}
 	}
 }
+
+# The bare domain and www send visitors to the beta until the product site exists (docs/hosting.md, step 3).
+# 302, not 301: browsers keep a 301 for good, and rawmark.app is kept for the product site.
+# Caddy gets these certificates once their A records point here; until then it retries and logs, harmlessly.
+rawmark.app, www.rawmark.app {
+	redir https://beta.rawmark.app{uri} 302
+}

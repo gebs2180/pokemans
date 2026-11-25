@@ -83,6 +83,7 @@ You need about an hour, a personal card, and an SSH key (`ssh-keygen -t ed25519`
 3. Pick the site address. The product is called Rawmark, and Zach bought `rawmark.app` on 2026-10-25. The beta site is `https://beta.rawmark.app` (live since 2026-10-28); the bare `rawmark.app` is kept for the product site. For a new server:
    - add an A record for `beta` (for `beta.rawmark.app`) → the server's IPv4, at the registrar or wherever the domain's DNS is hosted;
    - set `SITE_ADDRESS` in `.env` (step 5) to that host name, without `https://`. `.app` domains only work over HTTPS, which Caddy provides.
+   - for `rawmark.app` and `www.rawmark.app`, add A records → the same IPv4. The Caddyfile redirects both to `https://beta.rawmark.app` with a 302 until the product site exists. Leave the MX and SPF records alone;
    - Before DNS is ready you can test on `<ip-with-dashes>.sslip.io` (e.g. `203-0-113-7.sslip.io`), which resolves to that IP and gets a certificate too.
 4. SSH in and set up the box:
    ```bash
