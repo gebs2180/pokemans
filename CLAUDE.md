@@ -15,6 +15,7 @@ Collateral reports for raw-heavy Pokémon card collections: what a collection re
 - Before starting side sessions, check the 5-hour meter. Above 50%, start one. Run at most two heavy writers, and name the shared files and merge order in each brief.
 - Pick the model when a session starts, because switching later rebuilds the cache. Sonnet for recipe work; Opus for valuation math, money, auth and audits.
 - Review before every commit (Zach, 2026-11-24). A session that changes code runs `/code-review` on its diff before committing: `medium` by default, `high` for valuation math, money, auth and offers. Fix confirmed findings first. In the PR description, list any finding that wasn't fixed and why. Docs-only changes skip the review.
+- Paste the "Known pitfalls" section of [docs/known-pitfalls.md](docs/known-pitfalls.md) into every session brief (Zach, 2026-11-26). A session that hits a new pitfall adds it in the PR that fixes it.
 - A new decision goes into the methodology doc (ask Zach first), with its attribution and date. Keep "defaults to confirm" labels until Zach confirms them. Don't put rule text back into this file.
 
 ## Compact instructions
