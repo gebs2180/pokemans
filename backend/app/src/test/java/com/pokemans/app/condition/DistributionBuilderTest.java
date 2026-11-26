@@ -22,7 +22,7 @@ class DistributionBuilderTest {
                 new ConditionProperties.Worker(false, Duration.ofSeconds(15), 8, Duration.ofHours(24), Duration.ofMinutes(10), 10,
                         Duration.ofDays(7), Duration.ofMinutes(2)),
                 new ConditionProperties.CardGrade(false, null, null, "PSA", Duration.ofSeconds(30), 10, 50, Duration.ofHours(1)),
-                new ConditionProperties.Centering(false, 1.0));
+                new ConditionProperties.Centering(false, 1.0), null);
     }
 
     /**
@@ -203,11 +203,11 @@ class DistributionBuilderTest {
     void theTightSpreadNeverPutsMoreAboveTheGradeThanTheDefault() {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ConditionProperties(null,
                         Map.of(1, new BigDecimal("0.20"), 0, new BigDecimal("0.80")), null, 1.5, new BigDecimal("0.10"),
-                        new BigDecimal("0.25"), BigDecimal.ONE, BigDecimal.ZERO, null, null, null))
+                        new BigDecimal("0.25"), BigDecimal.ONE, BigDecimal.ZERO, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ConditionProperties(null,
                         Map.of(1, new BigDecimal("0.10"), 0, new BigDecimal("0.80")), null, 1.5, new BigDecimal("0.10"),
-                        new BigDecimal("0.25"), BigDecimal.ONE, BigDecimal.ZERO, null, null, null))
+                        new BigDecimal("0.25"), BigDecimal.ONE, BigDecimal.ZERO, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

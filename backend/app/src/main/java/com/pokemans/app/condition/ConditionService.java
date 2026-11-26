@@ -36,6 +36,8 @@ class ConditionService {
 
     private final ConditionProperties properties;
     private final List<String> enabledProviders;
+    /** Shadow providers that are switched on (ProviderPrediction#SHADOW): asked after CardGrade answers, never in enabledProviders. */
+    private final List<String> shadowProviders;
     private final PredictionRequestRepository requests;
     private final ProviderPredictionRepository predictions;
     private final ConditionAssessmentRepository assessments;
@@ -53,7 +55,9 @@ class ConditionService {
                      ConditionAssessmentRepository assessments, CardItems cardItems, Catalog catalog, CurrentUser currentUser,
                      ConditionProperties properties, ApplicationEventPublisher events) {
         this.properties = properties;
-        this.enabledProviders = providers.stream().map(PreGradeProvider::name).sorted().toList();
+        this.enabledProviders = providers.stream().map(PreGradeProvider::name).filter(name -> !ProviderPrediction.SHADOW.contains(name))
+                .sorted().toList();
+        this.shadowProviders = providers.stream().map(PreGradeProvider::name).filter(ProviderPrediction.SHADOW::contains).sorted().toList();
         this.requests = requests;
         this.predictions = predictions;
         this.assessments = assessments;
@@ -130,6 +134,58 @@ class ConditionService {
             events.publishEvent(new PredictionsQueued(card.id()));
         }
         return created;
+    }
+
+    /**
+     * Queues each shadow provider on the photos of CardGrade's newest answer, when it hasn't graded them.
+     * Runs after any CardGrade answer and after any shadow request ends, so a retake that CardGrade
+     * answered while a shadow request was still open (one open request per card and provider) is picked
+     * up once that request ends.
+     *
+     * <p>Skipped for a provider when it already has a request open for the card, or a stored answer on
+     * those photos. After CardGrade answers ("Ask again" included), a failed shadow attempt on the same
+     * photos is tried once more; after a shadow request ends, any earlier request on those photos counts,
+     * so a failing provider isn't re-queued in a loop. Each request is a paid batch.
+     *
+     * <p>Shadow answers are stored only (ProviderPrediction#SHADOW), so this never holds up or changes
+     * the card. Its own transaction: the worker logs a failure here and the card carries on.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    void queueShadow(PredictionRequest finished) {
+        if (shadowProviders.isEmpty()) {
+            return;
+        }
+        boolean afterShadow = shadowProviders.contains(finished.getProvider());
+        boolean afterCardGrade = CardGradePreGradeProvider.NAME.equals(finished.getProvider())
+                && finished.getStatus() == PredictionRequest.Status.DONE;
+        if (!afterShadow && !afterCardGrade) {
+            return;
+        }
+        List<PredictionRequest> history = requests.findByCardItemIdOrderByCreatedAtDesc(finished.getCardItemId());
+        // CardGrade's newest answer, whichever request just ended: an older one ending late isn't the photos in use.
+        Optional<PredictionRequest> cardGrade = history.stream()
+                .filter(r -> CardGradePreGradeProvider.NAME.equals(r.getProvider()) && r.getStatus() == PredictionRequest.Status.DONE)
+                .findFirst();
+        if (cardGrade.isEmpty()) {
+            return;
+        }
+        List<UUID> photoIds = cardGrade.get().getPhotoIds();
+        List<ProviderPrediction> answers = predictions.findByCardItemIdOrderByCreatedAtDesc(finished.getCardItemId());
+        boolean queued = false;
+        for (String provider : shadowProviders) {
+            boolean open = history.stream().anyMatch(r -> r.isOpen() && provider.equals(r.getProvider()));
+            boolean answered = answers.stream().anyMatch(p -> p.isSucceeded() && provider.equals(p.getProvider())
+                    && photoIds.equals(p.getPhotoIds()));
+            boolean tried = afterShadow && history.stream().anyMatch(r -> provider.equals(r.getProvider())
+                    && photoIds.equals(r.getPhotoIds()));
+            if (!open && !answered && !tried) {
+                requests.saveAndFlush(new PredictionRequest(finished.getOrgId(), finished.getCardItemId(), provider, photoIds, null));
+                queued = true;
+            }
+        }
+        if (queued) {
+            events.publishEvent(new PredictionsQueued(finished.getCardItemId()));
+        }
     }
 
     /**

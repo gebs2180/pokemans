@@ -111,6 +111,12 @@ pokemans:
       # distribution at the best grade PSA's centering table allows. Off until checked against
       # returned grades.
       enabled: ${CENTERING_ENABLED:false}
+    claude-vision:
+      # Shadow only (docs/claude-vision-shadow.md): Claude grades each card after CardGrade answers.
+      # Stored for comparison with PSA returns; never feeds the distribution, prices or offers.
+      enabled: ${CLAUDE_VISION_ENABLED:false}
+      api-key: ${CLAUDE_VISION_API_KEY:${ANTHROPIC_API_KEY:}}
+      samples: ${CLAUDE_VISION_SAMPLES:3}
   pricing:
     # Each grading company's comps price that company's grades separately; there is no bulk floor.
     currency: USD

@@ -104,6 +104,17 @@ class ConditionRebuildTest {
     }
 
     @Test
+    void theClaudeVisionShadowNeverReachesTheDistribution() {
+        ProviderPrediction shadow = graded(ClaudeVisionPreGradeProvider.NAME, 3.0, null);
+        ConditionAssessment without = rebuild(measured(9), graded("A", 9.0, null)).orElseThrow();
+        ConditionAssessment with = rebuild(shadow, measured(9), graded("A", 9.0, null)).orElseThrow();
+
+        assertThat(with.getDistribution()).isEqualTo(without.getDistribution());
+        assertThat(with.getConfidence()).isEqualTo(without.getConfidence());
+        assertThat(ProviderPrediction.latestSucceeded(List.of(shadow))).isEmpty();
+    }
+
+    @Test
     void aLaterRefusalKeepsTheOlderCap() {
         ConditionAssessment built = rebuild(refused(), measured(7), graded("A", 9.0, null)).orElseThrow();
 

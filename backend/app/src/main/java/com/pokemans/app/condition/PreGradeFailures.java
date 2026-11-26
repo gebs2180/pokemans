@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>A card counts when the latest request to a pre-grade provider on the photos in use FAILED and it has no
  * assessment that counts. A newer request (queued, running or done), a reviewer's assessment, or a retake
- * of either photo takes it off. Our own centering measurement isn't a pre-grade: its failures don't count.
+ * of either photo takes it off. Our own centering measurement isn't a pre-grade and shadow providers don't grade the card: their failures don't count.
  */
 @Service
 public class PreGradeFailures {
@@ -74,6 +74,7 @@ public class PreGradeFailures {
                 .filter(a -> !assessments.needsAssessingAgain(a)).forEach(a -> assessed.add(a.getCardItemId()));
         Map<UUID, List<PredictionRequest>> byCard = requests.findByCardItemIdIn(cardIds).stream()
                 .filter(r -> !CenteringPreGradeProvider.NAME.equals(r.getProvider()))
+                .filter(r -> !ProviderPrediction.SHADOW.contains(r.getProvider()))
                 .collect(Collectors.groupingBy(PredictionRequest::getCardItemId));
         Map<UUID, PredictionRequest> failed = new java.util.HashMap<>();
         byCard.forEach((cardId, all) -> {

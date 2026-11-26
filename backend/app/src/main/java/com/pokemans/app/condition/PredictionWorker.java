@@ -166,8 +166,12 @@ class PredictionWorker {
             Outcome outcome = call(request); // no transaction open: provider calls can take many seconds
             PredictionRequest finished = transactions.execute(status -> apply(id, leasedUntil, outcome));
             if (finished != null) {
-                // Its own transaction: a failed rebuild must not roll back the stored prediction.
-                transactions.executeWithoutResult(status -> afterFinished(finished));
+                try {
+                    // Its own transaction: a failed rebuild must not roll back the stored prediction.
+                    transactions.executeWithoutResult(status -> afterFinished(finished));
+                } finally {
+                    queueShadow(finished); // whether or not the rebuild worked
+                }
             }
         } catch (RuntimeException e) {
             log.warn("Prediction request {} failed unexpectedly", id, e);
@@ -239,7 +243,15 @@ class PredictionWorker {
             }
             case Polled polled -> {
                 switch (polled.poll()) {
-                    case PreGradeProvider.Pending pending -> request.stillPending(Duration.ofSeconds(10), properties.worker().maxPending());
+                    case PreGradeProvider.Pending pending -> {
+                        if (ProviderPrediction.SHADOW.contains(request.getProvider())) {
+                            // A batch: submitted within maxPending of the request being made (deferrals give up
+                            // then), it may run 24 hours more. Give it both, and look less often meanwhile.
+                            request.stillPending(Duration.ofMinutes(1), properties.worker().maxPending().multipliedBy(2).plusHours(1));
+                        } else {
+                            request.stillPending(Duration.ofSeconds(10), properties.worker().maxPending());
+                        }
+                    }
                     case PreGradeProvider.Done done -> request.done();
                     case PreGradeProvider.Failed failed -> request.rejected(failed.reason());
                 }
@@ -256,10 +268,27 @@ class PredictionWorker {
         return request.isOpen() ? null : request;
     }
 
+    /**
+     * A shadow provider's answer changes nothing about the card. Anything else may rebuild it once no
+     * other request is open (shadow requests aren't waited for), then queues the shadow providers.
+     */
     private void afterFinished(PredictionRequest request) {
+        if (ProviderPrediction.SHADOW.contains(request.getProvider())) {
+            return;
+        }
         condition.measureRetakeMissedBy(request);
-        if (requests.findByCardItemIdOrderByCreatedAtDesc(request.getCardItemId()).stream().noneMatch(PredictionRequest::isOpen)) {
+        if (requests.findByCardItemIdOrderByCreatedAtDesc(request.getCardItemId()).stream()
+                .noneMatch(r -> r.isOpen() && !ProviderPrediction.SHADOW.contains(r.getProvider()))) {
             condition.rebuildSystemAssessment(request.getCardItemId());
+        }
+    }
+
+    /** Its own transaction, outside the rebuild's; a failure is logged and the card carries on. */
+    private void queueShadow(PredictionRequest finished) {
+        try {
+            condition.queueShadow(finished);
+        } catch (RuntimeException e) {
+            log.warn("Couldn't queue the shadow providers for card {}; the card is unaffected", finished.getCardItemId(), e);
         }
     }
 

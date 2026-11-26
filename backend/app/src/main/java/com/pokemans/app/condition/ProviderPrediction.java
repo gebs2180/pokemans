@@ -97,10 +97,18 @@ class ProviderPrediction extends AssignedIdEntity<UUID> {
      */
     static final java.util.Set<String> RETIRED = java.util.Set.of("XIMILAR");
 
-    /** Each provider's newest successful answer, from predictions newest first, leaving out retired providers. */
+    /**
+     * Providers in shadow: asked and stored for comparison with the others and with returned grades, but
+     * never read for a distribution, a price, an offer or the seller's view. Moving one out is Zach's
+     * methodology decision (docs/claude-vision-shadow.md).
+     */
+    static final java.util.Set<String> SHADOW = java.util.Set.of(ClaudeVisionPreGradeProvider.NAME);
+
+    /** Each provider's newest successful answer, from predictions newest first, leaving out retired and shadow providers. */
     static Map<String, ProviderPrediction> latestSucceeded(List<ProviderPrediction> newestFirst) {
         Map<String, ProviderPrediction> latest = new LinkedHashMap<>();
         newestFirst.stream().filter(ProviderPrediction::isSucceeded).filter(p -> !RETIRED.contains(p.provider))
+                .filter(p -> !SHADOW.contains(p.provider))
                 .forEach(p -> latest.putIfAbsent(p.provider, p));
         return latest;
     }
